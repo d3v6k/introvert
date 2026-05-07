@@ -1,0 +1,406 @@
+import 'dart:async';
+import 'dart:ffi';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:ffi/ffi.dart';
+
+// --- Native C Signatures & Dart Mapping ---
+
+// Error handling & Binary transfer structure
+final class FfiResult extends Struct {
+  @Int32()
+  external int code;
+  external Pointer<Uint8> data;
+  @Size()
+  external int len;
+}
+
+// Network Signaling Callback: extern "C" fn(event_type: i32, data_ptr: *const u8, data_len: usize)
+typedef NativeNetworkCallback = Void Function(Int32 eventType, Pointer<Uint8> dataPtr, Size dataLen);
+
+// Async Callback for generic operations
+typedef NativeFfiCallback = Void Function(FfiResult result);
+
+// Callback for reward claiming
+typedef NativeRewardCallback = Void Function(Int32 status, Pointer<Utf8> txSignature);
+
+// Function typedefs for lookup
+typedef IntrovertEngineStartC = FfiResult Function(Pointer<Uint8> seed, Pointer<Utf8> dbPath);
+typedef IntrovertEngineStartDart = FfiResult Function(Pointer<Uint8> seed, Pointer<Utf8> dbPath);
+
+typedef IntrovertNetworkStartC = FfiResult Function(Pointer<NativeFunction<NativeNetworkCallback>> callback);
+typedef IntrovertNetworkStartDart = FfiResult Function(Pointer<NativeFunction<NativeNetworkCallback>> callback);
+
+typedef IntrovertNetworkSendMessageC = FfiResult Function(
+  Pointer<Utf8> peerId, 
+  Pointer<Utf8> msg, 
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+typedef IntrovertNetworkSendMessageDart = FfiResult Function(
+  Pointer<Utf8> peerId, 
+  Pointer<Utf8> msg, 
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+
+typedef IntrovertNetworkInitiateWebRtcC = FfiResult Function(
+  Pointer<Utf8> peerId, 
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+typedef IntrovertNetworkInitiateWebRtcDart = FfiResult Function(
+  Pointer<Utf8> peerId, 
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+
+typedef IntrovertNetworkAddAddressC = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> address);
+typedef IntrovertNetworkAddAddressDart = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> address);
+
+typedef IntrovertClaimRewardsAsyncC = FfiResult Function(Pointer<NativeFunction<NativeRewardCallback>> callback);
+typedef IntrovertClaimRewardsAsyncDart = FfiResult Function(Pointer<NativeFunction<NativeRewardCallback>> callback);
+
+typedef IntrovertStoreMessageAsyncC = FfiResult Function(
+  Pointer<Utf8> peerId, 
+  Pointer<Utf8> msg, 
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+typedef IntrovertStoreMessageAsyncDart = FfiResult Function(
+  Pointer<Utf8> peerId, 
+  Pointer<Utf8> msg, 
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+
+typedef IntrovertGetPeerIdC = Pointer<Utf8> Function();
+typedef IntrovertGetPeerIdDart = Pointer<Utf8> Function();
+
+typedef IntrovertEngineStopC = FfiResult Function();
+typedef IntrovertEngineStopDart = FfiResult Function();
+
+typedef IntrovertFreeStringC = Void Function(Pointer<Utf8> s);
+typedef IntrovertFreeStringDart = void Function(Pointer<Utf8> s);
+
+typedef IntrovertFreeBinaryC = Void Function(Pointer<Uint8> ptr, Size len);
+typedef IntrovertFreeBinaryDart = void Function(Pointer<Uint8> ptr, int len);
+
+typedef IntrovertWebRtcCloseC = FfiResult Function(Pointer<Utf8> peerId);
+typedef IntrovertWebRtcCloseDart = FfiResult Function(Pointer<Utf8> peerId);
+
+typedef IntrovertWebRtcRenegotiateC = FfiResult Function(
+  Pointer<Utf8> peerId,
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+typedef IntrovertWebRtcRenegotiateDart = FfiResult Function(
+  Pointer<Utf8> peerId,
+  Pointer<NativeFunction<NativeFfiCallback>> callback
+);
+
+// BIP-39 Identity Bindings
+typedef IntrovertGenerateMnemonicC = Pointer<Utf8> Function();
+typedef IntrovertGenerateMnemonicDart = Pointer<Utf8> Function();
+
+typedef IntrovertMnemonicToSeedC = FfiResult Function(Pointer<Utf8> mnemonic);
+typedef IntrovertMnemonicToSeedDart = FfiResult Function(Pointer<Utf8> mnemonic);
+
+class IntrovertClient {
+  static final IntrovertClient _instance = IntrovertClient._internal();
+  factory IntrovertClient() => _instance;
+
+  late DynamicLibrary _dylib;
+  late IntrovertEngineStartDart _engineStart;
+  late IntrovertNetworkStartDart _networkStart;
+  late IntrovertNetworkSendMessageDart _networkSendMessage;
+  late IntrovertNetworkInitiateWebRtcDart _networkInitiateWebRtc;
+  late IntrovertNetworkAddAddressDart _addAddress;
+  late IntrovertClaimRewardsAsyncDart _claimRewardsAsync;
+  late IntrovertStoreMessageAsyncDart _storeMessageAsync;
+  late IntrovertGetPeerIdDart _getPeerId;
+  late IntrovertEngineStopDart _engineStop;
+  late IntrovertFreeStringDart _freeString;
+  late IntrovertFreeBinaryDart _freeBinary;
+  late IntrovertWebRtcCloseDart _closeWebRtc;
+  late IntrovertWebRtcRenegotiateDart _renegotiateWebRtc;
+  late IntrovertGenerateMnemonicDart _generateMnemonic;
+  late IntrovertMnemonicToSeedDart _mnemonicToSeed;
+
+  NativeCallable<NativeNetworkCallback>? _networkCallable;
+
+  IntrovertClient._internal() {
+    _loadLibrary();
+    _bindFunctions();
+  }
+
+  void _loadLibrary() {
+    if (Platform.isAndroid || Platform.isLinux) {
+      _dylib = DynamicLibrary.open('libintrovert.so');
+    } else if (Platform.isIOS || Platform.isMacOS) {
+      _dylib = DynamicLibrary.process();
+    } else {
+      throw UnsupportedError('Unsupported operating system platform.');
+    }
+  }
+
+  void _bindFunctions() {
+    _engineStart = _dylib.lookupFunction<IntrovertEngineStartC, IntrovertEngineStartDart>('introvert_engine_start');
+    _networkStart = _dylib.lookupFunction<IntrovertNetworkStartC, IntrovertNetworkStartDart>('introvert_network_start');
+    _networkSendMessage = _dylib.lookupFunction<IntrovertNetworkSendMessageC, IntrovertNetworkSendMessageDart>('introvert_network_send_message');
+    _networkInitiateWebRtc = _dylib.lookupFunction<IntrovertNetworkInitiateWebRtcC, IntrovertNetworkInitiateWebRtcDart>('introvert_network_initiate_webrtc');
+    _addAddress = _dylib.lookupFunction<IntrovertNetworkAddAddressC, IntrovertNetworkAddAddressDart>('introvert_network_add_address');
+    _claimRewardsAsync = _dylib.lookupFunction<IntrovertClaimRewardsAsyncC, IntrovertClaimRewardsAsyncDart>('introvert_claim_rewards_async');
+    _storeMessageAsync = _dylib.lookupFunction<IntrovertStoreMessageAsyncC, IntrovertStoreMessageAsyncDart>('introvert_store_message_async');
+    _getPeerId = _dylib.lookupFunction<IntrovertGetPeerIdC, IntrovertGetPeerIdDart>('introvert_get_peer_id');
+    _engineStop = _dylib.lookupFunction<IntrovertEngineStopC, IntrovertEngineStopDart>('introvert_engine_stop');
+    _freeString = _dylib.lookupFunction<IntrovertFreeStringC, IntrovertFreeStringDart>('introvert_free_string');
+    _freeBinary = _dylib.lookupFunction<IntrovertFreeBinaryC, IntrovertFreeBinaryDart>('introvert_free_binary');
+    _closeWebRtc = _dylib.lookupFunction<IntrovertWebRtcCloseC, IntrovertWebRtcCloseDart>('introvert_webrtc_close_connection');
+    _renegotiateWebRtc = _dylib.lookupFunction<IntrovertWebRtcRenegotiateC, IntrovertWebRtcRenegotiateDart>('introvert_webrtc_renegotiate');
+    _generateMnemonic = _dylib.lookupFunction<IntrovertGenerateMnemonicC, IntrovertGenerateMnemonicDart>('introvert_generate_mnemonic');
+    _mnemonicToSeed = _dylib.lookupFunction<IntrovertMnemonicToSeedC, IntrovertMnemonicToSeedDart>('introvert_mnemonic_to_seed');
+  }
+
+  void _handleFfiResult(FfiResult result, {String context = "Rust Core"}) {
+    if (result.code != 0) {
+      final msg = result.data.address != 0 ? result.data.cast<Utf8>().toDartString() : "Unknown error";
+      if (result.data.address != 0) _freeBinary(result.data, result.len);
+      throw Exception('$context Error (${result.code}): $msg');
+    }
+  }
+
+  /// Generates a new 12-word BIP-39 mnemonic phrase.
+  String generateMnemonic() {
+    final ptr = _generateMnemonic();
+    if (ptr.address == 0) throw Exception("Failed to generate mnemonic");
+    try {
+      return ptr.toDartString();
+    } finally {
+      _freeString(ptr);
+    }
+  }
+
+  /// Converts a mnemonic phrase to a 32-byte seed for the engine.
+  Uint8List mnemonicToSeed(String phrase) {
+    late Uint8List seed;
+    using((Arena arena) {
+      final phrasePtr = phrase.toNativeUtf8(allocator: arena);
+      final res = _mnemonicToSeed(phrasePtr);
+      
+      if (res.code == 0) {
+        if (res.data.address == 0 || res.len != 32) {
+          throw Exception("Invalid seed returned from core");
+        }
+        final data = res.data.asTypedList(res.len);
+        seed = Uint8List.fromList(data);
+        _freeBinary(res.data, res.len);
+      } else {
+        _handleFfiResult(res, context: "Mnemonic to Seed");
+        throw Exception("Identity derivation failed"); // Should not reach here
+      }
+    });
+    return seed;
+  }
+
+  /// Starts the Rust core engine and SQLCipher storage using the provided 32-byte seed.
+  FfiResult startEngine(Uint8List seed, String dbPath) {
+    if (seed.length != 32) throw ArgumentError('Seed must be exactly 32 bytes.');
+
+    using((Arena arena) {
+      final seedPtr = arena<Uint8>(32);
+      for (var i = 0; i < 32; i++) {
+        seedPtr[i] = seed[i];
+      }
+      final dbPathPtr = dbPath.toNativeUtf8(allocator: arena);
+      final res = _engineStart(seedPtr, dbPathPtr);
+      _handleFfiResult(res, context: "Engine Start");
+      return res;
+    });
+    return FfiResult(); // Success (dummy return, exception thrown on error)
+  }
+
+  void startNetwork(void Function(int eventType, Uint8List data) onNetworkEvent) {
+    _networkCallable?.close();
+
+    _networkCallable = NativeCallable<NativeNetworkCallback>.listener((int eventType, Pointer<Uint8> dataPtr, int dataLen) {
+      if (dataPtr.address == 0) return;
+
+      try {
+        // Copy binary data into Dart-managed memory immediately to prevent use-after-free
+        final data = dataPtr.asTypedList(dataLen);
+        final copiedData = Uint8List.fromList(data);
+        
+        onNetworkEvent(eventType, copiedData);
+      } finally {
+        // Explicitly reclaim leaked Rust memory
+        _freeBinary(dataPtr, dataLen);
+      }
+    });
+
+    final res = _networkStart(_networkCallable!.nativeFunction);
+    _handleFfiResult(res, context: "Network Start");
+  }
+
+  Future<void> sendMessage(String peerId, String message) async {
+    final completer = Completer<void>();
+
+    late NativeCallable<NativeFfiCallback> callback;
+    callback = NativeCallable<NativeFfiCallback>.listener((FfiResult result) {
+      try {
+        if (result.code == 0) {
+          completer.complete();
+        } else {
+          final msg = result.data.address != 0 ? result.data.cast<Utf8>().toDartString() : "Unknown error";
+          completer.completeError(Exception('Send Message Error (${result.code}): $msg'));
+        }
+      } finally {
+        if (result.data.address != 0) _freeBinary(result.data, result.len);
+        callback.close();
+      }
+    });
+
+    using((Arena arena) {
+      final peerIdPtr = peerId.toNativeUtf8(allocator: arena);
+      final messagePtr = message.toNativeUtf8(allocator: arena);
+      final res = _networkSendMessage(peerIdPtr, messagePtr, callback.nativeFunction);
+      _handleFfiResult(res, context: "Send Message Dispatch");
+    });
+
+    return completer.future;
+  }
+
+  Future<void> initiateWebRtc(String peerId) async {
+    final completer = Completer<void>();
+
+    late NativeCallable<NativeFfiCallback> callback;
+    callback = NativeCallable<NativeFfiCallback>.listener((FfiResult result) {
+      try {
+        if (result.code == 0) {
+          completer.complete();
+        } else {
+          final msg = result.data.address != 0 ? result.data.cast<Utf8>().toDartString() : "Unknown error";
+          completer.completeError(Exception('WebRTC Initiation Error (${result.code}): $msg'));
+        }
+      } finally {
+        if (result.data.address != 0) _freeBinary(result.data, result.len);
+        callback.close();
+      }
+    });
+
+    using((Arena arena) {
+      final peerIdPtr = peerId.toNativeUtf8(allocator: arena);
+      final res = _networkInitiateWebRtc(peerIdPtr, callback.nativeFunction);
+      _handleFfiResult(res, context: "WebRTC Initiation Dispatch");
+    });
+
+    return completer.future;
+  }
+
+  void addAddress(String peerId, String address) {
+    using((Arena arena) {
+      final peerIdPtr = peerId.toNativeUtf8(allocator: arena);
+      final addressPtr = address.toNativeUtf8(allocator: arena);
+      final res = _addAddress(peerIdPtr, addressPtr);
+      _handleFfiResult(res, context: "Add Address");
+    });
+  }
+
+  Future<String> claimRewards() async {
+    final completer = Completer<String>();
+
+    late NativeCallable<NativeRewardCallback> callback;
+    callback = NativeCallable<NativeRewardCallback>.listener((int status, Pointer<Utf8> sigPtr) {
+      try {
+        final sig = sigPtr.address != 0 ? sigPtr.toDartString() : "";
+        if (status == 0) {
+          completer.complete(sig);
+        } else {
+          completer.completeError(Exception('Reward Claim Error ($status): $sig'));
+        }
+      } finally {
+        if (sigPtr.address != 0) _freeString(sigPtr);
+        callback.close();
+      }
+    });
+
+    final res = _claimRewardsAsync(callback.nativeFunction);
+    _handleFfiResult(res, context: "Reward Claim Dispatch");
+
+    return completer.future;
+  }
+
+  Future<void> storeMessage(String peerId, String message) async {
+    final completer = Completer<void>();
+
+    late NativeCallable<NativeFfiCallback> callback;
+    callback = NativeCallable<NativeFfiCallback>.listener((FfiResult result) {
+      try {
+        if (result.code == 0) {
+          completer.complete();
+        } else {
+          final msg = result.data.address != 0 ? result.data.cast<Utf8>().toDartString() : "Unknown error";
+          completer.completeError(Exception('Storage Error (${result.code}): $msg'));
+        }
+      } finally {
+        if (result.data.address != 0) _freeBinary(result.data, result.len);
+        callback.close();
+      }
+    });
+
+    using((Arena arena) {
+      final peerIdPtr = peerId.toNativeUtf8(allocator: arena);
+      final messagePtr = message.toNativeUtf8(allocator: arena);
+      final res = _storeMessageAsync(peerIdPtr, messagePtr, callback.nativeFunction);
+      _handleFfiResult(res, context: "Storage Dispatch");
+    });
+
+    return completer.future;
+  }
+
+  String? getPeerId() {
+    final rawPtr = _getPeerId();
+    if (rawPtr.address == 0) return null;
+
+    try {
+      return rawPtr.toDartString();
+    } finally {
+      _freeString(rawPtr);
+    }
+  }
+
+  void stopEngine() {
+    _networkCallable?.close();
+    _networkCallable = null;
+    final res = _engineStop();
+    _handleFfiResult(res, context: "Engine Stop");
+  }
+
+  void closeWebRtcSession(String peerId) {
+    using((Arena arena) {
+      final peerIdPtr = peerId.toNativeUtf8(allocator: arena);
+      final res = _closeWebRtc(peerIdPtr);
+      _handleFfiResult(res, context: "Close WebRTC");
+    });
+  }
+
+  Future<void> renegotiateWebRtcSession(String peerId) async {
+    final completer = Completer<void>();
+
+    late NativeCallable<NativeFfiCallback> callback;
+    callback = NativeCallable<NativeFfiCallback>.listener((FfiResult result) {
+      try {
+        if (result.code == 0) {
+          completer.complete();
+        } else {
+          final msg = result.data.address != 0 ? result.data.cast<Utf8>().toDartString() : "Unknown error";
+          completer.completeError(Exception('Renegotiation Error (${result.code}): $msg'));
+        }
+      } finally {
+        if (result.data.address != 0) _freeBinary(result.data, result.len);
+        callback.close();
+      }
+    });
+
+    using((Arena arena) {
+      final peerIdPtr = peerId.toNativeUtf8(allocator: arena);
+      final res = _renegotiateWebRtc(peerIdPtr, callback.nativeFunction);
+      _handleFfiResult(res, context: "Renegotiation Dispatch");
+    });
+
+    return completer.future;
+  }
+}

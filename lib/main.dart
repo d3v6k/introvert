@@ -1,0 +1,156 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'src/native/introvert_client.dart';
+import 'src/native/identity_manager.dart';
+import 'src/ui/main_shell.dart';
+import 'src/ui/onboarding_screen.dart';
+import 'src/repository/sync_repository.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final client = IntrovertClient();
+  final idManager = IdentityManager();
+  final syncRepository = SyncRepository();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SyncStateNotifier(syncRepository)),
+        Provider<IntrovertClient>.value(value: client),
+        Provider<IdentityManager>.value(value: idManager),
+      ],
+      child: const IntrovertApp(),
+    ),
+  );
+}
+
+class IntrovertApp extends StatefulWidget {
+  const IntrovertApp({super.key});
+
+  @override
+  State<IntrovertApp> createState() => _IntrovertAppState();
+}
+
+class _IntrovertAppState extends State<IntrovertApp> {
+  bool _isLoading = true;
+  bool _showOnboarding = false;
+  String? _dbPath;
+  final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    debugPrint("⏳ Starting sovereign initialization sequence...");
+    final idManager = IdentityManager();
+    final client = IntrovertClient();
+    
+    try {
+      if (Platform.isAndroid) {
+        // More resilient pathing for Android scoped storage
+        _dbPath = "/data/user/0/com.example.introvert_tests/files/introvert.db";
+        debugPrint("📍 Target DB Path (Android): $_dbPath");
+        final dir = Directory("/data/user/0/com.example.introvert_tests/files");
+        if (!await dir.exists()) {
+          debugPrint("📁 Creating storage directory...");
+          await dir.create(recursive: true);
+        }
+      } else if (Platform.isLinux) {
+        final home = Platform.environment['HOME'] ?? ".";
+        final dir = Directory("$home/.introvert");
+        await dir.create(recursive: true);
+        _dbPath = "${dir.path}/introvert.db";
+        debugPrint("📍 Target DB Path (Linux): $_dbPath");
+      } else {
+        _dbPath = "./introvert.db";
+      }
+      
+      debugPrint("🔑 Checking for existing identity...");
+      final existingSeed = await idManager.getSeed();
+      
+      if (existingSeed != null) {
+        debugPrint("🧠 Identity found. Starting native engine...");
+        // Non-blocking delay to allow UI to breathe
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        client.startEngine(existingSeed, _dbPath!);
+        debugPrint("📡 Starting networking plane...");
+        client.startNetwork();
+        debugPrint("🚀 Introvert Engine Started Successfully!");
+      } else {
+        debugPrint("🆕 No identity found. Transitioning to onboarding.");
+        _showOnboarding = true;
+      }
+    } catch (e) {
+      debugPrint("❌ Initialization Error: $e");
+      _showOnboarding = true;
+    } finally {
+      if (mounted) {
+        debugPrint("✅ Initialization complete. Loading UI.");
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _onOnboardingComplete(Uint8List seed) {
+    final client = Provider.of<IntrovertClient>(context, listen: false);
+    
+    try {
+      if (_dbPath == null) throw Exception("Database path not initialized");
+      client.startEngine(seed, _dbPath!);
+      client.startNetwork();
+      setState(() => _showOnboarding = false);
+    } catch (e) {
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text('Engine failed to start: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(color: Color(0xFF00FFFF)),
+          ),
+        ),
+      );
+    }
+
+    return MaterialApp(
+      scaffoldMessengerKey: _messengerKey,
+      title: 'Introvert P2P',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0A0E17),
+        primaryColor: const Color(0xFF00FFFF),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFF00FFFF),
+          surface: Color(0xFF0A0E17),
+          secondary: Color(0xFF00FFFF),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF0A0E17),
+          indicatorColor: const Color(0xFF00FFFF).withValues(alpha: 0.2),
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+      ),
+      home: _showOnboarding 
+          ? OnboardingScreen(onComplete: _onOnboardingComplete, messengerKey: _messengerKey) 
+          : const MainShell(),
+    );
+  }
+}

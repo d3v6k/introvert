@@ -1,0 +1,61 @@
+﻿🛠️ Introvert Master Plan
+Project Vision & Execution Strategy
+🌐 Project Vision
+Introvert is a privacy-centric, serverless, end-to-end communication platform. It utilizes a Hybrid Mesh architecture to ensure resilience and bypass mobile background restrictions while maintaining the highest levels of encryption. The project operates on a circular token economy hosted on the Solana network, where users are incentivized to contribute device resources in exchange for passive income. 
+    • Serverless Mutualism: There are no central servers; the network is maintained by the users for the users. 
+    • Privacy-First: All communication is secured with Noise Protocol and Double Ratchet encryption, ensuring total sovereignty. 
+    • Passive Income Model: Users earn native Introvert Tokens by acting as nodes. While usage carries a nominal cost, contributing to the mesh's health typically results in positive net earnings. 
+    • Node Hierarchy:
+        ◦ Mobile Clients (Ephemeral Nodes): High-efficiency nodes syncing state via CRDTs. 
+        ◦ Desktop Clients (Anchor Nodes): Stable backbone nodes providing routing and zero-knowledge "Store and Forward" (mailbox) services. 
+
+💻 Tech Stack & Environment
+    • Core Engine: Rust (Systems-level performance and safety). 
+    • Networking: libp2p (QUIC, WebRTC, Kademlia DHT) for serverless discovery. 
+    • Identity & Crypto: Ed25519 (Unified Node ID & Solana Wallet), Signal-standard encryption. 
+    • Data Layer: SQLite/SQLCipher, CRDTs, Lamport/Vector Clocks for decentralized consistency. 
+    • Mobile Bridge: Rust C-ABI (FFI) → Capacitor (Mobile Hybrid). 
+    • Blockchain: Solana (Native SPL Token) with a gasless fee-payer model. 
+
+🚀 Modular Execution Strategy
+Phase 1: Core Networking & Identity
+    • Initialize Rust workspace and libp2p swarm with Noise encryption. 
+    • Implement persistent Ed25519 identity with secure file permissions (0600). 
+    • Establish stable PeerId derivation that doubles as a Solana address. 
+Phase 2: Local Data & State
+    • Implement SQLCipher layer with keys derived via HKDF-SHA256. 
+    • Develop CRDT serialization and Causal Clocks for a shared "network brain" without a central server. 
+Phase 3: The Anchor Service
+    • Implement stability heuristics for Anchor promotion. 
+    • Build the zero-knowledge "Store and Forward" protocol for encrypted mailbox blobs. 
+Phase 4: VOIP & FFI Bridge
+    • Design C-ABI boundary for mobile integration and call lifecycle management. 
+    • Implement stateful Opus audio encoding over WebRTC data channels. 
+Phase 5: Capacitor UI & Distribution
+    • Develop "White Tech" glassmorphic UI with blueprint-style aesthetics. 
+    • Implement visual "Causal Branch Indicators" to represent decentralized reality. 
+Phase 6: Solana Incentive Layer
+    • SPL Token Integration: Deploy the native "Introvert Token" on Solana. 
+    • Gasless Economy: Implement a fee-payer model where the network treasury covers SOL gas. 
+    • Incentive Engine: Automate programmatic rewards for Anchor nodes based on network contribution. 
+
+🏛️ System Architecture Summary
+Layer	Implementation Detail
+Identity	Unified Ed25519 identity for Node ID, DB encryption, and Solana Wallet. 
+Networking	Serverless libp2p mesh for roaming resilience and NAT traversal. 
+Storage	Decentralized SQLCipher with CRDT-based consistency. 
+Anchors	Stable nodes providing storage services to offline peers in exchange for rewards. 
+Economy	Circular SPL Token model where service provision offsets usage costs. 
+
+✅ System Validation Checklist
+    • [ ] Security: Verify Noise/Double Ratchet forward secrecy and wallet isolation. 
+    • [ ] Mutualism: Confirm that active Anchor nodes maintain a positive net token balance. 
+    • [ ] Causal Integrity: Verify "Blueprint Line" fork/merge during simulated offline edits. 
+    • [ ] Gasless Logic: Validate that users can transact without holding native SOL. 
+
+🧪 Post-Implementation: "First Light" Test Plan
+    1. Launch Anchor: Start the desktop node and verify it accumulates "Proof of Storage" rewards. 
+    2. Launch Client: Initialize the mobile app and verify the Introvert Token balance. 
+    3. End-to-End Economy: Send a message; confirm the mobile node is charged and the Anchor is rewarded. 
+    4. Causal Sync: Reconnect an offline peer and verify the visual "Blueprint Line" merge. 
+

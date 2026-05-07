@@ -1,0 +1,20 @@
+name: introvert_tests
+description: Integration tests for the Introvert engine.
+version: 1.0.0
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.0
+  path: ^1.8.3
+  provider: ^6.0.5
+  uuid: ^4.3.3
+  flutter_callkit_incoming: ^3.0.0
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
