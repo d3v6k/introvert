@@ -13,8 +13,44 @@ dependencies:
   uuid: ^4.3.3
   flutter_callkit_incoming: ^3.0.0
   shared_preferences: ^2.5.5
+  file_picker: ^8.0.0
+  image_picker: ^1.0.7
+  path_provider: ^2.1.5
+  open_file: ^3.3.0
+  connectivity_plus: ^6.0.3
+  intl: ^0.19.0
+  pdf_render_maintained:
+    path: plugins/pdf_render_maintained
+  flutter_video_thumbnail_plus: ^1.0.6
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  macos:
+    generate: true
+  windows:
+    generate: true
+  image_path: "assets/images/app_icon_swarm_2.png"
+  adaptive_icon_background: "#1E1E1E"
+  adaptive_icon_foreground: "assets/images/app_icon_swarm_2.png"
+
+flutter_native_splash:
+  color: "#1E1E1E"
+  image: "assets/images/app_icon_swarm_2.png"
+  android_12:
+    image: "assets/images/app_icon_swarm_2.png"
+    color: "#1E1E1E"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/logo.png
+    - assets/images/default_avatar.png
+    - assets/images/app_icon.png
