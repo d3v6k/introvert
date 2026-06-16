@@ -28,12 +28,12 @@ class SovereignAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: isSuperActive ? Colors.greenAccent : AppTheme.current.accent.withValues(alpha: 0.3),
+              color: isSuperActive ? AppTheme.current.accent : AppTheme.current.accent.withValues(alpha: 0.3),
               width: isSuperActive ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isSuperActive ? Colors.greenAccent : AppTheme.current.accent).withValues(alpha: 0.1),
+                color: (isSuperActive ? AppTheme.current.accent : AppTheme.current.accent).withValues(alpha: 0.1),
                 blurRadius: 4,
               ),
             ],

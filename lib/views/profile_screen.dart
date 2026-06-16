@@ -201,7 +201,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Claim Successful! Sig: ${sig.substring(0, 8)}..."),
-            backgroundColor: Colors.greenAccent,
+            backgroundColor: AppTheme.current.accent,
           ),
         );
       }
@@ -268,7 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
                 focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
                 suffixIcon: (_isClaimed || _hasExistingHandle)
-                  ? Icon(Icons.verified, color: Colors.greenAccent, size: 20)
+                  ? Icon(Icons.verified, color: AppTheme.current.accent, size: 20)
                   : (_handleController.text.isNotEmpty ? Icon(Icons.new_releases_outlined, color: Colors.orangeAccent, size: 20) : null),
               ),
             ),

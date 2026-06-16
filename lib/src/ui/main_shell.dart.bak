@@ -170,7 +170,7 @@ class _ChatsTabState extends State<ChatsTab> {
                 return ListTile(
                   leading: CircleAvatar(
                     radius: 28,
-                    backgroundColor: Colors.primaries[index % Colors.primaries.length].withValues(alpha: 0.8),
+                    backgroundColor: Colors.primaries[index % Colors.primaries.length].withOpacity(0.8),
                     child: Text(
                       peerId.substring(0, 1),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),

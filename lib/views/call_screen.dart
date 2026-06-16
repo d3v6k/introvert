@@ -234,12 +234,12 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.security, color: Colors.greenAccent, size: 12),
+                              Icon(Icons.security, color: AppTheme.current.accent, size: 12),
                               const SizedBox(width: 4),
                               Text(
                                 'E2EE SOVEREIGN',
-                                style: const TextStyle(
-                                  color: Colors.greenAccent,
+                                style: TextStyle(
+                                  color: AppTheme.current.accent,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1,
@@ -335,7 +335,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                           Text(
                             'Connected',
                             style: TextStyle(
-                              color: Colors.greenAccent.withValues(alpha: 0.9),
+                              color: AppTheme.current.accent.withValues(alpha: 0.9),
                               fontSize: 12,
                             ),
                           ),

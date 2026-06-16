@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../native/introvert_client.dart';
+import '../../theme/app_theme.dart';
 
 /// Hardware-Accelerated Native Video Renderer.
 /// Bridges Rust WebRTC frames to Flutter's Texture primitive.
@@ -53,8 +53,8 @@ class _NativeVideoRendererState extends State<NativeVideoRenderer> {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized || _textureId == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.cyanAccent),
+      return Center(
+        child: CircularProgressIndicator(color: AppTheme.current.accent),
       );
     }
 
@@ -72,19 +72,19 @@ class _NativeVideoRendererState extends State<NativeVideoRenderer> {
             bottom: 16,
             left: 16,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.security, color: Colors.greenAccent, size: 14),
-                  const SizedBox(width: 4),
+                  Icon(Icons.security, color: AppTheme.current.accent, size: 14),
+                  SizedBox(width: 4),
                   Text(
                     "E2EE STREAM: ${widget.peerId.substring(0, 8)}...",
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: AppTheme.current.text.withValues(alpha: 0.7),
                       fontSize: 10,
                       fontFamily: 'monospace',
                     ),

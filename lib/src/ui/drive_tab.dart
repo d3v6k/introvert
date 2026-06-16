@@ -196,7 +196,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
                             onTap: () {
                               _client.sendFile(c['peer_id'], path);
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File forwarded to direct chat.", style: TextStyle(color: Colors.greenAccent))));
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File forwarded to direct chat.", style: TextStyle(color: AppTheme.current.accent))));
                             },
                           ));
                         }),
@@ -220,7 +220,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
                               _client.sendGroupMessage(g[0], "[FILE]:$manifest");
 
                               Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File forwarded to group.", style: TextStyle(color: Colors.greenAccent))));
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File forwarded to group.", style: TextStyle(color: AppTheme.current.accent))));
                             },
                           ));
                         }),

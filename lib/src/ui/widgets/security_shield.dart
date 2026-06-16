@@ -16,10 +16,10 @@ class SecurityShield extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: isSecure ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+        color: isSecure ? AppTheme.current.accent.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isSecure ? Colors.greenAccent : Colors.orangeAccent,
+          color: isSecure ? AppTheme.current.accent : Colors.orangeAccent,
           width: 0.5,
         ),
       ),
@@ -29,7 +29,7 @@ class SecurityShield extends StatelessWidget {
           Icon(
             isSecure ? Icons.verified_user : Icons.warning_amber_rounded,
             size: 14,
-            color: isSecure ? Colors.greenAccent : Colors.orangeAccent,
+            color: isSecure ? AppTheme.current.accent : Colors.orangeAccent,
           ),
           SizedBox(width: 8),
           Text(
@@ -37,7 +37,7 @@ class SecurityShield extends StatelessWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isSecure ? Colors.greenAccent : Colors.orangeAccent,
+              color: isSecure ? AppTheme.current.accent : Colors.orangeAccent,
               fontFamily: 'monospace',
             ),
           ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../native/introvert_client.dart';
 
+
 /// Explicit synchronization phases for state tracking.
 enum SyncPhase {
   idle,

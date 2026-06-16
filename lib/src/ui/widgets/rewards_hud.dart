@@ -39,7 +39,7 @@ class RewardsHUD extends StatelessWidget {
           Text(
             "${solRewards.toStringAsFixed(6)} INTR",
             style: TextStyle(
-              color: Colors.greenAccent,
+              color: AppTheme.current.accent,
               fontFamily: 'monospace',
               fontSize: 12,
               fontWeight: FontWeight.bold,

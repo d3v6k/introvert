@@ -1,0 +1,733 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import '../src/services/group_call_service.dart';
+import '../src/native/introvert_client.dart';
+import '../src/ui/widgets/call_widgets.dart';
+import '../theme/app_theme.dart';
+
+class GroupCallScreen extends StatefulWidget {
+  final String groupId;
+  final String groupName;
+  final List<String> participantIds;
+
+  const GroupCallScreen({
+    required this.groupId,
+    required this.groupName,
+    required this.participantIds,
+    super.key,
+  });
+
+  @override
+  State<GroupCallScreen> createState() => _GroupCallScreenState();
+}
+
+class _GroupCallScreenState extends State<GroupCallScreen> with SingleTickerProviderStateMixin {
+  final _callService = GroupCallService.instance;
+  Duration _callDuration = Duration.zero;
+  Timer? _callTimer;
+  late AnimationController _pulseController;
+  bool _showControls = true;
+  Timer? _hideControlsTimer;
+  StreamSubscription? _groupMessageSub;
+  bool _hasNavigated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+
+    _callService.onCallConnected = _onCallConnected;
+    _callService.onCallEnded = _onCallEnded;
+    _callService.onCallError = _onCallError;
+    _callService.onPeerJoined = _onPeerJoined;
+    _callService.onPeerLeft = _onPeerLeft;
+    _callService.onQualityWarning = _onQualityWarning;
+
+    _startHideControlsTimer();
+
+    // Listen for late joiners via group messages
+    _groupMessageSub = IntrovertClient().networkStream.listen((event) {
+      if (event.type == 21 || event.type == 23) {
+        // Group message received - check for join notifications
+        _handleGroupMessage(event.data);
+      }
+    });
+  }
+
+  void _handleGroupMessage(List<int> data) {
+    try {
+      int offset = 0;
+      final gidLen = data[offset++];
+      offset += gidLen;
+      if (data.length > offset) {
+        final sidLen = data[offset++];
+        offset += sidLen;
+        if (data.length > offset) {
+          final rtLen = data[offset++];
+          offset += rtLen;
+          final content = utf8.decode(data.sublist(offset));
+
+          if (content.startsWith("[GROUP_CALL_JOIN]:")) {
+            final jsonStr = content.substring(17);
+            final decoded = json.decode(jsonStr);
+            final peerId = decoded['peer_id']?.toString();
+            final callId = decoded['call_id']?.toString();
+            if (peerId != null && callId == _callService.callId && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("${_getPeerName(peerId)} joined the call"),
+                  duration: const Duration(seconds: 2),
+                  backgroundColor: AppTheme.current.accent.withValues(alpha: 0.9),
+                ),
+              );
+            }
+          } else if (content.startsWith("[GROUP_CALL_LEAVE]:")) {
+            final jsonStr = content.substring(18);
+            final decoded = json.decode(jsonStr);
+            final peerId = decoded['peer_id']?.toString();
+            final callId = decoded['call_id']?.toString();
+            if (peerId != null && callId == _callService.callId && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("${_getPeerName(peerId)} left the call"),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  String _getPeerName(String peerId) {
+    final info = _callService.getPeerDisplayInfo(peerId);
+    return info['name'] ?? peerId.substring(0, 8);
+  }
+
+  void _onCallConnected() {
+    if (!mounted) return;
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _callDuration += const Duration(seconds: 1));
+    });
+    setState(() {});
+  }
+
+  void _onCallEnded() {
+    if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
+    _callTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  void _onCallError(String reason) {
+    if (!mounted || _hasNavigated) return;
+    _hasNavigated = true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(reason),
+        backgroundColor: Colors.redAccent.withValues(alpha: 0.9),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  void _onPeerJoined(String peerId) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("${_getPeerName(peerId)} joined"),
+        duration: const Duration(seconds: 2),
+        backgroundColor: AppTheme.current.accent.withValues(alpha: 0.9),
+      ),
+    );
+  }
+
+  void _onPeerLeft(String peerId) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("${_getPeerName(peerId)} left"),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _onQualityWarning(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.signal_cellular_alt, color: Colors.orangeAccent, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message, style: const TextStyle(fontSize: 12))),
+          ],
+        ),
+        backgroundColor: Colors.black87,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration d) => CallWidgets.formatDuration(d);
+
+  void _startHideControlsTimer() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _callService.isCallActive) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls) _startHideControlsTimer();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    _callTimer?.cancel();
+    _hideControlsTimer?.cancel();
+    _groupMessageSub?.cancel();
+    _callService.onCallConnected = null;
+    _callService.onCallEnded = null;
+    _callService.onCallError = null;
+    _callService.onPeerJoined = null;
+    _callService.onPeerLeft = null;
+    _callService.onQualityWarning = null;
+    if (_callService.isCallActive || _callService.callState != GroupCallState.idle) {
+      _callService.hangUp();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _callService,
+      builder: (context, _) {
+        final state = _callService.callState;
+        final isConnected = state == GroupCallState.connected;
+        final participants = _callService.allParticipantIds;
+
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            onTap: _toggleControls,
+            child: Stack(
+              children: [
+                // Main video grid
+                if (isConnected && participants.isNotEmpty)
+                  _buildVideoGrid(participants)
+                else
+                  _buildWaitingView(),
+
+                // Local video PiP
+                if (isConnected && _callService.localRenderer != null && !_callService.isCameraOff)
+                  _buildLocalVideoPip(),
+
+                // Top bar
+                if (_showControls) _buildTopBar(isConnected, participants),
+
+                // Bottom controls
+                if (_showControls) _buildBottomControls(isConnected),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVideoGrid(List<String> participants) {
+    final count = participants.length;
+
+    if (count == 1) {
+      // Single participant - full screen
+      return _buildParticipantVideo(participants[0], isFullScreen: true);
+    }
+
+    if (count == 2) {
+      return Column(
+        children: [
+          Expanded(child: _buildParticipantVideo(participants[0])),
+          const SizedBox(height: 2),
+          Expanded(child: _buildParticipantVideo(participants[1])),
+        ],
+      );
+    }
+
+    if (count <= 4) {
+      return GridView.count(
+        crossAxisCount: 2,
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
+        childAspectRatio: 0.75,
+        children: participants.map((pid) => _buildParticipantVideo(pid)).toList(),
+      );
+    }
+
+    // 5+ participants: scrollable grid
+    return GridView.count(
+      crossAxisCount: 2,
+      mainAxisSpacing: 2,
+      crossAxisSpacing: 2,
+      childAspectRatio: 0.8,
+      children: participants.map((pid) => _buildParticipantVideo(pid)).toList(),
+    );
+  }
+
+  Widget _buildParticipantVideo(String peerId, {bool isFullScreen = false}) {
+    final remoteRenderer = _callService.getRemoteRenderer(peerId);
+    final info = _callService.getPeerDisplayInfo(peerId);
+    final name = info['name'] ?? peerId.substring(0, 8);
+
+    return Container(
+      color: const Color(0xFF1A1A2E),
+      child: Stack(
+        children: [
+          if (remoteRenderer != null && remoteRenderer.srcObject != null)
+            Positioned.fill(
+              child: RTCVideoView(
+                remoteRenderer,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                mirror: false,
+              ),
+            )
+          else
+            _buildAvatarPlaceholder(peerId, name, isFullScreen),
+
+          // Name badge
+          Positioned(
+            bottom: 8,
+            left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+
+          // Connection status indicator
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppTheme.current.accent,
+                boxShadow: [
+                  BoxShadow(color: AppTheme.current.accent.withValues(alpha: 0.5), blurRadius: 4),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarPlaceholder(String peerId, String name, bool isFullScreen) {
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) => Container(
+              width: isFullScreen ? 100 : 60,
+              height: isFullScreen ? 100 : 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.current.accent.withValues(alpha: 0.3 * _pulseController.value),
+                    blurRadius: 20 * _pulseController.value,
+                    spreadRadius: 5 * _pulseController.value,
+                  ),
+                ],
+              ),
+              child: child,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.current.accent.withValues(alpha: 0.8),
+                    AppTheme.current.accent.withValues(alpha: 0.4),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isFullScreen ? 36 : 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Connecting...",
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocalVideoPip() {
+    return Positioned(
+      top: 80,
+      right: 16,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          // Allow dragging the PiP
+        },
+        child: Container(
+          width: 100,
+          height: 130,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white24, width: 1),
+            boxShadow: [
+              BoxShadow(color: Colors.black54, blurRadius: 12),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: RTCVideoView(
+            _callService.localRenderer!,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            mirror: true,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWaitingView() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0, -0.3),
+          radius: 1.2,
+          colors: [
+            AppTheme.current.accent.withValues(alpha: 0.15),
+            Colors.black,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) => Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.current.accent.withValues(alpha: 0.3 * _pulseController.value),
+                      blurRadius: 40 * _pulseController.value,
+                      spreadRadius: 10 * _pulseController.value,
+                    ),
+                  ],
+                ),
+                child: child,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.current.accent.withValues(alpha: 0.8),
+                      AppTheme.current.accent.withValues(alpha: 0.4),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: AppTheme.current.accent.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(Icons.group, color: Colors.white, size: 48),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              widget.groupName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _callService.callState == GroupCallState.calling
+                  ? 'Calling participants...'
+                  : _callService.callState == GroupCallState.connecting
+                      ? 'Joining call...'
+                      : 'Waiting for participants...',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_callService.connectedPeerIds.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.current.accent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  "${_callService.connectedPeerIds.length + 1} participant${_callService.connectedPeerIds.length > 0 ? 's' : ''} connected",
+                  style: TextStyle(
+                    color: AppTheme.current.accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(bool isConnected, List<String> participants) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.8),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: Row(
+            children: [
+              // E2EE badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.security, color: AppTheme.current.accent, size: 10),
+                    const SizedBox(width: 4),
+                    Text(
+                      'E2EE',
+                      style: TextStyle(
+                        color: AppTheme.current.accent,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Quality downgrade indicator
+              if (_callService.wasDowngraded) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.orangeAccent.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cell_tower, color: Colors.orangeAccent, size: 10),
+                      const SizedBox(width: 4),
+                      Text(
+                        'AUDIO ONLY',
+                        style: TextStyle(
+                          color: Colors.orangeAccent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(width: 12),
+              // Group name
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.groupName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "${participants.length} participant${participants.length != 1 ? 's' : ''}",
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Duration
+              if (isConnected)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _formatDuration(_callDuration),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomControls(bool isConnected) {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.85),
+                Colors.transparent,
+              ],
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildControlButton(
+                icon: _callService.isMuted ? Icons.mic_off : Icons.mic,
+                label: _callService.isMuted ? 'Unmute' : 'Mute',
+                active: _callService.isMuted,
+                onTap: () => _callService.toggleMute(),
+              ),
+              _buildControlButton(
+                icon: _callService.isSpeakerOn ? Icons.volume_up : Icons.hearing,
+                label: _callService.isSpeakerOn ? 'Speaker' : 'Earpiece',
+                active: false,
+                onTap: () => _callService.setSpeakerphone(!_callService.isSpeakerOn),
+              ),
+              _buildHangUpButton(),
+              _buildControlButton(
+                icon: _callService.isCameraOff ? Icons.videocam_off : Icons.videocam,
+                label: _callService.isCameraOff ? 'Cam Off' : 'Camera',
+                active: _callService.isCameraOff,
+                onTap: () => _callService.toggleCamera(),
+              ),
+              _buildControlButton(
+                icon: Icons.flip_camera_ios_outlined,
+                label: 'Flip',
+                active: false,
+                onTap: () => _callService.switchCamera(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) => CallWidgets.controlButton(
+    icon: icon, label: label, active: active, onTap: onTap,
+    size: 52, iconSize: 22, fontSize: 9,
+  );
+
+  Widget _buildHangUpButton() => CallWidgets.hangUpButton(
+    onTap: () async {
+      await _callService.hangUp();
+      // onCallEnded callback handles navigation via _hasNavigated guard
+    },
+    size: 64,
+  );
+}

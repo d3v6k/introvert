@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'introvert_client.dart';
 
+
 class IdentityManager {
   static const String _seedKey = 'introvert_master_seed';
   final IntrovertClient _client = IntrovertClient();

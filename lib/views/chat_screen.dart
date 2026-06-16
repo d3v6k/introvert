@@ -1848,7 +1848,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     height: 7,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _status == "Direct P2P" || _status == "Relay Active" ? Colors.greenAccent : Colors.redAccent.withValues(alpha: 0.5),
+                      color: _status == "Direct P2P" || _status == "Relay Active" ? AppTheme.current.accent : Colors.redAccent.withValues(alpha: 0.5),
                     ),
                   ),
                   const SizedBox(width: 4),
