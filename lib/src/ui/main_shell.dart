@@ -941,6 +941,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   @override
   void initState() {
     super.initState();
+    AppTheme.current.addListener(_onThemeChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadContacts();
     });
@@ -956,8 +957,13 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
 
   @override
   void dispose() {
+    AppTheme.current.removeListener(_onThemeChanged);
     _networkSubscription?.cancel();
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
   }
 
   void _showInviteDialog(Uint8List data) {
