@@ -143,15 +143,6 @@ pub enum SignalingPayload {
         device_type: String, // "ios" or "android"
         push_token: String,
     },
-    TypingStart {
-        chat_id: String,
-    },
-    TypingStop {
-        chat_id: String,
-    },
-    Heartbeat {
-        timestamp: i64,
-    },
     FileTransfer { 
         transfer_id: String, 
         filename: String, 
@@ -211,8 +202,8 @@ pub enum NetworkCommand {
     EstablishSecureSession { peer_id: PeerId },
     FetchMailbox,
     UpdateAnchorStatus { enabled: bool },
-    SendFile { peer_id: PeerId, file_path: String, group_id: Option<String>, transfer_id: Option<String> },
-    SendFileFinalize { peer_id: PeerId, file_path: String, has_dc_already: bool, group_id: Option<String>, transfer_id: Option<String> },
+    SendFile { peer_id: PeerId, file_path: String, group_id: Option<String> },
+    SendFileFinalize { peer_id: PeerId, file_path: String, has_dc_already: bool, group_id: Option<String> },
     SendFileChunk { peer_id: PeerId, payload: SignalingPayload, progress: FileTransferProgress },
     SendAcknowledgement { peer_id: PeerId, msg_id: String, status: u8 },
     ForwardMeshSignaling { peer_id: PeerId, payload: SignalingPayload },
@@ -242,7 +233,6 @@ pub enum NetworkCommand {
     /// Force-store a payload in the anchor mailbox for a peer, bypassing all direct delivery.
     /// Used when direct relay sends fail — avoids the direct-retry loop.
     StoreInMailbox { peer_id: PeerId, payload: SignalingPayload },
-    CancelFileTransfer { transfer_id: String },
     RecheckConnection { peer_id: PeerId },
     HandleDiagnosticTimeout { peer_id: PeerId },
     RequestSwarmStats,
@@ -263,7 +253,6 @@ pub struct FileTransferProgress {
     pub local_path: Option<String>,
     pub start_time_ms: u64,
     pub speed_bps: f64,
-    pub group_id: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -282,10 +271,6 @@ struct IncomingTransfer {
     group_id: Option<String>,
     next_pull_idx: u32,
     chunk_size: u32,
-    /// Chunk count at the last watchdog tick — only re-request if this hasn't grown.
-    /// Prevents the watchdog from looping when a slow seeder (serving multiple peers)
-    /// takes longer than the stall threshold to deliver the next chunk.
-    stall_chunk_count: usize,
 }
 
 struct ActiveSeeder {
@@ -294,10 +279,9 @@ struct ActiveSeeder {
     file_hash: String,
     chunk_size: u32,
     total_chunks: u32,
-    _bytes_sent: usize,
-    _start_time: Instant,
+    bytes_sent: usize,
+    start_time: Instant,
     group_id: Option<String>,
-    pub completions: HashSet<PeerId>,
 }
 
 // --- FFI Network Callback ---
@@ -568,17 +552,16 @@ impl NetworkService {
         }
 
         let mut republication_interval = tokio::time::interval(Duration::from_secs(60)); // 1 min (Aggressive for Background Reachability)
-        let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(30)); // 30s last-seen broadcast
 
         let mut liveness_interval = tokio::time::interval(Duration::from_secs(self.liveness_interval_secs));
-        let mut contact_refresh_interval = tokio::time::interval(Duration::from_secs(120)); // 2 min (was 30s)
+        let mut contact_refresh_interval = tokio::time::interval(Duration::from_secs(30));
         let mut anchor_discovery_interval = tokio::time::interval(Duration::from_secs(2 * 60));
-        let mut mailbox_fetch_interval = tokio::time::interval(Duration::from_secs(120)); // 2 min (was 30s)
+        let mut mailbox_fetch_interval = tokio::time::interval(Duration::from_secs(30));
         let mut fast_poll_interval = tokio::time::interval(Duration::from_secs(1)); // Fast poll when transfers are active
-        let mut status_check_interval = tokio::time::interval(Duration::from_secs(60)); // 60s (was 15s)
-        let mut pull_retry_interval = tokio::time::interval(Duration::from_secs(1));
+        let mut status_check_interval = tokio::time::interval(Duration::from_secs(15)); // Check local status every 15s
+        let mut pull_retry_interval = tokio::time::interval(Duration::from_secs(4));
         let mut lease_interval = tokio::time::interval(Duration::from_secs(60 * 60));
-        // heartbeat_interval REMOVED — not needed with push notifications
+        let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(10));
 
 
         let mut last_status = 0u8;
@@ -587,13 +570,8 @@ impl NetworkService {
         loop {
             tokio::select! {
                 _ = heartbeat_interval.tick() => {
-                    // Broadcast last-seen heartbeat to connected peers
-                    let timestamp = chrono::Utc::now().timestamp();
-                    let connected: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
-                    for peer_id in connected {
-                        let payload = crate::network::SignalingPayload::Heartbeat { timestamp };
-                        let _ = self.forward_to_mesh(peer_id, payload, false).await;
-                    }
+                    let peers = self.swarm.connected_peers().count();
+                    println!("[Swarm Heartbeat] Connected peers: {}", peers);
                 }
                 _ = fast_poll_interval.tick() => {
                     let has_active_incoming = self.incoming_transfers.values().any(|t| t.is_relayed);
@@ -651,45 +629,28 @@ impl NetworkService {
                             };
                             let is_direct_p2p = (is_connected && !is_relayed_conn) || has_webrtc;
                             
-                            // SOVEREIGN SWARM: Periodically query Kademlia DHT for new seeders/providers
-                            // during active group downloads to dynamically discover completed peers (every 5 seconds).
-                            if t.group_id.is_some() && t.last_update.elapsed() > Duration::from_secs(5) {
-                                let tx = self.command_tx.clone();
-                                let hash = t.file_hash.clone();
-                                tokio::spawn(async move {
-                                    let _ = tx.send(NetworkCommand::FindProviders { file_hash: hash }).await;
-                                });
-                            }
-
-                            // SMART STALL DETECTION: Only retry if the received chunk count has NOT
-                            // grown since the last watchdog tick. This prevents re-requesting chunks
-                            // that are actively arriving from a slow seeder serving multiple peers.
-                            let current_chunk_count = t.received_chunks.len();
-                            let watchdog_timeout = if is_direct_p2p { 10 } else { 8 };
-                            let truly_stalled = current_chunk_count == t.stall_chunk_count
-                                && t.last_update.elapsed() > Duration::from_secs(watchdog_timeout);
-                            // Always update the stall_chunk_count so next tick reflects new arrivals.
-                            t.stall_chunk_count = current_chunk_count;
-
-                            // Direct P2P switches to pull recovery if completely stalled for watchdog_timeout (10s)
-                            // to handle reconnects or lost chunks without permanently downgrading healthy high-speed transfers.
-                            let should_retry = truly_stalled;
+                            let should_retry = if is_direct_p2p {
+                                // Fallback/Stall recovery: if direct push is active but has stalled for 2s, trigger pull retry
+                                t.last_update.elapsed() > Duration::from_secs(2)
+                            } else {
+                                // For relayed connections or when disconnected, trigger pull retry after 8s
+                                (t.is_relayed || is_relayed_conn) && t.last_update.elapsed() > Duration::from_secs(8)
+                            };
 
                             if should_retry {
                                 // Find the first missing chunk index
                                 let mut next = 0u32;
                                 while t.received_chunks.contains_key(&next) { next += 1; }
-                                let window = if is_direct_p2p { 8 } else { 4 };
                                 let limit = if t.total_chunks > 0 {
-                                    std::cmp::min(next + window, t.total_chunks)
+                                    std::cmp::min(next + 4, t.total_chunks)
                                 } else {
-                                    next + window
+                                    next + 4
                                 };
                                 if next < limit {
                                     // Align next_pull_idx so it starts pulling sequentially from the new limit
                                     t.next_pull_idx = limit;
                                     t.last_update = Instant::now();
-                                    t.is_relayed = true; // Auto-transition to pull model on stall
+                                    t.is_relayed = true; // Auto-transition to pull model to recover from push stall!
                                     stalled.push((tid.clone(), t.peer_id, t.providers.clone(), next, limit, t.chunk_size));
                                 }
                             }
@@ -706,10 +667,7 @@ impl NetworkService {
                             
                             let tx = self.command_tx.clone();
                             let tid_clone = tid.clone();
-
-                            // Intelligent Provider Selection: Prioritize connected direct peers over relayed/offline ones
                             let selected_providers = Self::select_best_providers_static(&self.swarm, &self.is_relayed_map, &providers);
-
                             tokio::spawn(async move {
                                 for idx in first_missing_idx..limit {
                                     let target_peer = if !selected_providers.is_empty() {
@@ -894,21 +852,16 @@ impl NetworkService {
     }
 
     async fn handle_file_chunk(&mut self, peer: PeerId, transfer_id: String, chunk_index: u32, total_chunks: u32, data_base64: String) {
-        println!("[DEBUG] handle_file_chunk: transfer_id={}, chunk_index={}/{}", transfer_id, chunk_index, total_chunks);
         if let Some(transfer) = self.incoming_transfers.get_mut(&transfer_id) {
             transfer.total_chunks = total_chunks;
             transfer.last_update = Instant::now();
-            println!("[DEBUG] Found transfer in incoming_transfers. Decoded chunks so far: {}", transfer.received_chunks.len());
-            if let Ok(chunk_data) = general_purpose::STANDARD.decode(&data_base64) {
-                println!("[DEBUG] Successfully decoded chunk {} (size: {} bytes)", chunk_index, chunk_data.len());
+            if let Ok(chunk_data) = general_purpose::STANDARD.decode(data_base64) {
                 // RELIABILITY: Only trigger N+4 if this is a NEW chunk.
                 // This prevents duplicate requests from retries or re-deliveries.
                 let is_new_chunk = transfer.received_chunks.insert(chunk_index, chunk_data).is_none();
-                println!("[DEBUG] Chunk {} is new: {}. Total unique chunks: {}", chunk_index, is_new_chunk, transfer.received_chunks.len());
                 
                 let progress_val = transfer.received_chunks.len() as f32 / total_chunks as f32;
                 let is_complete = transfer.received_chunks.len() as u32 == total_chunks;
-                println!("[DEBUG] progress_val={}, is_complete={}", progress_val, is_complete);
                 
                 let received_bytes: usize = transfer.received_chunks.values().map(|v| v.len()).sum();
                 let elapsed = transfer.start_time.elapsed().as_secs_f64();
@@ -1003,7 +956,6 @@ impl NetworkService {
                                 local_path: Some(path.clone()),
                                 start_time_ms: transfer.start_time.elapsed().as_millis() as u64,
                                 speed_bps: 0.0,
-                                group_id: transfer.group_id.clone(),
                             };
                             crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
 
@@ -1014,19 +966,8 @@ impl NetworkService {
                             let mime_d = transfer.mime_type.clone();
                             let size_d = transfer.total_size;
                             let path_d = path.clone();
-                            let peer_id_str = peer.to_string();
-                            let msg_id = transfer_id.clone();
-                            let progress_d = progress.clone();
                             tokio::task::spawn_blocking(move || {
                                 let _ = storage_d.upsert_drive_file(&filename_d, &hash_d, &mime_d, size_d as i64, &path_d);
-                                if let Ok(json_str) = serde_json::to_string(&progress_d) {
-                                    let c = format!("[FILE]:{}", json_str);
-                                    if let Some(ref gid) = progress_d.group_id {
-                                        let _ = storage_d.store_group_message(gid, &peer_id_str, &msg_id, &c, false, None);
-                                    } else {
-                                        let _ = storage_d.store_message_with_id(&peer_id_str, &msg_id, &c, false, None);
-                                    }
-                                }
                             });
 
                             // Send Completion ACK back to sender via command queue to ensure Mailbox routing
@@ -1041,11 +982,11 @@ impl NetworkService {
                         tokio::spawn(async move { let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: peer, payload: error }).await; });
                         transfer.filename = format!("ERROR: {}", transfer.filename);
                     }
-                } else if !transfer.filename.starts_with("ERROR:") {
+                } else if is_new_chunk && !transfer.filename.starts_with("ERROR:") {
                     let is_relayed_conn = self.is_relayed_map.read().get(&peer).cloned().unwrap_or(false);
                     if transfer.is_relayed || is_relayed_conn {
                         // SOVEREIGN SWARM: Stable windowed pull using next_pull_idx, distributed across providers.
-                        // This maintains the concurrency pipeline even if duplicate chunks are received.
+                        // This maintains exactly 4 chunks in flight, balancing load across all seeders.
                         let next_idx = transfer.next_pull_idx;
                         if next_idx < total_chunks {
                             transfer.next_pull_idx += 1;
@@ -1080,7 +1021,6 @@ impl NetworkService {
                     local_path: local_path.clone(),
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps,
-                    group_id: transfer.group_id.clone(),
                 };
 
                 let data = serde_json::to_vec(&progress).unwrap_or_default();
@@ -1114,12 +1054,7 @@ impl NetworkService {
                 }
                 // CRITICAL FIX: Always remove from incoming transfers when complete (success or fail) to prevent memory leak
                 if is_complete { self.incoming_transfers.remove(&transfer_id); }
-            } else {
-                println!("[DEBUG] Failed to decode base64 for chunk {}", chunk_index);
             }
-        } else {
-            println!("[DEBUG] transfer_id {} not found in incoming_transfers. Available: {:?}", 
-                     transfer_id, self.incoming_transfers.keys().collect::<Vec<_>>());
         }
     }
 
@@ -1611,7 +1546,7 @@ impl NetworkService {
                         let key_str = String::from_utf8_lossy(key.as_ref()).into_owned();
                         if key_str.starts_with("i@") {
                             println!("[Mesh] Failed to resolve handle {}: {:?}", key_str, e);
-                            let data = key_str.into_bytes();
+                            let mut data = key_str.into_bytes();
                             crate::dispatch_global_event(35, &data); // Event 35: Handle Resolve Failed
                         }
                     }
@@ -1688,13 +1623,7 @@ impl NetworkService {
                 // Status 1 = Mesh Active (at least one peer connected)
                 crate::dispatch_global_event(10, &[1]);
 
-                let endpoint_addr = endpoint.get_remote_address();
-                let is_local_ip = endpoint_addr.to_string().contains("192.168.") || 
-                                 endpoint_addr.to_string().contains("10.") || 
-                                 endpoint_addr.to_string().contains("172.") ||
-                                 endpoint_addr.to_string().contains("127.0.0.1");
-
-                let is_relayed = endpoint.is_relayed() && !is_local_ip;
+                let is_relayed = endpoint.is_relayed();
                 if !is_relayed {
                     let count = self.direct_conn_count.entry(peer_id).or_insert(0);
                     *count += 1;
@@ -1702,10 +1631,6 @@ impl NetworkService {
                 
                 let is_now_relayed = self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0) == 0;
                 self.is_relayed_map.write().insert(peer_id, is_now_relayed);
-                
-                if is_local_ip && endpoint.is_relayed() {
-                    println!("[Mesh] Peer {} connected via LOCAL RELAY. Treating as DIRECT for performance.", peer_id);
-                }
 
                 // --- RELIABILITY FIX: Relay Reservation ---
                 // If we connect to a bootstrap node (RBN) or any anchor node, and we are NOT an anchor ourselves,
@@ -1788,13 +1713,7 @@ impl NetworkService {
                    let _ = pc.close().await;
                }
 
-               let endpoint_addr = endpoint.get_remote_address();
-               let is_local_ip = endpoint_addr.to_string().contains("192.168.") || 
-                                endpoint_addr.to_string().contains("10.") || 
-                                endpoint_addr.to_string().contains("172.") ||
-                                endpoint_addr.to_string().contains("127.0.0.1");
-
-               let is_relayed = endpoint.is_relayed() && !is_local_ip;
+               let is_relayed = endpoint.is_relayed();
                if !is_relayed {
                    if let Some(count) = self.direct_conn_count.get_mut(&peer_id) {
                        if *count > 0 {
@@ -1856,9 +1775,6 @@ impl NetworkService {
                     // Track diagnostic failures for the recheck overlay
                     if self.pending_diagnostics.contains_key(&pid) {
                         let err_str = format!("{:?}", error).replace('"', "'");
-                        if err_str.contains("ResourceLimitExceeded") {
-                            println!("[Mesh] ⚠️ RELAY CONGESTION: RBN rejected circuit for {} due to ResourceLimitExceeded.", pid);
-                        }
                         let diag_payload = format!(
                             r#"{{"peer_id":"{}","step":"error","status":"dial_failed","error":"{}"}}"#,
                             pid, err_str
@@ -1884,27 +1800,51 @@ impl NetworkService {
 
         println!("[Mesh] Peer {} not connected. Constructing relay paths...", recipient_str);
 
-        // 1. Dial ONE random RBN node from the bootstrap list (Scalability fix for Million-Node Mandate)
-        // Dilation all RBNs simultaneously causes ResourceLimitExceeded on the relays.
-        let mut rbn_list: Vec<_> = self.bootstrap_nodes.iter()
-            .filter(|(_, addr)| addr.to_string().contains("443"))
-            .collect();
-        
-        use rand::seq::SliceRandom;
-        let mut rng = rand::thread_rng();
-        rbn_list.shuffle(&mut rng);
+        // 1. Dial ALL port 443 RBN nodes (matching stable v11 robustness)
+        for (rbn_id, rbn_addr) in self.bootstrap_nodes.clone() {
+            if rbn_addr.to_string().contains("443") {
+                let relay_addr = rbn_addr.clone()
+                    .with(libp2p::multiaddr::Protocol::P2p(rbn_id))
+                    .with(libp2p::multiaddr::Protocol::P2pCircuit)
+                    .with(libp2p::multiaddr::Protocol::P2p(recipient_id));
 
-        if let Some((rbn_id, rbn_addr)) = rbn_list.first() {
-            let relay_addr = rbn_addr.clone()
-                .with(libp2p::multiaddr::Protocol::P2p(*rbn_id))
-                .with(libp2p::multiaddr::Protocol::P2pCircuit)
-                .with(libp2p::multiaddr::Protocol::P2p(recipient_id));
-
-            println!("[Mesh] Attempting relay path dial via RBN: {}", rbn_id);
-            let _ = self.swarm.dial(relay_addr);
+                let _ = self.swarm.dial(relay_addr);
+            }
         }
 
-        // 2. Also attempt direct dial as primary fallback
+        // 2. Dial via ONE additional active connected anchor (if physical IP is known)
+        let mut anchor_ids = Vec::new();
+        if let Ok(verified_anchors) = self.storage.fetch_all_anchor_nodes() {
+            for node in verified_anchors {
+                if let Ok(pid) = node.peer_id.parse::<PeerId>() {
+                    if !anchor_ids.contains(&pid) { anchor_ids.push(pid); }
+                }
+            }
+        }
+        for pid in &self.discovered_anchors {
+            if !anchor_ids.contains(pid) { anchor_ids.push(*pid); }
+        }
+
+        let mut extra_dial_count = 0;
+        for anchor_id in anchor_ids {
+            if self.swarm.is_connected(&anchor_id) && extra_dial_count < 1 {
+                // Skip if this is already a bootstrap RBN (already dialed above)
+                if self.bootstrap_nodes.iter().any(|(id, _)| id == &anchor_id) { continue; }
+
+                if let Some(addr) = self.anchor_mappings.get(&anchor_id) {
+                    let relay_addr = addr.clone()
+                        .with(libp2p::multiaddr::Protocol::P2p(anchor_id))
+                        .with(libp2p::multiaddr::Protocol::P2pCircuit)
+                        .with(libp2p::multiaddr::Protocol::P2p(recipient_id));
+                    
+                    println!("[Mesh] Dialing recipient {} via extra anchor relay: {}", recipient_id, relay_addr);
+                    let _ = self.swarm.dial(relay_addr);
+                    extra_dial_count += 1;
+                }
+            }
+        }
+
+        // 3. Also attempt direct dial as fallback
         let _ = self.swarm.dial(recipient_id);
     }
 
@@ -1924,13 +1864,11 @@ impl NetworkService {
 
         if !force_mailbox {
             // 1. Try WebRTC Data Channel if open
-            // HYBRID ROUTING: WebRTC Data Channels are extremely fast for small signaling payloads.
-            // However, the SCTP stack in webrtc-rs can severely bottleneck on large 64KB+ file chunks.
-            // Therefore, we skip WebRTC ONLY for actual FileChunk data (large binary payloads),
-            // but allow FileChunkRequest and FileTransfer manifest to use WebRTC for ultra-low latency.
-            let is_large_data = matches!(payload, SignalingPayload::FileChunk { .. });
-            let is_relayed_conn = self.is_relayed_map.read().get(&recipient_id).cloned().unwrap_or(true);
-            let skip_webrtc = is_large_data && !is_relayed_conn;
+            // HYBRID ROUTING: Direct P2P uses WebRTC for everything (max speed).
+            // Relayed transfers avoid WebRTC for ALL File Payloads to use the robust libp2p stack.
+            let is_file_payload = matches!(payload, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. } | SignalingPayload::FileTransfer { .. });
+            let is_relayed_conn = self.is_relayed_map.read().get(&recipient_id).cloned().unwrap_or(false);
+            let skip_webrtc = is_relayed_conn && is_file_payload;
 
             if !skip_webrtc {
                 let dc_opt = { self.data_channels.read().get(&recipient_id).cloned() };
@@ -2348,7 +2286,7 @@ impl NetworkService {
                         for m in &members {
                             if m.peer_id == my_peer_id || m.peer_id == requester_peer_id { continue; }
                             if let Ok(pid) = m.peer_id.parse::<PeerId>() {
-                                let _ = self.forward_to_mesh(pid, action_payload.clone(), false).await;
+                                    let _ = self.forward_to_mesh(pid, action_payload.clone(), false).await;
                             }
                         }
                     }
@@ -2653,10 +2591,9 @@ impl NetworkService {
                     file_hash: file_hash.clone(),
                     chunk_size,
                     total_chunks,
-                    _bytes_sent: 0,
-                    _start_time: Instant::now(),
+                    bytes_sent: 0,
+                    start_time: Instant::now(),
                     group_id,
-                    completions: HashSet::new(),
                 });
 
                 // SOVEREIGN DRIVE: Persist metadata so this node can serve as a mesh seeder indefinitely
@@ -2677,105 +2614,26 @@ impl NetworkService {
             NetworkCommand::UnregisterSeeder { transfer_id } => {
                 self.active_seeders.remove(&transfer_id);
             }
-            NetworkCommand::CancelFileTransfer { transfer_id } => {
-                println!("[Mesh] Cancelling file transfer: {}", transfer_id);
-                // Remove from active seeders (outgoing transfers)
-                self.active_seeders.remove(&transfer_id);
-                // Remove from incoming transfers
-                self.incoming_transfers.remove(&transfer_id);
-                // Notify UI of cancellation
-                let progress = FileTransferProgress {
-                    transfer_id: transfer_id.clone(),
-                    peer_id: String::new(),
-                    filename: String::new(),
-                    mime_type: String::new(),
-                    file_hash: String::new(),
-                    progress: 0.0,
-                    is_complete: true,
-                    is_verified: false,
-                    is_outgoing: false,
-                    local_path: None,
-                    start_time_ms: 0,
-                    speed_bps: 0.0,
-                    group_id: None,
-                };
-                crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
-            }
             NetworkCommand::FindProviders { file_hash } => {
                 println!("[Mesh] Searching Sovereign Swarm for providers of file: {}", file_hash);
                 let key = RecordKey::new(&file_hash.as_bytes());
                 let _ = self.swarm.behaviour_mut().kademlia.get_providers(key);
             }
-            NetworkCommand::SendFile { peer_id, file_path, group_id, transfer_id } => {
+            NetworkCommand::SendFile { peer_id, file_path, group_id } => {
                 let local_id = *self.swarm.local_peer_id();
                 
                 // If peer_id == local_id, it's a group broadcast share from Drive.
                 if peer_id == local_id && group_id.is_some() {
-                    let gid = group_id.as_ref().unwrap().clone();
-                    println!("[Mesh] Group-wide file share detected for {}. Initiating intelligent swarm logic.", gid);
-
-                    // Compute hash once to ensure stable transfer_id for all paths
-                    let path = std::path::Path::new(&file_path);
-                    if !path.exists() { return Err(anyhow::anyhow!("File not found: {}", file_path)); }
-                    
-                    let file_hash = {
-                        let mut hasher = Sha256::new();
-                        let f = std::fs::File::open(path)?;
-                        let mut reader = std::io::BufReader::new(f);
-                        std::io::copy(&mut reader, &mut hasher)?;
-                        format!("{:x}", hasher.finalize())
-                    };
-                    
-                    let t_id = transfer_id.unwrap_or_else(|| {
-                        format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
-                    });
-                    let tx = self.command_tx.clone();
-                    
-                    // 1. Proactive Local Push: Attempt to reach group members via direct paths
-                    if let Ok(Some(group)) = self.storage.get_group(&gid) {
-                        if let Ok(members) = serde_json::from_str::<Vec<GroupMemberMetadata>>(&group.members_json) {
-                            let mut push_count = 0;
-                            for member in members {
-                                if member.peer_id == local_id.to_string() { continue; }
-                                if push_count >= 100 { break; } // Scalability cap for proactive push
-                                
-                                if let Ok(m_peer_id) = member.peer_id.parse::<PeerId>() {
-                                    // Even if not currently connected direct, try a SendFile.
-                                    // SendFile logic will auto-negotiate WebRTC/Direct paths.
-                                    println!("[Mesh] 🚀 Proactively initiating path discovery for group member {}.", member.peer_id);
-                                    let f_path = file_path.clone();
-                                    let g_id = Some(gid.clone());
-                                    let t_id_clone = Some(t_id.clone());
-                                    let tx_clone = tx.clone();
-                                    tokio::spawn(async move {
-                                        let _ = tx_clone.send(NetworkCommand::SendFile { 
-                                            peer_id: m_peer_id, 
-                                            file_path: f_path, 
-                                            group_id: g_id,
-                                            transfer_id: t_id_clone 
-                                        }).await;
-                                    });
-                                    push_count += 1;
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. Gossipsub Manifest Broadcast: announce to the group topic so all members
-                    // (including those not yet directly reachable) know a transfer is in progress.
-                    // We pass is_relayed=false so that receivers who receive this manifest via Gossipsub
-                    // will wait for the direct PUSH from the per-member SendFile calls above,
-                    // rather than immediately entering the slow pull pipeline.
-                    // Chunk delivery is handled entirely by the individual SendFile per-member paths.
-                    let storage = self.storage.clone();
-                    let is_stress = self.is_stress_test;
-                    let t_id_for_broadcast = t_id.clone();
-                    let relayed_map = self.is_relayed_map.clone();
-                    let dc_store = self.data_channels.clone();
-                    tokio::spawn(async move {
-                        let _ = Self::process_outgoing_file(peer_id, file_path, false, relayed_map, dc_store, tx, storage, local_id, group_id, is_stress, Some(t_id_for_broadcast)).await;
-                    });
-                    return Ok(());
+                     println!("[Mesh] Group-wide file share detected for {}. Bypassing direct negotiation.", group_id.as_ref().unwrap());
+                     let tx = self.command_tx.clone();
+                     let storage = self.storage.clone();
+                     let is_stress = self.is_stress_test;
+                     let relayed_map = self.is_relayed_map.clone();
+                     let dc_store = self.data_channels.clone();
+                     tokio::spawn(async move {
+                         let _ = Self::process_outgoing_file(peer_id, file_path, true, relayed_map, dc_store, tx, storage, local_id, group_id, is_stress).await;
+                     });
+                     return Ok(());
                 }
 
                 let already_direct = self.swarm.is_connected(&peer_id)
@@ -2801,7 +2659,6 @@ impl NetworkService {
 
                 let dc_store = Arc::clone(&self.data_channels);
                 let tx = self.command_tx.clone();
-                let tid_pass = transfer_id;
 
                 tokio::spawn(async move {
                     // Wait up to 4 seconds (40 × 100ms) for the WebRTC Data Channel to reach Open state
@@ -2821,10 +2678,10 @@ impl NetworkService {
                             tokio::time::sleep(Duration::from_millis(100)).await;
                         }
                     }
-                    let _ = tx.send(NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already, group_id, transfer_id: tid_pass }).await;
+                    let _ = tx.send(NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already, group_id }).await;
                 });
             }
-            NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already: _, group_id, transfer_id } => {
+            NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already: _, group_id } => {
                 let is_connected_now = self.swarm.is_connected(&peer_id);
                 let relayed_map_snapshot = self.is_relayed_map.read().get(&peer_id).cloned();
                 let tx = self.command_tx.clone();
@@ -2836,12 +2693,12 @@ impl NetworkService {
 
                 tokio::spawn(async move {
                     let is_relayed = if is_connected_now {
-                        relayed_map_snapshot.unwrap_or(false) // Default to false (direct P2P) if connected
+                        relayed_map_snapshot.unwrap_or(true)
                     } else {
                         true
                     };
 
-                    let _ = Self::process_outgoing_file(peer_id, file_path, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress, transfer_id).await;
+                    let _ = Self::process_outgoing_file(peer_id, file_path, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress).await;
                 });
             }
             NetworkCommand::SendFileChunk { peer_id, payload, progress } => {
@@ -2869,7 +2726,6 @@ impl NetworkService {
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
             NetworkCommand::ForwardWebRtcNative { peer_id, json } => {
-                // Forward a raw flutter_webrtc SDP/ICE JSON signal to the remote peer via mesh
                 let payload = SignalingPayload::WebRtcNative(json);
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
@@ -3484,29 +3340,6 @@ impl NetworkService {
                             }
                         } else {
                             let _ = self.storage.store_mailbox_payload(&recipient, &peer, payload);
-                            
-                            // Push notification: wake up offline peer
-                            if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_id) {
-                                println!("[Mesh] 🔔 Push wake-up for offline peer {} ({})", recipient_id, device_type);
-                                let client = reqwest::Client::new();
-                                let peer_hash = {
-                                    use sha2::{Sha256, Digest};
-                                    hex::encode(Sha256::digest(recipient_id.as_bytes()))
-                                };
-                                let payload_json = serde_json::json!({
-                                    "device_type": device_type,
-                                    "token": token,
-                                    "peer_id_hash": peer_hash
-                                });
-                                tokio::spawn(async move {
-                                    let _ = client.post("https://push.introvert.network/wakeup")
-                                        .json(&payload_json)
-                                        .timeout(Duration::from_secs(5))
-                                        .send()
-                                        .await;
-                                });
-                            }
-
                             // Push upgrade for other peers...
                             if self.swarm.is_connected(&recipient) {
                                 if let Ok(messages) = self.storage.drain_mailbox(&recipient) {
@@ -3600,7 +3433,7 @@ impl NetworkService {
                 }
             }
             SignalingPayload::WebRtcNative(json) => {
-                // Dispatch Event 15: flutter_webrtc signal (SDP offer/answer or ICE candidate)
+                // Dispatch Event 15: flutter_webrtc signal
                 // Format: [peer_id_len: u8][peer_id_bytes][json_bytes]
                 let peer_bytes = peer.to_string().into_bytes();
                 let mut data = vec![peer_bytes.len() as u8];
@@ -3651,7 +3484,7 @@ impl NetworkService {
                 
                 // 1. Try active seeder first (session-specific)
                 let seeder_info = self.active_seeders.get(&transfer_id).map(|s| {
-                    (s.file_path.clone(), s.chunk_size, s.total_chunks, s.file_hash.clone(), s.group_id.clone())
+                    (s.file_path.clone(), s.chunk_size, s.total_chunks, s.file_hash.clone())
                 }).or_else(|| {
                     // Robust fallback: if exact transfer_id not found, find ANY seeder for the same hash
                     // Extract hash from transfer_id if it follows the gft_{hash}_{ts} pattern
@@ -3659,19 +3492,19 @@ impl NetworkService {
                     if parts.len() >= 2 && parts[0] == "gft" {
                         let hash = parts[1];
                         self.active_seeders.values().find(|s| s.file_hash == hash).map(|s| {
-                            (s.file_path.clone(), s.chunk_size, s.total_chunks, s.file_hash.clone(), s.group_id.clone())
+                            (s.file_path.clone(), s.chunk_size, s.total_chunks, s.file_hash.clone())
                         })
                     } else {
                         None
                     }
                 });
 
-                let (path, csize, tchunks, f_hash, grp_id) = if let Some(info) = seeder_info {
+                let (path, csize, tchunks, f_hash) = if let Some(info) = seeder_info {
                     // Use requested chunk_size if provided, otherwise fallback to seeder's registered chunk_size
                     let requested_csize = chunk_size.unwrap_or(info.1);
                     let size = std::fs::metadata(&info.0).map(|m| m.len()).unwrap_or(0) as usize;
                     let tchunks = (size as f32 / requested_csize as f32).ceil() as u32;
-                    (info.0, requested_csize, tchunks, info.3, info.4)
+                    (info.0, requested_csize, tchunks, info.3)
                 } else {
                     // 2. FALLBACK: Check if we have this file in our Sovereign Drive (persistent seeding)
                     let storage = self.storage.clone();
@@ -3733,14 +3566,12 @@ impl NetworkService {
                             file_hash: hash.clone(),
                             chunk_size: requested_csize,
                             total_chunks: tchunks,
-                            _bytes_sent: 0,
-                            _start_time: Instant::now(),
+                            bytes_sent: 0,
+                            start_time: Instant::now(),
                             group_id: None,
-                            completions: HashSet::new(),
                         });
 
-                        // We do not have group context for fallback drive files, so None
-                        (path, requested_csize, tchunks, hash, None)
+                        (path, requested_csize, tchunks, hash)
                     } else {
                         println!("[Mesh] ❌ Rejected chunk request: No seeder or drive file found for {}", transfer_id);
                         return;
@@ -3785,7 +3616,6 @@ impl NetworkService {
                                     local_path: Some(path),
                                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                                     speed_bps: 0.0,
-                                    group_id: grp_id,
                                 };
 
                                 crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
@@ -3873,49 +3703,22 @@ impl NetworkService {
                     return;
                 }
 
-                // Prioritize direct P2P connection: prevent broadcast manifest from demoting to relayed
-                let is_connected_now = self.swarm.is_connected(&actual_seeder_peer);
-                let relayed_map_snapshot = self.is_relayed_map.read().get(&actual_seeder_peer).cloned();
-                let is_direct_p2p = is_connected_now && !relayed_map_snapshot.unwrap_or(false);
-                let final_is_relayed = if is_direct_p2p { false } else { is_relayed };
-
-                let chunk_size = if final_is_relayed { 64 * 1024 } else { 256 * 1024 };
+                let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 };
                 let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
-
-                // DEDUPLICATION: If we already have an active transfer for this file_hash (regardless
-                // of transfer_id), merge the new sender as a provider into the existing transfer.
-                // This prevents two parallel transfers of the same file from competing for seeder
-                // bandwidth and causing the watchdog stall loop.
-                let already_active_tid = self.incoming_transfers
-                    .iter()
-                    .find(|(tid, t)| t.file_hash == file_hash && t.group_id == group_id && *tid != &transfer_id)
-                    .map(|(tid, _)| tid.clone());
-                if let Some(existing_tid) = already_active_tid {
-                    if let Some(existing) = self.incoming_transfers.get_mut(&existing_tid) {
-                        if !existing.providers.contains(&actual_seeder_peer) {
-                            existing.providers.push(actual_seeder_peer);
-                            println!("[Mesh] Dedup: merged seeder {} into existing transfer {} (duplicate transfer_id={} ignored)",
-                                actual_seeder_peer, existing_tid, transfer_id);
-                        }
-                    }
-                    return;
-                }
 
                 let mut is_update = false;
                 if let Some(existing) = self.incoming_transfers.get_mut(&transfer_id) {
                     println!("[Mesh] FileTransfer manifest update for existing transfer {}. Updating config and preserving progress.", transfer_id);
                     is_update = true;
                     let was_relayed = existing.is_relayed;
-                    
-                    existing.is_relayed = final_is_relayed;
-
+                    existing.is_relayed = is_relayed;
                     if !existing.providers.contains(&actual_seeder_peer) {
                         existing.providers.push(actual_seeder_peer);
                     }
                     existing.last_update = Instant::now();
                     
                     // If it transitioned to relayed now, start the pull sequence from current progress
-                    if final_is_relayed && !was_relayed {
+                    if is_relayed && !was_relayed {
                         let mut next = 0u32;
                         while existing.received_chunks.contains_key(&next) { next += 1; }
                         let limit = if existing.total_chunks > 0 {
@@ -3955,17 +3758,16 @@ impl NetworkService {
                         providers: vec![actual_seeder_peer],
                         start_time: Instant::now(),
                         last_update: Instant::now(),
-                        is_relayed: final_is_relayed,
+                        is_relayed,
                         group_id: group_id.clone(),
                         next_pull_idx: 4,
                         chunk_size,
-                        stall_chunk_count: 0,
                     });
                 }
 
                 // SOVEREIGN SWARM: If this is a relayed (cross-network) transfer,
                 // trigger a DHT search to find other providers/seeders for this file.
-                if final_is_relayed {
+                if is_relayed {
                     let tx = self.command_tx.clone();
                     let hash = file_hash.clone();
                     tokio::spawn(async move {
@@ -3987,7 +3789,6 @@ impl NetworkService {
                         local_path: None,
                         start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
                         speed_bps: 0.0,
-                        group_id: group_id.clone(),
                     };
                     let peer_id_str = actual_seeder_peer.to_string();
                     let storage = Arc::clone(&self.storage);
@@ -4011,35 +3812,24 @@ impl NetworkService {
                     let data = serde_json::to_vec(&progress).unwrap_or_default();
                     crate::dispatch_global_event(12, &data);
 
-                    // Start pulling chunks ONLY if the sender is not pushing them directly.
-                    // final_is_relayed=false means the sender will PUSH 256KB chunks directly to us.
-                    // final_is_relayed=true means we must PULL chunks via FileChunkRequest.
-                    if final_is_relayed {
-                        let is_direct = self.swarm.is_connected(&actual_seeder_peer)
-                            && self.is_relayed_map.read().get(&actual_seeder_peer).cloned() == Some(false);
-                        let initial_pipeline = if is_direct { 8 } else { 4 };
-                        let pacing_delay = if is_direct { 10 } else { 50 };
-
-                        println!("[Mesh] Relay/Pull transfer detected. Initiating primed pull sequence ({} deep) for {}", initial_pipeline, transfer_id);
+                    // Start pulling chunks ONLY if the sender is not pushing them directly
+                    if is_relayed {
+                        println!("[Mesh] Relay transfer detected. Initiating primed pull sequence (4 deep) for {}", transfer_id);
                         let tx = self.command_tx.clone();
                         let tid = transfer_id.clone();
                         let total_chunks_val = total_chunks;
                         let csize = chunk_size;
                         tokio::spawn(async move {
-                            for i in 0..initial_pipeline {
+                            for i in 0..4 {
                                 if i < total_chunks_val {
                                     let req = SignalingPayload::FileChunkRequest { transfer_id: tid.clone(), chunk_index: i, chunk_size: Some(csize) };
                                     let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: actual_seeder_peer, payload: req }).await;
-                                    tokio::time::sleep(Duration::from_millis(pacing_delay)).await;
+                                    tokio::time::sleep(Duration::from_millis(50)).await;
                                 }
                             }
                         });
                     } else {
-                        // Direct push path: sender is pushing 256KB chunks to us.
-                        // The 4-second watchdog stall recovery will automatically switch to
-                        // pull mode (setting is_relayed=true) if chunks stop arriving,
-                        // e.g. if the direct connection fails or the sender can't reach us.
-                        println!("[Mesh] Direct push transfer detected. Waiting for 256KB chunks from sender for {}", transfer_id);
+                        println!("[Mesh] Direct transfer detected. Waiting for chunks to be pushed for {}", transfer_id);
                     }
                 }
             }
@@ -4414,17 +4204,10 @@ impl NetworkService {
                 let mut is_group_transfer = false;
                 
                 let mut f_hash = "".to_string();
-                let mut grp_id = None;
-                let mut total_members = 0;
-                let mut current_completions = 0;
-
-                if let Some(seeder) = self.active_seeders.get_mut(&transfer_id) {
-                    seeder.completions.insert(peer);
-                    
+                if let Some(seeder) = self.active_seeders.get(&transfer_id) {
                     let s_path = seeder.file_path.clone();
                     local_path = Some(s_path.clone());
                     f_hash = seeder.file_hash.clone();
-                    grp_id = seeder.group_id.clone();
 
                     let p_path = std::path::Path::new(&s_path);
                     filename = p_path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
@@ -4437,42 +4220,16 @@ impl NetworkService {
                         _ => "application/octet-stream".to_string(),
                     };
                     is_group_transfer = seeder.group_id.is_some();
-
-                    if is_group_transfer {
-                         if let Some(gid) = &grp_id {
-                             if let Ok(Some(group)) = self.storage.get_group(gid) {
-                                 if let Ok(members) = serde_json::from_str::<Vec<GroupMemberMetadata>>(&group.members_json) {
-                                     // excluding self
-                                     total_members = members.len().saturating_sub(1);
-                                     current_completions = seeder.completions.len();
-                                     println!("[Mesh] Group transfer {} progress: {}/{} members finished.", transfer_id, current_completions, total_members);
-                                 }
-                             }
-                         }
-                    }
                 }
 
                 // MANDATE: In 1-to-1 transfers, stop seeding once receiver confirms receipt.
-                // In group transfers, we continue seeding indefinitely for the session.
-                if !is_group_transfer && self.active_seeders.contains_key(&transfer_id) {
+                // In group transfers, we continue seeding until the whole group is satisfied.
+                if !is_group_transfer {
                     println!("[Mesh] 1-to-1 transfer {} complete. Removing seeder and taking off mesh.", transfer_id);
                     self.active_seeders.remove(&transfer_id);
-                } else if is_group_transfer {
+                } else {
                     println!("[Mesh] Group member received transfer {}. Continuing to seed for the rest of the group.", transfer_id);
                 }
-
-                let (progress_ratio, outgoing_complete) = if is_group_transfer && total_members > 0 {
-                    (current_completions as f32 / total_members as f32, current_completions >= total_members)
-                } else if is_group_transfer && total_members == 0 {
-                    // VERIFIED FIX: Group transfer but couldn't read member count from storage.
-                    // Never prematurely signal outgoing_complete — wait for explicit member count.
-                    // Show proportional progress based on completions seen so far (at least 1 member).
-                    let ratio = current_completions as f32 / (current_completions.max(1) as f32);
-                    println!("[Mesh] ⚠️ Group member count unavailable for {}. Holding verified state.", transfer_id);
-                    (ratio, false)
-                } else {
-                    (1.0, true)
-                };
 
                 let peer_id_str = peer.to_string();
                 let storage = Arc::clone(&self.storage);
@@ -4483,30 +4240,17 @@ impl NetworkService {
                     filename,
                     mime_type,
                     file_hash: f_hash,
-                    progress: progress_ratio,
-                    is_complete: outgoing_complete,
-                    is_verified: outgoing_complete,
+                    progress: 1.0,
+                    is_complete: true,
+                    is_verified: true,
                     is_outgoing: true,
                     local_path,
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps: 0.0,
-                    group_id: grp_id.clone(), // clone here so grp_id is still usable for DB routing below
                 };
                 if let Ok(json_str) = serde_json::to_string(&progress) {
                     let c = format!("[FILE]:{}", json_str);
-                    // ROUTING FIX: Write to the correct DB table based on transfer type.
-                    // Previously always wrote to store_message_with_id (direct-chat table), causing
-                    // the sender's completed group file to appear in the 1-on-1 chat with the last ACKer.
-                    if let Some(ref gid) = grp_id {
-                        let gid_clone = gid.clone();
-                        tokio::task::spawn_blocking(move || {
-                            let _ = storage.store_group_message(&gid_clone, &peer_id_str, &msg_id, &c, true, None);
-                        });
-                    } else {
-                        tokio::task::spawn_blocking(move || {
-                            let _ = storage.store_message_with_id(&peer_id_str, &msg_id, &c, true, None);
-                        });
-                    }
+                    tokio::task::spawn_blocking(move || storage.store_message_with_id(&peer_id_str, &msg_id, &c, true, None));
                 }
                 
                 // Clear RAM buffer for this transfer to prevent memory leaks
@@ -4545,27 +4289,6 @@ impl NetworkService {
                 let mut data = vec![status];
                 data.extend(msg_id.as_bytes());
                 crate::dispatch_global_event(13, &data);
-            }
-            SignalingPayload::TypingStart { chat_id: _ } => {
-                let peer_bytes = peer.to_string().into_bytes();
-                let mut data = peer_bytes.clone();
-                data.push(1); // 1 = typing started
-                crate::dispatch_global_event(39, &data);
-            }
-            SignalingPayload::TypingStop { chat_id: _ } => {
-                let peer_bytes = peer.to_string().into_bytes();
-                let mut data = peer_bytes.clone();
-                data.push(0); // 0 = typing stopped
-                crate::dispatch_global_event(39, &data);
-            }
-            SignalingPayload::Heartbeat { timestamp } => {
-                // Store last-seen timestamp for the peer
-                let peer_str = peer.to_string();
-                let ts = timestamp;
-                let storage = Arc::clone(&self.storage);
-                tokio::task::spawn_blocking(move || {
-                    let _ = storage.update_last_seen(&peer_str, ts);
-                });
             }
             SignalingPayload::DirectInviteRequest(peer_identity) => {
                 let is_extroverted = self.storage.is_privacy_mode_extroverted();
@@ -4798,7 +4521,6 @@ impl NetworkService {
         local_peer_id: PeerId,
         group_id: Option<String>,
         is_stress_test: bool,
-        transfer_id_override: Option<String>,
     ) -> anyhow::Result<()> {
 
         let path = std::path::Path::new(&file_path);
@@ -4826,9 +4548,7 @@ impl NetworkService {
         };
         let total_size = std::fs::metadata(path)?.len() as usize;
 
-        let transfer_id = transfer_id_override.unwrap_or_else(|| {
-            format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
-        });
+        let transfer_id = format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs());
         
         // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 64KB (Sovereign Swarm Pull)
         let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 }; 
@@ -4857,7 +4577,6 @@ impl NetworkService {
             local_path: Some(file_path.clone()),
             start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
             speed_bps: 0.0,
-            group_id: group_id.clone(),
         };
 
         // Persistent History: Save file manifest and BROADCAST TO GROUP if applicable
@@ -4905,15 +4624,6 @@ impl NetworkService {
 
         let _ = tx.send(NetworkCommand::SendFileChunk { peer_id, payload: transfer_payload, progress: initial_progress.clone() }).await;
 
-        // GOSSIPSUB BROADCAST PATH: When peer_id == local_peer_id, this call came from the
-        // group broadcast announce path. We've registered as seeder and gossiped the manifest.
-        // Actual chunk delivery is handled per-member by the individual SendFile calls above.
-        // Return here to avoid a self-push loop.
-        if peer_id == local_peer_id {
-            println!("✅ Group manifest announced and seeder registered for {}. Per-member push handles delivery.", filename);
-            return Ok(());
-        }
-
         if is_relayed {
             println!("✅ File transfer manifest sent for {}. (Relay mode - waiting for chunk requests).", filename);
             // BUG 1 FIX: Immediate mailbox fetch so we see the receiver's pull requests right away
@@ -4955,7 +4665,6 @@ impl NetworkService {
                 local_path: Some(file_path.clone()),
                 start_time_ms: initial_progress.start_time_ms,
                 speed_bps,
-                group_id: group_id.clone(),
             };
             
             // Since SendFileChunk is handled via the command channel, we can't easily wait here.
@@ -4964,7 +4673,7 @@ impl NetworkService {
             let _ = tx.send(NetworkCommand::SendFileChunk { peer_id, payload: chunk_payload.clone(), progress: progress.clone() }).await;
             
             // ADAPTIVE PACING: Direct P2P/WebRTC uses 20ms, Relay uses 250ms (checked dynamically)
-            let current_relayed = is_relayed_map.read().get(&peer_id).cloned().unwrap_or(is_relayed);
+            let current_relayed = is_relayed_map.read().get(&peer_id).cloned().unwrap_or(true);
             let has_webrtc = {
                 let dc_store_read = data_channels.read();
                 if let Some(dc) = dc_store_read.get(&peer_id) {
