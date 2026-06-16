@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_theme.dart';
 
 class RewardsHUD extends StatelessWidget {
   final int relayedBytes;
@@ -13,31 +14,31 @@ class RewardsHUD extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.black54,
+        color: AppTheme.current.bg.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.bolt, color: Colors.cyanAccent, size: 16),
-          const SizedBox(width: 8),
+          Icon(Icons.bolt, color: AppTheme.current.accent, size: 16),
+          SizedBox(width: 8),
           Text(
             "${(relayedBytes / 1024 / 1024).toStringAsFixed(2)} MB",
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppTheme.current.text,
               fontFamily: 'monospace',
               fontSize: 12,
             ),
           ),
-          const SizedBox(width: 12),
-          const VerticalDivider(color: Colors.white24, width: 1, thickness: 1),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
+          VerticalDivider(color: AppTheme.current.mutedText.withValues(alpha: 0.5), width: 1, thickness: 1),
+          SizedBox(width: 12),
           Text(
             "${solRewards.toStringAsFixed(6)} INTR",
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.greenAccent,
               fontFamily: 'monospace',
               fontSize: 12,
@@ -63,57 +64,51 @@ class SovereignEarnings extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final balance = (economyStats['intr_balance'] ?? 0) / 1000000000.0;
-    final pending = (economyStats['pending_rewards'] ?? 0) / 1024 / 1024;
+    final pending = (economyStats['pending_rewards'] ?? 0) / 1000000000.0;
     final totalRelayed = (economyStats['total_relayed'] ?? 0) / 1024 / 1024;
-    final address = economyStats['sol_address'] ?? "Unknown";
     final tokenName = economyStats['token_name'] ?? "INTR";
 
     return Card(
-      color: Colors.grey[900],
+      color: AppTheme.current.surface,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.cyanAccent.withOpacity(0.2)),
+        side: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   "SOVEREIGN EARNINGS",
                   style: TextStyle(
-                    color: Colors.cyanAccent,
+                    color: AppTheme.current.accent,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 1.2,
                   ),
                 ),
-                Icon(Icons.account_balance_wallet_outlined, color: Colors.cyanAccent.withOpacity(0.5)),
+                Icon(Icons.account_balance_wallet_outlined, color: AppTheme.current.accent.withValues(alpha: 0.5)),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildStatRow("$tokenName Balance", "${balance.toStringAsFixed(4)} $tokenName"),
-            _buildStatRow("Pending Rewards", "${pending.toStringAsFixed(2)} MB"),
+            _buildStatRow("Pending Activity Yield", "${pending.toStringAsFixed(4)} $tokenName"),
             _buildStatRow("Lifetime Relayed", "${totalRelayed.toStringAsFixed(2)} MB"),
-            const Divider(color: Colors.white12, height: 24),
-            Text(
-              "WALLET: $address",
-              style: TextStyle(color: Colors.white38, fontSize: 10, fontFamily: 'monospace'),
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: pending >= 1.0 ? onClaim : null,
+                onPressed: pending > 0.0 ? onClaim : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyanAccent,
+                  backgroundColor: AppTheme.current.accent,
                   foregroundColor: Colors.black,
-                  disabledBackgroundColor: Colors.white12,
+                  disabledBackgroundColor: AppTheme.current.mutedText.withValues(alpha: 0.2),
                 ),
-                child: const Text("CLAIM REWARDS"),
+                child: Text("CLAIM REWARDS"),
               ),
             ),
           ],
@@ -124,12 +119,12 @@ class SovereignEarnings extends StatelessWidget {
 
   Widget _buildStatRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      padding: EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+          Text(label, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 13)),
+          Text(value, style: TextStyle(color: AppTheme.current.text, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
         ],
       ),
     );

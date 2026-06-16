@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme/app_theme.dart';
 
 class SecurityShield extends StatelessWidget {
   final bool isSecure;
@@ -13,7 +14,7 @@ class SecurityShield extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: isSecure ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -30,7 +31,7 @@ class SecurityShield extends StatelessWidget {
             size: 14,
             color: isSecure ? Colors.greenAccent : Colors.orangeAccent,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Text(
             isSecure ? "E2EE ACTIVE" : "SIGNALING ONLY",
             style: TextStyle(
@@ -41,14 +42,14 @@ class SecurityShield extends StatelessWidget {
             ),
           ),
           if (isSecure) ...[
-            const SizedBox(width: 8),
-            const Text("|", style: TextStyle(color: Colors.white24)),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
+            Text("|", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
+            SizedBox(width: 8),
             Text(
               peerIdFingerprint,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
-                color: Colors.white70,
+                color: AppTheme.current.text.withValues(alpha: 0.7),
                 fontFamily: 'monospace',
               ),
             ),

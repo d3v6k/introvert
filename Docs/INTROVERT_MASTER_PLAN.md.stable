@@ -1,0 +1,241 @@
+# Introvert Master Plan
+
+## Phase 1: Foundation (Complete)
+
+### 1.1 Core Engine
+- [x] Deterministic identity derivation (HKDF-SHA256)
+- [x] SQLCipher encrypted storage (18 tables)
+- [x] libp2p swarm with Kademlia DHT
+- [x] Noise IK transport encryption
+- [x] FFI bridge (50+ exported functions)
+
+### 1.2 Networking
+- [x] Port 443 strategy for firewall bypass
+- [x] Custom dark mesh protocols
+- [x] Client-only mode for mobile
+- [x] Relay circuit v2 support
+- [x] mDNS local discovery
+
+### 1.3 Messaging
+- [x] 1-on-1 encrypted messaging
+- [x] Read receipts (Sent/Delivered/Read)
+- [x] Message reactions
+- [x] Message editing and deletion
+- [x] Reply threading
+
+### 1.4 File Transfer
+- [x] Chunked file transfer protocol
+- [x] SHA-256 integrity verification
+- [x] Sovereign Drive encrypted storage
+- [x] Automatic file organization
+- [x] Progress tracking
+
+## Phase 2: Advanced Features (Complete)
+
+### 2.1 Groups
+- [x] Gossipsub-based group mesh
+- [x] Role-based permissions (Creator/Admin/Member)
+- [x] Signed group actions
+- [x] Group secrets management
+- [x] Member muting
+
+### 2.2 Identity
+- [x] Magic Wormhole onboarding
+- [x] Handle registry (PoW + RBN consensus)
+- [x] Profile management
+- [x] Contact verification
+
+### 2.3 Media
+- [x] WebRTC video/audio calls
+- [x] Media gallery viewer
+- [x] Pinch-to-zoom images
+- [x] Video playback controls
+- [x] Thumbnail generation
+
+### 2.4 Economy
+- [x] Solana $INTR token integration
+- [x] Reward tracker (1MB threshold)
+- [x] Treasury co-signing
+- [x] Balance queries
+
+## Phase 3: Network Hardening (Complete)
+
+### 3.1 Relay Infrastructure
+- [x] Root Bootstrap Nodes (RBNs)
+- [x] WebSocket tunnel for NAT traversal
+- [x] Direct connection auto-upgrade
+- [x] Connection count tracking
+
+### 3.2 Security
+- [x] Session resumption
+- [x] Memory safety (FFI cleanup)
+- [x] SQLCipher encryption
+- [x] Dark mesh isolation
+
+### 3.3 Performance
+- [x] 14+ Mbps direct transfers
+- [x] 1GB relay headroom
+- [x] 2MB request-response payloads
+- [x] Concurrent transfer support
+
+## Phase 4: Push Notifications & Battery Optimization (In Progress)
+
+### 4.1 Push Token Infrastructure (Complete)
+- [x] `push_tokens` SQLite table (peer_id, device_type, push_token)
+- [x] `save_push_token` / `get_push_token` storage functions
+- [x] `IdentifySleepState` signaling payload
+- [x] `register_push_token` FFI function
+- [x] Dart `registerPushToken()` method
+- [x] iOS `remote-notification` entitlement
+
+### 4.2 FCM Integration (Android) ✅ COMPLETE
+- [x] Add Firebase dependencies to `build.gradle.kts`
+- [x] Add `google-services.json` (Firebase project config)
+- [x] Create `FirebaseMessagingService.kt` handler
+- [x] Register FCM token on app start
+- [x] Handle foreground/background push notifications
+- [x] Create notification channels (messages, calls)
+- [x] Package name: `chat.introvert.app`
+- [x] Firebase project: `introvert-p2p` (Sender ID: 302706705869)
+
+### 4.3 APNS Integration (iOS) ⏳ PENDING — Apple Developer Account Required
+- [ ] **REQUIRES: Apple Developer Account ($99/year) with Push Notification capability**
+- [ ] Generate APNS Auth Key (.p8) in Apple Developer Console
+- [ ] Configure APNS Key ID and Team ID in Firebase Console
+- [ ] Enable APNS in Firebase Cloud Messaging settings
+- [ ] Add APNS key to `firebase/` config
+- [ ] iOS `remote-notification` entitlement: ✅ Already configured
+- [ ] Register APNS token on app start (same flow as Android FCM)
+- [ ] Handle push notifications via `AppDelegate.swift`
+- [ ] Background fetch with `BGTaskScheduler`
+- [ ] **BLOCKER**: Cannot complete without Apple Developer Account
+
+### 4.4 RBN Push Relay ✅ COMPLETE & DEPLOYED
+- [x] RBN stores push tokens for connected peers
+- [x] When message stored in mailbox, RBN sends FCM push
+- [x] Push payload: `{device_type, token, peer_id_hash}` (minimal, encrypted)
+- [x] Actual message content stays encrypted in mailbox
+- [x] Fallback to mesh delivery if push fails
+- [x] Deployed to `root@47.89.252.80` on 2026-06-16
+
+### 4.5 Background Sync Optimization ✅ COMPLETE & DEPLOYED
+- [x] Removed heartbeat timer (was 10s)
+- [x] Increased mailbox_fetch from 30s → 2min
+- [x] Increased contact_refresh from 30s → 2min
+- [x] Increased status_check from 15s → 60s
+- [x] Drive tab refresh from 5s → 30s
+- [x] Deployed to RBN on 2026-06-16
+
+### 4.6 Expected Impact
+- Battery drain: ~3-5%/hour → ~0.5-1%/hour
+- Message delivery: 0-30s → 0-2s (when push available)
+- CPU wakeups: ~10,000/day → ~500-1,000/day
+- Samsung Deep Sleep: survives vs gets killed
+
+## Phase 4: Platform Expansion (In Progress)
+
+### 4.1 Android
+- [x] Cross-compilation (arm64 + x86_64)
+- [x] NDK v28.2 integration
+- [x] Flutter launcher icons
+- [x] Native splash screen
+
+### 4.2 iOS
+- [x] Static library compilation
+- [x] CocoaPods integration
+- [x] Local network entitlements
+- [x] Bonjour services configuration
+
+### 4.3 macOS
+- [x] Dynamic library compilation
+- [x] CocoaPods integration
+- [x] Sandbox path resolution
+- [x] App signing
+
+### 4.4 Linux (RBN)
+- [x] Cross-compilation via cargo-zigbuild
+- [x] systemd service deployment
+- [x] Automated deployment scripts
+- [x] Health monitoring
+
+## Phase 5: Ecosystem (Planned)
+
+### 5.1 Governance
+- [ ] DAO structure for protocol decisions
+- [ ] $INTR voting mechanism
+- [ ] Proposal and voting UI
+- [ ] Delegation system
+
+### 5.2 Advanced Economy
+- [ ] Staking rewards
+- [ ] Liquidity pools
+- [ ] Cross-chain bridges
+- [ ] NFT badges
+
+### 5.3 Platform Features
+- [ ] Voice messages
+- [ ] Screen sharing
+- [ ] Collaborative documents
+- [ ] Calendar integration
+
+### 5.4 Developer Ecosystem
+- [ ] Plugin API
+- [ ] SDK for third-party apps
+- [ ] Bot framework
+- [ ] Webhooks
+
+## Phase 6: Scale (Future)
+
+### 6.1 Global Deployment
+- [ ] 1M+ active nodes
+- [ ] Regional RBN clusters
+- [ ] Multi-language support
+- [ ] Accessibility compliance
+
+### 6.2 Enterprise
+- [ ] Managed deployments
+- [ ] Compliance frameworks
+- [ ] Audit logging
+- [ ] Admin dashboards
+
+### 6.3 Research
+- [ ] Post-quantum cryptography
+- [ ] Advanced DHT algorithms
+- [ ] Energy optimization
+- [ ] Mesh networking theory
+
+## Current Status (June 2026)
+
+### Completed
+- Core engine with 3414 lines of Rust
+- Network layer with 4928 lines
+- FFI bridge with 1560 lines
+- Main UI with 3087 lines
+- 18-table SQLCipher database
+- Solana $INTR economy
+- Multi-platform builds (Android, iOS, macOS, Linux)
+- FCM push notifications (Android) ✅
+- RBN push relay deployed ✅
+- Background sync optimized ✅
+
+### Pending — Apple/iOS (Requires Apple Developer Account)
+1. **APNS push notifications** — Cannot configure without Apple Developer Account ($99/year)
+2. **APNS Auth Key generation** — Requires Apple Developer Console access
+3. **Firebase APNS setup** — Requires APNS key + Team ID in Firebase Console
+4. **AppDelegate.swift updates** — Token registration and push handling (blocked by #1)
+5. **BGTaskScheduler** — iOS background fetch for when push unavailable (blocked by #1)
+
+### Pending — Android Polish
+1. Swift Package Manager migration (plugin-dependent)
+2. Built-in Kotlin migration (Flutter requirement)
+
+### Pending — Cross-Platform
+1. Background sync: WorkManager (Android) / BGTaskScheduler (iOS)
+2. Smart polling based on connectivity state
+- Plugin compatibility updates
+- Performance optimization
+
+### Next Steps
+- Complete Phase 5 ecosystem features
+- Scale to 1M+ nodes
+- Enterprise offerings

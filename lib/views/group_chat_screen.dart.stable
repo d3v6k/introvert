@@ -1240,7 +1240,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 _buildCallTypeOption(
                   icon: Icons.phone_rounded,
                   label: "Audio",
-                  color: AppTheme.current.accent,
+                  color: Colors.greenAccent,
                   onTap: () {
                     Navigator.pop(context);
                     _initiateCall(0); // 0 = audio only
@@ -1448,7 +1448,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   children: [
                     _buildAttachmentItem(
                       icon: Icons.image_rounded,
-                      color: AppTheme.current.accent,
+                      color: Colors.greenAccent,
                       label: "IMAGE",
                       onTap: () {
                         Navigator.pop(context);
@@ -2244,14 +2244,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppTheme.current.accent.withValues(alpha: 0.2),
+                color: Colors.greenAccent.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.5)),
+                border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.5)),
               ),
-              child: Text(
+              child: const Text(
                 "JOIN",
                 style: TextStyle(
-                  color: AppTheme.current.accent,
+                  color: Colors.greenAccent,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1,

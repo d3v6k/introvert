@@ -1,11 +1,11 @@
 [package]
 name = "introvert"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
 
 [dependencies]
 # Identity & Crypto
-libp2p = { version = "0.53.2", features = ["ed25519", "rsa", "tcp", "quic", "kad", "noise", "yamux", "dns", "tokio", "macros", "request-response", "json", "mdns", "dcutr", "relay", "autonat", "identify", "websocket"] }
+libp2p = { version = "0.56.0", features = ["ed25519", "rsa", "tcp", "quic", "kad", "noise", "yamux", "dns", "tokio", "macros", "request-response", "json", "mdns", "dcutr", "relay", "autonat", "identify", "websocket", "upnp", "ping", "gossipsub"] }
 ed25519-dalek = "2.1"
 x25519-dalek = "2.0"
 snow = "0.9"
@@ -16,16 +16,18 @@ rand = "0.8"
 hex = "0.4"
 serde_json = "1.0"
 webrtc = "0.11"
+bytes = "1.5"
 
 # Storage
-rusqlite = { version = "0.31", features = ["bundled-sqlcipher"] }
+rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
 
 # Wormhole Onboarding
-magic-wormhole = { version = "0.7", features = ["transfer", "transit"] }
+magic-wormhole = { version = "0.7", features = ["transfer", "transit", "tls"] }
 
-# Solana - Using 2.0.0 to align with curve25519-dalek 4.x / zeroize 1.7
-solana-sdk = "2.0.0"
-solana-client = "2.0.0"
+# Solana - Using 4.0.x to align with curve25519-dalek 4.x / zeroize 1.7
+solana-sdk = "4.0.1"
+solana-client = "4.0.0-rc.0"
+solana-account-decoder = "4.0.0-rc.0"
 
 # Async & Threading
 tokio = { version = "1.36", features = ["full"] }
@@ -38,7 +40,7 @@ libc = "0.2"
 anyhow = "1.0"
 tracing = "0.1"
 serde = { version = "1.0", features = ["derive"] }
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 webpki-roots = "0.25"
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", features = ["vendored"] }
@@ -46,7 +48,11 @@ base64 = "0.21"
 bincode = "1.3"
 clap = { version = "4.4", features = ["derive"] }
 chrono = { version = "0.4.44", features = ["serde"] }
-solana-account-decoder = "=2.1.0"
+rpassword = "7.3"
+dialoguer = "0.11"
+async-compat = "0.2.5"
+tokio-tungstenite = "0.28.0"
+futures-util = "0.3"
 
 [dev-dependencies]
 tempfile = "3.10"

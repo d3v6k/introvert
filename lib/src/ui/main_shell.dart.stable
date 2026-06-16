@@ -48,7 +48,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   DateTime? _lastCallAlertTime;
   bool _isHandleResolvedDialogOpen = false;
   final Set<String> _activeConnectionRequestPeerIds = {};
-  final Set<String> _activeGroupJoinRequestIds = {};
 
   final List<Widget> _tabs = [
     ChatsTab(key: ChatsTab.chatsKey),
@@ -61,7 +60,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    AppTheme.current.addListener(_onThemeChanged);
     _startGlobalListener();
 
     // Ensure WebRtcCallService starts listening to event stream early
@@ -75,10 +73,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     });
   }
 
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
-  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -569,10 +563,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         _triggerMessageAlert("$alias ($handle) wants to join group $groupName");
       }
 
-      final joinKey = "$groupId:$requesterPeerId";
-      if (_activeGroupJoinRequestIds.contains(joinKey)) return;
-      _activeGroupJoinRequestIds.add(joinKey);
-
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -603,10 +593,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           actions: [
             TextButton(
               onPressed: () {
-                final messenger = ScaffoldMessenger.of(context);
                 _client.rejectGroupJoin(groupId, requesterPeerId, "group admin has denied access");
                 Navigator.pop(context);
-                messenger.showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("Group join request rejected")),
                 );
               },
@@ -614,10 +603,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             ),
             ElevatedButton(
               onPressed: () {
-                final messenger = ScaffoldMessenger.of(context);
                 _client.approveGroupJoin(groupId, requesterPeerId, alias.isNotEmpty ? alias : null, avatar, handle.isNotEmpty ? handle : null);
                 Navigator.pop(context);
-                messenger.showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("Group join request approved")),
                 );
               },
@@ -626,9 +614,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             ),
           ],
         ),
-      ).then((_) {
-        _activeGroupJoinRequestIds.remove(joinKey);
-      });
+      );
     } catch (e) {
       debugPrint("Error handling group join request: $e");
     }
@@ -697,7 +683,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 Text("Handle Resolved", style: TextStyle(color: AppTheme.current.text, fontSize: 16)),
                 if (isVerified) ...[
                   SizedBox(width: 8),
-                  Icon(Icons.verified, color: AppTheme.current.accent, size: 18),
+                  Icon(Icons.verified, color: Colors.greenAccent, size: 18),
                 ],
               ],
             ),
@@ -721,7 +707,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     padding: EdgeInsets.only(top: 16.0),
                     child: Text(
                       "✅ This handle is OFFICIALLY VERIFIED by the Introvert Mesh.",
-                      style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   )
                 else
@@ -758,7 +744,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    AppTheme.current.removeListener(_onThemeChanged);
     _globalMediaSubscription?.cancel();
     _networkSubscription.cancel();
     try {
@@ -797,21 +782,37 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) => Image.asset('assets/images/logo.png', height: 20),
             ),
-            SizedBox(width: 10),
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: _localStatusColor),
-            ),
-            SizedBox(width: 6),
+            SizedBox(width: 12),
             Flexible(
-              child: Text(
-                _localStatus.toLowerCase(),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w400,
-                  color: AppTheme.current.mutedText,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _localStatusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _localStatusColor.withValues(alpha: 0.3), width: 0.5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: _localStatusColor),
+                    ),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        _localStatus,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 9, 
+                          fontWeight: FontWeight.bold, 
+                          color: _localStatusColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -819,9 +820,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         ),
         actions: [
           NetworkOptimizationButton(color: AppTheme.current.accent),
-          SizedBox(width: 4),
           IconButton(
-            icon: Icon(Icons.account_circle_outlined, color: AppTheme.current.mutedText),
+            icon: Icon(Icons.account_circle_outlined),
             onPressed: () {
               Navigator.push(
                 context,
@@ -842,70 +842,66 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppTheme.current.surface.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 16, offset: const Offset(0, 4)),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(0, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'CHATS'),
-                _buildNavItem(1, Icons.cloud_queue_rounded, Icons.cloud_rounded, 'DRIVE'),
-                _buildNavItem(2, Icons.sticky_note_2_outlined, Icons.sticky_note_2_rounded, 'NOTES'),
-                _buildNavItem(3, Icons.settings_outlined, Icons.settings_rounded, 'SETTINGS'),
-              ],
-            ),
-          ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1), width: 0.5)),
+          color: AppTheme.current.bg,
         ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData outlineIcon, IconData filledIcon, String label) {
-    final isSelected = _selectedIndex == index;
-    final accent = AppTheme.current.accent;
-    final muted = AppTheme.current.mutedText;
-
-    return GestureDetector(
-      onTap: () => _onDestinationSelected(index),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 60,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: isSelected
-                  ? BoxDecoration(
-                      color: accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    )
-                  : null,
-              child: Icon(
-                isSelected ? filledIcon : outlineIcon,
-                color: isSelected ? accent : muted,
-                size: 20,
+        child: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onDestinationSelected,
+          backgroundColor: Colors.transparent,
+          indicatorColor: const Color(0xFF00FFFF).withValues(alpha: 0.15),
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          height: 65,
+          destinations: [
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline_rounded, color: AppTheme.current.mutedText.withValues(alpha: 0.6), size: 22),
+              selectedIcon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF007AFF).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 22),
               ),
+              label: 'CHATS',
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? accent : muted,
-                fontSize: 9,
-                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                letterSpacing: 0.3,
+            NavigationDestination(
+              icon: Icon(Icons.cloud_queue_rounded, color: AppTheme.current.mutedText.withValues(alpha: 0.6), size: 22),
+              selectedIcon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF007AFF).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.cloud_rounded, color: Colors.white, size: 22),
               ),
+              label: 'DRIVE',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.sticky_note_2_outlined, color: AppTheme.current.mutedText.withValues(alpha: 0.6), size: 22),
+              selectedIcon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF007AFF).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.sticky_note_2_rounded, color: Colors.white, size: 22),
+              ),
+              label: 'NOTES',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined, color: AppTheme.current.mutedText.withValues(alpha: 0.6), size: 22),
+              selectedIcon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF007AFF).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
+              ),
+              label: 'SETTINGS',
             ),
           ],
         ),
@@ -1077,7 +1073,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                                   },
                                 ),
                                 IconButton(
-                                  icon: Icon(Icons.check, color: AppTheme.current.accent, size: 20),
+                                  icon: Icon(Icons.check, color: Colors.greenAccent, size: 20),
                                   onPressed: () {
                                     _client.acceptGroupInvite(groupId);
                                     setDialogState(() {});
@@ -2333,13 +2329,13 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
               'Node Status',
               [
                 ListTile(
-                  leading: Icon(Icons.check_circle, color: AppTheme.current.accent),
+                  leading: Icon(Icons.check_circle, color: Colors.green),
                   title: Text('Bulletproof Core Active'),
                 ),
                 ListTile(
                   leading: Icon(Icons.storage),
                   title: Text('SQLCipher Storage Encrypted'),
-                  trailing: Icon(Icons.check_circle, color: AppTheme.current.accent),
+                  trailing: Icon(Icons.check_circle, color: Colors.green),
                 ),
                 ListTile(
                   leading: Icon(Icons.delete_sweep, color: Colors.redAccent),
@@ -2842,7 +2838,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       iconColor = Colors.purpleAccent;
     } else if (token == 'USDC') {
       icon = Icons.monetization_on;
-      iconColor = AppTheme.current.accent;
+      iconColor = Colors.greenAccent;
     } else {
       icon = Icons.token;
       iconColor = AppTheme.current.accent;
@@ -3213,7 +3209,7 @@ class _IncomingCallOverlayState extends State<_IncomingCallOverlay> with SingleT
                   _buildCallOptionButton(
                     icon: Icons.phone_rounded,
                     label: "Audio",
-                    color: AppTheme.current.accent,
+                    color: Colors.greenAccent,
                     onTap: () => widget.onAccept(0), // 0 = Audio only
                   ),
                   _buildCallOptionButton(
