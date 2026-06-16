@@ -1338,6 +1338,17 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _syncContactDetails() {
+    _client.pollPeerProfile(widget.peerId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Syncing contact details...", style: TextStyle(color: AppTheme.current.accent)),
+        backgroundColor: AppTheme.current.surface,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _startCall() {
     showDialog(
       context: context,
@@ -1863,6 +1874,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           if (_isE2eeActive) Icon(Icons.lock_outline, color: AppTheme.current.accent, size: 18),
+          IconButton(
+            onPressed: _syncContactDetails,
+            icon: Icon(Icons.sync_rounded, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
+            tooltip: 'Sync Contact Details',
+          ),
           IconButton(
             onPressed: _startCall,
             icon: Icon(Icons.videocam_rounded, color: AppTheme.current.accent),

@@ -1199,6 +1199,20 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     });
   }
 
+  void _syncContactDetails() {
+    final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
+    for (final memberId in memberIds) {
+      _client.pollPeerProfile(memberId);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Syncing ${memberIds.length} contact(s)...", style: TextStyle(color: AppTheme.current.accent)),
+        backgroundColor: AppTheme.current.surface,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _startGroupCall() {
     final memberIds = _members
         .map((m) => m['peer_id']?.toString() ?? '')
@@ -1988,6 +2002,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               icon: Icon(Icons.videocam_rounded, color: AppTheme.current.accent),
               tooltip: 'Start Group Call',
             ),
+          IconButton(
+            onPressed: _syncContactDetails,
+            icon: Icon(Icons.sync_rounded, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
+            tooltip: 'Sync Contact Details',
+          ),
           IconButton(
             onPressed: _showInfo,
             icon: Icon(Icons.info_outline, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
