@@ -222,6 +222,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final IntrovertClient _client = IntrovertClient();
   final List<dynamic> _messages = [];
   bool _isLoading = false;
+  bool _isSyncing = false;
   String? _myAvatar;
   dynamic _replyingTo;
   String? _editingMsgId;
@@ -265,6 +266,10 @@ class _ChatScreenState extends State<ChatScreen> {
     
     // Graceful background update of peer profile
     _client.pollPeerProfile(widget.peerId);
+    
+    // Sync missed messages from peer
+    _client.syncChatMessages(widget.peerId, widget.peerId, false);
+    _showSyncIndicator();
   }
 
   @override
@@ -1340,13 +1345,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _syncContactDetails() {
     _client.pollPeerProfile(widget.peerId);
+    _client.syncChatMessages(widget.peerId, widget.peerId, false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Syncing contact details...", style: TextStyle(color: AppTheme.current.accent)),
+        content: Text("Syncing contact details & messages...", style: TextStyle(color: AppTheme.current.accent)),
         backgroundColor: AppTheme.current.surface,
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  void _showSyncIndicator() {
+    if (!mounted) return;
+    setState(() => _isSyncing = true);
+    // Auto-hide after 3 seconds or when messages reload
+    Future.delayed(Duration(seconds: 3), () {
+      if (mounted) setState(() => _isSyncing = false);
+    });
   }
 
   void _startCall() {
@@ -1893,6 +1908,22 @@ class _ChatScreenState extends State<ChatScreen> {
           const SovereignWallpaper(),
           Column(
             children: [
+              if (_isSyncing)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: AppTheme.current.accent.withValues(alpha: 0.1),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.current.accent),
+                      ),
+                      SizedBox(width: 8),
+                      Text("Catching up & syncing chat...", style: TextStyle(color: AppTheme.current.accent, fontSize: 11)),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: _isLoading ? Center(child: CircularProgressIndicator(color: AppTheme.current.accent)) : ListView.builder(
                   controller: _scrollController,

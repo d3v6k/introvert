@@ -186,6 +186,30 @@ pub enum SignalingPayload {
         handle: String,
         avatar_base64: Option<String>,
     },
+    /// Request message sync from a peer (1:1 or group)
+    ChatSyncRequest {
+        chat_id: String,
+        is_group: bool,
+        last_msg_id: Option<String>,
+        last_timestamp: i64,
+        limit: u32,
+    },
+    /// Response with messages the requester is missing
+    ChatSyncResponse {
+        chat_id: String,
+        is_group: bool,
+        messages: Vec<SyncMessage>,
+        has_more: bool,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncMessage {
+    pub msg_id: String,
+    pub sender_id: String,
+    pub content: String,
+    pub timestamp: String,
+    pub reply_to: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,6 +271,8 @@ pub enum NetworkCommand {
     HandleDiagnosticTimeout { peer_id: PeerId },
     RequestSwarmStats,
     PollPeerProfile { peer_id: PeerId },
+    /// Trigger message sync with a peer (1:1) or all group members
+    SyncChatMessages { peer_id: PeerId, chat_id: String, is_group: bool },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3251,6 +3277,47 @@ impl NetworkService {
                 let payload = SignalingPayload::ProfileRequest;
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
+            NetworkCommand::SyncChatMessages { peer_id, chat_id, is_group } => {
+                println!("[Mesh] Syncing messages for chat: {} (group={})", chat_id, is_group);
+                let storage = Arc::clone(&self.storage);
+                let chat_id_clone = chat_id.clone();
+                let is_group_clone = is_group;
+                let last_msg_id = tokio::task::spawn_blocking(move || {
+                    if is_group_clone {
+                        storage.get_group_messages(&chat_id_clone).ok()
+                            .and_then(|msgs| msgs.last().map(|m| m.0.clone()))
+                    } else {
+                        storage.get_messages_for_peer(&chat_id_clone).ok()
+                            .and_then(|msgs| msgs.last().map(|m| m.4.clone().unwrap_or_default()))
+                    }
+                }).await.unwrap_or(None);
+
+                let storage2 = Arc::clone(&self.storage);
+                let chat_id_c2 = chat_id.clone();
+                let is_group_c2 = is_group;
+                let last_timestamp = tokio::task::spawn_blocking(move || {
+                    if is_group_c2 {
+                        storage2.get_group_messages(&chat_id_c2).ok()
+                            .and_then(|msgs| msgs.last().map(|m| m.3.clone()))
+                            .and_then(|ts| ts.parse::<i64>().ok())
+                            .unwrap_or(0)
+                    } else {
+                        storage2.get_messages_for_peer(&chat_id_c2).ok()
+                            .and_then(|msgs| msgs.last().map(|m| m.1.clone()))
+                            .and_then(|ts| ts.parse::<i64>().ok())
+                            .unwrap_or(0)
+                    }
+                }).await.unwrap_or(0);
+
+                let payload = SignalingPayload::ChatSyncRequest {
+                    chat_id,
+                    is_group,
+                    last_msg_id,
+                    last_timestamp,
+                    limit: 100,
+                };
+                let _ = self.forward_to_mesh(peer_id, payload, false).await;
+            }
             NetworkCommand::RequestSwarmStats => {
                 // Calculate local storage contribution: min(1GB, 75% of free disk space)
                 let local_storage_gb: u64 = {
@@ -3858,6 +3925,97 @@ impl NetworkService {
                 data.extend(avatar_bytes);
 
                 crate::dispatch_global_event(25, &data);
+            }
+            SignalingPayload::ChatSyncRequest { chat_id, is_group, last_msg_id, last_timestamp, limit } => {
+                println!("[Mesh] Received ChatSyncRequest from {} for chat {} (group={}, after ts={})", peer, chat_id, is_group, last_timestamp);
+                let storage = Arc::clone(&self.storage);
+                let chat_id_c = chat_id.clone();
+                let is_group_c = is_group;
+                let last_ts_c = last_timestamp;
+                let limit_c = limit as usize;
+                let last_mid = last_msg_id.clone();
+
+                let messages = tokio::task::spawn_blocking(move || {
+                    let mut result = Vec::new();
+                    if is_group_c {
+                        if let Ok(msgs) = storage.get_group_messages(&chat_id_c) {
+                            for m in msgs {
+                                // m: (msg_id, sender_id, content, timestamp, reply_to_msg_id)
+                                if let Ok(ts) = m.3.parse::<i64>() {
+                                    if ts > last_ts_c {
+                                        result.push(SyncMessage {
+                                            msg_id: m.0,
+                                            sender_id: m.1,
+                                            content: m.2,
+                                            timestamp: m.3,
+                                            reply_to: m.4,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        if let Ok(msgs) = storage.get_messages_for_peer(&chat_id_c) {
+                            for m in msgs {
+                                // m: (content, timestamp, is_me, status, msg_id, reply_to_msg_id)
+                                if let Ok(ts) = m.1.parse::<i64>() {
+                                    if ts > last_ts_c {
+                                        let is_me_str = if m.2 { "self" } else { "peer" };
+                                        result.push(SyncMessage {
+                                            msg_id: m.4.unwrap_or_default(),
+                                            sender_id: is_me_str.to_string(),
+                                            content: m.0,
+                                            timestamp: m.1,
+                                            reply_to: m.5,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    result
+                }).await.unwrap_or_default();
+
+                let has_more = messages.len() > limit_c;
+                let truncated = if has_more { messages[..limit_c].to_vec() } else { messages };
+
+                println!("[Mesh] Sending {} sync messages to {}", truncated.len(), peer);
+                let response = SignalingPayload::ChatSyncResponse {
+                    chat_id,
+                    is_group,
+                    messages: truncated,
+                    has_more,
+                };
+                let _ = self.forward_to_mesh(peer, response, false).await;
+            }
+            SignalingPayload::ChatSyncResponse { chat_id, is_group, messages, has_more } => {
+                println!("[Mesh] Received ChatSyncResponse for {} with {} messages (has_more={})", chat_id, messages.len(), has_more);
+                let storage = Arc::clone(&self.storage);
+                let chat_id_c = chat_id.clone();
+                let is_group_c = is_group;
+                let peer_id_str = peer.to_string();
+
+                tokio::task::spawn_blocking(move || {
+                    for msg in messages {
+                        if is_group_c {
+                            let _ = storage.store_group_message(&chat_id_c, &msg.sender_id, &msg.msg_id, &msg.content, false, msg.reply_to.as_deref());
+                        } else {
+                            let is_me = msg.sender_id == "self";
+                            let _ = storage.store_message_with_id(&chat_id_c, &msg.msg_id, &msg.content, is_me, msg.reply_to.as_deref());
+                        }
+                    }
+                });
+
+                // Dispatch event to refresh chat UI
+                if is_group {
+                    crate::dispatch_global_event(23, chat_id.as_bytes()); // Event 23: group updated
+                } else {
+                    let mut data = vec![peer_id_str.len() as u8];
+                    data.extend(peer_id_str.as_bytes());
+                    data.extend(0i64.to_be_bytes()); // timestamp placeholder
+                    data.push(0u8); // msg_id_len = 0 (no specific message)
+                    crate::dispatch_global_event(2, &data); // Event 2: new message
+                }
             }
             SignalingPayload::FileTransfer { transfer_id, filename, mime_type, file_hash, total_size, is_relayed, sender_peer_id, group_id } => {
                 // BUG 3 FIX: Use the actual sender's peer ID if provided, otherwise fallback to the anchor peer

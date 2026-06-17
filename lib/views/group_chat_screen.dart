@@ -56,6 +56,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   bool _isAdmin = false;
 
   bool _isInputEmpty = true;
+  bool _isSyncing = false;
   bool _showPanel = false;
   
   // Active List state
@@ -168,6 +169,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
     });
     _startListener();
+    
+    // Sync missed messages from all group members
+    Future.microtask(() async {
+      if (!mounted) return;
+      final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
+      if (memberIds.isNotEmpty) {
+        setState(() => _isSyncing = true);
+        for (final memberId in memberIds) {
+          _client.syncChatMessages(memberId, widget.groupId, true);
+        }
+        Future.delayed(Duration(seconds: 3), () {
+          if (mounted) setState(() => _isSyncing = false);
+        });
+      }
+    });
+    
     _transferSubscription = _client.transferStream.listen((progress) {
       if (mounted) {
         if (progress.groupId != widget.groupId) return; // Leakage Fix: Skip 1-on-1 or other group transfers
@@ -1203,10 +1220,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
     for (final memberId in memberIds) {
       _client.pollPeerProfile(memberId);
+      _client.syncChatMessages(memberId, widget.groupId, true);
     }
+    setState(() => _isSyncing = true);
+    Future.delayed(Duration(seconds: 3), () {
+      if (mounted) setState(() => _isSyncing = false);
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Syncing ${memberIds.length} contact(s)...", style: TextStyle(color: AppTheme.current.accent)),
+        content: Text("Syncing ${memberIds.length} contact(s) & messages...", style: TextStyle(color: AppTheme.current.accent)),
         backgroundColor: AppTheme.current.surface,
         duration: Duration(seconds: 2),
       ),
@@ -2018,6 +2040,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           const SovereignWallpaper(),
           Column(
             children: [
+              if (_isSyncing)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: AppTheme.current.accent.withValues(alpha: 0.1),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.current.accent),
+                      ),
+                      SizedBox(width: 8),
+                      Text("Catching up & syncing chat...", style: TextStyle(color: AppTheme.current.accent, fontSize: 11)),
+                    ],
+                  ),
+                ),
               // Ongoing call banner (only show if <= 8 participants)
               if (_activeCallId != null && _activeCallMembers.length <= 8) _buildOngoingCallBanner(),
               Expanded(

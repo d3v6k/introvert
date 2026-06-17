@@ -77,12 +77,15 @@ pub struct Engine {
     pub network_tx: RwLock<Option<mpsc::Sender<NetworkCommand>>>,
     pub network_callback: RwLock<Option<FfiNetworkCallback>>,
     pub is_anchor_mode: RwLock<bool>,
+    pub is_tunnel_mode: RwLock<bool>,
     pub downloads_dir: String,
 }
 
 pub static ENGINE: Lazy<RwLock<Option<Engine>>> = Lazy::new(|| RwLock::new(None));
 
 pub static TEST_CALLBACK: Lazy<RwLock<Option<FfiNetworkCallback>>> = Lazy::new(|| RwLock::new(None));
+
+pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>> = Lazy::new(|| parking_lot::Mutex::new(None));
 
 /// Dispatches an event to the global FFI callback. 
 /// The memory pointed to by data_ptr MUST be allocated with libc::malloc 
@@ -254,8 +257,11 @@ pub extern "C" fn introvert_engine_start(
     let mut engine_lock = ENGINE.write();
     let downloads_dir = std::path::Path::new(db_path_str.as_ref())
         .parent()
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "/tmp".to_string());
+        .map(|p| p.join("drive").to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/tmp/drive".to_string());
+
+    let is_anchor_mode = storage.is_anchor_mode_enabled();
+    let is_tunnel_mode = storage.is_tunnel_mode_enabled();
 
     *engine_lock = Some(Engine {
         runtime,
@@ -266,7 +272,8 @@ pub extern "C" fn introvert_engine_start(
         session_encryption_key,
         network_tx: RwLock::new(None),
         network_callback: RwLock::new(None),
-        is_anchor_mode: RwLock::new(false),
+        is_anchor_mode: RwLock::new(is_anchor_mode),
+        is_tunnel_mode: RwLock::new(is_tunnel_mode),
         downloads_dir,
     });
 
@@ -298,6 +305,12 @@ pub extern "C" fn introvert_network_start_production(
         Some(e) => e,
         None => return FfiResult::error(-10, "Engine not started"),
     };
+
+    // If network is already started, DO NOT start a duplicate service!
+    if engine.network_tx.read().is_some() {
+        dispatch_debug_log("Network already started. Ignoring duplicate start call.");
+        return FfiResult::success();
+    }
 
     // Update the global callback first
     {
@@ -345,6 +358,7 @@ pub extern "C" fn introvert_network_start_production(
             max_connections,
             liveness_interval_secs,
             downloads_dir,
+            false, // is_stress_test
         ).await {
             Ok(service) => {
                 dispatch_debug_log("NetworkService initialized. Running swarm...");
@@ -560,10 +574,16 @@ pub extern "C" fn introvert_network_send_file(
     } else {
         None
     };
-    
-    let peer_id = match PeerId::from_str(&peer_id_str) {
-        Ok(pid) => pid,
-        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+
+    // If it's a group share, we might not have a specific target peer yet.
+    // We use the local PeerId as a placeholder if peer_id_str is empty.
+    let peer_id = if peer_id_str.is_empty() && group_id.is_some() {
+        engine.identity.peer_id
+    } else {
+        match PeerId::from_str(&peer_id_str) {
+            Ok(pid) => pid,
+            Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+        }
     };
 
     let tx_lock = engine.network_tx.read();
@@ -573,7 +593,34 @@ pub extern "C" fn introvert_network_send_file(
     };
 
     engine.runtime.spawn(async move {
-        let _ = tx.send(crate::network::NetworkCommand::SendFile { peer_id, file_path, group_id }).await;
+        let _ = tx.send(crate::network::NetworkCommand::SendFile { peer_id, file_path, group_id, transfer_id: None }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Cancels an active file transfer by transfer_id.
+#[no_mangle]
+pub extern "C" fn introvert_network_cancel_file_transfer(
+    transfer_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if transfer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let transfer_id = unsafe { CStr::from_ptr(transfer_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::CancelFileTransfer { transfer_id }).await;
     });
 
     FfiResult::success()
@@ -604,6 +651,36 @@ pub extern "C" fn introvert_network_dial(peer_id_ptr: *const c_char) -> FfiResul
 
     engine.runtime.spawn(async move {
         let _ = tx.send(NetworkCommand::Dial { peer_id, address: None }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Explicitly triggers a network diagnostics recheck / redial sequence for a peer.
+#[no_mangle]
+pub extern "C" fn introvert_network_recheck_connection(peer_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = match PeerId::from_str(&peer_id_str) {
+        Ok(pid) => pid,
+        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::RecheckConnection { peer_id }).await;
     });
 
     FfiResult::success()
@@ -647,6 +724,7 @@ pub extern "C" fn introvert_network_establish_secure_session(
 pub extern "C" fn introvert_network_send_message(
     peer_id_ptr: *const c_char,
     msg_ptr: *const c_char,
+    reply_to_ptr: *const c_char,
     callback: FfiCallback,
 ) -> FfiResult {
     let lock = ENGINE.read();
@@ -659,7 +737,8 @@ pub extern "C" fn introvert_network_send_message(
 
     let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
     let message = unsafe { CStr::from_ptr(msg_ptr).to_string_lossy().into_owned() };
-    
+    let reply_to = if reply_to_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(reply_to_ptr).to_string_lossy().into_owned() }) };
+
     let peer_id = match PeerId::from_str(&peer_id_str) {
         Ok(pid) => pid,
         Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
@@ -680,7 +759,7 @@ pub extern "C" fn introvert_network_send_message(
     engine.runtime.spawn(async move {
         let msg_id = format!("m_{}_{}", peer_id_str, chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
         let mid_cb = msg_id.clone();
-        match tx.send(NetworkCommand::SendSignaling { peer_id, msg_id, message }).await {
+        match tx.send(NetworkCommand::SendSignaling { peer_id, msg_id, message, reply_to }).await {
             Ok(_) => {
                 callback(FfiResult::binary(mid_cb.into_bytes()));
             }
@@ -697,6 +776,7 @@ pub extern "C" fn introvert_network_send_message(
 #[no_mangle]
 pub extern "C" fn introvert_network_initiate_webrtc(
     peer_id_ptr: *const c_char,
+    media_type: u8,
     callback: FfiCallback,
 ) -> FfiResult {
     let lock = ENGINE.read();
@@ -721,7 +801,7 @@ pub extern "C" fn introvert_network_initiate_webrtc(
     };
 
     engine.runtime.spawn(async move {
-        match tx.send(NetworkCommand::InitiateWebRtc { peer_id }).await {
+        match tx.send(NetworkCommand::InitiateWebRtc { peer_id, media_type }).await {
             Ok(_) => {
                 callback(FfiResult::success());
             }
@@ -734,7 +814,47 @@ pub extern "C" fn introvert_network_initiate_webrtc(
     FfiResult::success()
 }
 
+/// Forwards a raw flutter_webrtc SDP/ICE signal JSON to a remote peer via the Rust mesh.
+/// This is used when flutter_webrtc handles the WebRTC media stack natively on the Flutter side.
+/// The signal is forwarded as SignalingPayload::WebRtcNative over the encrypted libp2p mesh.
+#[no_mangle]
+pub extern "C" fn introvert_webrtc_send_native_signal(
+    peer_id_ptr: *const c_char,
+    json_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() || json_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let json = unsafe { CStr::from_ptr(json_ptr).to_string_lossy().into_owned() };
+
+    let peer_id = match PeerId::from_str(&peer_id_str) {
+        Ok(pid) => pid,
+        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::ForwardWebRtcNative { peer_id, json }).await;
+    });
+
+    FfiResult::success()
+}
+
 /// Manually adds a peer address to the Kademlia routing table for bootstrapping.
+
 #[no_mangle]
 pub extern "C" fn introvert_network_add_address(
     peer_id_ptr: *const c_char,
@@ -784,8 +904,8 @@ pub extern "C" fn introvert_storage_get_profile() -> FfiResult {
     };
 
     match engine.storage.get_profile() {
-        Ok(Some((name, avatar))) => {
-            let json = json!({ "name": name, "avatar": avatar }).to_string();
+        Ok(Some((name, handle, avatar, privacy_mode))) => {
+            let json = json!({ "name": name, "handle": handle, "avatar": avatar, "privacy_mode": privacy_mode }).to_string();
             FfiResult::binary(json.into_bytes())
         }
         Ok(None) => FfiResult::binary(b"{}".to_vec()),
@@ -797,7 +917,9 @@ pub extern "C" fn introvert_storage_get_profile() -> FfiResult {
 #[no_mangle]
 pub extern "C" fn introvert_storage_set_profile(
     name_ptr: *const c_char,
+    handle_ptr: *const c_char,
     avatar_ptr: *const c_char,
+    privacy_mode: i32,
 ) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() {
@@ -806,9 +928,10 @@ pub extern "C" fn introvert_storage_set_profile(
     };
 
     let name = if name_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(name_ptr).to_str().unwrap_or_default() }) };
+    let handle = if handle_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(handle_ptr).to_str().unwrap_or_default() }) };
     let avatar = if avatar_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(avatar_ptr).to_str().unwrap_or_default() }) };
 
-    match engine.storage.set_profile(name, avatar) {
+    match engine.storage.set_profile(name, handle, avatar, privacy_mode) {
         Ok(_) => FfiResult::success(),
         Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
     }
@@ -834,6 +957,8 @@ pub extern "C" fn introvert_storage_get_contacts() -> FfiResult {
                     "alias": c.local_alias, // UI expects 'alias'
                     "avatar": c.avatar_base64, // UI expects 'avatar'
                     "is_anchor_capable": c.is_anchor_capable,
+                    "retention_hours": c.retention_seconds,
+                    "handle": c.handle,
                 })
             }).collect();
             let json = serde_json::to_string(&mapped_contacts).unwrap_or_default();
@@ -948,6 +1073,74 @@ pub extern "C" fn introvert_network_start_media_stream(
     FfiResult::success()
 }
 
+/// Accepts a pending WebRTC call from a peer with specified media tracks.
+/// media_type: 0 = Audio, 1 = Video, 2 = Both.
+#[no_mangle]
+pub extern "C" fn introvert_network_accept_call(
+    peer_id_ptr: *const c_char,
+    media_type: u8,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    
+    let peer_id = match PeerId::from_str(&peer_id_str) {
+        Ok(pid) => pid,
+        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::AcceptWebRtc { peer_id, media_type }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Rejects a pending WebRTC call from a peer.
+#[no_mangle]
+pub extern "C" fn introvert_network_reject_call(
+    peer_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    
+    let peer_id = match PeerId::from_str(&peer_id_str) {
+        Ok(pid) => pid,
+        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::RejectWebRtc { peer_id }).await;
+    });
+
+    FfiResult::success()
+}
+
 /// Asynchronously persists a message using a non-blocking spawn_blocking task.
 #[no_mangle]
 pub extern "C" fn introvert_store_message_async(
@@ -1028,15 +1221,16 @@ pub extern "C" fn introvert_storage_get_messages(peer_id_ptr: *const c_char) -> 
     match engine.storage.get_messages_for_peer(&peer_id) {
         Ok(messages) => {
             println!("FFI: get_messages for peer {} returned {} rows", peer_id, messages.len());
-            let json_messages: Vec<serde_json::Value> = messages.into_iter().map(|(content, timestamp, is_me, status, msg_id)| {
-                // Convert SQLite timestamp (YYYY-MM-DD HH:MM:SS) to ISO 8601 (YYYY-MM-DDTHH:MM:SS)
-                let iso_timestamp = timestamp.replace(" ", "T");
+            let json_messages: Vec<serde_json::Value> = messages.into_iter().map(|(content, timestamp, is_me, status, msg_id, reply_to)| {
+                // Convert SQLite timestamp (YYYY-MM-DD HH:MM:SS) to ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
+                let iso_timestamp = timestamp.replace(" ", "T") + "Z";
                 serde_json::json!({
                     "content": content,
                     "timestamp": iso_timestamp,
                     "is_me": is_me,
                     "status": status,
-                    "msg_id": msg_id
+                    "msg_id": msg_id,
+                    "reply_to": reply_to
                 })
             }).collect();
 
@@ -1071,7 +1265,7 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
     };
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_avatar) = storage.get_profile().unwrap_or(None).unwrap_or((None, None));
+    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
 
     let my_identity = crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -1082,45 +1276,71 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
         local_alias: local_name,
         avatar_base64: local_avatar,
         is_anchor_capable: true, 
+        retention_seconds: 0,
+        handle: local_handle,
     };
 
-    engine.runtime.spawn(async move {
-        dispatch_debug_log("Wormhole: Connecting to mailbox relay...");
-        
+    let handle = engine.runtime.spawn(async move {
+        dispatch_debug_log("Wormhole: Starting invite creation process...");
+
         let invite_result = tokio::time::timeout(
-            Duration::from_secs(30),
+            Duration::from_secs(60),
             crate::network::wormhole::create_invite(my_identity)
         ).await;
 
         match invite_result {
             Ok(Ok((code, handshake_future))) => {
-                dispatch_debug_log(&format!("Wormhole: Code generated: {}", code));
+                dispatch_debug_log(&format!("Wormhole: Code generated successfully: {}", code));
+                // Add a small delay for UI stability
+                std::thread::sleep(std::time::Duration::from_millis(100));
                 // Emit the code to the UI (Event Type 6)
                 dispatch_global_event(6, code.as_bytes());
                 
-                // Wait for the peer to connect and exchange identity
-                match handshake_future.await {
-                    Ok(peer_identity) => {
-                        let _ = storage.upsert_sovereign_contact(&peer_identity);
+                // Wait for the peer to connect and exchange identity with a 90-second timeout
+                let handshake_res = tokio::time::timeout(
+                    Duration::from_secs(90),
+                    handshake_future
+                ).await;
+
+                match handshake_res {
+                    Ok(Ok(peer_identity)) => {
+                        dispatch_debug_log("Wormhole: Handshake SUCCESS. Persisting contact...");
+                        let _ = storage.upsert_sovereign_contact(&peer_identity, true, false);
                         // Emit a 'Handover Complete' event (Event Type 7)
+                        // Add a small delay to ensure DB is flushed before UI reloads
+                        std::thread::sleep(std::time::Duration::from_millis(300));
                         dispatch_global_event(7, peer_identity.peer_id.as_bytes());
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
+                        let err_msg = format!("ERROR:HANDSHAKE_FAILED:{}", e);
                         eprintln!("Wormhole handshake failed: {}", e);
-                        dispatch_global_event(6, format!("ERROR:HANDSHAKE_FAILED:{}", e).as_bytes());
+                        dispatch_global_event(6, err_msg.as_bytes());
+                    }
+                    Err(_) => {
+                        eprintln!("Wormhole handshake timed out");
+                        dispatch_global_event(6, "ERROR:TIMEOUT:Handshake timed out. Peer might have disconnected.".as_bytes());
                     }
                 }
             }
             Ok(Err(e)) => {
+                let err_msg = format!("ERROR:CREATE_FAILED:{}", e);
                 eprintln!("Failed to create Wormhole invite: {}", e);
-                dispatch_global_event(6, format!("ERROR:CREATE_FAILED:{}", e).as_bytes());
+                dispatch_global_event(6, err_msg.as_bytes());
             }
             Err(_) => {
                 eprintln!("Wormhole invite creation timed out");
-                dispatch_global_event(6, "ERROR:TIMEOUT:Mailbox relay unreachable".as_bytes());
+                dispatch_global_event(6, "ERROR:TIMEOUT:Mailbox relay unreachable. Please check your connection or firewall (Port 443/WSS).".as_bytes());
             }
         }
     });
+
+    {
+        let mut task_lock = WORMHOLE_TASK.lock();
+        if let Some(h) = task_lock.replace(handle) {
+            h.abort();
+            println!("Wormhole: Aborted previous active session/task.");
+        }
+    }
 
     FfiResult::success()
 }
@@ -1171,7 +1391,7 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
     };
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_avatar) = storage.get_profile().unwrap_or(None).unwrap_or((None, None));
+    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
 
     let my_identity = crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -1182,30 +1402,76 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
         local_alias: local_name,
         avatar_base64: local_avatar,
         is_anchor_capable: true, 
+        retention_seconds: 0,
+        handle: local_handle,
     };
 
-    engine.runtime.spawn(async move {
-        match crate::network::wormhole::accept_invite(code, my_identity).await {
-            Ok(handshake_future) => {
-                match handshake_future.await {
-                    Ok(peer_identity) => {
-                        let _ = storage.upsert_sovereign_contact(&peer_identity);
+    let handle = engine.runtime.spawn(async move {
+        dispatch_debug_log("Wormhole: Starting join process...");
+        let accept_res = tokio::time::timeout(
+            Duration::from_secs(60),
+            crate::network::wormhole::accept_invite(code, my_identity)
+        ).await;
+
+        match accept_res {
+            Ok(Ok(handshake_future)) => {
+                dispatch_debug_log("Wormhole: Linked to peer. Waiting for handshake...");
+                let handshake_res = tokio::time::timeout(
+                    Duration::from_secs(90),
+                    handshake_future
+                ).await;
+
+                match handshake_res {
+                    Ok(Ok(peer_identity)) => {
+                        dispatch_debug_log("Wormhole: Join SUCCESS. Persisting contact...");
+                        let _ = storage.upsert_sovereign_contact(&peer_identity, true, false);
                         // Emit a 'Handover Complete' event (Event Type 7)
+                        // Add a small delay to ensure DB is flushed before UI reloads
+                        std::thread::sleep(std::time::Duration::from_millis(300));
                         dispatch_global_event(7, peer_identity.peer_id.as_bytes());
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
+                        let err_msg = format!("ERROR:JOIN_HANDSHAKE_FAILED:{}", e);
                         eprintln!("Wormhole join handshake failed: {}", e);
-                        dispatch_global_event(6, format!("ERROR:JOIN_HANDSHAKE_FAILED:{}", e).as_bytes());
+                        dispatch_global_event(6, err_msg.as_bytes());
+                    }
+                    Err(_) => {
+                        eprintln!("Wormhole join handshake timed out");
+                        dispatch_global_event(6, "ERROR:TIMEOUT:Join handshake timed out".as_bytes());
                     }
                 }
             }
-            Err(e) => {
+            Ok(Err(e)) => {
+                let err_msg = format!("ERROR:JOIN_FAILED:{}", e);
                 eprintln!("Failed to join Wormhole session: {}", e);
-                dispatch_global_event(6, format!("ERROR:JOIN_FAILED:{}", e).as_bytes());
+                dispatch_global_event(6, err_msg.as_bytes());
+            }
+            Err(_) => {
+                eprintln!("Wormhole join connection timed out");
+                dispatch_global_event(6, "ERROR:TIMEOUT:Join connection timed out. Please check your connection or firewall (Port 443/WSS).".as_bytes());
             }
         }
     });
 
+    {
+        let mut task_lock = WORMHOLE_TASK.lock();
+        if let Some(h) = task_lock.replace(handle) {
+            h.abort();
+            println!("Wormhole: Aborted previous active session/task.");
+        }
+    }
+
+    FfiResult::success()
+}
+
+/// Aborts any active Magic Wormhole invite or join session.
+#[no_mangle]
+pub extern "C" fn introvert_wormhole_abort() -> FfiResult {
+    let mut task_lock = WORMHOLE_TASK.lock();
+    if let Some(h) = task_lock.take() {
+        h.abort();
+        println!("Wormhole: Aborted active session/task on user request.");
+    }
     FfiResult::success()
 }
 
@@ -1288,6 +1554,9 @@ pub extern "C" fn introvert_network_set_anchor_mode(enabled: bool) -> FfiResult 
         *anchor_lock = enabled;
     }
 
+    let storage = Arc::clone(&engine.storage);
+    let _ = storage.set_anchor_mode_enabled(enabled);
+
     let tx_lock = engine.network_tx.read();
     let tx = match tx_lock.as_ref() {
         Some(t) => t.clone(),
@@ -1307,6 +1576,37 @@ pub extern "C" fn introvert_network_get_anchor_mode() -> i32 {
     let lock = ENGINE.read();
     if let Some(engine) = lock.as_ref() {
         if *engine.is_anchor_mode.read() { 1 } else { 0 }
+    } else {
+        0
+    }
+}
+
+/// Sets the node's WebSocket secure tunnel mode.
+#[no_mangle]
+pub extern "C" fn introvert_network_set_tunnel_mode(enabled: bool) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    {
+        let mut tunnel_lock = engine.is_tunnel_mode.write();
+        *tunnel_lock = enabled;
+    }
+
+    let storage = Arc::clone(&engine.storage);
+    let _ = storage.set_tunnel_mode_enabled(enabled);
+
+    FfiResult::success()
+}
+
+/// Returns 1 if Tunnel Mode is enabled, 0 otherwise.
+#[no_mangle]
+pub extern "C" fn introvert_network_get_tunnel_mode() -> i32 {
+    let lock = ENGINE.read();
+    if let Some(engine) = lock.as_ref() {
+        if *engine.is_tunnel_mode.read() { 1 } else { 0 }
     } else {
         0
     }
@@ -1461,6 +1761,33 @@ pub extern "C" fn introvert_drive_get_all() -> FfiResult {
     }
 }
 
+/// Retrieves metadata for a specific file in the local encrypted Drive by its hash.
+#[no_mangle]
+pub extern "C" fn introvert_drive_get_by_hash(
+    file_hash_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if file_hash_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let file_hash = unsafe { CStr::from_ptr(file_hash_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.get_drive_file_by_hash(&file_hash) {
+        Ok(Some(file)) => {
+            let json = serde_json::to_string(&file).unwrap_or_default();
+            FfiResult::binary(json.into_bytes())
+        }
+        Ok(None) => FfiResult::binary(b"{}".to_vec()),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
 /// Deletes a file from the local encrypted Drive.
 #[no_mangle]
 pub extern "C" fn introvert_drive_delete(
@@ -1545,10 +1872,16 @@ pub extern "C" fn introvert_group_create(
 
     let creator_peer_id = engine.identity.peer_id.to_string();
     let creator_pubkey = engine.identity.keypair.public().encode_protobuf();
+    let local_profile = engine.storage.get_profile().ok().flatten();
+    let creator_alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
+    let creator_avatar = local_profile.and_then(|(_, _, a, _)| a);
+
     let creator_member = crate::network::GroupMemberMetadata {
         peer_id: creator_peer_id,
         pubkey: creator_pubkey,
         role: crate::network::GroupRole::Creator,
+        alias: creator_alias,
+        avatar_base64: creator_avatar,
     };
 
     let mut members = vec![creator_member];
@@ -1560,6 +1893,8 @@ pub extern "C" fn introvert_group_create(
                 peer_id: peer_id_str,
                 pubkey: contact.p2p_pubkey,
                 role: crate::network::GroupRole::Member,
+                alias: contact.local_alias.or(contact.global_name),
+                avatar_base64: contact.avatar_base64,
             });
         }
     }
@@ -1616,6 +1951,7 @@ pub extern "C" fn introvert_group_create(
 pub extern "C" fn introvert_group_send_message(
     group_id_ptr: *const c_char,
     msg_ptr: *const c_char,
+    reply_to_ptr: *const c_char,
 ) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() {
@@ -1629,6 +1965,7 @@ pub extern "C" fn introvert_group_send_message(
 
     let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
     let message = unsafe { CStr::from_ptr(msg_ptr).to_string_lossy().into_owned() };
+    let reply_to = if reply_to_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(reply_to_ptr).to_string_lossy().into_owned() }) };
 
     let group_secret_vec = match engine.storage.load_group_secret(&group_id) {
         Ok(Some(s)) => s,
@@ -1661,14 +1998,14 @@ pub extern "C" fn introvert_group_send_message(
             }
         }
     }
-    let action = crate::network::GroupAction::Message { content_encrypted, msg_id: msg_id.clone() };
+    let action = crate::network::GroupAction::Message { content_encrypted, msg_id: msg_id.clone(), reply_to: reply_to.clone() };
     let signed = match crate::network::group::GroupManager::sign_action(group_id.clone(), action, &engine.identity.keypair) {
         Ok(s) => s,
         Err(e) => return FfiResult::error(-4, &format!("Sign error: {}", e)),
     };
 
     let my_peer_id = engine.identity.peer_id.to_string();
-    if let Err(e) = engine.storage.store_group_message(&group_id, &my_peer_id, &msg_id, &message) {
+    if let Err(e) = engine.storage.store_group_message(&group_id, &my_peer_id, &msg_id, &message, true, reply_to.as_deref()) {
         return FfiResult::error(-5, &format!("Database error: {}", e));
     }
 
@@ -1696,6 +2033,66 @@ pub extern "C" fn introvert_group_send_message(
     FfiResult::success()
 }
 
+/// Retrieves all unread message counts.
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_unread_counts() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    match engine.storage.get_unread_counts() {
+        Ok(counts) => {
+            let json = serde_json::to_string(&counts).unwrap_or_default();
+            FfiResult::binary(json.into_bytes())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+/// Updates the status of all messages in a group.
+#[no_mangle]
+pub extern "C" fn introvert_storage_update_group_message_status(
+    group_id_ptr: *const c_char,
+    status: u8,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if group_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.update_group_message_status(&group_id, status) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+/// Updates the status of all messages for a peer.
+#[no_mangle]
+pub extern "C" fn introvert_storage_update_message_status_for_peer(
+    peer_id_ptr: *const c_char,
+    status: u8,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.update_message_status_for_peer(&peer_id, status) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
 /// Retrieves all groups.
 #[no_mangle]
 pub extern "C" fn introvert_group_get_all() -> FfiResult {
@@ -1707,13 +2104,15 @@ pub extern "C" fn introvert_group_get_all() -> FfiResult {
 
     match engine.storage.get_all_groups() {
         Ok(groups) => {
+            println!("[FFI] Found {} groups in database", groups.len());
             let mut groups_json = Vec::new();
-            for (gid, name, members, desc) in groups {
+            for (gid, name, members, desc, retention) in groups {
                 groups_json.push(vec![
                     serde_json::Value::String(gid),
                     serde_json::Value::String(name),
                     serde_json::Value::String(members),
                     serde_json::Value::String(desc),
+                    serde_json::Value::Number(retention.into()),
                 ]);
             }
             let json_str = match serde_json::to_string(&groups_json) {
@@ -1744,23 +2143,65 @@ pub extern "C" fn introvert_group_get_messages(
     let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
     let my_peer_id = engine.identity.peer_id.to_string();
 
+    let members_json = engine.storage.get_group_members(&group_id).ok().flatten();
+    let group_members: Vec<crate::network::GroupMemberMetadata> = if let Some(ref mj) = members_json {
+        serde_json::from_str(mj).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     match engine.storage.get_group_messages(&group_id) {
         Ok(msgs) => {
             let mut msgs_json = Vec::new();
-            for (sender_id, _msg_id, content, timestamp) in msgs {
-                let sender_name = if sender_id == my_peer_id {
-                    "me".to_string()
-                } else if let Ok(Some(contact)) = engine.storage.get_contact(&sender_id) {
-                    contact.local_alias.clone().or(contact.global_name.clone()).unwrap_or_else(|| sender_id.clone())
+            for (sender_id, msg_id, content, timestamp, reply_to) in msgs {
+                let (sender_name, sender_avatar) = if sender_id == my_peer_id {
+                    // Local user name & avatar resolution
+                    let profile = engine.storage.get_profile().ok().flatten();
+                    let name = profile.as_ref().and_then(|(n, _, _, _)| n.clone().filter(|n| !n.is_empty()))
+                        .unwrap_or_else(|| "me".to_string());
+                    let avatar = profile.and_then(|(_, _, a, _)| a);
+                    (name, avatar)
                 } else {
-                    sender_id.clone()
+                    // Resolution Priority:
+                    // 1. Local Contact (Alias/GlobalName + Avatar)
+                    // 2. Group Member Metadata (Alias + Avatar)
+                    // 3. Raw Peer ID (truncated)
+
+                    let contact_opt = engine.storage.get_contact(&sender_id).ok().flatten();
+
+                    let mut name = contact_opt.as_ref()
+                        .and_then(|c| c.local_alias.clone().or(c.global_name.clone()))
+                        .unwrap_or_else(|| {
+                            group_members.iter()
+                                .find(|m| m.peer_id == sender_id)
+                                .and_then(|m| m.alias.clone())
+                                .unwrap_or_else(|| sender_id.clone())
+                        });
+
+                    let avatar = contact_opt.as_ref()
+                        .and_then(|c| c.avatar_base64.clone())
+                        .or_else(|| {
+                            group_members.iter()
+                                .find(|m| m.peer_id == sender_id)
+                                .and_then(|m| m.avatar_base64.clone())
+                        });
+
+                    // If it's a raw PeerID (long string), truncate it for the UI
+                    if name.len() > 30 && name == sender_id {
+                        name = format!("Peer: {}...{}", &name[0..6], &name[name.len()-4..]);
+                    }
+                    (name, avatar)
                 };
 
+                let iso_timestamp = timestamp.replace(" ", "T") + "Z";
                 msgs_json.push(vec![
                     serde_json::Value::String(sender_id),
                     serde_json::Value::String(sender_name),
                     serde_json::Value::String(content),
-                    serde_json::Value::String(timestamp),
+                    serde_json::Value::String(iso_timestamp),
+                    serde_json::Value::String(msg_id),
+                    reply_to.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null),
+                    sender_avatar.map(serde_json::Value::String).unwrap_or(serde_json::Value::Null),
                 ]);
             }
             let json_str = match serde_json::to_string(&msgs_json) {
@@ -1771,6 +2212,88 @@ pub extern "C" fn introvert_group_get_messages(
         }
         Err(e) => FfiResult::error(-2, &format!("Database error: {}", e)),
     }
+}
+
+/// Admin approves a group join request.
+#[no_mangle]
+pub extern "C" fn introvert_group_approve_join(
+    group_id_ptr: *const c_char,
+    peer_id_ptr: *const c_char,
+    alias_ptr: *const c_char,
+    avatar_ptr: *const c_char,
+    handle_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if group_id_ptr.is_null() || peer_id_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let alias = if alias_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(alias_ptr).to_string_lossy().into_owned() }) };
+    let avatar = if avatar_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(avatar_ptr).to_string_lossy().into_owned() }) };
+    let handle = if handle_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(handle_ptr).to_string_lossy().into_owned() }) };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::ApproveGroupJoin {
+            group_id,
+            requester_peer_id: peer_id,
+            alias,
+            avatar,
+            handle,
+        }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Admin rejects a group join request.
+#[no_mangle]
+pub extern "C" fn introvert_group_reject_join(
+    group_id_ptr: *const c_char,
+    peer_id_ptr: *const c_char,
+    reason_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if group_id_ptr.is_null() || peer_id_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let reason = if reason_ptr.is_null() { "Access denied".to_string() } else { unsafe { CStr::from_ptr(reason_ptr).to_string_lossy().into_owned() } };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::RejectGroupJoin {
+            group_id,
+            requester_peer_id: peer_id,
+            reason,
+        }).await;
+    });
+
+    FfiResult::success()
 }
 
 /// Adds a member to a group.
@@ -1823,6 +2346,8 @@ pub extern "C" fn introvert_group_remove_member(
 
     let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
     let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let my_peer_id = engine.identity.peer_id.to_string();
+    let is_self = peer_id_str == my_peer_id;
 
     let tx_lock = engine.network_tx.read();
     let tx = match tx_lock.as_ref() {
@@ -1830,8 +2355,22 @@ pub extern "C" fn introvert_group_remove_member(
         None => return FfiResult::error(-13, "Network not started"),
     };
 
+    let mut members_json = None;
+    if is_self {
+        // If we are leaving, perform local deletion synchronously to ensure UI reflects it immediately.
+        if let Ok(Some(group_info)) = engine.storage.get_group(&group_id) {
+            members_json = Some(group_info.members_json.clone());
+            let _ = engine.storage.delete_group(&group_id);
+            crate::dispatch_global_event(22, group_id.as_bytes());
+        }
+    }
+
     engine.runtime.spawn(async move {
-        let _ = tx.send(crate::network::NetworkCommand::RemoveGroupMember { group_id, peer_id: peer_id_str }).await;
+        let _ = tx.send(crate::network::NetworkCommand::RemoveGroupMember { 
+            group_id, 
+            peer_id: peer_id_str,
+            members_json,
+        }).await;
     });
 
     FfiResult::success()
@@ -1955,37 +2494,49 @@ pub extern "C" fn introvert_group_delete(
 
     let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
     let my_peer_id = engine.identity.peer_id.to_string();
+    println!("[FFI] Attempting to delete group: {}", group_id);
 
     if let Ok(Some(group_info)) = engine.storage.get_group(&group_id) {
         let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&group_info.members_json).unwrap_or_default();
         let is_creator = members.iter().any(|m| m.peer_id == my_peer_id && m.role == crate::network::GroupRole::Creator);
-        if !is_creator {
-            return FfiResult::error(-12, "Permission denied: Only the main group creator can delete the group");
-        }
-
-        let tx_lock = engine.network_tx.read();
-        if let Some(tx) = tx_lock.as_ref() {
-            let tx = tx.clone();
-            let action = crate::network::GroupAction::DeleteGroup;
-            if let Ok(signed) = crate::network::group::GroupManager::sign_action(group_id.clone(), action, &engine.identity.keypair) {
-                let payload = crate::network::SignalingPayload::GroupAction(signed);
-                let my_peer_id_clone = my_peer_id.clone();
-                
-                engine.runtime.spawn(async move {
-                    for m in members {
-                        if m.peer_id == my_peer_id_clone { continue; }
-                        if let Ok(pid) = PeerId::from_str(&m.peer_id) {
-                            let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+        println!("[FFI] Group found. Is creator: {}", is_creator);
+        
+        // Only signal the mesh if we are the creator. 
+        if is_creator {
+            println!("[FFI] Signaling mesh about group deletion");
+            let tx_lock = engine.network_tx.read();
+            if let Some(tx) = tx_lock.as_ref() {
+                let tx = tx.clone();
+                let action = crate::network::GroupAction::DeleteGroup;
+                if let Ok(signed) = crate::network::group::GroupManager::sign_action(group_id.clone(), action, &engine.identity.keypair) {
+                    let payload = crate::network::SignalingPayload::GroupAction(signed);
+                    let my_peer_id_clone = my_peer_id.clone();
+                    
+                    engine.runtime.spawn(async move {
+                        for m in members {
+                            if m.peer_id == my_peer_id_clone { continue; }
+                            if let Ok(pid) = PeerId::from_str(&m.peer_id) {
+                                let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
         }
+    } else {
+        println!("[FFI] Group {} not found in storage during delete attempt", group_id);
     }
 
     match engine.storage.delete_group(&group_id) {
-        Ok(_) => FfiResult::success(),
-        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+        Ok(_) => {
+            println!("[FFI] Successfully deleted group {} from local storage", group_id);
+            crate::dispatch_global_event(22, group_id.as_bytes());
+            FfiResult::success()
+        },
+        Err(e) => {
+            println!("[FFI] FAILED to delete group {}: {}", group_id, e);
+            FfiResult::error(-1, &format!("Database error: {}", e))
+        },
     }
 }
 
@@ -2080,6 +2631,173 @@ pub extern "C" fn introvert_group_decline_invite(
     FfiResult::success()
 }
 
+/// Mutes a member in a group (Admin only).
+#[no_mangle]
+pub extern "C" fn introvert_group_mute_member(
+    group_id_ptr: *const c_char,
+    peer_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if group_id_ptr.is_null() || peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    let action = crate::network::GroupAction::MuteMember { peer_id };
+    let signed = match crate::network::group::GroupManager::sign_action(group_id.clone(), action, &engine.identity.keypair) {
+        Ok(s) => s,
+        Err(e) => return FfiResult::error(-4, &format!("Sign error: {}", e)),
+    };
+    let payload = crate::network::SignalingPayload::GroupAction(signed);
+    let storage = engine.storage.clone();
+    let my_peer_id = engine.identity.peer_id.to_string();
+    engine.runtime.spawn(async move {
+        if let Ok(Some(members_json)) = storage.get_group_members(&group_id) {
+            let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+            for m in members {
+                if m.peer_id == my_peer_id { continue; }
+                if let Ok(pid) = m.peer_id.parse::<PeerId>() {
+                    let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                }
+            }
+        }
+    });
+
+    FfiResult::success()
+}
+
+/// Unmutes a member in a group (Admin only).
+#[no_mangle]
+pub extern "C" fn introvert_group_unmute_member(
+    group_id_ptr: *const c_char,
+    peer_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if group_id_ptr.is_null() || peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    let action = crate::network::GroupAction::UnmuteMember { peer_id };
+    let signed = match crate::network::group::GroupManager::sign_action(group_id.clone(), action, &engine.identity.keypair) {
+        Ok(s) => s,
+        Err(e) => return FfiResult::error(-4, &format!("Sign error: {}", e)),
+    };
+    let payload = crate::network::SignalingPayload::GroupAction(signed);
+    let storage = engine.storage.clone();
+    let my_peer_id = engine.identity.peer_id.to_string();
+    engine.runtime.spawn(async move {
+        if let Ok(Some(members_json)) = storage.get_group_members(&group_id) {
+            let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+            for m in members {
+                if m.peer_id == my_peer_id { continue; }
+                if let Ok(pid) = m.peer_id.parse::<PeerId>() {
+                    let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                }
+            }
+        }
+    });
+
+    FfiResult::success()
+}
+
+/// Retrieves the list of muted members in a group.
+#[no_mangle]
+pub extern "C" fn introvert_group_get_muted_members(
+    group_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if group_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.get_group_muted_members(&group_id) {
+        Ok(muted) => {
+            let json = serde_json::to_string(&muted).unwrap_or_else(|_| "[]".to_string());
+            FfiResult::binary(json.into_bytes())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
+/// Requests a fresh calculation of swarm statistics.
+/// Results are dispatched via Global Event Type 30.
+#[no_mangle]
+pub extern "C" fn introvert_network_request_swarm_stats() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::RequestSwarmStats).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Computes the SHA-256 hash of a local file.
+#[no_mangle]
+pub extern "C" fn introvert_network_compute_file_hash(
+    file_path_ptr: *const c_char,
+) -> FfiResult {
+    if file_path_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+    let file_path = unsafe { CStr::from_ptr(file_path_ptr).to_string_lossy().into_owned() };
+    
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return FfiResult::error(-1, "File not found");
+    }
+
+    use sha2::{Sha256, Digest};
+    use std::io::BufReader;
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(e) => return FfiResult::error(-2, &format!("Failed to open file: {:?}", e)),
+    };
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    if let Err(e) = std::io::copy(&mut reader, &mut hasher) {
+        return FfiResult::error(-3, &format!("Failed to read file: {:?}", e));
+    }
+    let file_hash = format!("{:x}", hasher.finalize());
+
+    FfiResult::binary(file_hash.into_bytes())
+}
+
 /// Registers the local node as a seeder for a file.
 #[no_mangle]
 pub extern "C" fn introvert_network_register_seeder(
@@ -2115,7 +2833,7 @@ pub extern "C" fn introvert_network_register_seeder(
         None => return FfiResult::error(-13, "Network not started"),
     };
 
-    let chunk_size = 256 * 1024;
+    let chunk_size = if group_id.is_some() { 64 * 1024 } else { 256 * 1024 };
     let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
     let local_peer_id = engine.identity.peer_id;
 
@@ -2168,9 +2886,13 @@ pub extern "C" fn introvert_network_start_pull(
         None
     };
 
-    let peer = match PeerId::from_str(&peer_id_str) {
-        Ok(pid) => pid,
-        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+    let peer = if peer_id_str.is_empty() {
+        engine.identity.peer_id
+    } else {
+        match PeerId::from_str(&peer_id_str) {
+            Ok(pid) => pid,
+            Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+        }
     };
 
     let tx_lock = engine.network_tx.read();
@@ -2192,8 +2914,840 @@ pub extern "C" fn introvert_network_start_pull(
 
     engine.runtime.spawn(async move {
         // Forward signaling directly to ourselves as if received from 'peer'
-        let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: peer, payload }).await;
+        let _ = tx.send(crate::network::NetworkCommand::HandleIncomingPayload { peer_id: peer, payload }).await;
     });
 
     FfiResult::success()
+}
+
+/// Resolves a persistent handle (i@handle) to a PeerId via DHT.
+/// Result is dispatched via Global Event Type 33.
+#[no_mangle]
+pub extern "C" fn introvert_network_resolve_handle(
+    handle_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if handle_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let mut handle = unsafe { CStr::from_ptr(handle_ptr).to_string_lossy().into_owned() };
+    if !handle.starts_with("i@") {
+        handle = format!("i@{}", handle);
+    }
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::ResolveHandle { handle }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Initiates a handle claim process. Performs local PoW then broadcasts to RBNs.
+/// Result is dispatched via Global Event Type 34.
+#[no_mangle]
+pub extern "C" fn introvert_network_claim_handle(
+    handle_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if handle_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let mut handle = unsafe { CStr::from_ptr(handle_ptr).to_string_lossy().into_owned() };
+    if !handle.starts_with("i@") {
+        handle = format!("i@{}", handle);
+    }
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::ClaimHandle { handle }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Queries the local registry for a handle's verified status.
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_handle_status(
+    handle_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if handle_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let mut handle = unsafe { CStr::from_ptr(handle_ptr).to_string_lossy().into_owned() };
+    if !handle.starts_with("i@") {
+        handle = format!("i@{}", handle);
+    }
+
+    match engine.storage.get_handle_claim(&handle) {
+        Ok(Some((peer_id, timestamp, signatures, verified))) => {
+            let json = json!({
+                "peer_id": peer_id,
+                "timestamp": timestamp,
+                "signatures": signatures,
+                "verified": verified
+            }).to_string();
+            FfiResult::binary(json.into_bytes())
+        }
+        Ok(None) => FfiResult::binary(b"{}".to_vec()),
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
+/// Registers a mobile push token with the RBN backbone for background wakeups.
+#[no_mangle]
+pub extern "C" fn introvert_network_register_push_token(
+    device_type_ptr: *const c_char,
+    token_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if device_type_ptr.is_null() || token_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let device_type = unsafe { CStr::from_ptr(device_type_ptr).to_string_lossy().into_owned() };
+    let push_token = unsafe { CStr::from_ptr(token_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let payload = crate::network::SignalingPayload::IdentifySleepState { device_type, push_token };
+        // Broadcast to all RBNs/Bootstrap nodes
+        let bootstrap = crate::network::config::get_bootstrap_nodes();
+        for (pid, _) in bootstrap {
+            let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+        }
+    });
+
+    FfiResult::success()
+}
+/// Sends an emoji reaction to a message.
+#[no_mangle]
+pub extern "C" fn introvert_network_send_reaction(
+    target_id_ptr: *const c_char, // PeerID or GroupID
+    msg_id_ptr: *const c_char,
+    emoji_ptr: *const c_char,
+    is_group: bool,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if target_id_ptr.is_null() || msg_id_ptr.is_null() || emoji_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let target_id_str = unsafe { CStr::from_ptr(target_id_ptr).to_string_lossy().into_owned() };
+    let msg_id = unsafe { CStr::from_ptr(msg_id_ptr).to_string_lossy().into_owned() };
+    let emoji = unsafe { CStr::from_ptr(emoji_ptr).to_string_lossy().into_owned() };
+
+    let my_peer_id = engine.identity.peer_id.to_string();
+    if let Err(e) = engine.storage.add_message_reaction(&msg_id, &my_peer_id, &emoji) {
+        return FfiResult::error(-1, &format!("Storage error: {}", e));
+    }
+
+    // DISPATCH LOCALLY: Ensure sender's UI updates immediately
+    let mut local_data = vec![msg_id.len() as u8];
+    local_data.extend(msg_id.as_bytes());
+    local_data.extend(emoji.as_bytes());
+    crate::dispatch_global_event(35, &local_data);
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    if is_group {
+        let action = crate::network::GroupAction::Reaction { msg_id, emoji };
+        let signed = match crate::network::group::GroupManager::sign_action(target_id_str.clone(), action, &engine.identity.keypair) {
+            Ok(s) => s,
+            Err(e) => return FfiResult::error(-4, &format!("Sign error: {}", e)),
+        };
+        let payload = crate::network::SignalingPayload::GroupAction(signed);
+        let storage = engine.storage.clone();
+        engine.runtime.spawn(async move {
+            if let Ok(Some(members_json)) = storage.get_group_members(&target_id_str) {
+                let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+                for m in members {
+                    if m.peer_id == my_peer_id { continue; }
+                    if let Ok(pid) = m.peer_id.parse::<PeerId>() {
+                        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                    }
+                }
+            }
+        });
+    } else {
+        if let Ok(peer_id) = PeerId::from_str(&target_id_str) {
+            engine.runtime.spawn(async move {
+                let payload = crate::network::SignalingPayload::MessageReaction { msg_id, emoji };
+                let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+            });
+        }
+    }
+
+    FfiResult::success()
+}
+
+/// Retrieves aggregated reactions for a message.
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_reactions(
+    msg_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if msg_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let msg_id = unsafe { CStr::from_ptr(msg_id_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.get_message_reactions(&msg_id) {
+        Ok(json) => FfiResult::binary(json.to_string().into_bytes()),
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
+/// Sends a direct connection invite to a peer.
+#[no_mangle]
+pub extern "C" fn introvert_network_send_direct_invite(
+    peer_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = match PeerId::from_str(&peer_id_str) {
+        Ok(pid) => pid,
+        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
+    };
+
+    let identity = Arc::clone(&engine.identity);
+    let storage = Arc::clone(&engine.storage);
+    
+    let local_static_secret = match NodeIdentity::derive_e2ee_key(identity.seed) {
+        Ok(k) => k,
+        Err(_) => return FfiResult::error(-14, "E2EE key derivation failed"),
+    };
+    let local_static_public = x25519_dalek::PublicKey::from(&local_static_secret);
+    
+    let solana_signing_key = match NodeIdentity::derive_solana_keypair(identity.seed) {
+        Ok(k) => k,
+        Err(_) => return FfiResult::error(-15, "Solana key derivation failed"),
+    };
+    let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
+
+    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+
+    let my_identity = crate::identity::SovereignIdentity {
+        peer_id: identity.peer_id.to_string(),
+        p2p_pubkey: identity.keypair.public().encode_protobuf(),
+        static_key: local_static_public.to_bytes(),
+        solana_address,
+        global_name: local_name.clone(),
+        local_alias: local_name,
+        avatar_base64: local_avatar,
+        is_anchor_capable: true, 
+        retention_seconds: 0,
+        handle: local_handle,
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    let status = storage.get_contact_status(&peer_id_str).ok().flatten();
+    let is_accept = match status {
+        Some((false, true)) => {
+            let _ = storage.update_contact_verification(&peer_id_str, true);
+            true
+        }
+        _ => {
+            if status.is_none() {
+                let placeholder = crate::identity::SovereignIdentity {
+                    peer_id: peer_id_str.clone(),
+                    p2p_pubkey: vec![],
+                    static_key: [0u8; 32],
+                    solana_address: "".to_string(),
+                    global_name: None,
+                    local_alias: None,
+                    avatar_base64: None,
+                    is_anchor_capable: false,
+                    retention_seconds: 0,
+                    handle: None,
+                };
+                let _ = storage.upsert_sovereign_contact(&placeholder, false, false);
+            }
+            false
+        }
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::SendDirectInvite { 
+            peer_id, 
+            identity: my_identity,
+            is_accept,
+        }).await;
+    });
+
+    FfiResult::success()
+}
+
+/// Sets retention policy and gossips it to the peer/group.
+#[no_mangle]
+pub extern "C" fn introvert_network_set_retention(
+    target_id_ptr: *const c_char,
+    seconds: u32,
+    is_group: bool,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if target_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let target_id_str = unsafe { CStr::from_ptr(target_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    if is_group {
+        let _ = engine.storage.set_group_retention(&target_id_str, seconds);
+        let action = crate::network::GroupAction::SetRetention { seconds };
+        let signed = match crate::network::group::GroupManager::sign_action(target_id_str.clone(), action, &engine.identity.keypair) {
+            Ok(s) => s,
+            Err(e) => return FfiResult::error(-4, &format!("Sign error: {}", e)),
+        };
+        let payload = crate::network::SignalingPayload::GroupAction(signed);
+        let storage = engine.storage.clone();
+        let my_peer_id = engine.identity.peer_id.to_string();
+        engine.runtime.spawn(async move {
+            if let Ok(Some(members_json)) = storage.get_group_members(&target_id_str) {
+                let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+                for m in members {
+                    if m.peer_id == my_peer_id { continue; }
+                    if let Ok(pid) = m.peer_id.parse::<PeerId>() {
+                        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                    }
+                }
+            }
+        });
+    } else {
+        let _ = engine.storage.set_contact_retention(&target_id_str, seconds);
+        if let Ok(peer_id) = PeerId::from_str(&target_id_str) {
+            engine.runtime.spawn(async move {
+                let payload = crate::network::SignalingPayload::SetRetention { seconds };
+                let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+            });
+        }
+    }
+
+    FfiResult::success()
+}
+
+/// Deletes a message locally and gossips the deletion.
+#[no_mangle]
+pub extern "C" fn introvert_network_delete_message(
+    target_id_ptr: *const c_char,
+    msg_id_ptr: *const c_char,
+    is_group: bool,
+    deleted_by_admin: bool,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if target_id_ptr.is_null() || msg_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let target_id_str = unsafe { CStr::from_ptr(target_id_ptr).to_string_lossy().into_owned() };
+    let msg_id = unsafe { CStr::from_ptr(msg_id_ptr).to_string_lossy().into_owned() };
+
+    let _ = engine.storage.delete_message(&msg_id, is_group, deleted_by_admin);
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    if is_group {
+        let action = crate::network::GroupAction::DeleteMessage { msg_id };
+        let signed = match crate::network::group::GroupManager::sign_action(target_id_str.clone(), action, &engine.identity.keypair) {
+            Ok(s) => s,
+            Err(e) => return FfiResult::error(-4, &format!("Sign error: {}", e)),
+        };
+        let payload = crate::network::SignalingPayload::GroupAction(signed);
+        let storage = engine.storage.clone();
+        let my_peer_id = engine.identity.peer_id.to_string();
+        engine.runtime.spawn(async move {
+            if let Ok(Some(members_json)) = storage.get_group_members(&target_id_str) {
+                let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+                for m in members {
+                    if m.peer_id == my_peer_id { continue; }
+                    if let Ok(pid) = m.peer_id.parse::<PeerId>() {
+                        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                    }
+                }
+            }
+        });
+    } else {
+        if let Ok(peer_id) = PeerId::from_str(&target_id_str) {
+            engine.runtime.spawn(async move {
+                let payload = crate::network::SignalingPayload::DeleteMessage { msg_id };
+                let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+            });
+        }
+    }
+
+    FfiResult::success()
+}
+
+/// Edits a message locally and gossips the edit.
+#[no_mangle]
+pub extern "C" fn introvert_network_edit_message(
+    target_id_ptr: *const c_char,
+    msg_id_ptr: *const c_char,
+    new_content_ptr: *const c_char,
+    is_group: bool,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if target_id_ptr.is_null() || msg_id_ptr.is_null() || new_content_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let target_id_str = unsafe { CStr::from_ptr(target_id_ptr).to_string_lossy().into_owned() };
+    let msg_id = unsafe { CStr::from_ptr(msg_id_ptr).to_string_lossy().into_owned() };
+    let new_content = unsafe { CStr::from_ptr(new_content_ptr).to_string_lossy().into_owned() };
+
+    let _ = engine.storage.edit_message(&msg_id, &new_content, is_group);
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    if is_group {
+        let storage = engine.storage.clone();
+        let my_peer_id = engine.identity.peer_id.to_string();
+        let keypair = engine.identity.keypair.clone();
+        engine.runtime.spawn(async move {
+            if let Ok(Some(group_info)) = storage.get_group(&target_id_str) {
+                use aes_gcm::{Aes256Gcm, Key, Nonce, KeyInit, aead::Aead};
+                use rand::RngCore;
+                let mut nonce_bytes = [0u8; 12];
+                rand::thread_rng().fill_bytes(&mut nonce_bytes);
+                let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&group_info.secret));
+                if let Ok(encrypted) = cipher.encrypt(Nonce::from_slice(&nonce_bytes), new_content.as_bytes()) {
+                    let mut new_content_encrypted = nonce_bytes.to_vec();
+                    new_content_encrypted.extend(encrypted);
+                    let action = crate::network::GroupAction::EditMessage { msg_id, new_content_encrypted };
+                    if let Ok(signed) = crate::network::group::GroupManager::sign_action(target_id_str.clone(), action, &keypair) {
+                        let payload = crate::network::SignalingPayload::GroupAction(signed);
+                        if let Ok(Some(members_json)) = storage.get_group_members(&target_id_str) {
+                            let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+                            for m in members {
+                                if m.peer_id == my_peer_id { continue; }
+                                if let Ok(pid) = m.peer_id.parse::<PeerId>() {
+                                    let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        if let Ok(peer_id) = PeerId::from_str(&target_id_str) {
+            engine.runtime.spawn(async move {
+                let payload = crate::network::SignalingPayload::EditMessage { msg_id, new_content };
+                let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+            });
+        }
+    }
+
+    FfiResult::success()
+}
+
+/// Polls the profile of a specific peer by sending a ProfileRequest.
+#[no_mangle]
+pub extern "C" fn introvert_network_poll_peer_profile(
+    peer_id_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    if let Ok(peer_id) = libp2p::PeerId::from_str(&peer_id_str) {
+        engine.runtime.spawn(async move {
+            let _ = tx.send(crate::network::NetworkCommand::PollPeerProfile { peer_id }).await;
+        });
+    }
+
+    FfiResult::success()
+}
+
+// ==================== MESSAGE SYNC FFI ====================
+
+/// Triggers message sync with a peer. Sends a ChatSyncRequest to the peer
+/// who responds with any messages the local device is missing.
+#[no_mangle]
+pub extern "C" fn introvert_network_sync_chat_messages(
+    peer_id_ptr: *const c_char,
+    chat_id_ptr: *const c_char,
+    is_group: i32,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() || chat_id_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let chat_id = unsafe { CStr::from_ptr(chat_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    if let Ok(peer_id) = libp2p::PeerId::from_str(&peer_id_str) {
+        engine.runtime.spawn(async move {
+            let _ = tx.send(crate::network::NetworkCommand::SyncChatMessages {
+                peer_id,
+                chat_id,
+                is_group: is_group != 0,
+            }).await;
+        });
+    }
+
+    FfiResult::success()
+}
+
+// ==================== NOTES FFI ====================
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_create(
+    id_ptr: *const c_char,
+    title_ptr: *const c_char,
+    content_ptr: *const c_char,
+    tags_ptr: *const c_char,
+    image_path_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if id_ptr.is_null() || title_ptr.is_null() || content_ptr.is_null() || tags_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let id = unsafe { CStr::from_ptr(id_ptr).to_string_lossy().into_owned() };
+    let title = unsafe { CStr::from_ptr(title_ptr).to_string_lossy().into_owned() };
+    let content = unsafe { CStr::from_ptr(content_ptr).to_string_lossy().into_owned() };
+    let tags = unsafe { CStr::from_ptr(tags_ptr).to_string_lossy().into_owned() };
+    let image_path = if image_path_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(image_path_ptr).to_string_lossy().into_owned() }) };
+    match engine.storage.create_note(&id, &title, &content, &tags, image_path.as_deref()) {
+        Ok(_) => FfiResult::success(), Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_update(
+    id_ptr: *const c_char, title_ptr: *const c_char, content_ptr: *const c_char,
+    tags_ptr: *const c_char, image_path_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if id_ptr.is_null() || title_ptr.is_null() || content_ptr.is_null() || tags_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let id = unsafe { CStr::from_ptr(id_ptr).to_string_lossy().into_owned() };
+    let title = unsafe { CStr::from_ptr(title_ptr).to_string_lossy().into_owned() };
+    let content = unsafe { CStr::from_ptr(content_ptr).to_string_lossy().into_owned() };
+    let tags = unsafe { CStr::from_ptr(tags_ptr).to_string_lossy().into_owned() };
+    let image_path = if image_path_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(image_path_ptr).to_string_lossy().into_owned() }) };
+    match engine.storage.update_note(&id, &title, &content, &tags, image_path.as_deref()) {
+        Ok(_) => FfiResult::success(), Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_delete(id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let id = unsafe { CStr::from_ptr(id_ptr).to_string_lossy().into_owned() };
+    match engine.storage.delete_note(&id) {
+        Ok(_) => FfiResult::success(), Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_get(id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let id = unsafe { CStr::from_ptr(id_ptr).to_string_lossy().into_owned() };
+    match engine.storage.get_note(&id) {
+        Ok(Some((id, title, content, tags, image_path, created_at, updated_at))) => {
+            let json = serde_json::json!({ "id": id, "title": title, "content": content, "tags": tags, "image_path": image_path, "created_at": created_at, "updated_at": updated_at });
+            FfiResult::binary(serde_json::to_vec(&json).unwrap_or_default())
+        }
+        Ok(None) => FfiResult::error(-2, "Note not found"),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_get_all() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    match engine.storage.get_all_notes() {
+        Ok(notes) => {
+            let json_notes: Vec<serde_json::Value> = notes.into_iter().map(|(id, title, content, tags, image_path, created_at, updated_at)| {
+                serde_json::json!({ "id": id, "title": title, "content": content, "tags": tags, "image_path": image_path, "created_at": created_at, "updated_at": updated_at })
+            }).collect();
+            FfiResult::binary(serde_json::to_vec(&json_notes).unwrap_or_default())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_search(query_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if query_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let query = unsafe { CStr::from_ptr(query_ptr).to_string_lossy().into_owned() };
+    match engine.storage.search_notes(&query) {
+        Ok(notes) => {
+            let json_notes: Vec<serde_json::Value> = notes.into_iter().map(|(id, title, content, tags, image_path, created_at, updated_at)| {
+                serde_json::json!({ "id": id, "title": title, "content": content, "tags": tags, "image_path": image_path, "created_at": created_at, "updated_at": updated_at })
+            }).collect();
+            FfiResult::binary(serde_json::to_vec(&json_notes).unwrap_or_default())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_save_version(note_id_ptr: *const c_char, title_ptr: *const c_char, content_ptr: *const c_char, tags_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if note_id_ptr.is_null() || title_ptr.is_null() || content_ptr.is_null() || tags_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let note_id = unsafe { CStr::from_ptr(note_id_ptr).to_string_lossy().into_owned() };
+    let title = unsafe { CStr::from_ptr(title_ptr).to_string_lossy().into_owned() };
+    let content = unsafe { CStr::from_ptr(content_ptr).to_string_lossy().into_owned() };
+    let tags = unsafe { CStr::from_ptr(tags_ptr).to_string_lossy().into_owned() };
+    match engine.storage.save_note_version(&note_id, &title, &content, &tags) {
+        Ok(version) => FfiResult::binary(version.to_string().into_bytes()),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_notes_get_versions(note_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if note_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let note_id = unsafe { CStr::from_ptr(note_id_ptr).to_string_lossy().into_owned() };
+    match engine.storage.get_note_versions(&note_id) {
+        Ok(versions) => {
+            let json_versions: Vec<serde_json::Value> = versions.into_iter().map(|(num, title, content, tags, created_at)| {
+                serde_json::json!({ "version": num, "title": title, "content": content, "tags": tags, "created_at": created_at })
+            }).collect();
+            FfiResult::binary(serde_json::to_vec(&json_versions).unwrap_or_default())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+// ==================== CALL HISTORY FFI ====================
+
+#[no_mangle]
+pub extern "C" fn introvert_call_history_log(
+    peer_id_ptr: *const c_char,
+    call_type_ptr: *const c_char,
+    media_type: i32,
+    duration_seconds: i32,
+    is_incoming: bool,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if peer_id_ptr.is_null() || call_type_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let call_type = unsafe { CStr::from_ptr(call_type_ptr).to_string_lossy().into_owned() };
+    match engine.storage.log_call(&peer_id, &call_type, media_type, duration_seconds, is_incoming) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_call_history_get(limit: i32) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    match engine.storage.get_call_history(limit) {
+        Ok(history) => {
+            let json_history: Vec<serde_json::Value> = history.into_iter().map(|(peer_id, call_type, media_type, duration, is_incoming, timestamp)| {
+                serde_json::json!({
+                    "peer_id": peer_id, "call_type": call_type, "media_type": media_type,
+                    "duration_seconds": duration, "is_incoming": is_incoming, "timestamp": timestamp
+                })
+            }).collect();
+            FfiResult::binary(serde_json::to_vec(&json_history).unwrap_or_default())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_call_history_count() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    match engine.storage.get_call_count() {
+        Ok(count) => FfiResult::binary(count.to_string().into_bytes()),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+// ==================== MESSAGE SEARCH FFI ====================
+
+#[no_mangle]
+pub extern "C" fn introvert_search_messages(peer_id_ptr: *const c_char, query_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if peer_id_ptr.is_null() || query_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let query = unsafe { CStr::from_ptr(query_ptr).to_string_lossy().into_owned() };
+    match engine.storage.search_messages(&peer_id, &query) {
+        Ok(messages) => {
+            let json_messages: Vec<serde_json::Value> = messages.into_iter().map(|(content, timestamp, is_me, status, msg_id, reply_to)| {
+                serde_json::json!({
+                    "content": content, "timestamp": timestamp, "is_me": is_me,
+                    "status": status, "msg_id": msg_id, "reply_to": reply_to
+                })
+            }).collect();
+            FfiResult::binary(serde_json::to_vec(&json_messages).unwrap_or_default())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_search_group_messages(group_id_ptr: *const c_char, query_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if group_id_ptr.is_null() || query_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
+    let query = unsafe { CStr::from_ptr(query_ptr).to_string_lossy().into_owned() };
+    match engine.storage.search_group_messages(&group_id, &query) {
+        Ok(messages) => {
+            let json_messages: Vec<serde_json::Value> = messages.into_iter().map(|(sender_id, msg_id, content, timestamp, reply_to)| {
+                serde_json::json!({
+                    "sender_id": sender_id, "msg_id": msg_id, "content": content,
+                    "timestamp": timestamp, "reply_to": reply_to
+                })
+            }).collect();
+            FfiResult::binary(serde_json::to_vec(&json_messages).unwrap_or_default())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+// ==================== TYPING INDICATOR & LAST SEEN FFI ====================
+
+#[no_mangle]
+pub extern "C" fn introvert_send_typing_start(peer_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = match PeerId::from_str(&peer_id_str) { Ok(pid) => pid, Err(_) => return FfiResult::error(-12, "Invalid PeerId") };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() { Some(t) => t.clone(), None => return FfiResult::error(-13, "Network not started") };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload: crate::network::SignalingPayload::TypingStart { chat_id: peer_id_str } }).await;
+    });
+    FfiResult::success()
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_send_typing_stop(peer_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let peer_id = match PeerId::from_str(&peer_id_str) { Ok(pid) => pid, Err(_) => return FfiResult::error(-12, "Invalid PeerId") };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() { Some(t) => t.clone(), None => return FfiResult::error(-13, "Network not started") };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload: crate::network::SignalingPayload::TypingStop { chat_id: peer_id_str } }).await;
+    });
+    FfiResult::success()
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_get_last_seen(peer_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    match engine.storage.get_last_seen(&peer_id_str) {
+        Ok(Some(ts)) => FfiResult::binary(ts.to_string().into_bytes()),
+        Ok(None) => FfiResult::binary(b"0".to_vec()),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
 }
