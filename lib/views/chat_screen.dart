@@ -174,6 +174,25 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
             color: Colors.transparent,
             child: ListTile(
               contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.sync, color: AppTheme.current.accent),
+              title: Text("Sync Full History", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
+              subtitle: Text("Fetch all messages from peer", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              onTap: () {
+                _client.syncChatMessages(widget.peerId, widget.peerId, false, isFull: true);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Syncing full history...", style: TextStyle(color: AppTheme.current.accent)),
+                    backgroundColor: AppTheme.current.surface,
+                  ),
+                );
+              },
+            ),
+          ),
+          Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.delete_sweep, color: Colors.redAccent),
               title: const Text("Clear Chat", style: TextStyle(color: Colors.redAccent, fontSize: 13)),
               onTap: () async {
@@ -1346,19 +1365,24 @@ class _ChatScreenState extends State<ChatScreen> {
   void _syncContactDetails() {
     _client.pollPeerProfile(widget.peerId);
     _client.syncChatMessages(widget.peerId, widget.peerId, false);
+    _showSyncIndicator();
+  }
+
+  void _syncFullHistory() {
+    _client.syncChatMessages(widget.peerId, widget.peerId, false, isFull: true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("Syncing contact details & messages...", style: TextStyle(color: AppTheme.current.accent)),
+        content: Text("Syncing full chat history...", style: TextStyle(color: AppTheme.current.accent)),
         backgroundColor: AppTheme.current.surface,
-        duration: Duration(seconds: 2),
+        duration: Duration(seconds: 3),
       ),
     );
+    _showSyncIndicator();
   }
 
   void _showSyncIndicator() {
     if (!mounted) return;
     setState(() => _isSyncing = true);
-    // Auto-hide after 3 seconds or when messages reload
     Future.delayed(Duration(seconds: 3), () {
       if (mounted) setState(() => _isSyncing = false);
     });

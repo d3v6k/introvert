@@ -2646,6 +2646,23 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
         ],
         SizedBox(height: 8),
         TextButton.icon(
+          onPressed: () {
+            final memberIds = widget.contactNames?.keys.toList() ?? [];
+            for (final memberId in memberIds) {
+              _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Syncing full group history...", style: TextStyle(color: AppTheme.current.accent)),
+                backgroundColor: AppTheme.current.surface,
+              ),
+            );
+          },
+          icon: Icon(Icons.sync, size: 18, color: AppTheme.current.accent),
+          label: Text("SYNC FULL HISTORY", style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold))
+        ),
+        SizedBox(height: 8),
+        TextButton.icon(
           onPressed: () async {
             final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(backgroundColor: AppTheme.current.surface, title: const Text("Clear Chat?", style: TextStyle(color: Colors.redAccent)), content: Text("This will permanently delete all messages for this group from your device.", style: TextStyle(color: AppTheme.current.text)), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCEL")), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("CLEAR", style: TextStyle(color: Colors.redAccent)))]));
             if (confirm == true && mounted) { _client.deleteChat(widget.groupId); widget.onUpdate(); Navigator.pop(context); }

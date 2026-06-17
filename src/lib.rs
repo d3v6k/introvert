@@ -3444,11 +3444,13 @@ pub extern "C" fn introvert_network_poll_peer_profile(
 
 /// Triggers message sync with a peer. Sends a ChatSyncRequest to the peer
 /// who responds with any messages the local device is missing.
+/// is_full: if 1, sends empty known_msg_ids to request ALL messages (full history sync)
 #[no_mangle]
 pub extern "C" fn introvert_network_sync_chat_messages(
     peer_id_ptr: *const c_char,
     chat_id_ptr: *const c_char,
     is_group: i32,
+    is_full: i32,
 ) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() {
@@ -3475,6 +3477,7 @@ pub extern "C" fn introvert_network_sync_chat_messages(
                 peer_id,
                 chat_id,
                 is_group: is_group != 0,
+                is_full: is_full != 0,
             }).await;
         });
     }

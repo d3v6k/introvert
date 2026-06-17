@@ -192,8 +192,8 @@ typedef IntrovertNetworkRequestSwarmStatsDart = FfiResult Function();
 typedef IntrovertNetworkPollPeerProfileC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertNetworkPollPeerProfileDart = FfiResult Function(Pointer<Utf8> peerId);
 
-typedef IntrovertNetworkSyncChatMessagesC = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> chatId, Int32 isGroup);
-typedef IntrovertNetworkSyncChatMessagesDart = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> chatId, int isGroup);
+typedef IntrovertNetworkSyncChatMessagesC = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> chatId, Int32 isGroup, Int32 isFull);
+typedef IntrovertNetworkSyncChatMessagesDart = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> chatId, int isGroup, int isFull);
 
 
 typedef IntrovertNetworkComputeFileHashC = FfiResult Function(Pointer<Utf8> filePath);
@@ -806,7 +806,7 @@ class IntrovertClient {
       _getHandleStatus = safeLookup('get_handle_status', () => _dylib.lookupFunction<IntrovertStorageGetHandleStatusC, IntrovertStorageGetHandleStatusDart>('introvert_storage_get_handle_status'), (h) => FfiResult.dummy);
       _requestSwarmStats = safeLookup('request_swarm_stats', () => _dylib.lookupFunction<IntrovertNetworkRequestSwarmStatsC, IntrovertNetworkRequestSwarmStatsDart>('introvert_network_request_swarm_stats'), () => FfiResult.dummy);
       _pollPeerProfile = safeLookup('poll_peer_profile', () => _dylib.lookupFunction<IntrovertNetworkPollPeerProfileC, IntrovertNetworkPollPeerProfileDart>('introvert_network_poll_peer_profile'), (p) => FfiResult.dummy);
-      _syncChatMessages = safeLookup('sync_chat_messages', () => _dylib.lookupFunction<IntrovertNetworkSyncChatMessagesC, IntrovertNetworkSyncChatMessagesDart>('introvert_network_sync_chat_messages'), (p, a, b) => FfiResult.dummy);
+      _syncChatMessages = safeLookup('sync_chat_messages', () => _dylib.lookupFunction<IntrovertNetworkSyncChatMessagesC, IntrovertNetworkSyncChatMessagesDart>('introvert_network_sync_chat_messages'), (p, a, b, c) => FfiResult.dummy);
       _getProfile = safeLookup('get_profile', () => _dylib.lookupFunction<IntrovertStorageGetProfileC, IntrovertStorageGetProfileDart>('introvert_storage_get_profile'), () => FfiResult.dummy);
       _setProfile = safeLookup('set_profile', () => _dylib.lookupFunction<IntrovertStorageSetProfileC, IntrovertStorageSetProfileDart>('introvert_storage_set_profile'), (n, h, a, p) => FfiResult.dummy);
       _sendFile = safeLookup('send_file', () => _dylib.lookupFunction<IntrovertNetworkSendFileC, IntrovertNetworkSendFileDart>('introvert_network_send_file'), (p, f, g) => FfiResult.dummy);
@@ -1423,11 +1423,11 @@ class IntrovertClient {
     }
   }
 
-  void syncChatMessages(String peerId, String chatId, bool isGroup) {
+  void syncChatMessages(String peerId, String chatId, bool isGroup, {bool isFull = false}) {
     final pidPtr = peerId.toNativeUtf8();
     final cidPtr = chatId.toNativeUtf8();
     try {
-      _handleFfiResult(_syncChatMessages(pidPtr, cidPtr, isGroup ? 1 : 0), context: "Sync Chat Messages");
+      _handleFfiResult(_syncChatMessages(pidPtr, cidPtr, isGroup ? 1 : 0, isFull ? 1 : 0), context: "Sync Chat Messages");
     } finally {
       malloc.free(pidPtr);
       malloc.free(cidPtr);
