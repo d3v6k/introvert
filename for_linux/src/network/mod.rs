@@ -269,6 +269,7 @@ pub enum NetworkCommand {
     PollPeerProfile { peer_id: PeerId },
     CancelFileTransfer { transfer_id: String },
     SyncChatMessages { peer_id: PeerId, chat_id: String, is_group: bool, is_full: bool },
+    RelaySyncedMessages { chat_id: String, messages: Vec<SyncMessage> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3184,6 +3185,21 @@ impl NetworkService {
                 };
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
+            NetworkCommand::RelaySyncedMessages { chat_id, messages } => {
+                let connected_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
+                let my_id = *self.swarm.local_peer_id();
+                println!("[Mesh] Relaying {} synced messages to {} peers for group {}", messages.len(), connected_peers.len(), chat_id);
+                for pid in connected_peers {
+                    if pid == my_id { continue; }
+                    let response = SignalingPayload::ChatSyncResponse {
+                        chat_id: chat_id.clone(),
+                        is_group: true,
+                        messages: messages.clone(),
+                        missing_ids: Vec::new(),
+                    };
+                    let _ = self.forward_to_mesh(pid, response, false).await;
+                }
+            }
             NetworkCommand::RequestSwarmStats => {
                 // Calculate local storage contribution: min(1GB, 75% of free disk space)
                 let local_storage_gb: u64 = {
@@ -3817,17 +3833,28 @@ impl NetworkService {
                 let is_group_c = is_group;
                 let peer_id_str = peer.to_string();
                 let chat_id_for_dispatch = chat_id.clone();
+                let relay_messages = if is_group { messages.clone() } else { Vec::new() };
+                let received_count = messages.len();
 
                 let _ = tokio::task::spawn_blocking(move || {
                     for msg in messages {
                         if is_group_c {
                             let _ = storage.store_group_message(&chat_id_clone, &msg.sender_id, &msg.msg_id, &msg.content, false, msg.reply_to.as_deref());
                         } else {
-                            let is_me = msg.sender_id == "peer"; // "peer" means the requesting peer sent it
+                            let is_me = msg.sender_id == "peer";
                             let _ = storage.store_message_with_id(&chat_id_clone, &msg.msg_id, &msg.content, is_me, msg.reply_to.as_deref());
                         }
                     }
                 }).await;
+
+                if is_group && received_count > 0 {
+                    let tx = self.command_tx.clone();
+                    let relay_chat = chat_id_for_dispatch.clone();
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_millis(300)).await;
+                        let _ = tx.send(NetworkCommand::RelaySyncedMessages { chat_id: relay_chat, messages: relay_messages }).await;
+                    });
+                }
 
                 if !missing_ids.is_empty() {
                     let storage2 = Arc::clone(&self.storage);

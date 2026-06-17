@@ -176,11 +176,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
       if (memberIds.isNotEmpty) {
         setState(() => _isSyncing = true);
+        // Round 1: Sync with all connected members
         for (final memberId in memberIds) {
           _client.syncChatMessages(memberId, widget.groupId, true);
         }
-        Future.delayed(Duration(seconds: 3), () {
-          if (mounted) setState(() => _isSyncing = false);
+        // Round 2: After relay propagation, sync again to catch messages relayed by others
+        Future.delayed(Duration(seconds: 2), () {
+          if (!mounted) return;
+          for (final memberId in memberIds) {
+            _client.syncChatMessages(memberId, widget.groupId, true);
+          }
+          Future.delayed(Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() => _isSyncing = false);
+              _loadMessages();
+            }
+          });
         });
       }
     });
@@ -2647,9 +2658,15 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
               _client.pollPeerProfile(memberId);
               _client.syncChatMessages(memberId, widget.groupId, true);
             }
+            // Round 2 after relay propagation
+            Future.delayed(Duration(seconds: 2), () {
+              for (final memberId in memberIds) {
+                _client.syncChatMessages(memberId, widget.groupId, true);
+              }
+            });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text("Syncing ${memberIds.length} contacts & messages...", style: TextStyle(color: AppTheme.current.accent)),
+                content: Text("Syncing ${memberIds.length} contacts & messages (2 rounds)...", style: TextStyle(color: AppTheme.current.accent)),
                 backgroundColor: AppTheme.current.surface,
               ),
             );
