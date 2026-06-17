@@ -234,8 +234,8 @@ pub enum NetworkCommand {
     EstablishSecureSession { peer_id: PeerId },
     FetchMailbox,
     UpdateAnchorStatus { enabled: bool },
-    SendFile { peer_id: PeerId, file_path: String, group_id: Option<String> },
-    SendFileFinalize { peer_id: PeerId, file_path: String, has_dc_already: bool, group_id: Option<String> },
+    SendFile { peer_id: PeerId, file_path: String, group_id: Option<String>, transfer_id: Option<String> },
+    SendFileFinalize { peer_id: PeerId, file_path: String, has_dc_already: bool, group_id: Option<String>, transfer_id: Option<String> },
     SendFileChunk { peer_id: PeerId, payload: SignalingPayload, progress: FileTransferProgress },
     SendAcknowledgement { peer_id: PeerId, msg_id: String, status: u8 },
     ForwardMeshSignaling { peer_id: PeerId, payload: SignalingPayload },
@@ -2661,7 +2661,7 @@ impl NetworkService {
                 let key = RecordKey::new(&file_hash.as_bytes());
                 let _ = self.swarm.behaviour_mut().kademlia.get_providers(key);
             }
-            NetworkCommand::SendFile { peer_id, file_path, group_id } => {
+            NetworkCommand::SendFile { peer_id, file_path, group_id, transfer_id } => {
                 let local_id = *self.swarm.local_peer_id();
                 
                 // If peer_id == local_id, it's a group broadcast share from Drive.
@@ -2673,7 +2673,7 @@ impl NetworkService {
                      let relayed_map = self.is_relayed_map.clone();
                      let dc_store = self.data_channels.clone();
                      tokio::spawn(async move {
-                         let _ = Self::process_outgoing_file(peer_id, file_path, true, relayed_map, dc_store, tx, storage, local_id, group_id, is_stress).await;
+                         let _ = Self::process_outgoing_file(peer_id, file_path, true, relayed_map, dc_store, tx, storage, local_id, group_id, is_stress, None).await;
                      });
                      return Ok(());
                 }
@@ -2720,10 +2720,10 @@ impl NetworkService {
                             tokio::time::sleep(Duration::from_millis(100)).await;
                         }
                     }
-                    let _ = tx.send(NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already, group_id }).await;
+                    let _ = tx.send(NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already, group_id, transfer_id }).await;
                 });
             }
-            NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already: _, group_id } => {
+            NetworkCommand::SendFileFinalize { peer_id, file_path, has_dc_already: _, group_id, transfer_id } => {
                 let is_connected_now = self.swarm.is_connected(&peer_id);
                 let relayed_map_snapshot = self.is_relayed_map.read().get(&peer_id).cloned();
                 let tx = self.command_tx.clone();
@@ -2740,7 +2740,7 @@ impl NetworkService {
                         true
                     };
 
-                    let _ = Self::process_outgoing_file(peer_id, file_path, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress).await;
+                    let _ = Self::process_outgoing_file(peer_id, file_path, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress, transfer_id).await;
                 });
             }
             NetworkCommand::SendFileChunk { peer_id, payload, progress } => {
@@ -4740,6 +4740,7 @@ impl NetworkService {
         local_peer_id: PeerId,
         group_id: Option<String>,
         is_stress_test: bool,
+        transfer_id_override: Option<String>,
     ) -> anyhow::Result<()> {
 
         let path = std::path::Path::new(&file_path);
@@ -4767,7 +4768,10 @@ impl NetworkService {
         };
         let total_size = std::fs::metadata(path)?.len() as usize;
 
-        let transfer_id = format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs());
+        let transfer_id = transfer_id_override.unwrap_or_else(|| {
+            let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+            format!("gft_{}_{}", file_hash, ts)
+        });
         
         // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 64KB (Sovereign Swarm Pull)
         let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 }; 
