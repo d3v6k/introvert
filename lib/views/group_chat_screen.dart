@@ -2647,7 +2647,7 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
         SizedBox(height: 8),
         TextButton.icon(
           onPressed: () {
-            final memberIds = widget.contactNames?.keys.toList() ?? [];
+            final memberIds = widget.contactNames.keys.toList();
             for (final memberId in memberIds) {
               _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
             }
