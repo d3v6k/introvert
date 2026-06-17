@@ -143,6 +143,15 @@ pub enum SignalingPayload {
         device_type: String, // "ios" or "android"
         push_token: String,
     },
+    TypingStart {
+        chat_id: String,
+    },
+    TypingStop {
+        chat_id: String,
+    },
+    Heartbeat {
+        timestamp: i64,
+    },
     FileTransfer { 
         transfer_id: String, 
         filename: String, 
@@ -258,7 +267,8 @@ pub enum NetworkCommand {
     HandleDiagnosticTimeout { peer_id: PeerId },
     RequestSwarmStats,
     PollPeerProfile { peer_id: PeerId },
-    SyncChatMessages { peer_id: PeerId, chat_id: String, is_group: bool },
+    CancelFileTransfer { transfer_id: String },
+    SyncChatMessages { peer_id: PeerId, chat_id: String, is_group: bool, is_full: bool },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,6 +285,7 @@ pub struct FileTransferProgress {
     pub local_path: Option<String>,
     pub start_time_ms: u64,
     pub speed_bps: f64,
+    pub group_id: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -978,6 +989,7 @@ impl NetworkService {
                                 local_path: Some(path.clone()),
                                 start_time_ms: transfer.start_time.elapsed().as_millis() as u64,
                                 speed_bps: 0.0,
+                                group_id: transfer.group_id.clone(),
                             };
                             crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
 
@@ -1043,6 +1055,7 @@ impl NetworkService {
                     local_path: local_path.clone(),
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps,
+                    group_id: transfer.group_id.clone(),
                 };
 
                 let data = serde_json::to_vec(&progress).unwrap_or_default();
@@ -1741,11 +1754,11 @@ impl NetworkService {
                        if *count > 0 {
                            *count -= 1;
                        }
-                       if *count == 0 {
-                           self.direct_conn_count.remove(&peer_id);
-                       }
-                   }
-               }
+                        if *count == 0 {
+                            self.direct_conn_count.remove(&peer_id);
+                        }
+                    }
+            }
 
                if !self.swarm.is_connected(&peer_id) {
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
@@ -2760,6 +2773,11 @@ impl NetworkService {
                 // This breaks the relay direct-retry loop for non-FileChunk payloads.
                 let _ = self.forward_to_mesh(peer_id, payload, true).await;
             }
+            NetworkCommand::CancelFileTransfer { transfer_id } => {
+                println!("[Mesh] Cancelling file transfer: {}", transfer_id);
+                self.active_seeders.remove(&transfer_id);
+                self.incoming_transfers.remove(&transfer_id);
+            }
             NetworkCommand::HandleIncomingPayload { peer_id, payload } => {
                 self.handle_signaling_payload(peer_id, payload, false).await;
             }
@@ -3133,32 +3151,36 @@ impl NetworkService {
                 let payload = SignalingPayload::ProfileRequest;
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
-            NetworkCommand::SyncChatMessages { peer_id, chat_id, is_group } => {
-                println!("[Mesh] Syncing messages for chat: {} (group={})", chat_id, is_group);
+            NetworkCommand::SyncChatMessages { peer_id, chat_id, is_group, is_full } => {
+                println!("[Mesh] Syncing messages for chat: {} (group={}, full={})", chat_id, is_group, is_full);
                 let storage = Arc::clone(&self.storage);
                 let chat_id_clone = chat_id.clone();
                 let is_group_clone = is_group;
 
-                let known_ids = tokio::task::spawn_blocking(move || {
-                    let mut ids = Vec::new();
-                    if is_group_clone {
-                        if let Ok(msgs) = storage.get_group_messages(&chat_id_clone) {
-                            for m in msgs { ids.push(m.0.clone()); }
+                let known_ids = if is_full {
+                    Vec::new() // Empty = request all messages
+                } else {
+                    tokio::task::spawn_blocking(move || {
+                        let mut ids = Vec::new();
+                        if is_group_clone {
+                            if let Ok(msgs) = storage.get_group_messages(&chat_id_clone) {
+                                for m in msgs { ids.push(m.0.clone()); }
+                            }
+                        } else {
+                            if let Ok(msgs) = storage.get_messages_for_peer(&chat_id_clone) {
+                                for m in msgs { if let Some(mid) = &m.4 { ids.push(mid.clone()); } }
+                            }
                         }
-                    } else {
-                        if let Ok(msgs) = storage.get_messages_for_peer(&chat_id_clone) {
-                            for m in msgs { if let Some(mid) = &m.4 { ids.push(mid.clone()); } }
-                        }
-                    }
-                    ids
-                }).await.unwrap_or_default();
+                        ids
+                    }).await.unwrap_or_default()
+                };
 
-                println!("[Mesh] Sending sync request with {} known IDs", known_ids.len());
+                println!("[Mesh] Sending sync request with {} known IDs (full={})", known_ids.len(), is_full);
                 let payload = SignalingPayload::ChatSyncRequest {
                     chat_id,
                     is_group,
                     known_msg_ids: known_ids,
-                    limit: 100,
+                    limit: if is_full { 10000 } else { 100 },
                 };
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
@@ -3671,6 +3693,7 @@ impl NetworkService {
                                     local_path: Some(path),
                                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                                     speed_bps: 0.0,
+                                    group_id: None,
                                 };
 
                                 crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
@@ -3935,6 +3958,7 @@ impl NetworkService {
                         local_path: None,
                         start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
                         speed_bps: 0.0,
+                        group_id: group_id.clone(),
                     };
                     let peer_id_str = actual_seeder_peer.to_string();
                     let storage = Arc::clone(&self.storage);
@@ -4393,6 +4417,7 @@ impl NetworkService {
                     local_path,
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps: 0.0,
+                    group_id: None,
                 };
                 if let Ok(json_str) = serde_json::to_string(&progress) {
                     let c = format!("[FILE]:{}", json_str);
@@ -4652,6 +4677,21 @@ impl NetworkService {
                     self.pending_claims.remove(&handle);
                 }
             }
+            SignalingPayload::Heartbeat { timestamp } => {
+                println!("[Mesh] Received Heartbeat from {} (ts={})", peer, timestamp);
+            }
+            SignalingPayload::TypingStart { chat_id: _ } => {
+                let peer_bytes = peer.to_string().into_bytes();
+                let mut data = peer_bytes;
+                data.push(1); // 1 = typing started
+                crate::dispatch_global_event(39, &data);
+            }
+            SignalingPayload::TypingStop { chat_id: _ } => {
+                let peer_bytes = peer.to_string().into_bytes();
+                let mut data = peer_bytes;
+                data.push(0); // 0 = typing stopped
+                crate::dispatch_global_event(39, &data);
+            }
             _ => {}
         }
     }
@@ -4723,6 +4763,7 @@ impl NetworkService {
             local_path: Some(file_path.clone()),
             start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
             speed_bps: 0.0,
+            group_id: group_id.clone(),
         };
 
         // Persistent History: Save file manifest and BROADCAST TO GROUP if applicable
@@ -4811,6 +4852,7 @@ impl NetworkService {
                 local_path: Some(file_path.clone()),
                 start_time_ms: initial_progress.start_time_ms,
                 speed_bps,
+                group_id: group_id.clone(),
             };
             
             // Since SendFileChunk is handled via the command channel, we can't easily wait here.
