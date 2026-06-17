@@ -3164,7 +3164,7 @@ impl NetworkService {
                         let mut ids = Vec::new();
                         if is_group_clone {
                             if let Ok(msgs) = storage.get_group_messages(&chat_id_clone) {
-                                for m in msgs { ids.push(m.0.clone()); }
+                                for m in msgs { ids.push(m.1.clone()); } // m.1 = msg_id
                             }
                         } else {
                             if let Ok(msgs) = storage.get_messages_for_peer(&chat_id_clone) {
@@ -3823,7 +3823,7 @@ impl NetworkService {
                         if is_group_c {
                             let _ = storage.store_group_message(&chat_id_clone, &msg.sender_id, &msg.msg_id, &msg.content, false, msg.reply_to.as_deref());
                         } else {
-                            let is_me = msg.sender_id == "self";
+                            let is_me = msg.sender_id == "peer"; // "peer" means the requesting peer sent it
                             let _ = storage.store_message_with_id(&chat_id_clone, &msg.msg_id, &msg.content, is_me, msg.reply_to.as_deref());
                         }
                     }
@@ -3856,7 +3856,7 @@ impl NetworkService {
                 }
 
                 if is_group { crate::dispatch_global_event(23, chat_id_for_dispatch.as_bytes()); }
-                else { let mut data = vec![peer_id_str.len() as u8]; data.extend(peer_id_str.as_bytes()); data.extend(0i64.to_be_bytes()); data.push(0u8); crate::dispatch_global_event(2, &data); }
+                crate::dispatch_global_event(23, chat_id_for_dispatch.as_bytes());
             }
             SignalingPayload::FileTransfer { transfer_id, filename, mime_type, file_hash, total_size, is_relayed, sender_peer_id, group_id } => {
                 // BUG 3 FIX: Use the actual sender's peer ID if provided, otherwise fallback to the anchor peer

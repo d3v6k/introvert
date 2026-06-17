@@ -1154,7 +1154,12 @@ class _ChatScreenState extends State<ChatScreen> {
           else { _status = "Offline"; _isE2eeActive = false; }
         });
         if (statusCode == 0 || statusCode == 1) _client.establishSecureSession(widget.peerId);
-      } else if (event.type == 2 || event.type == 4) {
+      } else if (event.type == 2 || event.type == 4 || event.type == 23) {
+        // Event 23 = sync refresh (reload from DB)
+        if (event.type == 23) {
+          _loadMessages();
+          return;
+        }
         final data = event.data;
         if (data.length < 8) return;
         final timestamp = ByteData.sublistView(Uint8List.fromList(data.sublist(0, 8))).getInt64(0, Endian.big);
