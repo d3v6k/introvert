@@ -4679,6 +4679,11 @@ impl NetworkService {
             }
             SignalingPayload::Heartbeat { timestamp } => {
                 println!("[Mesh] Received Heartbeat from {} (ts={})", peer, timestamp);
+                let storage = Arc::clone(&self.storage);
+                let peer_id_str = peer.to_string();
+                tokio::task::spawn_blocking(move || {
+                    let _ = storage.update_last_seen(&peer_id_str, timestamp);
+                });
             }
             SignalingPayload::TypingStart { chat_id: _ } => {
                 let peer_bytes = peer.to_string().into_bytes();
