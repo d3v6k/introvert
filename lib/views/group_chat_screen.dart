@@ -170,17 +170,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     });
     _startListener();
     
-    // Sync missed messages from all group members
+    // Auto-sync: contacts + last 100 messages from all members (background, discreet)
     Future.microtask(() async {
       if (!mounted) return;
       final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
       if (memberIds.isNotEmpty) {
         setState(() => _isSyncing = true);
-        // Round 1: Sync with all connected members
         for (final memberId in memberIds) {
+          _client.pollPeerProfile(memberId);
           _client.syncChatMessages(memberId, widget.groupId, true);
         }
-        // Round 2: After relay propagation, sync again to catch messages relayed by others
         Future.delayed(Duration(seconds: 2), () {
           if (!mounted) return;
           for (final memberId in memberIds) {
@@ -190,6 +189,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             if (mounted) {
               setState(() => _isSyncing = false);
               _loadMessages();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("Chat synced", style: TextStyle(color: AppTheme.current.accent)),
+                  backgroundColor: AppTheme.current.surface,
+                  duration: Duration(seconds: 1),
+                ),
+              );
             }
           });
         });
@@ -2656,40 +2662,23 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
             final memberIds = widget.contactNames.keys.toList();
             for (final memberId in memberIds) {
               _client.pollPeerProfile(memberId);
-              _client.syncChatMessages(memberId, widget.groupId, true);
+              _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
             }
             // Round 2 after relay propagation
             Future.delayed(Duration(seconds: 2), () {
               for (final memberId in memberIds) {
-                _client.syncChatMessages(memberId, widget.groupId, true);
+                _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
               }
             });
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text("Syncing ${memberIds.length} contacts & messages (2 rounds)...", style: TextStyle(color: AppTheme.current.accent)),
+                content: Text("Syncing full chat...", style: TextStyle(color: AppTheme.current.accent)),
                 backgroundColor: AppTheme.current.surface,
               ),
             );
           },
           icon: Icon(Icons.sync, size: 18, color: AppTheme.current.accent),
-          label: Text("SYNC CONTACTS & MESSAGES", style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold))
-        ),
-        SizedBox(height: 8),
-        TextButton.icon(
-          onPressed: () {
-            final memberIds = widget.contactNames.keys.toList();
-            for (final memberId in memberIds) {
-              _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("Syncing full group history...", style: TextStyle(color: AppTheme.current.accent)),
-                backgroundColor: AppTheme.current.surface,
-              ),
-            );
-          },
-          icon: Icon(Icons.sync, size: 18, color: AppTheme.current.accent),
-          label: Text("SYNC FULL HISTORY", style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold))
+          label: Text("SYNC CHAT", style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold))
         ),
         SizedBox(height: 8),
         TextButton.icon(

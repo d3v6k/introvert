@@ -175,33 +175,14 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.sync, color: AppTheme.current.accent),
-              title: Text("Sync Contacts & Messages", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
-              subtitle: Text("Fetch latest avatar, handle & recent messages", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              title: Text("Sync Chat", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
+              subtitle: Text("Fetch all contacts, profiles & messages from mesh", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
               onTap: () {
                 _client.pollPeerProfile(widget.peerId);
-                _client.syncChatMessages(widget.peerId, widget.peerId, false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text("Syncing contacts & messages...", style: TextStyle(color: AppTheme.current.accent)),
-                    backgroundColor: AppTheme.current.surface,
-                  ),
-                );
-              },
-            ),
-          ),
-          Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-          Material(
-            color: Colors.transparent,
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.history, color: AppTheme.current.accent),
-              title: Text("Sync Full History", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
-              subtitle: Text("Fetch all messages from peer", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
-              onTap: () {
                 _client.syncChatMessages(widget.peerId, widget.peerId, false, isFull: true);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text("Syncing full history...", style: TextStyle(color: AppTheme.current.accent)),
+                    content: Text("Syncing full chat...", style: TextStyle(color: AppTheme.current.accent)),
                     backgroundColor: AppTheme.current.surface,
                   ),
                 );
@@ -306,9 +287,21 @@ class _ChatScreenState extends State<ChatScreen> {
     // Graceful background update of peer profile
     _client.pollPeerProfile(widget.peerId);
     
-    // Sync missed messages from peer
+    // Auto-sync: contacts + last 100 messages (background, discreet)
+    setState(() => _isSyncing = true);
     _client.syncChatMessages(widget.peerId, widget.peerId, false);
-    _showSyncIndicator();
+    Future.delayed(Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Chat synced", style: TextStyle(color: AppTheme.current.accent)),
+            backgroundColor: AppTheme.current.surface,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    });
   }
 
   @override
