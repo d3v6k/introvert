@@ -2662,17 +2662,12 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
             final memberIds = widget.contactNames.keys.toList();
             for (final memberId in memberIds) {
               _client.pollPeerProfile(memberId);
-              _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
+              _client.syncChatMessages(memberId, widget.groupId, true);
             }
-            // Round 2 after relay propagation
-            Future.delayed(Duration(seconds: 2), () {
-              for (final memberId in memberIds) {
-                _client.syncChatMessages(memberId, widget.groupId, true, isFull: true);
-              }
-            });
+            Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text("Syncing full chat...", style: TextStyle(color: AppTheme.current.accent)),
+                content: Text("Syncing chat...", style: TextStyle(color: AppTheme.current.accent)),
                 backgroundColor: AppTheme.current.surface,
               ),
             );

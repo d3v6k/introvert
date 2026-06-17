@@ -3815,11 +3815,11 @@ impl NetworkService {
 
                 let our_set: std::collections::HashSet<String> = our_ids.iter().cloned().collect();
                 let missing_on_peer: Vec<String> = our_set.difference(&peer_known).cloned().collect();
-                let missing_on_us: Vec<String> = peer_known.difference(&our_set).cloned().collect();
+                let missing_on_us: Vec<String> = peer_known.difference(&our_set).cloned().take(200).collect();
 
                 let to_send: Vec<SyncMessage> = our_messages.into_iter()
-                    .filter(|m| missing_on_peer.contains(&m.msg_id))
-                    .take(limit_c)
+                    .filter(|m| missing_on_peer.contains(&m.msg_id) && !m.content.starts_with("[FILE]:"))
+                    .take(50)
                     .collect();
 
                 println!("[Mesh] Sync response: sending {} messages, requesting {} missing", to_send.len(), missing_on_us.len());
