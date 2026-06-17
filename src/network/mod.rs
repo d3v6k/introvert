@@ -3933,10 +3933,10 @@ impl NetworkService {
                     if is_group_c {
                         if let Ok(msgs) = storage.get_group_messages(&chat_id_c) {
                             for m in msgs {
-                                ids.push(m.0.clone());
+                                ids.push(m.1.clone()); // m.1 = msg_id
                                 messages.push(SyncMessage {
-                                    msg_id: m.0,
-                                    sender_id: m.1,
+                                    msg_id: m.1,       // msg_id
+                                    sender_id: m.0,     // sender_id
                                     content: m.2,
                                     timestamp: m.3,
                                     reply_to: m.4,
@@ -3990,8 +3990,8 @@ impl NetworkService {
                 let peer_id_str = peer.to_string();
                 let chat_id_for_dispatch = chat_id.clone();
 
-                // Store received messages (dedup via ON CONFLICT)
-                tokio::task::spawn_blocking(move || {
+                // Store received messages (dedup via ON CONFLICT) — await to ensure DB write before dispatch
+                let _ = tokio::task::spawn_blocking(move || {
                     for msg in messages {
                         if is_group_c {
                             let _ = storage.store_group_message(&chat_id_clone, &msg.sender_id, &msg.msg_id, &msg.content, false, msg.reply_to.as_deref());
@@ -4000,7 +4000,7 @@ impl NetworkService {
                             let _ = storage.store_message_with_id(&chat_id_clone, &msg.msg_id, &msg.content, is_me, msg.reply_to.as_deref());
                         }
                     }
-                });
+                }).await;
 
                 // If peer is requesting messages we have, send them back
                 if !missing_ids.is_empty() {
@@ -4014,10 +4014,10 @@ impl NetworkService {
                         if is_group_c2 {
                             if let Ok(msgs) = storage2.get_group_messages(&chat_id_c2) {
                                 for m in msgs {
-                                    if missing_set.contains(&m.0) {
+                                    if missing_set.contains(&m.1) { // m.1 = msg_id
                                         result.push(SyncMessage {
-                                            msg_id: m.0,
-                                            sender_id: m.1,
+                                            msg_id: m.1,       // msg_id
+                                            sender_id: m.0,     // sender_id
                                             content: m.2,
                                             timestamp: m.3,
                                             reply_to: m.4,

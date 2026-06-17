@@ -2025,13 +2025,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               tooltip: 'Start Group Call',
             ),
           IconButton(
-            onPressed: _syncContactDetails,
-            icon: Icon(Icons.sync_rounded, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
-            tooltip: 'Sync Contact Details',
-          ),
-          IconButton(
             onPressed: _showInfo,
-            icon: Icon(Icons.info_outline, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
+            icon: Icon(Icons.more_vert, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
           )
         ],
       ),
@@ -2644,6 +2639,24 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
           SizedBox(height: 8), 
           TextButton.icon(onPressed: _generateInviteCode, icon: Icon(Icons.qr_code, size: 18), label: Text("SHARE INVITE CODE")),
         ],
+        SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () {
+            final memberIds = widget.contactNames.keys.toList();
+            for (final memberId in memberIds) {
+              _client.pollPeerProfile(memberId);
+              _client.syncChatMessages(memberId, widget.groupId, true);
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Syncing ${memberIds.length} contacts & messages...", style: TextStyle(color: AppTheme.current.accent)),
+                backgroundColor: AppTheme.current.surface,
+              ),
+            );
+          },
+          icon: Icon(Icons.sync, size: 18, color: AppTheme.current.accent),
+          label: Text("SYNC CONTACTS & MESSAGES", style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold))
+        ),
         SizedBox(height: 8),
         TextButton.icon(
           onPressed: () {

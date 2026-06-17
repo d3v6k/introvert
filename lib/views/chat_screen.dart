@@ -175,6 +175,26 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
             child: ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(Icons.sync, color: AppTheme.current.accent),
+              title: Text("Sync Contacts & Messages", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
+              subtitle: Text("Fetch latest avatar, handle & recent messages", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              onTap: () {
+                _client.pollPeerProfile(widget.peerId);
+                _client.syncChatMessages(widget.peerId, widget.peerId, false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Syncing contacts & messages...", style: TextStyle(color: AppTheme.current.accent)),
+                    backgroundColor: AppTheme.current.surface,
+                  ),
+                );
+              },
+            ),
+          ),
+          Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.history, color: AppTheme.current.accent),
               title: Text("Sync Full History", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
               subtitle: Text("Fetch all messages from peer", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
               onTap: () {
@@ -1902,16 +1922,11 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           if (_isE2eeActive) Icon(Icons.lock_outline, color: AppTheme.current.accent, size: 18),
           IconButton(
-            onPressed: _syncContactDetails,
-            icon: Icon(Icons.sync_rounded, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
-            tooltip: 'Sync Contact Details',
-          ),
-          IconButton(
             onPressed: _startCall,
             icon: Icon(Icons.videocam_rounded, color: AppTheme.current.accent),
             tooltip: 'Video Call',
           ),
-          IconButton(onPressed: _showInfo, icon: Icon(Icons.info_outline, color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
+          IconButton(onPressed: _showInfo, icon: Icon(Icons.more_vert, color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
           const SizedBox(width: 8)
         ],
       ),

@@ -3781,8 +3781,8 @@ impl NetworkService {
                     if is_group_c {
                         if let Ok(msgs) = storage.get_group_messages(&chat_id_c) {
                             for m in msgs {
-                                ids.push(m.0.clone());
-                                messages.push(SyncMessage { msg_id: m.0, sender_id: m.1, content: m.2, timestamp: m.3, reply_to: m.4 });
+                                ids.push(m.1.clone()); // m.1 = msg_id
+                                messages.push(SyncMessage { msg_id: m.1, sender_id: m.0, content: m.2, timestamp: m.3, reply_to: m.4 });
                             }
                         }
                     } else {
@@ -3818,7 +3818,7 @@ impl NetworkService {
                 let peer_id_str = peer.to_string();
                 let chat_id_for_dispatch = chat_id.clone();
 
-                tokio::task::spawn_blocking(move || {
+                let _ = tokio::task::spawn_blocking(move || {
                     for msg in messages {
                         if is_group_c {
                             let _ = storage.store_group_message(&chat_id_clone, &msg.sender_id, &msg.msg_id, &msg.content, false, msg.reply_to.as_deref());
@@ -3827,7 +3827,7 @@ impl NetworkService {
                             let _ = storage.store_message_with_id(&chat_id_clone, &msg.msg_id, &msg.content, is_me, msg.reply_to.as_deref());
                         }
                     }
-                });
+                }).await;
 
                 if !missing_ids.is_empty() {
                     let storage2 = Arc::clone(&self.storage);
@@ -3839,7 +3839,7 @@ impl NetworkService {
                         let mut result = Vec::new();
                         if is_group_c2 {
                             if let Ok(msgs) = storage2.get_group_messages(&chat_id_c2) {
-                                for m in msgs { if missing_set.contains(&m.0) { result.push(SyncMessage { msg_id: m.0, sender_id: m.1, content: m.2, timestamp: m.3, reply_to: m.4 }); } }
+                                for m in msgs { if missing_set.contains(&m.1) { result.push(SyncMessage { msg_id: m.1, sender_id: m.0, content: m.2, timestamp: m.3, reply_to: m.4 }); } }
                             }
                         } else {
                             if let Ok(msgs) = storage2.get_messages_for_peer(&chat_id_c2) {
