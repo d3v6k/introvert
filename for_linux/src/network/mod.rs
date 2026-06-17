@@ -3791,7 +3791,6 @@ impl NetworkService {
                 let storage = Arc::clone(&self.storage);
                 let chat_id_c = chat_id.clone();
                 let is_group_c = is_group;
-                let limit_c = limit as usize;
                 let peer_known: std::collections::HashSet<String> = known_msg_ids.into_iter().collect();
 
                 let (our_ids, our_messages) = tokio::task::spawn_blocking(move || {
@@ -3834,7 +3833,6 @@ impl NetworkService {
                 let storage = Arc::clone(&self.storage);
                 let chat_id_clone = chat_id.clone();
                 let is_group_c = is_group;
-                let peer_id_str = peer.to_string();
                 let chat_id_for_dispatch = chat_id.clone();
                 let relay_messages = if is_group && !is_relay { messages.clone() } else { Vec::new() };
                 let received_count = messages.len();

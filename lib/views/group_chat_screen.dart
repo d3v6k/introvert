@@ -1233,25 +1233,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     });
   }
 
-  void _syncContactDetails() {
-    final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
-    for (final memberId in memberIds) {
-      _client.pollPeerProfile(memberId);
-      _client.syncChatMessages(memberId, widget.groupId, true);
-    }
-    setState(() => _isSyncing = true);
-    Future.delayed(Duration(seconds: 3), () {
-      if (mounted) setState(() => _isSyncing = false);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Syncing ${memberIds.length} contact(s) & messages...", style: TextStyle(color: AppTheme.current.accent)),
-        backgroundColor: AppTheme.current.surface,
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   void _startGroupCall() {
     final memberIds = _members
         .map((m) => m['peer_id']?.toString() ?? '')

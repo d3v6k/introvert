@@ -1380,20 +1380,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _syncContactDetails() {
-    _client.pollPeerProfile(widget.peerId);
-    _client.syncChatMessages(widget.peerId, widget.peerId, false);
-    _showSyncIndicator();
-  }
-
-  void _showSyncIndicator() {
-    if (!mounted) return;
-    setState(() => _isSyncing = true);
-    Future.delayed(Duration(seconds: 3), () {
-      if (mounted) setState(() => _isSyncing = false);
-    });
-  }
-
   void _startCall() {
     showDialog(
       context: context,
