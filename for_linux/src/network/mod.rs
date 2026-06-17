@@ -197,6 +197,8 @@ pub enum SignalingPayload {
         is_group: bool,
         messages: Vec<SyncMessage>,
         missing_ids: Vec<String>,
+        #[serde(default)]
+        is_relay: bool,
     },
 }
 
@@ -3196,6 +3198,7 @@ impl NetworkService {
                         is_group: true,
                         messages: messages.clone(),
                         missing_ids: Vec::new(),
+                        is_relay: true,
                     };
                     let _ = self.forward_to_mesh(pid, response, false).await;
                 }
@@ -3823,17 +3826,17 @@ impl NetworkService {
                     .collect();
 
                 println!("[Mesh] Sync response: sending {} messages, requesting {} missing", to_send.len(), missing_on_us.len());
-                let response = SignalingPayload::ChatSyncResponse { chat_id, is_group, messages: to_send, missing_ids: missing_on_us };
+                let response = SignalingPayload::ChatSyncResponse { chat_id, is_group, messages: to_send, missing_ids: missing_on_us, is_relay: false };
                 let _ = self.forward_to_mesh(peer, response, false).await;
             }
-            SignalingPayload::ChatSyncResponse { chat_id, is_group, messages, missing_ids } => {
-                println!("[Mesh] Received ChatSyncResponse for {} with {} messages, {} missing IDs", chat_id, messages.len(), missing_ids.len());
+            SignalingPayload::ChatSyncResponse { chat_id, is_group, messages, missing_ids, is_relay } => {
+                println!("[Mesh] Received ChatSyncResponse for {} with {} messages, {} missing IDs (relay={})", chat_id, messages.len(), missing_ids.len(), is_relay);
                 let storage = Arc::clone(&self.storage);
                 let chat_id_clone = chat_id.clone();
                 let is_group_c = is_group;
                 let peer_id_str = peer.to_string();
                 let chat_id_for_dispatch = chat_id.clone();
-                let relay_messages = if is_group { messages.clone() } else { Vec::new() };
+                let relay_messages = if is_group && !is_relay { messages.clone() } else { Vec::new() };
                 let received_count = messages.len();
 
                 let _ = tokio::task::spawn_blocking(move || {
@@ -3847,7 +3850,7 @@ impl NetworkService {
                     }
                 }).await;
 
-                if is_group && received_count > 0 {
+                if is_group && !is_relay && received_count > 0 {
                     let tx = self.command_tx.clone();
                     let relay_chat = chat_id_for_dispatch.clone();
                     tokio::spawn(async move {
@@ -3877,7 +3880,7 @@ impl NetworkService {
                     }).await.unwrap_or_default();
 
                     if !to_send.is_empty() {
-                        let reply = SignalingPayload::ChatSyncResponse { chat_id, is_group, messages: to_send, missing_ids: Vec::new() };
+                        let reply = SignalingPayload::ChatSyncResponse { chat_id, is_group, messages: to_send, missing_ids: Vec::new(), is_relay: false };
                         let _ = self.forward_to_mesh(peer, reply, false).await;
                     }
                 }

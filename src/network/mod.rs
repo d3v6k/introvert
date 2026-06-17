@@ -199,6 +199,8 @@ pub enum SignalingPayload {
         is_group: bool,
         messages: Vec<SyncMessage>,
         missing_ids: Vec<String>,
+        #[serde(default)]
+        is_relay: bool,
     },
 }
 
@@ -2501,9 +2503,9 @@ impl NetworkService {
                                 }
                             }
                         }
+                    }
                 }
             }
-        }
             NetworkCommand::PublishGroupManifest { group_id, code } => {
                 println!("[Mesh] Publishing discovery record for Sovereign Group: {}", group_id);
                 // SECURITY HARDENING: Never publish the group secret to the DHT.
@@ -3314,8 +3316,6 @@ impl NetworkService {
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
             NetworkCommand::RelaySyncedMessages { chat_id, messages } => {
-                // Relay newly synced messages to all other connected group members
-                // This ensures messages propagate across the entire group mesh
                 let connected_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
                 let my_id = *self.swarm.local_peer_id();
                 println!("[Mesh] Relaying {} synced messages to {} peers for group {}", messages.len(), connected_peers.len(), chat_id);
@@ -3326,6 +3326,7 @@ impl NetworkService {
                         is_group: true,
                         messages: messages.clone(),
                         missing_ids: Vec::new(),
+                        is_relay: true,
                     };
                     let _ = self.forward_to_mesh(pid, response, false).await;
                 }
@@ -3998,17 +3999,18 @@ impl NetworkService {
                     is_group,
                     messages: to_send,
                     missing_ids: missing_on_us,
+                    is_relay: false,
                 };
                 let _ = self.forward_to_mesh(peer, response, false).await;
             }
-            SignalingPayload::ChatSyncResponse { chat_id, is_group, messages, missing_ids } => {
-                println!("[Mesh] Received ChatSyncResponse for {} with {} messages, {} missing IDs requested", chat_id, messages.len(), missing_ids.len());
+            SignalingPayload::ChatSyncResponse { chat_id, is_group, messages, missing_ids, is_relay } => {
+                println!("[Mesh] Received ChatSyncResponse for {} with {} messages, {} missing IDs (relay={})", chat_id, messages.len(), missing_ids.len(), is_relay);
                 let storage = Arc::clone(&self.storage);
                 let chat_id_clone = chat_id.clone();
                 let is_group_c = is_group;
                 let peer_id_str = peer.to_string();
                 let chat_id_for_dispatch = chat_id.clone();
-                let relay_messages = if is_group { messages.clone() } else { Vec::new() };
+                let relay_messages = if is_group && !is_relay { messages.clone() } else { Vec::new() };
                 let received_count = messages.len();
 
                 // Store received messages (dedup via ON CONFLICT) — await to ensure DB write before dispatch
@@ -4023,8 +4025,8 @@ impl NetworkService {
                     }
                 }).await;
 
-                // Relay newly received group messages to other connected peers
-                if is_group && received_count > 0 {
+                // Relay newly received group messages to other connected peers (only for original sync, not relayed)
+                if is_group && !is_relay && received_count > 0 {
                     let tx = self.command_tx.clone();
                     let relay_chat = chat_id_for_dispatch.clone();
                     tokio::spawn(async move {
@@ -4087,6 +4089,7 @@ impl NetworkService {
                             is_group,
                             messages: to_send,
                             missing_ids: Vec::new(),
+                            is_relay: false,
                         };
                         let _ = self.forward_to_mesh(peer, reply, false).await;
                     }
