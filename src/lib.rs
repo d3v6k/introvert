@@ -1664,6 +1664,74 @@ pub extern "C" fn intro_claw_get_api_key() -> *mut c_char {
     }
 }
 
+/// Manually trigger an Intro-Claw maintenance tick.
+#[no_mangle]
+pub extern "C" fn intro_claw_trigger_tick() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::IntroClawTick {
+            battery_pct: 100,
+            is_background: false,
+            connected_peers: Vec::new(),
+            mdns_discovered: Vec::new(),
+        }).await;
+    });
+    FfiResult::success()
+}
+
+/// Enable or disable the Intro-Claw automation engine.
+#[no_mangle]
+pub extern "C" fn intro_claw_set_active(active: bool) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let mode = engine.storage.get_intro_claw_ai_mode();
+    // Store the active state in economy_meta for persistence
+    let _ = engine.storage.set_intro_claw_ai_mode(mode, "");
+    let tx_lock = engine.network_tx.read();
+    if let Some(tx) = tx_lock.as_ref() {
+        let tx = tx.clone();
+        engine.runtime.spawn(async move {
+            let _ = tx.send(NetworkCommand::IntroClawTick {
+                battery_pct: 100,
+                is_background: false,
+                connected_peers: Vec::new(),
+                mdns_discovered: Vec::new(),
+            }).await;
+        });
+    }
+    FfiResult::success()
+}
+
+/// Returns Intro-Claw status as JSON: { "ai_mode": 0/1, "api_key_set": bool }
+#[no_mangle]
+pub extern "C" fn intro_claw_get_status() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let mode = engine.storage.get_intro_claw_ai_mode();
+    let has_key = !engine.storage.get_intro_claw_api_key().is_empty();
+    let status = serde_json::json!({
+        "ai_mode": mode,
+        "api_key_set": has_key,
+    });
+    let json_str = status.to_string();
+    FfiResult::binary(json_str.into_bytes())
+}
+
 #[no_mangle]
 pub extern "C" fn introvert_get_peer_id() -> *mut c_char {
     let lock = ENGINE.read();

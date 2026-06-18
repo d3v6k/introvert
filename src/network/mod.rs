@@ -276,6 +276,13 @@ pub enum NetworkCommand {
     SyncChatMessages { peer_id: PeerId, chat_id: String, is_group: bool, is_full: bool },
     /// Relay newly synced messages to other connected group members
     RelaySyncedMessages { chat_id: String, messages: Vec<SyncMessage> },
+    /// Intro-Claw automation tick — runs all maintenance modules
+    IntroClawTick {
+        battery_pct: i32,
+        is_background: bool,
+        connected_peers: Vec<String>,
+        mdns_discovered: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -377,6 +384,10 @@ pub struct NetworkService {
     diagnostic_requests: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, Instant)>,
     is_stress_test: bool,
     pending_offers: HashMap<PeerId, String>,
+    /// Buffer for chunks that arrive before their FileTransfer manifest (race condition fix)
+    early_chunks: HashMap<String, Vec<(u32, u32, String)>>,
+    /// Intro-Claw automation engine
+    intro_claw: crate::intro_claw::IntroClawService,
 }
 
 #[derive(Debug, Clone)]
@@ -497,6 +508,9 @@ impl NetworkService {
             }
         }
 
+        // Create shared Arc for is_relayed_map so both NetworkService and IntroClaw can use it
+        let shared_is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>> = Arc::new(RwLock::new(HashMap::new()));
+
         Ok(Self {
             swarm, 
             command_rx,
@@ -517,7 +531,7 @@ impl NetworkService {
             active_providers: HashMap::new(),
             discovered_anchors: Vec::new(),
             mesh_active_peers: HashSet::new(),
-            is_relayed_map: Arc::new(RwLock::new(HashMap::new())),
+            is_relayed_map: shared_is_relayed_map.clone(),
             direct_conn_count: HashMap::new(),
             relay_reservations: HashSet::new(),
             relay_listeners: HashMap::new(),
@@ -537,6 +551,11 @@ impl NetworkService {
             diagnostic_requests: HashMap::new(),
             is_stress_test,
             pending_offers: HashMap::new(),
+            early_chunks: HashMap::new(),
+            intro_claw: crate::intro_claw::IntroClawService::new(
+                Arc::clone(&storage),
+                shared_is_relayed_map,
+            ),
         })
     }
 
@@ -607,6 +626,7 @@ impl NetworkService {
         let mut status_check_interval = tokio::time::interval(Duration::from_secs(60)); // 60s (was 15s)
         let mut pull_retry_interval = tokio::time::interval(Duration::from_secs(1));
         let mut lease_interval = tokio::time::interval(Duration::from_secs(60 * 60));
+        let mut intro_claw_interval = tokio::time::interval(Duration::from_secs(300)); // 5 min
         // heartbeat_interval REMOVED — not needed with push notifications
 
 
@@ -829,6 +849,23 @@ impl NetworkService {
                             let _ = self.swarm.disconnect_peer_id(local_peer_id); 
                             crate::dispatch_global_event(10, &[0]);
                         }
+                    }
+                }
+                _ = intro_claw_interval.tick() => {
+                    if self.intro_claw.is_active() {
+                        let connected_peers: Vec<String> = self.swarm.connected_peers()
+                            .cloned()
+                            .map(|pid| pid.to_string())
+                            .collect();
+                        let active_hashes = self.storage.get_active_drive_hashes();
+                        let ctx = crate::intro_claw::ClawTickContext {
+                            battery_pct: 100, // Platform-specific in future
+                            is_background: false,
+                            connected_peers,
+                            mdns_discovered: Vec::new(),
+                            active_transfer_hashes: active_hashes,
+                        };
+                        self.intro_claw.tick(&ctx);
                     }
                 }
                 _ = republication_interval.tick() => {
@@ -1147,8 +1184,9 @@ impl NetworkService {
                 println!("[DEBUG] Failed to decode base64 for chunk {}", chunk_index);
             }
         } else {
-            println!("[DEBUG] transfer_id {} not found in incoming_transfers. Available: {:?}", 
-                     transfer_id, self.incoming_transfers.keys().collect::<Vec<_>>());
+            // Buffer chunks that arrive before their manifest (race condition fix)
+            println!("[DEBUG] transfer_id {} not found in incoming_transfers. Buffering chunk {} for later.", transfer_id, chunk_index);
+            self.early_chunks.entry(transfer_id.clone()).or_default().push((chunk_index, total_chunks, data_base64));
         }
     }
 
@@ -2019,8 +2057,9 @@ impl NetworkService {
                     SignalingPayload::MessageReaction { .. } |
                     SignalingPayload::EditMessage { .. } |
                     SignalingPayload::SetRetention { .. } => true,
-                    // Only encrypt FileChunk over direct (non-relay) connections
-                    SignalingPayload::FileChunk { .. } => !is_relayed_conn,
+                    // FileChunk: NEVER use app-level Noise. libp2p transport already encrypts.
+                    // App-level Noise adds ~83% wire overhead per chunk with no security benefit.
+                    SignalingPayload::FileChunk { .. } => false,
                     _ => false,
                 };
                 if noise_eligible {
@@ -2089,8 +2128,8 @@ impl NetworkService {
                     .timeout(Duration::from_secs(5))
                     .send()
                     .await;
-            });
-        }
+                    });
+                }
 
         // WebRTC signaling and handle claims are transient and should never be stored in persistent mailboxes.
         if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. }) {
@@ -2869,7 +2908,7 @@ impl NetworkService {
                     let is_relayed = if is_connected_now {
                         relayed_map_snapshot.unwrap_or(false) // Default to false (direct P2P) if connected
                     } else {
-                        true
+                        false // Default to direct P2P — manifest will be retried if unreachable
                     };
 
                     let _ = Self::process_outgoing_file(peer_id, file_path, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress, transfer_id).await;
@@ -2884,7 +2923,6 @@ impl NetworkService {
                     }
                     Err(_) => {
                         // If forward failed, the helper already dialed or queued.
-                        // We still show progress as "QUEUED" essentially.
                     }
                 }
             }
@@ -3391,6 +3429,17 @@ impl NetworkService {
                 if let Ok(json) = serde_json::to_string(&stats) {
                     crate::dispatch_global_event(30, json.as_bytes()); // Event Type 30: Swarm Stats
                 }
+            }
+            NetworkCommand::IntroClawTick { battery_pct, is_background, connected_peers, mdns_discovered } => {
+                let active_hashes = self.storage.get_active_drive_hashes();
+                let ctx = crate::intro_claw::ClawTickContext {
+                    battery_pct,
+                    is_background,
+                    connected_peers,
+                    mdns_discovered,
+                    active_transfer_hashes: active_hashes,
+                };
+                self.intro_claw.tick(&ctx);
             }
         }
         Ok(())
@@ -4200,6 +4249,14 @@ impl NetworkService {
                     });
                 }
 
+                // FLUSH EARLY CHUNKS: Process any chunks that arrived before this manifest
+                if let Some(buffered) = self.early_chunks.remove(&transfer_id) {
+                    println!("[Mesh] Flushing {} buffered chunks for {}", buffered.len(), transfer_id);
+                    for (chunk_idx, total_chunks_val, data) in buffered {
+                        self.handle_file_chunk(peer, transfer_id.clone(), chunk_idx, total_chunks_val, data).await;
+                    }
+                }
+
                 // SOVEREIGN SWARM: If this is a relayed (cross-network) transfer,
                 // trigger a DHT search to find other providers/seeders for this file.
                 if final_is_relayed {
@@ -4226,27 +4283,10 @@ impl NetworkService {
                         speed_bps: 0.0,
                         group_id: group_id.clone(),
                     };
-                    let peer_id_str = actual_seeder_peer.to_string();
-                    let storage = Arc::clone(&self.storage);
-                    let mid = transfer_id.clone();
-                    if let Some(ref gid) = group_id {
-                        let gid_clone = gid.clone();
-                        if let Ok(json_str) = serde_json::to_string(&progress) {
-                            let c = format!("[FILE]:{}", json_str);
-                            tokio::task::spawn_blocking(move || {
-                                let _ = storage.store_group_message(&gid_clone, &peer_id_str, &mid, &c, false, None);
-                            });
-                        }
-                    } else {
-                        if let Ok(json_str) = serde_json::to_string(&progress) {
-                            let c = format!("[FILE]:{}", json_str);
-                            tokio::task::spawn_blocking(move || {
-                                let _ = storage.store_message_with_id(&peer_id_str, &mid, &c, false, None);
-                            });
-                        }
-                    }
-                    let data = serde_json::to_vec(&progress).unwrap_or_default();
-                    crate::dispatch_global_event(12, &data);
+                    // Don't store in database at manifest arrival — wait for verification
+                    // The verified completion handler (line ~1121) stores the message with localPath
+
+                    // Suppress Event 12 on manifest — don't show anything in chat until verified
 
                     // Start pulling chunks ONLY if the sender is not pushing them directly.
                     // final_is_relayed=false means the sender will PUSH 256KB chunks directly to us.
@@ -5159,7 +5199,7 @@ impl NetworkService {
         }
         
         // Extended delay for manifest to propagate and relay circuits to warm up
-        tokio::time::sleep(Duration::from_millis(if is_relayed { 2000 } else { 500 })).await;
+        tokio::time::sleep(Duration::from_millis(if is_relayed { 2000 } else { 200 })).await;
 
         // BUG 4 FIX: Read chunks from disk during push loop
         let mut file = std::fs::File::open(path)?;
