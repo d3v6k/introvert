@@ -5,6 +5,7 @@ pub mod storage;
 pub mod economy;
 pub mod network;
 pub mod media;
+pub mod intro_claw;
 
 use std::sync::Arc;
 use std::ffi::{CStr, CString};
@@ -1609,6 +1610,57 @@ pub extern "C" fn introvert_network_get_tunnel_mode() -> i32 {
         if *engine.is_tunnel_mode.read() { 1 } else { 0 }
     } else {
         0
+    }
+}
+
+// --- Intro-Claw AI Engine Mode ---
+
+/// Returns the Intro-Claw AI mode: 0 = 100% Offline (Deterministic Macros), 1 = Hybrid AI Assistant.
+#[no_mangle]
+pub extern "C" fn intro_claw_get_ai_mode() -> i32 {
+    let lock = ENGINE.read();
+    if let Some(engine) = lock.as_ref() {
+        let storage = Arc::clone(&engine.storage);
+        storage.get_intro_claw_ai_mode()
+    } else {
+        0 // Default: 100% Offline
+    }
+}
+
+/// Sets the Intro-Claw AI mode and optionally the external LLM API key.
+/// mode: 0 = 100% Offline, 1 = Hybrid AI Assistant.
+/// api_key: The external LLM API key (stored encrypted via SQLCipher). Pass empty string to clear.
+#[no_mangle]
+pub extern "C" fn intro_claw_set_ai_mode(mode: i32, api_key: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    let api_key_str = if api_key.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(api_key).to_string_lossy().to_string() }
+    };
+
+    let storage = Arc::clone(&engine.storage);
+    match storage.set_intro_claw_ai_mode(mode, &api_key_str) {
+        Ok(()) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Failed to save AI mode: {}", e)),
+    }
+}
+
+/// Returns the Intro-Claw API key (encrypted via SQLCipher master key).
+#[no_mangle]
+pub extern "C" fn intro_claw_get_api_key() -> *mut c_char {
+    let lock = ENGINE.read();
+    if let Some(engine) = lock.as_ref() {
+        let storage = Arc::clone(&engine.storage);
+        let key = storage.get_intro_claw_api_key();
+        CString::new(key).unwrap().into_raw()
+    } else {
+        std::ptr::null_mut()
     }
 }
 
