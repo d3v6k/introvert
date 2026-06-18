@@ -217,6 +217,25 @@ typedef IntrovertNetworkCancelFileTransferDart = FfiResult Function(Pointer<Utf8
 typedef IntrovertNetworkForceRefreshC = FfiResult Function();
 typedef IntrovertNetworkForceRefreshDart = FfiResult Function();
 
+// --- Intro-Claw AI Engine Mode ---
+typedef IntroClawGetAiModeC = Int32 Function();
+typedef IntroClawGetAiModeDart = int Function();
+
+typedef IntroClawSetAiModeC = FfiResult Function(Int32 mode, Pointer<Utf8> apiKey);
+typedef IntroClawSetAiModeDart = FfiResult Function(int mode, Pointer<Utf8> apiKey);
+
+typedef IntroClawGetApiKeyC = Pointer<Utf8> Function();
+typedef IntroClawGetApiKeyDart = Pointer<Utf8> Function();
+
+typedef IntroClawTriggerTickC = FfiResult Function();
+typedef IntroClawTriggerTickDart = FfiResult Function();
+
+typedef IntroClawSetActiveC = FfiResult Function(Bool active);
+typedef IntroClawSetActiveDart = FfiResult Function(bool active);
+
+typedef IntroClawGetStatusC = FfiResult Function();
+typedef IntroClawGetStatusDart = FfiResult Function();
+
 typedef IntrovertGroupCreateC = FfiResult Function(Pointer<Utf8> name, Pointer<Utf8> description, Pointer<Utf8> membersJson);
 typedef IntrovertGroupCreateDart = FfiResult Function(Pointer<Utf8> name, Pointer<Utf8> description, Pointer<Utf8> membersJson);
 
@@ -390,7 +409,7 @@ class FileTransferProgress {
       isOutgoing: json['is_outgoing'] == true,
       isCancelled: json['is_cancelled'] == true,
       localPath: IntrovertClient().resolveSandboxPath(json['local_path']?.toString()),
-      startTimeMs: (json['start_time_ms'] as num?)?.toInt() ?? 0,
+      startTimeMs: (() { final v = (json['start_time_ms'] as num?)?.toInt(); return (v == null || v == 0) ? DateTime.now().millisecondsSinceEpoch : v; })(),
       isWaitingForDownload: false,
       thumbnail: json['thumbnail']?.toString(),
       groupId: json['group_id']?.toString(),
@@ -530,6 +549,14 @@ class IntrovertClient {
   late IntrovertNotesSearchDart _notesSearch;
   late IntrovertNotesSaveVersionDart _notesSaveVersion;
   late IntrovertNotesGetVersionsDart _notesGetVersions;
+
+  // --- Intro-Claw AI Engine Mode ---
+  late IntroClawGetAiModeDart _getAiMode;
+  late IntroClawSetAiModeDart _setAiMode;
+  late IntroClawGetApiKeyDart _getApiKey;
+  late IntroClawTriggerTickDart _clawTriggerTick;
+  late IntroClawSetActiveDart _clawSetActive;
+  late IntroClawGetStatusDart _clawGetStatus;
 
   NativeCallable<NativeNetworkCallback>? _unifiedCallable;
 
@@ -863,6 +890,12 @@ class IntrovertClient {
       _sendTypingStart = safeLookup('send_typing_start', () => _dylib.lookupFunction<IntrovertSendTypingStartC, IntrovertSendTypingStartDart>('introvert_send_typing_start'), (p) => FfiResult.dummy);
       _sendTypingStop = safeLookup('send_typing_stop', () => _dylib.lookupFunction<IntrovertSendTypingStopC, IntrovertSendTypingStopDart>('introvert_send_typing_stop'), (p) => FfiResult.dummy);
       _getLastSeen = safeLookup('get_last_seen', () => _dylib.lookupFunction<IntrovertGetLastSeenC, IntrovertGetLastSeenDart>('introvert_get_last_seen'), (p) => FfiResult.dummy);
+      _getAiMode = safeLookup('get_ai_mode', () => _dylib.lookupFunction<IntroClawGetAiModeC, IntroClawGetAiModeDart>('intro_claw_get_ai_mode'), () => 0);
+      _setAiMode = safeLookup('set_ai_mode', () => _dylib.lookupFunction<IntroClawSetAiModeC, IntroClawSetAiModeDart>('intro_claw_set_ai_mode'), (m, k) => FfiResult.dummy);
+      _getApiKey = safeLookup('get_api_key', () => _dylib.lookupFunction<IntroClawGetApiKeyC, IntroClawGetApiKeyDart>('intro_claw_get_api_key'), () => nullptr);
+      _clawTriggerTick = safeLookup('claw_trigger_tick', () => _dylib.lookupFunction<IntroClawTriggerTickC, IntroClawTriggerTickDart>('intro_claw_trigger_tick'), () => FfiResult.dummy);
+      _clawSetActive = safeLookup('claw_set_active', () => _dylib.lookupFunction<IntroClawSetActiveC, IntroClawSetActiveDart>('intro_claw_set_active'), (a) => FfiResult.dummy);
+      _clawGetStatus = safeLookup('claw_get_status', () => _dylib.lookupFunction<IntroClawGetStatusC, IntroClawGetStatusDart>('intro_claw_get_status'), () => FfiResult.dummy);
       debugPrint('✅ All native functions bound successfully.');
     } catch (e) {
       debugPrint('❌ Error binding native functions: $e');
@@ -1398,6 +1431,32 @@ class IntrovertClient {
 
   void setAnchorMode(bool enabled) => _handleFfiResult(_setAnchorMode(enabled), context: "Set Anchor Mode");
   bool isAnchorModeEnabled() => _getAnchorMode() == 1;
+
+  // --- Intro-Claw AI Engine Mode ---
+  int getIntroClawAiMode() => _getAiMode();
+  
+  void setIntroClawAiMode(int mode, {String apiKey = ''}) {
+    using((Arena arena) {
+      _handleFfiResult(
+        _setAiMode(mode, apiKey.toNativeUtf8(allocator: arena)),
+        context: "Set Intro-Claw AI Mode",
+      );
+    });
+  }
+  
+  String getIntroClawApiKey() {
+    final ptr = _getApiKey();
+    if (ptr.address == 0) return '';
+    try { return ptr.toDartString(); } finally { _freeString(ptr); }
+  }
+
+  // --- Intro-Claw Automation Methods ---
+  void triggerIntroClawTick() => _handleFfiResult(_clawTriggerTick(), context: "IntroClaw Tick");
+  void setIntroClawActive(bool active) => _handleFfiResult(_clawSetActive(active), context: "IntroClaw Active");
+  String getIntroClawStatus() {
+    final result = _clawGetStatus();
+    return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+  }
 
   void setTunnelMode(bool enabled) => _handleFfiResult(_setTunnelMode(enabled), context: "Set Tunnel Mode");
   bool isTunnelModeEnabled() => _getTunnelMode() == 1;
