@@ -51,14 +51,14 @@ Extend point-to-point sovereignty to decentralized multi-user environments and h
 - [x] **DHT Seeder Discovery:** Use libp2p Kademlia `start_providing` to announce file availability.
 - [x] **Participating Seeding:** Every node that verifies a file automatically joins the swarm as a provider.
 - [x] **Pipelined Pull Model:** Implemented 4-deep chunk pipelining to hide relay latency during cross-network transfers.
-- [ ] **Gossipsub Integration:** Implement `libp2p-gossipsub` for efficient multi-point message propagation without central relays.
+- [x] **Gossipsub Integration:** Implement `libp2p-gossipsub` for efficient multi-point message propagation without central relays.
 - [ ] **Decentralized Group E2EE:** Implement MLS (Messaging Layer Security) or TreeKEM-based group key rotation.
 
-### Phase 6: Solana Economy & Incentives [IN PROGRESS]
+### Phase 6: Solana Economy & Incentives [STABLE]
 Activate the `INTR` token economy to sustain the network.
 - [x] **Reward Tracker:** Integrate the `economy` module to track message delivery and generate work proofs.
 - [x] **Seeder Incentives:** Track data served via Sovereign Swarm to reward long-term file providers.
-- [ ] **Solana Mainnet Integration:** Enable SPL-token balance checks and gasless reward payouts via Treasury ATA.
+- [x] **Solana Mainnet Integration:** Enable SPL-token balance checks and gasless reward payouts via Treasury ATA.
 
 ---
 
