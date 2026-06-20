@@ -174,8 +174,17 @@ pub extern "C" fn introvert_derive_identifiers(
         return FfiResult::error(-1, "Null pointer");
     }
 
+    #[cfg(debug_assertions)]
+    {
+        // In debug mode, verify the pointer is readable before dereferencing
+        unsafe {
+            let test_slice = std::slice::from_raw_parts(seed_ptr, 32);
+            debug_assert!(!test_slice.iter().all(|&b| b == 0), "Seed pointer points to all-zero memory");
+        }
+    }
+
     let seed: &[u8; 32] = unsafe { &*(seed_ptr as *const [u8; 32]) };
-    
+
     // 1. Derive libp2p identity and peer ID
     let identity = match NodeIdentity::from_seed(*seed) {
         Ok(id) => id,
@@ -212,6 +221,14 @@ pub extern "C" fn introvert_engine_start(
 ) -> FfiResult {
     if seed_ptr.is_null() || db_path_ptr.is_null() {
         return FfiResult::error(-1, "Null pointer");
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        unsafe {
+            let test_slice = std::slice::from_raw_parts(seed_ptr, 32);
+            debug_assert!(!test_slice.iter().all(|&b| b == 0), "Seed pointer points to all-zero memory");
+        }
     }
 
     let seed: &[u8; 32] = unsafe { &*(seed_ptr as *const [u8; 32]) };
