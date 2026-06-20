@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use tracing::{info, debug};
 
 use candle_core::{Device, Tensor, DType};
 use candle_transformers::models::bert::{BertModel, Config as BertConfig};
@@ -134,7 +135,7 @@ impl EmbeddingEngine {
                 rt.block_on(async {
                     match Self::load_model(&model_dir).await {
                         Ok(bert_inference) => {
-                            println!("[Embedding] ✅ BERT model loaded — vector similarity active");
+                            info!("[Embedding] BERT model loaded — vector similarity active");
                             *inference.write() = Some(bert_inference);
 
                             // Pre-compute action embeddings
@@ -147,12 +148,12 @@ impl EmbeddingEngine {
                                             action.embedding = inf.encode(&action.description).ok();
                                         }
                                     }
-                                    println!("[Embedding] ✅ Pre-computed {} action embeddings", m.actions.len());
+                                    info!("[Embedding] Pre-computed {} action embeddings", m.actions.len());
                                 }
                             }
                         }
                         Err(e) => {
-                            println!("[Embedding] ℹ️ BERT model unavailable: {} — keyword matching only", e);
+                            debug!("[Embedding] BERT model unavailable: {} — keyword matching only", e);
                         }
                     }
                     *is_loading.write() = false;
@@ -172,7 +173,7 @@ impl EmbeddingEngine {
 
         // Download if not cached
         if !tokenizer_path.exists() || !weights_path.exists() || !config_path.exists() {
-            println!("[Embedding] Downloading all-MiniLM-L6-v2 model (~23MB)...");
+            info!("[Embedding] Downloading all-MiniLM-L6-v2 model (~23MB)...");
             let api = hf_hub::api::sync::Api::new()
                 .map_err(|e| format!("HF Hub init failed: {}", e))?;
             let repo = api.model("sentence-transformers/all-MiniLM-L6-v2".to_string());
@@ -184,7 +185,7 @@ impl EmbeddingEngine {
                 std::fs::copy(&file, &dest)
                     .map_err(|e| format!("Failed to copy {}: {}", filename, e))?;
             }
-            println!("[Embedding] ✅ Model downloaded to {:?}", model_dir);
+            info!("[Embedding] Model downloaded to {:?}", model_dir);
         }
 
         // Load on CPU
@@ -210,7 +211,7 @@ impl EmbeddingEngine {
         let model = BertModel::load(vb, &config)
             .map_err(|e| format!("Failed to load BERT model: {}", e))?;
 
-        println!("[Embedding] ✅ BERT model initialized on CPU ({} layers, hidden={})",
+        info!("[Embedding] BERT model initialized on CPU ({} layers, hidden={})",
             config.num_hidden_layers, config.hidden_size);
 
         Ok(BertInference { model, tokenizer, device, config })

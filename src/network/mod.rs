@@ -23,6 +23,7 @@ use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::data_channel::data_channel_state::RTCDataChannelState;
 use libp2p::{autonat, identify};
 use x25519_dalek::{StaticSecret, PublicKey};
+use tracing::{error, debug, warn};
 
 pub mod noise_session;
 pub mod wormhole;
@@ -472,7 +473,7 @@ impl NetworkService {
                     println!("[Tunnel] WebSocket Tunnel active on local port {}. Bootstrapping via localhost.", assigned_port);
                 }
                 Err(e) => {
-                    eprintln!("[Tunnel] Failed to start WebSocket tunnel: {}", e);
+                    error!("[Tunnel] Failed to start WebSocket tunnel: {}", e);
                 }
             }
         }
@@ -534,7 +535,7 @@ impl NetworkService {
             for (group_id, _, _, _, _) in groups {
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-                    eprintln!("[Mesh] Failed to subscribe to gossipsub topic {}: {}", group_id, e);
+                    error!("[Mesh] Failed to subscribe to gossipsub topic {}: {}", group_id, e);
                 } else {
                     println!("[Mesh] Subscribed to gossipsub topic {}", group_id);
                 }
@@ -976,13 +977,13 @@ impl NetworkService {
                 }
                 event = self.swarm.select_next_some() => {
                     if let Err(e) = self.handle_swarm_event(event).await {
-                        eprintln!("Error handling swarm event: {:?}", e);
+                        error!("Error handling swarm event: {:?}", e);
                     }
                 }
                 command = self.command_rx.recv() => {
                     if let Some(cmd) = command {
                         if let Err(e) = self.handle_command(cmd).await {
-                            eprintln!("Command error: {:?}", e);
+                            error!("Command error: {:?}", e);
                         }
                     } else {
                         break;
@@ -993,21 +994,21 @@ impl NetworkService {
     }
 
     async fn handle_file_chunk(&mut self, peer: PeerId, transfer_id: String, chunk_index: u32, total_chunks: u32, data_base64: String) {
-        println!("[DEBUG] handle_file_chunk: transfer_id={}, chunk_index={}/{}", transfer_id, chunk_index, total_chunks);
+        debug!("[DEBUG] handle_file_chunk: transfer_id={}, chunk_index={}/{}", transfer_id, chunk_index, total_chunks);
         if let Some(transfer) = self.incoming_transfers.get_mut(&transfer_id) {
             transfer.total_chunks = total_chunks;
             transfer.last_update = Instant::now();
-            println!("[DEBUG] Found transfer in incoming_transfers. Decoded chunks so far: {}", transfer.received_chunks.len());
+            debug!("[DEBUG] Found transfer in incoming_transfers. Decoded chunks so far: {}", transfer.received_chunks.len());
             if let Ok(chunk_data) = general_purpose::STANDARD.decode(&data_base64) {
-                println!("[DEBUG] Successfully decoded chunk {} (size: {} bytes)", chunk_index, chunk_data.len());
+                debug!("[DEBUG] Successfully decoded chunk {} (size: {} bytes)", chunk_index, chunk_data.len());
                 // RELIABILITY: Only trigger N+4 if this is a NEW chunk.
                 // This prevents duplicate requests from retries or re-deliveries.
                 let is_new_chunk = transfer.received_chunks.insert(chunk_index, chunk_data).is_none();
-                println!("[DEBUG] Chunk {} is new: {}. Total unique chunks: {}", chunk_index, is_new_chunk, transfer.received_chunks.len());
+                debug!("[DEBUG] Chunk {} is new: {}. Total unique chunks: {}", chunk_index, is_new_chunk, transfer.received_chunks.len());
                 
                 let progress_val = transfer.received_chunks.len() as f32 / total_chunks as f32;
                 let is_complete = transfer.received_chunks.len() as u32 == total_chunks;
-                println!("[DEBUG] progress_val={}, is_complete={}", progress_val, is_complete);
+                debug!("[DEBUG] progress_val={}, is_complete={}", progress_val, is_complete);
                 
                 let received_bytes: usize = transfer.received_chunks.values().map(|v| v.len()).sum();
                 let elapsed = transfer.start_time.elapsed().as_secs_f64();
@@ -1037,7 +1038,7 @@ impl NetworkService {
                                 println!("[Mesh] Organized into group folder: {}_Media", g_name);
                                 format!("{}_Media", g_name)
                             } else {
-                                println!("[Mesh] ⚠️ Group not found in storage for folder organization: {}", gid);
+                                warn!("[Mesh] Group not found in storage for folder organization: {}", gid);
                                 "Group_Media".to_string()
                             }
                         } else {
@@ -1049,7 +1050,7 @@ impl NetworkService {
                                 println!("[Mesh] Organized into contact folder: {}_Media", s_name);
                                 format!("{}_Media", s_name)
                             } else {
-                                println!("[Mesh] ⚠️ Contact not found in storage for folder organization: {}", peer_str);
+                                warn!("[Mesh] Contact not found in storage for folder organization: {}", peer_str);
                                 "Direct_Media".to_string()
                             }
                         };
@@ -1058,7 +1059,7 @@ impl NetworkService {
                         let dir_path = format!("{}/{}", self.downloads_dir, safe_subfolder);
                         println!("[Mesh] Creating Drive directory: {}", dir_path);
                         if let Err(e) = std::fs::create_dir_all(&dir_path) {
-                            eprintln!("[Mesh] ❌ Failed to create Drive subfolder {}: {:?}", dir_path, e);
+                            error!("[Mesh] ❌ Failed to create Drive subfolder {}: {:?}", dir_path, e);
                         }
 
                         let safe_filename = Self::sanitize_filename(&transfer.filename);
@@ -1135,7 +1136,7 @@ impl NetworkService {
                             tokio::spawn(async move { let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: peer, payload: ack }).await; });
                         }
                     } else {
-                        eprintln!("❌ File integrity FAILED for transfer {}. Expected {}, got {}", transfer_id, transfer.file_hash, actual_hash);
+                        error!("❌ File integrity FAILED for transfer {}. Expected {}, got {}", transfer_id, transfer.file_hash, actual_hash);
                         let error = SignalingPayload::FileTransferError { transfer_id: transfer_id.clone(), reason: "Integrity verification failed".to_string() };
                         let tx = self.command_tx.clone();
                         tokio::spawn(async move { let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: peer, payload: error }).await; });
@@ -1216,11 +1217,11 @@ impl NetworkService {
                 // CRITICAL FIX: Always remove from incoming transfers when complete (success or fail) to prevent memory leak
                 if is_complete { self.incoming_transfers.remove(&transfer_id); }
             } else {
-                println!("[DEBUG] Failed to decode base64 for chunk {}", chunk_index);
+                debug!("[DEBUG] Failed to decode base64 for chunk {}", chunk_index);
             }
         } else {
             // Buffer chunks that arrive before their manifest (race condition fix)
-            println!("[DEBUG] transfer_id {} not found in incoming_transfers. Buffering chunk {} for later.", transfer_id, chunk_index);
+            debug!("[DEBUG] transfer_id {} not found in incoming_transfers. Buffering chunk {} for later.", transfer_id, chunk_index);
             self.early_chunks.entry(transfer_id.clone()).or_default().push((chunk_index, total_chunks, data_base64));
         }
     }
@@ -1959,7 +1960,7 @@ impl NetworkService {
                     if self.pending_diagnostics.contains_key(&pid) {
                         let err_str = format!("{:?}", error).replace('"', "'");
                         if err_str.contains("ResourceLimitExceeded") {
-                            println!("[Mesh] ⚠️ RELAY CONGESTION: RBN rejected circuit for {} due to ResourceLimitExceeded.", pid);
+                            warn!("[Mesh] RELAY CONGESTION: RBN rejected circuit for {} due to ResourceLimitExceeded.", pid);
                         }
                         let diag_payload = format!(
                             r#"{{"peer_id":"{}","step":"error","status":"dial_failed","error":"{}"}}"#,
@@ -2364,7 +2365,7 @@ impl NetworkService {
                     
                     let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                     if !is_admin {
-                        eprintln!("[Mesh] Permission denied: Only admins can add members");
+                        error!("[Mesh] Permission denied: Only admins can add members");
                         return Ok(());
                     }
 
@@ -2411,7 +2412,7 @@ impl NetworkService {
                             }
                         }
                     } else {
-                        eprintln!("[Mesh] Cannot add member: Peer {} is not in contacts list", peer_id);
+                        error!("[Mesh] Cannot add member: Peer {} is not in contacts list", peer_id);
                     }
                 }
             }
@@ -2503,13 +2504,13 @@ impl NetworkService {
                     
                     let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                     if !is_admin && !is_self {
-                        eprintln!("[Mesh] Permission denied: Only admins can remove members");
+                        error!("[Mesh] Permission denied: Only admins can remove members");
                         return Ok(());
                     }
 
                     if let Some(pos) = members.iter().position(|m| m.peer_id == peer_id) {
                         if members[pos].role == GroupRole::Creator {
-                            eprintln!("[Mesh] Permission denied: Creator cannot leave or be removed from the group");
+                            error!("[Mesh] Permission denied: Creator cannot leave or be removed from the group");
                             return Ok(());
                         }
 
@@ -2552,13 +2553,13 @@ impl NetworkService {
                     
                     let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                     if !is_admin {
-                        eprintln!("[Mesh] Permission denied: Only admins can update roles");
+                        error!("[Mesh] Permission denied: Only admins can update roles");
                         return Ok(());
                     }
 
                     if let Some(pos) = members.iter().position(|m| m.peer_id == peer_id) {
                         if members[pos].role == GroupRole::Creator {
-                            eprintln!("[Mesh] Permission denied: Cannot change creator's role");
+                            error!("[Mesh] Permission denied: Cannot change creator's role");
                             return Ok(());
                         }
 
@@ -2681,10 +2682,10 @@ impl NetworkService {
                             }
                         }
                     } else {
-                        eprintln!("[Mesh] ❌ Failed to unwrap group secret for {}", group_id);
+                        error!("[Mesh] ❌ Failed to unwrap group secret for {}", group_id);
                     }
                 } else {
-                    eprintln!("[Mesh] No pending invite found for group: {}", group_id);
+                    error!("[Mesh] No pending invite found for group: {}", group_id);
                 }
             }
             NetworkCommand::DeclineGroupInvite { group_id } => {
@@ -2695,7 +2696,7 @@ impl NetworkService {
             NetworkCommand::PublishGossipsub { topic, data } => {
                 let ident_topic = libp2p::gossipsub::IdentTopic::new(topic.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.publish(ident_topic, data) {
-                    eprintln!("[Mesh] ❌ Failed to publish gossipsub message to topic {}: {:?}", topic, e);
+                    error!("[Mesh] ❌ Failed to publish gossipsub message to topic {}: {:?}", topic, e);
                 }
             }
             NetworkCommand::BroadcastGroupMessage { group_id, message, reply_to } => {
@@ -2710,7 +2711,7 @@ impl NetworkService {
                     // Check if we are muted before broadcasting
                     if let Ok(muted) = storage.get_group_muted_members(&gid) {
                         if muted.contains(&my_peer_id) {
-                            eprintln!("[Mesh] ❌ Blocked broadcast: User is MUTED in group {}", gid);
+                            error!("[Mesh] ❌ Blocked broadcast: User is MUTED in group {}", gid);
                             return;
                         }
                     }
@@ -3028,7 +3029,7 @@ impl NetworkService {
                 });
 
                 if let Err(e) = MediaManager::add_media_tracks(Arc::clone(&pc), media_type).await {
-                    eprintln!("❌ Failed to add media tracks: {:?}", e);
+                    error!("❌ Failed to add media tracks: {:?}", e);
                 }
 
                 let offer_sdp = MediaManager::create_offer(Arc::clone(&pc)).await?;
@@ -3064,7 +3065,7 @@ impl NetworkService {
                         });
 
                         if let Err(e) = MediaManager::add_media_tracks(Arc::clone(&pc), media_type).await {
-                            eprintln!("❌ Failed to add media tracks: {:?}", e);
+                            error!("❌ Failed to add media tracks: {:?}", e);
                         }
 
                         if let Ok(answer_sdp) = MediaManager::handle_offer(offer_sdp, Arc::clone(&pc)).await {
@@ -3616,7 +3617,7 @@ impl NetworkService {
                                         }
                                     }
                                     Err(e) => {
-                                        eprintln!("❌ Noise decryption FAILED for {}: {:?}", p, e);
+                                        error!("❌ Noise decryption FAILED for {}: {:?}", p, e);
                                         self.noise_sessions.remove(&p);
                                         let storage = Arc::clone(&self.storage);
                                         let pid_str = p.to_string();
@@ -4424,7 +4425,7 @@ impl NetworkService {
                 // Subscribe to Gossipsub topic for this group immediately to start receiving mesh traffic
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-                    eprintln!("[Mesh] Failed to subscribe to gossipsub topic for invited group {}: {:?}", group_id, e);
+                    error!("[Mesh] Failed to subscribe to gossipsub topic for invited group {}: {:?}", group_id, e);
                 }
                 // Privacy-First: Store as pending invite — user must explicitly accept
                 let members_json = serde_json::to_string(&members).unwrap_or_default();
@@ -4675,10 +4676,10 @@ impl NetworkService {
 
                     }
                     Ok(false) => {
-                        eprintln!("[Mesh] ❌ GroupAction signature verification failed for signer {}", signed_action.signer_peer_id);
+                        error!("[Mesh] ❌ GroupAction signature verification failed for signer {}", signed_action.signer_peer_id);
                     }
                     Err(e) => {
-                        eprintln!("[Mesh] ❌ GroupAction verification error for signer {}: {:?}", signed_action.signer_peer_id, e);
+                        error!("[Mesh] ❌ GroupAction verification error for signer {}: {:?}", signed_action.signer_peer_id, e);
                     }
                 }
                 }
@@ -4701,7 +4702,7 @@ impl NetworkService {
                 // Subscribe to Gossipsub topic for this group
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-                    eprintln!("[Mesh] Failed to subscribe to gossipsub topic {}: {:?}", group_id, e);
+                    error!("[Mesh] Failed to subscribe to gossipsub topic {}: {:?}", group_id, e);
                 } else {
                     println!("[Mesh] Dynamically subscribed to gossipsub topic {}", group_id);
                 }
@@ -4796,7 +4797,7 @@ impl NetworkService {
                     // Never prematurely signal outgoing_complete — wait for explicit member count.
                     // Show proportional progress based on completions seen so far (at least 1 member).
                     let ratio = current_completions as f32 / (current_completions.max(1) as f32);
-                    println!("[Mesh] ⚠️ Group member count unavailable for {}. Holding verified state.", transfer_id);
+                    warn!("[Mesh] Group member count unavailable for {}. Holding verified state.", transfer_id);
                     (ratio, false)
                 } else {
                     (1.0, true)
@@ -4847,7 +4848,7 @@ impl NetworkService {
                 crate::dispatch_global_event(12, &data);
             }
             SignalingPayload::FileTransferError { transfer_id, reason } => {
-                println!("❌ File transfer error for {}: {}", transfer_id, reason);
+                warn!("File transfer error for {}: {}", transfer_id, reason);
                 
                 // BUG 1 FIX: Remove from active seeders to stop aggressive polling
                 self.active_seeders.remove(&transfer_id);

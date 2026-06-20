@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use parking_lot::RwLock;
 use libp2p::PeerId;
 use crate::storage::StorageService;
+use tracing::info;
 
 /// Context passed to IntroClaw on each tick cycle
 pub struct ClawTickContext {
@@ -285,9 +286,9 @@ impl IntroClawService {
     pub fn set_active(&mut self, active: bool) {
         self.is_active = active;
         if active {
-            println!("[IntroClaw] Engine ACTIVATED");
+            info!("[IntroClaw] Engine ACTIVATED");
         } else {
-            println!("[IntroClaw] Engine DEACTIVATED");
+            info!("[IntroClaw] Engine DEACTIVATED");
         }
     }
 
@@ -300,7 +301,7 @@ impl IntroClawService {
         if !self.is_active { return; }
 
         self.tick_count += 1;
-        println!("[IntroClaw] Tick #{} — battery={}%, bg={}, peers={}, mdns={}",
+        info!("[IntroClaw] Tick #{} — battery={}%, bg={}, peers={}, mdns={}",
                  self.tick_count, ctx.battery_pct, ctx.is_background,
                  ctx.connected_peers.len(), ctx.mdns_discovered.len());
 
@@ -343,22 +344,22 @@ impl IntroClawService {
 
     fn run_database_maintenance(&mut self) {
         if !self.db_pruner.should_run() { return; }
-        println!("[IntroClaw] Running database maintenance...");
+        info!("[IntroClaw] Running database maintenance...");
         let _ = self.storage.prune_expired_sessions(SESSION_CACHE_MAX_AGE_SECS);
         let _ = self.storage.prune_expired_crypto_sessions(CRYPTO_SESSION_MAX_AGE_SECS);
         let _ = self.storage.prune_old_mesh_chunks();
         let _ = self.storage.run_pragma_optimize();
         self.db_pruner.last_prune = std::time::Instant::now();
-        println!("[IntroClaw] Database maintenance complete");
+        info!("[IntroClaw] Database maintenance complete");
     }
 
     fn run_media_cleanup(&mut self) {
         if !self.media_manager.should_run() { return; }
-        println!("[IntroClaw] Running media lifecycle cleanup...");
+        info!("[IntroClaw] Running media lifecycle cleanup...");
         let active_hashes = self.storage.get_active_drive_hashes();
         let _ = self.storage.cleanup_orphaned_mesh_chunks(&active_hashes);
         self.media_manager.last_cleanup = std::time::Instant::now();
-        println!("[IntroClaw] Media cleanup complete");
+        info!("[IntroClaw] Media cleanup complete");
     }
 
     fn run_connection_optimization(&mut self, ctx: &ClawTickContext) {
@@ -376,7 +377,7 @@ impl IntroClawService {
             let has_mdns = ctx.mdns_discovered.contains(peer_id_str);
 
             if is_relayed && has_mdns && battery_ok {
-                println!("[IntroClaw] Direct P2P upgrade candidate: {}", peer_id_str);
+                info!("[IntroClaw] Direct P2P upgrade candidate: {}", peer_id_str);
             }
         }
         self.conn_optimizer.last_optimize = std::time::Instant::now();
@@ -406,7 +407,7 @@ impl IntroClawService {
         let (drive_bytes, mesh_bytes, total_disk) = self.storage.get_storage_usage();
         let usage_pct = if total_disk > 0 { ((drive_bytes + mesh_bytes) as f64 / total_disk as f64 * 100.0) as i32 } else { 0 };
         if usage_pct > 80 {
-            println!("[IntroClaw] Storage at {}% — auto-pruning mesh chunks", usage_pct);
+            info!("[IntroClaw] Storage at {}% — auto-pruning mesh chunks", usage_pct);
             let active = self.storage.get_active_drive_hashes();
             let _ = self.storage.cleanup_orphaned_mesh_chunks(&active);
         }

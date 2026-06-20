@@ -13,6 +13,7 @@ use std::ffi::{CStr, CString};
 use std::time::Duration;
 use libc::c_char;
 use once_cell::sync::Lazy;
+use tracing::{error, debug};
 use parking_lot::RwLock;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -94,7 +95,7 @@ pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle
 /// and ownership is transferred to Dart (Dart will call libc::free).
 pub fn dispatch_global_event_raw(event_type: i32, data_ptr: *const u8, data_len: usize) {
     if data_ptr.is_null() && data_len > 0 {
-        println!("FFI Warning: Null data_ptr for non-zero data_len in event {}", event_type);
+        debug!("FFI Warning: Null data_ptr for non-zero data_len in event {}", event_type);
         return;
     }
     
@@ -106,10 +107,10 @@ pub fn dispatch_global_event_raw(event_type: i32, data_ptr: *const u8, data_len:
         if let Some(callback) = *engine.network_callback.read() {
             callback(event_type, data_ptr, data_len);
         } else {
-            println!("FFI Warning: No callback registered in engine for event {}", event_type);
+            debug!("FFI Warning: No callback registered in engine for event {}", event_type);
         }
     } else {
-        println!("FFI Warning: Engine not initialized for event {}", event_type);
+        debug!("FFI Warning: Engine not initialized for event {}", event_type);
     }
 }
 
@@ -367,7 +368,7 @@ pub extern "C" fn introvert_network_start_production(
             }
             Err(e) => {
                 let err_msg = format!("Failed to start network service: {}", e);
-                eprintln!("{}", err_msg);
+                error!("{}", err_msg);
                 dispatch_debug_log(&err_msg);
             }
         }

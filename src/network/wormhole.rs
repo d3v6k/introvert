@@ -3,10 +3,11 @@ use anyhow::{Result, Context};
 use crate::identity::SovereignIdentity;
 use std::future::Future;
 use async_compat::Compat;
+use tracing::info;
 
 /// Creates a new Wormhole invite, returning the human-readable code and a future that resolves to the peer's identity.
 pub async fn create_invite(my_identity: SovereignIdentity) -> Result<(String, impl Future<Output = Result<SovereignIdentity>>)> {
-    println!("Wormhole: Connecting to rendezvous relay...");
+    info!("Wormhole: Connecting to rendezvous relay...");
     crate::dispatch_debug_log("Wormhole: Contacting rendezvous relay...");
     
     let mut custom_config = transfer::APP_CONFIG.clone();
@@ -19,7 +20,7 @@ pub async fn create_invite(my_identity: SovereignIdentity) -> Result<(String, im
     let mut last_err = None;
     for attempt in 1..=3 {
         let msg = format!("Wormhole: Connecting to rendezvous relay (attempt {}/3)...", attempt);
-        println!("{}", msg);
+        info!("{}", msg);
         crate::dispatch_debug_log(&msg);
         
         match magic_wormhole::MailboxConnection::create(
@@ -33,7 +34,7 @@ pub async fn create_invite(my_identity: SovereignIdentity) -> Result<(String, im
             }
             Err(e) => {
                 let err_msg = format!("Wormhole attempt {} failed: {}", attempt, e);
-                println!("{}", err_msg);
+                info!("{}", err_msg);
                 crate::dispatch_debug_log(&err_msg);
                 last_err = Some(e);
                 tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
@@ -47,7 +48,7 @@ pub async fn create_invite(my_identity: SovereignIdentity) -> Result<(String, im
     };
 
     let code = connector.code().to_string();
-    println!("Wormhole: Code generated: {}", code);
+    info!("Wormhole: Code generated: {}", code);
     crate::dispatch_debug_log(&format!("Wormhole: Code generated: {}", code));
 
     // Now wrap the handshake in Compat for compatibility
@@ -70,7 +71,7 @@ pub async fn create_invite(my_identity: SovereignIdentity) -> Result<(String, im
 
 /// Joins an existing Wormhole session using a code and returns the peer's identity.
 pub async fn accept_invite(code: String, my_identity: SovereignIdentity) -> Result<impl Future<Output = Result<SovereignIdentity>>> {
-    println!("Wormhole: Joining existing session...");
+    info!("Wormhole: Joining existing session...");
     crate::dispatch_debug_log("Wormhole: Joining existing session...");
 
     let mut custom_config = transfer::APP_CONFIG.clone();
