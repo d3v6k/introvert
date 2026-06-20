@@ -31,6 +31,7 @@ pub mod registry;
 pub mod tunnel;
 pub mod types;
 pub mod service;
+pub mod e2ee;
 
 pub use types::*;
 pub use service::{NetworkService, NetworkConfig, IncomingTransfer, ActiveSeeder, PendingDiagnostic};
