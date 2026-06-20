@@ -142,6 +142,37 @@ impl RewardTracker {
         self.state.read().last_claim_timestamp
     }
 
+    pub fn needs_seed_balance(&self) -> bool {
+        if let Some(ref s) = self.storage {
+            !s.is_seed_claimed()
+        } else {
+            false
+        }
+    }
+
+    pub fn prepare_seed_request(&self, user_address: &str) -> Option<String> {
+        // Prepare a request for the initial onboarding seed balance
+        Some(format!("SEED_REQUEST:{}", user_address))
+    }
+
+    pub fn commit_seed_claimed(&self) {
+        if let Some(ref s) = self.storage {
+            let _ = s.set_seed_claimed(true);
+        }
+    }
+
+    pub fn record_message_activity(&self, peer_id: &str) {
+        // Phase III: Activity Yield
+        // For now, we record a flat 1KB activity credit
+        self.record_relay(peer_id, 1024);
+    }
+
+    pub fn is_lease_valid(&self, _balance: u64) -> bool {
+        // Phase II: Identity Lease
+        // RELAXED: Always return true for now to ensure connectivity during testing.
+        true
+    }
+
     /// DEV ONLY: Overrides the internal start time to simulate long uptimes.
     pub fn simulate_uptime(&self, seconds: u64) {
         let mut state = self.state.write();

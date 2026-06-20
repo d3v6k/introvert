@@ -55,3 +55,12 @@ release/
 *.seed
 *.so
 introvertd
+*.bak*
+*.stable
+*.bak_*
+*.log
+*.bak2
+*.bak3
+*.bak4
+.antigravitycli/
+.openssl_linux/

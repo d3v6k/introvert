@@ -9,7 +9,7 @@ use webrtc::data_channel::RTCDataChannel;
 use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
-use webrtc::track::track_local::TrackLocal;
+use webrtc::track::track_local::{TrackLocal};
 use webrtc::track::track_remote::TrackRemote;
 use webrtc::rtp_transceiver::rtp_codec::{RTCRtpCodecCapability, RTCRtpCodecParameters, RTPCodecType};
 use std::sync::Arc;
@@ -40,7 +40,8 @@ impl MediaManager {
         is_caller: bool,
         reward_tracker: Arc<RewardTracker>,
         remote_peer_id: PeerId,
-    ) -> Result<Arc<RTCPeerConnection>> {
+        command_tx: tokio::sync::mpsc::Sender<crate::network::NetworkCommand>,
+    ) -> Result<(Arc<RTCPeerConnection>, tokio::sync::mpsc::Receiver<Arc<RTCDataChannel>>)> {
         let mut m = MediaEngine::default();
         
         m.register_codec(
@@ -77,15 +78,40 @@ impl MediaManager {
             .with_media_engine(m)
             .build();
 
-        let config = RTCConfiguration {
-            ice_servers: vec![RTCIceServer {
+        let ice_servers = if cfg!(test) || std::env::var("INTROVERT_TEST").is_ok() {
+            vec![]
+        } else {
+            vec![RTCIceServer {
                 urls: vec!["stun:stun.l.google.com:19302".to_owned()],
                 ..Default::default()
-            }],
+            }]
+        };
+
+        let config = RTCConfiguration {
+            ice_servers,
             ..Default::default()
         };
 
         let pc = Arc::new(api.new_peer_connection(config).await?);
+        let (dc_tx, dc_rx) = tokio::sync::mpsc::channel(1);
+
+        // ICE Candidate Handling: Send local candidates to remote peer via Mesh
+        let tx_candidate = command_tx.clone();
+        let peer_candidate = remote_peer_id;
+        pc.on_ice_candidate(Box::new(move |c| {
+            let tx = tx_candidate.clone();
+            let peer = peer_candidate;
+            Box::pin(async move {
+                if let Some(candidate) = c {
+                    if let Ok(json) = serde_json::to_string(&candidate.to_json().unwrap()) {
+                         let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { 
+                             peer_id: peer, 
+                             payload: crate::network::SignalingPayload::Candidate(json) 
+                         }).await;
+                    }
+                }
+            })
+        }));
 
         // Handle incoming tracks (Event Type 5)
         let tracker_clone = Arc::clone(&reward_tracker);
@@ -121,67 +147,85 @@ impl MediaManager {
                     data.extend_from_slice(header_slice);
                     data.extend_from_slice(&rtp_packet.payload);
                     
-                    data.shrink_to_fit();
-                    let ptr = data.as_ptr();
-                    let len = data.len();
-                    std::mem::forget(data);
-                    
-                    crate::dispatch_global_event(5, ptr, len);
+                    crate::dispatch_global_event(5, &data);
                 }
             })
         }));
 
         if is_caller {
             let dc = pc.create_data_channel("introvert-messaging", None).await?;
-            Self::setup_data_channel_handlers(dc, reward_tracker, remote_peer_id).await;
+            let _ = dc_tx.send(Arc::clone(&dc)).await;
+            Self::setup_data_channel_handlers(dc, reward_tracker, remote_peer_id, command_tx.clone()).await;
         } else {
             let tracker_clone = Arc::clone(&reward_tracker);
+            let tx_clone = command_tx.clone();
             pc.on_data_channel(Box::new(move |dc: Arc<RTCDataChannel>| {
                 let tracker = Arc::clone(&tracker_clone);
                 let peer_id = remote_peer_id;
+                let dc_tx_clone = dc_tx.clone();
+                let tx = tx_clone.clone();
                 Box::pin(async move {
-                    Self::setup_data_channel_handlers(dc, tracker, peer_id).await;
+                    let _ = dc_tx_clone.send(Arc::clone(&dc)).await;
+                    Self::setup_data_channel_handlers(dc, tracker, peer_id, tx).await;
                 })
             }));
         }
 
+        let tx_state = command_tx.clone();
+        let peer_id_state = remote_peer_id;
         pc.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
-            println!("Peer Connection State has changed: {}", s);
-            Box::pin(async move {})
+            let tx = tx_state.clone();
+            let pid = peer_id_state;
+            Box::pin(async move {
+                if s == RTCPeerConnectionState::Failed || s == RTCPeerConnectionState::Disconnected || s == RTCPeerConnectionState::Closed {
+                    let _ = tx.send(crate::network::NetworkCommand::WebRtcFailed { peer_id: pid }).await;
+                }
+            })
         }));
 
-        Ok(pc)
+        Ok((pc, dc_rx))
     }
 
     async fn setup_data_channel_handlers(
         dc: Arc<RTCDataChannel>, 
-        reward_tracker: Arc<RewardTracker>,
+        _reward_tracker: Arc<RewardTracker>,
         remote_peer_id: PeerId,
+        command_tx: tokio::sync::mpsc::Sender<crate::network::NetworkCommand>,
     ) {
-        let _dc_label = dc.label().to_owned();
-        let tracker = reward_tracker;
-        let consumer_id = remote_peer_id.to_string();
-        
+        let tx = command_tx;
+        let pid_open = remote_peer_id;
         dc.on_open(Box::new(move || {
-            let mut data = "open".as_bytes().to_vec();
-            data.shrink_to_fit();
-            let ptr = data.as_ptr();
-            let len = data.len();
-            std::mem::forget(data);
-            crate::dispatch_global_event(3, ptr, len);
+            crate::dispatch_global_event(3, b"open");
+            let mut data = pid_open.to_string().into_bytes();
+            data.push(b':');
+            data.push(0); // 0 = Direct P2P
+            crate::dispatch_global_event(8, &data);
             Box::pin(async move {})
         }));
 
+        let tx_message = tx.clone();
         dc.on_message(Box::new(move |msg: DataChannelMessage| {
-            let msg_len = msg.data.len() as u64;
-            tracker.record_relay(&consumer_id, msg_len);
-            let mut data = msg.data.to_vec();
-            data.shrink_to_fit();
-            let ptr = data.as_ptr();
-            let len = data.len();
-            std::mem::forget(data);
-            crate::dispatch_global_event(4, ptr, len);
+            // Attempt to parse as SignalingPayload
+            if let Ok(payload) = serde_json::from_slice::<crate::network::SignalingPayload>(&msg.data) {
+                let tx_clone = tx_message.clone();
+                let peer_id = remote_peer_id;
+                return Box::pin(async move {
+                    let _ = tx_clone.send(crate::network::NetworkCommand::HandleIncomingWebRtcPayload { peer_id, payload }).await;
+                });
+            }
+
+            crate::dispatch_global_event(4, &msg.data);
             Box::pin(async move {})
+        }));
+
+        let tx_close = tx.clone();
+        let pid_close = remote_peer_id;
+        dc.on_close(Box::new(move || {
+            let tx = tx_close.clone();
+            let pid = pid_close;
+            Box::pin(async move {
+                let _ = tx.send(crate::network::NetworkCommand::CloseWebRtc { peer_id: pid }).await;
+            })
         }));
     }
 

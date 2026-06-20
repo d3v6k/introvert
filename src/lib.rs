@@ -6,6 +6,7 @@ pub mod economy;
 pub mod network;
 pub mod media;
 pub mod intro_claw;
+pub mod embedding;
 
 use std::sync::Arc;
 use std::ffi::{CStr, CString};
@@ -22,7 +23,7 @@ use solana_sdk::signature::Signer;
 
 use crate::identity::NodeIdentity;
 use crate::storage::StorageService;
-use crate::network::{FfiNetworkCallback, NetworkCommand, NetworkService};
+use crate::network::{FfiNetworkCallback, NetworkCommand, NetworkConfig, NetworkService};
 use crate::economy::RewardTracker;
 use crate::economy::solana::SolanaIncentiveEngine;
 use serde_json::json;
@@ -342,25 +343,24 @@ pub extern "C" fn introvert_network_start_production(
 
     engine.runtime.spawn(async move {
         dispatch_debug_log("Starting NetworkService initialization...");
-        match NetworkService::new(
+        match NetworkService::new(NetworkConfig {
             keypair,
-            callback,
-            rx,
-            tx_clone,
+            command_rx: rx,
+            command_tx: tx_clone,
             storage,
             reward_tracker,
             solana_client,
             local_static_secret,
             session_encryption_key,
-            true,
-            true,
+            enable_mdns: true,
+            enable_listeners: true,
             tcp_port,
             enable_relay_server,
             max_connections,
             liveness_interval_secs,
             downloads_dir,
-            false, // is_stress_test
-        ).await {
+            is_stress_test: false,
+        }).await {
             Ok(service) => {
                 dispatch_debug_log("NetworkService initialized. Running swarm...");
                 service.run().await;
@@ -1241,6 +1241,32 @@ pub extern "C" fn introvert_storage_get_messages(peer_id_ptr: *const c_char) -> 
         Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
     }
 }
+fn build_local_sovereign_identity(engine: &Engine) -> anyhow::Result<crate::identity::SovereignIdentity> {
+    let identity = &engine.identity;
+    let storage = &engine.storage;
+
+    let local_static_secret = NodeIdentity::derive_e2ee_key(identity.seed)?;
+    let local_static_public = x25519_dalek::PublicKey::from(&local_static_secret);
+
+    let solana_signing_key = NodeIdentity::derive_solana_keypair(identity.seed)?;
+    let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
+
+    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+
+    Ok(crate::identity::SovereignIdentity {
+        peer_id: identity.peer_id.to_string(),
+        p2p_pubkey: identity.keypair.public().encode_protobuf(),
+        static_key: local_static_public.to_bytes(),
+        solana_address,
+        global_name: local_name.clone(),
+        local_alias: local_name,
+        avatar_base64: local_avatar,
+        is_anchor_capable: true,
+        retention_seconds: 0,
+        handle: local_handle,
+    })
+}
+
 /// Initiates a Magic Wormhole invite session using the global network callback.
 #[no_mangle]
 pub extern "C" fn introvert_wormhole_start() -> FfiResult {
@@ -1250,35 +1276,12 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
         None => return FfiResult::error(-10, "Engine not started"),
     };
 
-    let identity = Arc::clone(&engine.identity);
+    let _identity = Arc::clone(&engine.identity);
     let storage = Arc::clone(&engine.storage);
-    
-    // Construct our SovereignIdentity
-    let local_static_secret = match NodeIdentity::derive_e2ee_key(identity.seed) {
-        Ok(k) => k,
-        Err(_) => return FfiResult::error(-14, "E2EE key derivation failed"),
-    };
-    let local_static_public = x25519_dalek::PublicKey::from(&local_static_secret);
-    
-    let solana_signing_key = match NodeIdentity::derive_solana_keypair(identity.seed) {
-        Ok(k) => k,
-        Err(_) => return FfiResult::error(-15, "Solana key derivation failed"),
-    };
-    let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
-
-    let my_identity = crate::identity::SovereignIdentity {
-        peer_id: identity.peer_id.to_string(),
-        p2p_pubkey: identity.keypair.public().encode_protobuf(),
-        static_key: local_static_public.to_bytes(),
-        solana_address,
-        global_name: local_name.clone(),
-        local_alias: local_name,
-        avatar_base64: local_avatar,
-        is_anchor_capable: true, 
-        retention_seconds: 0,
-        handle: local_handle,
+    let my_identity = match build_local_sovereign_identity(engine) {
+        Ok(id) => id,
+        Err(_) => return FfiResult::error(-14, "Identity derivation failed"),
     };
 
     let handle = engine.runtime.spawn(async move {
@@ -1376,35 +1379,12 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
     if code_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
     let code = unsafe { CStr::from_ptr(code_ptr).to_string_lossy().into_owned() };
 
-    let identity = Arc::clone(&engine.identity);
+    let _identity = Arc::clone(&engine.identity);
     let storage = Arc::clone(&engine.storage);
     
-    // Construct our SovereignIdentity
-    let local_static_secret = match NodeIdentity::derive_e2ee_key(identity.seed) {
-        Ok(k) => k,
-        Err(_) => return FfiResult::error(-14, "E2EE key derivation failed"),
-    };
-    let local_static_public = x25519_dalek::PublicKey::from(&local_static_secret);
-    
-    let solana_signing_key = match NodeIdentity::derive_solana_keypair(identity.seed) {
-        Ok(k) => k,
-        Err(_) => return FfiResult::error(-15, "Solana key derivation failed"),
-    };
-    let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
-
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
-
-    let my_identity = crate::identity::SovereignIdentity {
-        peer_id: identity.peer_id.to_string(),
-        p2p_pubkey: identity.keypair.public().encode_protobuf(),
-        static_key: local_static_public.to_bytes(),
-        solana_address,
-        global_name: local_name.clone(),
-        local_alias: local_name,
-        avatar_base64: local_avatar,
-        is_anchor_capable: true, 
-        retention_seconds: 0,
-        handle: local_handle,
+    let my_identity = match build_local_sovereign_identity(engine) {
+        Ok(id) => id,
+        Err(_) => return FfiResult::error(-14, "Identity derivation failed"),
     };
 
     let handle = engine.runtime.spawn(async move {
@@ -1696,7 +1676,7 @@ pub extern "C" fn intro_claw_set_active(active: bool) -> FfiResult {
         Some(e) => e,
         None => return FfiResult::error(-10, "Engine not started"),
     };
-    let mode = engine.storage.get_intro_claw_ai_mode();
+    let mode = if active { 1 } else { 0 };
     // Store the active state in economy_meta for persistence
     let _ = engine.storage.set_intro_claw_ai_mode(mode, "");
     let tx_lock = engine.network_tx.read();

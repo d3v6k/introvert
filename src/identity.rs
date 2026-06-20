@@ -8,9 +8,15 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SovereignIdentity {
     pub peer_id: String,        // Permanent libp2p PeerId
+    pub p2p_pubkey: Vec<u8>,    // Permanent Ed25519 public key (Protobuf encoded)
     pub static_key: [u8; 32],   // Permanent X25519 public key for Noise IK
     pub solana_address: String, // User's reward destination
+    pub global_name: Option<String>,
+    pub local_alias: Option<String>,
+    pub avatar_base64: Option<String>,
     pub is_anchor_capable: bool, // Node supports mailbox storage
+    pub retention_seconds: u32,
+    pub handle: Option<String>,
 }
 
 pub struct NodeIdentity {

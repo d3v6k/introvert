@@ -41,3 +41,8 @@ When a peer is offline, encrypted messages are stored on an **Anchor Node**.
 ## 6. FFI Memory Safety
 - **Binary Buffers:** Memory transferred between Rust and Dart is explicitly managed. Rust allocates memory using `libc::malloc`, and the Dart layer is responsible for calling `introvert_free_binary` once the data is copied.
 - **Opaque Pointers:** The `Engine` state is stored as a global `Lazy<RwLock<Option<Arc<Engine>>>>`, ensuring safe access across FFI boundaries.
+
+## 7. Intro-Claw Security Sandbox
+- **Zero Access:** Intro-Claw has no access to master keys, message content, or session blobs.
+- **Network Isolation:** Network isolation enforced in Offline mode.
+- **On-Device Processing:** All AI/automation runs locally without external data transmission.

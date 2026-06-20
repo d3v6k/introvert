@@ -47,6 +47,7 @@ All signaling is wrapped in a `SignalingPayload` enum:
 4.  **Reachability Maintenance:**
     - **Proactive Relay:** Nodes re-request relay reservations every **5 minutes** from RBNs to ensure reachability after carrier IP changes.
     - **Pending Retry:** Nodes scan the `pending_messages` buffer every **30s** and re-attempt relay discovery for disconnected recipients.
+    - **Intro-Claw Self-Healing:** 5-strategy connection recovery (direct dial, relay circuit, anchor routing, WebSocket tunnel, mailbox fallback) for automatic network resilience.
 5.  **Offline Reporting:** Status only changes to "Offline" (Event 8, Status 2) if **all** paths (direct and relay) are closed.
 
 ## 5. Hybrid File Transfer (Smart Adaptive)

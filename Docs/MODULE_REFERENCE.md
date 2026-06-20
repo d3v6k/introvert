@@ -50,7 +50,27 @@ The FFI bridge. Maps C-style function pointers to Dart methods and exposes the `
 - `chat_screen.dart`: The core messaging interface. Revamped to include **Encrypted Call** (VoIP/Video) directly in the header.
 - `contact_screen.dart`: Contact management and Wormhole invitations.
 
-## 3. Scripts & Tooling
+## 3. Intro-Claw / Automation Engine
+
+### `src/intro_claw.rs` (~1500 lines)
+- 12 automation modules for maintenance tasks
+- Assistant query engine for natural language processing
+- Network recon and self-healing capabilities
+
+### `src/embedding.rs` (~300 lines)
+- BERT inference for semantic understanding
+- Cosine similarity and keyword matching
+- On-device embeddings for privacy
+
+### `lib/src/ui/assistant_tab.dart` (~800 lines)
+- Chat UI for CLAW interactions
+- RECON/HEAL buttons for network diagnostics
+- Query cards grid for offline mode
+
+### `for_linux/src/fcm.rs` (~230 lines)
+- Firebase Cloud Messaging push notifications
+
+## 4. Scripts & Tooling
 - `Makefile`: Central build orchestration.
 - `scripts/build_android.sh`: NDK cross-compilation environment setup.
 - `for_linux/build_linux.sh`: Native ELF compilation for RBNs.

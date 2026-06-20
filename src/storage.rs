@@ -245,7 +245,8 @@ impl StorageService {
         )?;
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_call_history_peer ON call_history (peer_id, timestamp DESC)", []);
 
-        // Migrations
+        // Migrations: All ALTER TABLE ADD COLUMN failures are intentionally discarded
+        // because they succeed on first run and fail with "duplicate column" on subsequent runs.
         let _ = conn.execute("ALTER TABLE profile ADD COLUMN handle TEXT", []);
         let _ = conn.execute("ALTER TABLE profile ADD COLUMN privacy_mode INTEGER DEFAULT 1", []);
         if let Ok(1) = conn.execute("INSERT OR IGNORE INTO economy_meta (key, value) VALUES ('privacy_default_migrated', 'true')", []) {
@@ -337,6 +338,52 @@ impl StorageService {
             }
         }
         String::new()
+    }
+
+    /// Gets the Intro-Claw active state (true = engine running, false = engine stopped)
+    pub fn get_intro_claw_active(&self) -> bool {
+        let conn = self.conn.lock();
+        if let Ok(mut stmt) = conn.prepare("SELECT value FROM economy_meta WHERE key = 'intro_claw_active'") {
+            if let Ok(mut rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                if let Some(Ok(val)) = rows.next() {
+                    return val == "true";
+                }
+            }
+        }
+        false // Default: engine not active
+    }
+
+    /// Sets the Intro-Claw active state
+    pub fn set_intro_claw_active(&self, active: bool) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO economy_meta (key, value) VALUES ('intro_claw_active', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![active.to_string()],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_intro_claw_endpoint(&self) -> String {
+        let conn = self.conn.lock();
+        if let Ok(mut stmt) = conn.prepare("SELECT value FROM economy_meta WHERE key = 'intro_claw_endpoint'") {
+            if let Ok(mut rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                if let Some(Ok(val)) = rows.next() {
+                    return val;
+                }
+            }
+        }
+        String::new()
+    }
+
+    pub fn set_intro_claw_endpoint(&self, endpoint: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO economy_meta (key, value) VALUES ('intro_claw_endpoint', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![endpoint],
+        )?;
+        Ok(())
     }
 
     pub fn is_privacy_mode_extroverted(&self) -> bool {

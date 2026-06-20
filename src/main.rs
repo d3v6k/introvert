@@ -9,15 +9,15 @@ use introvert::*; // Import FfiResult and engine controls
 #[command(author, version, about = "Introvert Headless Daemon", long_about = None)]
 struct Args {
     /// Path to the 32-byte master seed file (binary)
-    #[arg(short, long, default_value = "introvert.seed")]
-    seed_file: PathBuf,
+    #[arg(short, long)]
+    seed_file: Option<PathBuf>,
 
     /// Path to the SQLCipher database file
     #[arg(short, long, default_value = "introvert.db")]
     db_path: String,
 
     /// TCP port to listen on
-    #[arg(short, long, default_value_t = 4001)]
+    #[arg(short, long, default_value_t = 443)]
     port: u16,
 
     /// Enable global relay server functionality
@@ -27,6 +27,18 @@ struct Args {
     /// Legacy support: Path to the data directory
     #[arg(long)]
     data_dir: Option<PathBuf>,
+
+    /// Maximum number of concurrent connections (Production Scale)
+    #[arg(long, default_value_t = 1000000)]
+    max_connections: u32,
+
+    /// Interval for K-Bucket liveness checks in seconds
+    #[arg(long, default_value_t = 300)]
+    liveness_check: u64,
+
+    /// Port to run the WebSocket tunnel on
+    #[arg(long, default_value_t = 80)]
+    tunnel_port: u16,
 }
 
 // Global callback for the headless daemon
@@ -46,7 +58,7 @@ extern "C" fn daemon_network_callback(event_type: i32, data_ptr: *const u8, data
         3 => println!("[Network] WebRTC Channel Open"),
         4 => println!("[Network] WebRTC Data Received ({} bytes)", data_len),
         8 => {
-            let status = data_slice.get(0).cloned().unwrap_or(2);
+            let status = data_slice.first().cloned().unwrap_or(2);
             let status_text = match status {
                 0 => "DIRECT",
                 1 => "RELAYED",
@@ -55,7 +67,7 @@ extern "C" fn daemon_network_callback(event_type: i32, data_ptr: *const u8, data
             println!("[Network] Connection Status Change: {}", status_text);
         }
         10 => {
-            let status = data_slice.get(0).cloned().unwrap_or(0);
+            let status = data_slice.first().cloned().unwrap_or(0);
             let status_text = match status {
                 1 => "ONLINE (Listening)",
                 2 => "RELAY CONNECTED",
@@ -78,30 +90,38 @@ async fn main() -> anyhow::Result<()> {
     let mut args = Args::parse();
 
     // Handle --data-dir legacy support
-    if let Some(dir) = args.data_dir {
-        // If data_dir is provided, we expect the seed and db to be inside it 
-        // unless they were explicitly overridden by -s or -d
+    if let Some(dir) = args.data_dir.clone() {
         if args.db_path == "introvert.db" {
             args.db_path = dir.join("introvert.db").to_string_lossy().into_owned();
         }
-        if args.seed_file == PathBuf::from("introvert.seed") {
-            args.seed_file = dir.join("introvert.seed");
+        if args.seed_file.is_none() {
+            let default_seed = dir.join("introvert.seed");
+            if default_seed.exists() {
+                args.seed_file = Some(default_seed);
+            }
         }
     }
 
     // 1. Load Seed
-    if !args.seed_file.exists() {
-        eprintln!("Error: Seed file not found at {:?}", args.seed_file);
-        println!("Hint: Create a 32-byte binary file containing your master seed.");
-        std::process::exit(1);
+    let seed: Vec<u8> = if let Ok(env_seed) = std::env::var("INTROVERT_SEED") {
+        println!("[System] Loading master seed from INTROVERT_SEED environment variable.");
+        hex::decode(env_seed.trim()).map_err(|e| anyhow::anyhow!("Invalid hex in INTROVERT_SEED: {}", e))?
+    } else if let Some(path) = &args.seed_file {
+        if !path.exists() {
+            anyhow::bail!("Seed file not found at {:?}", path);
+        }
+        fs::read(path)?
+    } else {
+        // Fallback to prompt
+        println!("[Security] No master seed provided via environment or file.");
+        let input = rpassword::prompt_password("Enter Master Seed (Hex, 32 bytes): ")?;
+        hex::decode(input.trim()).map_err(|e| anyhow::anyhow!("Invalid hex input: {}", e))?
+    };
+
+    if seed.len() != 32 {
+        anyhow::bail!("Error: Master seed must be exactly 32 bytes (64 hex characters). Found {} bytes.", seed.len());
     }
 
-    let seed = fs::read(&args.seed_file)?;
-    if seed.len() != 32 {
-        eprintln!("Error: Seed file must be exactly 32 bytes (found {}).", seed.len());
-        std::process::exit(1);
-    }
-    
     let mut seed_fixed = [0u8; 32];
     seed_fixed.copy_from_slice(&seed);
 
@@ -116,8 +136,26 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Introvert Engine started successfully.");
 
-    // 3. Start Network
-    let res = introvert_network_start_ext(daemon_network_callback, args.port, args.relay);
+    // 3. Start WebSocket Tunnel Server if running as a relay/RBN
+    if args.relay {
+        println!("[System] Starting WebSocket tunnel server on port {}...", args.tunnel_port);
+        let libp2p_port = args.port;
+        let tunnel_port = args.tunnel_port;
+        tokio::spawn(async move {
+            if let Err(e) = introvert::network::tunnel::start_tunnel_server(tunnel_port, libp2p_port).await {
+                eprintln!("WebSocket tunnel server failed to start: {}", e);
+            }
+        });
+    }
+
+    // 4. Start Network
+    let res = introvert_network_start_production(
+        daemon_network_callback, 
+        args.port, 
+        args.relay,
+        args.max_connections,
+        args.liveness_check,
+    );
     if res.code != 0 {
         let msg = unsafe { CStr::from_ptr(res.data as *mut c_char).to_string_lossy() };
         eprintln!("Failed to start network ({}): {}", res.code, msg);
@@ -134,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Press Ctrl+C to stop...");
 
-    // 4. Handle Shutdown
+    // 5. Handle Shutdown
     signal::ctrl_c().await?;
     println!("\nShutting down...");
 

@@ -38,6 +38,14 @@ Introvert's UI is designed to feel "native" and responsive. It uses a **reactive
     - Splash -> Mnemonic Generation -> Mnemonic Verification -> Identity Activation.
     - Seed is passed once to the Rust core via `introvert_identity_create` and never stored in plain text on the Dart side.
 
+### `AssistantTab` (`lib/src/ui/assistant_tab.dart`)
+- **Purpose:** CLAW tab with chat interface.
+- **Key Logic:**
+    - Chat interface with suggestion chips.
+    - Floating result overlays for query responses.
+    - RECON/HEAL buttons with terminal-style animations.
+    - Query cards grid for offline mode exploration.
+
 ## 3. Specialized Widgets
 
 ### `FileTransferBubble` (`lib/src/ui/widgets/file_transfer_bubble.dart`)

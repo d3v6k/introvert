@@ -1,6 +1,6 @@
 use anyhow::Result;
 use introvert::identity::NodeIdentity;
-use introvert::network::{NetworkCommand, NetworkService, SignalingPayload, SecureMessage};
+use introvert::network::{NetworkCommand, NetworkConfig, NetworkService, SignalingPayload, SecureMessage};
 use introvert::storage::StorageService;
 use introvert::economy::RewardTracker;
 use libp2p::{Multiaddr, PeerId};
@@ -39,10 +39,24 @@ async fn test_asynchronous_contiguity_and_yield() -> Result<()> {
     let (cmd_tx_anchor, cmd_rx_anchor) = mpsc::channel(100);
     
     // Anchor on fixed port
-    let service_anchor = NetworkService::new(
-        id_anchor.keypair.clone(), audit_callback, cmd_rx_anchor, storage_anchor.clone(), tracker_anchor.clone(),
-        NodeIdentity::derive_e2ee_key(seed_anchor)?, NodeIdentity::derive_session_encryption_key(seed_anchor)?, false, true, 11000, false
-    ).await?;
+    let service_anchor = NetworkService::new(NetworkConfig {
+        keypair: id_anchor.keypair.clone(),
+        command_rx: cmd_rx_anchor,
+        command_tx: cmd_tx_anchor.clone(),
+        storage: storage_anchor.clone(),
+        reward_tracker: tracker_anchor.clone(),
+        solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new("http://localhost:8899", "11111111111111111111111111111111", "http://localhost:8899")?),
+        local_static_secret: NodeIdentity::derive_e2ee_key(seed_anchor)?,
+        session_encryption_key: NodeIdentity::derive_session_encryption_key(seed_anchor)?,
+        enable_mdns: false,
+        enable_listeners: true,
+        tcp_port: 11000,
+        enable_relay_server: false,
+        max_connections: 128,
+        liveness_interval_secs: 30,
+        downloads_dir: "/tmp".to_string(),
+        is_stress_test: false,
+    }).await?;
     let peer_id_anchor = id_anchor.peer_id;
     tokio::spawn(service_anchor.run());
     println!("Anchor Node online: {}", peer_id_anchor);
@@ -55,10 +69,24 @@ async fn test_asynchronous_contiguity_and_yield() -> Result<()> {
     let storage_a = Arc::new(StorageService::new(temp_dir_a.path().join("a.db"), &NodeIdentity::derive_storage_key(seed_a)?)?);
     let tracker_a = Arc::new(RewardTracker::new(Some(storage_a.clone())));
     let (cmd_tx_a, cmd_rx_a) = mpsc::channel(100);
-    let service_a = NetworkService::new(
-        id_a.keypair.clone(), audit_callback, cmd_rx_a, storage_a.clone(), tracker_a.clone(),
-        NodeIdentity::derive_e2ee_key(seed_a)?, NodeIdentity::derive_session_encryption_key(seed_a)?, false, true, 0, false
-    ).await?;
+    let service_a = NetworkService::new(NetworkConfig {
+        keypair: id_a.keypair.clone(),
+        command_rx: cmd_rx_a,
+        command_tx: cmd_tx_a.clone(),
+        storage: storage_a.clone(),
+        reward_tracker: tracker_a.clone(),
+        solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new("http://localhost:8899", "11111111111111111111111111111111", "http://localhost:8899")?),
+        local_static_secret: NodeIdentity::derive_e2ee_key(seed_a)?,
+        session_encryption_key: NodeIdentity::derive_session_encryption_key(seed_a)?,
+        enable_mdns: false,
+        enable_listeners: true,
+        tcp_port: 0,
+        enable_relay_server: false,
+        max_connections: 128,
+        liveness_interval_secs: 30,
+        downloads_dir: "/tmp".to_string(),
+        is_stress_test: false,
+    }).await?;
     tokio::spawn(service_a.run());
     println!("Node A online: {}", id_a.peer_id);
 
@@ -113,10 +141,24 @@ async fn test_asynchronous_contiguity_and_yield() -> Result<()> {
         is_anchor_capable: true,
     })?;
 
-    let service_b = NetworkService::new(
-        id_b.keypair.clone(), audit_callback, cmd_rx_b, storage_b.clone(), tracker_b.clone(),
-        NodeIdentity::derive_e2ee_key(seed_b)?, NodeIdentity::derive_session_encryption_key(seed_b)?, false, true, 0, false
-    ).await?;
+    let service_b = NetworkService::new(NetworkConfig {
+        keypair: id_b.keypair.clone(),
+        command_rx: cmd_rx_b,
+        command_tx: cmd_tx_b.clone(),
+        storage: storage_b.clone(),
+        reward_tracker: tracker_b.clone(),
+        solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new("http://localhost:8899", "11111111111111111111111111111111", "http://localhost:8899")?),
+        local_static_secret: NodeIdentity::derive_e2ee_key(seed_b)?,
+        session_encryption_key: NodeIdentity::derive_session_encryption_key(seed_b)?,
+        enable_mdns: false,
+        enable_listeners: true,
+        tcp_port: 0,
+        enable_relay_server: false,
+        max_connections: 128,
+        liveness_interval_secs: 30,
+        downloads_dir: "/tmp".to_string(),
+        is_stress_test: false,
+    }).await?;
     tokio::spawn(service_b.run());
     println!("Node B online: {}", id_b.peer_id);
 

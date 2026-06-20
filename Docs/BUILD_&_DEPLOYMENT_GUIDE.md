@@ -6,6 +6,7 @@ To rebuild Introvert from scratch, you need the following toolchains:
 - **Flutter:** `3.19+` (stable channel).
 - **Android NDK:** Required for cross-compiling the Rust core for mobile.
 - **CMake & LLVM:** Required for the native build process.
+- **candle-core:** Required for BERT embeddings in Intro-Claw (included in Cargo.toml).
 
 ## 2. Platform Build Targets
 

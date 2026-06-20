@@ -30,10 +30,13 @@ pub struct IntroClawService {
     media_manager: MediaLifecycleManager,
     conn_optimizer: ConnectionOptimizer,
     message_batcher: MessageBatcher,
+    #[allow(dead_code)]
     prefetcher: PredictivePrefetcher,
+    #[allow(dead_code)]
     sync_prioritizer: SyncPrioritizer,
     duplicate_suppressor: DuplicateSuppressor,
     health_scorer: ConnectionHealthScorer,
+    #[allow(dead_code)]
     storage_quotas: StorageQuotaManager,
     adaptive_chunker: AdaptiveChunkSizer,
 
@@ -149,6 +152,7 @@ impl ConnectionOptimizer {
 
 pub struct MessageBatcher {
     pending_outgoing: Vec<Vec<u8>>,
+    #[allow(dead_code)]
     is_batching: bool,
 }
 
@@ -173,6 +177,7 @@ impl MessageBatcher {
 // ============================================================
 
 pub struct PredictivePrefetcher {
+    #[allow(dead_code)]
     prefetch_limit: usize,
 }
 
@@ -196,16 +201,21 @@ impl SyncPrioritizer {
 
 pub struct DuplicateSuppressor {
     seen_ids: Vec<String>,
+    max_capacity: usize,
 }
 
 impl DuplicateSuppressor {
-    pub fn new() -> Self { Self { seen_ids: Vec::new() } }
+    pub fn new() -> Self { Self { seen_ids: Vec::new(), max_capacity: 10_000 } }
 
     pub fn check(&self, msg_id: &str) -> bool {
         self.seen_ids.contains(&msg_id.to_string())
     }
 
     pub fn mark_seen(&mut self, msg_id: &str) {
+        if self.seen_ids.len() >= self.max_capacity {
+            let drain_count = self.max_capacity / 4;
+            self.seen_ids.drain(..drain_count);
+        }
         self.seen_ids.push(msg_id.to_string());
     }
 }

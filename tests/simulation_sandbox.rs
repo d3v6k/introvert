@@ -1,6 +1,6 @@
 use anyhow::Result;
 use introvert::identity::NodeIdentity;
-use introvert::network::{NetworkCommand, NetworkService};
+use introvert::network::{NetworkCommand, NetworkConfig, NetworkService};
 use introvert::storage::StorageService;
 use introvert::economy::RewardTracker;
 use libp2p::{Multiaddr, PeerId};
@@ -53,19 +53,24 @@ async fn simulation_sandbox_stress_test() -> Result<()> {
         let session_encryption_key = NodeIdentity::derive_session_encryption_key(seed)?;
         let (command_tx, command_rx) = mpsc::channel(100);
 
-        let service = NetworkService::new(
-            identity.keypair.clone(),
-            dummy_callback,
+        let service = NetworkService::new(NetworkConfig {
+            keypair: identity.keypair.clone(),
             command_rx,
-            storage.clone(),
+            command_tx: command_tx.clone(),
+            storage: storage.clone(),
             reward_tracker,
-            local_static_key,
+            solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new("http://localhost:8899", "11111111111111111111111111111111", "http://localhost:8899")?),
+            local_static_secret: local_static_key,
             session_encryption_key,
-            true,
-            true,
-            0,
-            false,
-        ).await?;
+            enable_mdns: true,
+            enable_listeners: true,
+            tcp_port: 0,
+            enable_relay_server: false,
+            max_connections: 128,
+            liveness_interval_secs: 30,
+            downloads_dir: "/tmp".to_string(),
+            is_stress_test: false,
+        }).await?;
 
         // In a real simulation we'd listen on actual ports, but for this basic fix 
         // we'll just use a mock address for bootstrapping.

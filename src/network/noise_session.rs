@@ -12,16 +12,12 @@ pub struct NoiseSessionState {
     // rapid re-handshake (Noise IK) using these persisted parameters.
 }
 
+#[derive(Default)]
 pub enum NoiseState {
     Handshake(Box<HandshakeState>),
     Transport(TransportState),
+    #[default]
     Placeholder,
-}
-
-impl Default for NoiseState {
-    fn default() -> Self {
-        NoiseState::Placeholder
-    }
 }
 
 pub struct NoiseSession {
@@ -69,12 +65,8 @@ impl NoiseSession {
 
     /// Recovers a session from persisted state.
     pub fn from_state(state: NoiseSessionState) -> Result<Self> {
-        if state.is_transport && state.remote_public.is_some() {
-            // If it was transport, we ideally resume. For snow, we re-handshake IK
-            // to ensure safety while maintaining the verified identity.
-            Self::initiator(&state.local_private, &state.remote_public.unwrap())
-        } else if state.remote_public.is_some() {
-            Self::initiator(&state.local_private, &state.remote_public.unwrap())
+        if let Some(remote_public) = &state.remote_public {
+            Self::initiator(&state.local_private, remote_public)
         } else {
             Self::responder(&state.local_private)
         }

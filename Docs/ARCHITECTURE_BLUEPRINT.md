@@ -35,7 +35,10 @@ Architecture for decentralized multi-user communication:
 - **Group Privacy:** E2EE using AES-256-GCM with a shared master secret. 
 - **Mesh Discovery:** Supports "Join by Code" via Kademlia DHT. Manifests are encrypted with a human passphrase and stored on Anchor nodes.
 
-### E. Sovereign Swarm & Mesh Storage (Latest)
+### E. Automation Layer (Intro-Claw)
+Local automation engine running 12 maintenance modules on 5-minute tick loop. Semantic intent engine with BERT embeddings for natural language queries. Network recon and self-healing for connection recovery. Hybrid AI mode with optional external LLM integration. All processing stays on-device in Offline mode.
+
+### F. Sovereign Swarm & Mesh Storage (Latest)
 Decentralized file storage and retrieval strategy:
 - **Hybrid P2P Engine:** 
     - **Direct/WebRTC:** Utilizes a high-speed sequential **PUSH** model (256KB chunks @ 20ms) to maximize local throughput.

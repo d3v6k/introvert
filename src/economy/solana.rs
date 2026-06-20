@@ -22,7 +22,7 @@ pub struct SolanaIncentiveEngine {
 impl SolanaIncentiveEngine {
     pub fn new(rpc_url: &str, treasury_pubkey: &str, treasury_api_url: &str) -> Result<Self> {
         Ok(Self {
-            rpc_client: Arc::new(RpcClient::new(rpc_url.to_string())),
+            rpc_client: Arc::new(RpcClient::new_with_timeout(rpc_url.to_string(), std::time::Duration::from_secs(3))),
             intr_mint: Pubkey::from_str("NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn")?,
             treasury_pubkey: Pubkey::from_str(treasury_pubkey)?,
             treasury_api_url: treasury_api_url.to_string(),
@@ -54,7 +54,7 @@ impl SolanaIncentiveEngine {
 
         let token_program_id = Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
         
-        let accounts = self.rpc_client.get_program_accounts_with_config(
+        let accounts = self.rpc_client.get_program_ui_accounts_with_config(
             &token_program_id,
             RpcProgramAccountsConfig {
                 filters,
@@ -68,15 +68,82 @@ impl SolanaIncentiveEngine {
 
         if let Some((_, account)) = accounts.first() {
             // Parse token balance from account data (offset 64, 8 bytes)
-            if account.data.len() >= 72 {
-                let mut amount_bytes = [0u8; 8];
-                amount_bytes.copy_from_slice(&account.data[64..72]);
-                Ok(u64::from_le_bytes(amount_bytes))
-            } else {
-                Ok(0)
+            match &account.data {
+                solana_account_decoder::UiAccountData::Binary(data, _) => {
+                    if let Ok(decoded) = base64::Engine::decode(
+                        &base64::engine::general_purpose::STANDARD, data
+                    ) {
+                        if decoded.len() >= 72 {
+                            let mut amount_bytes = [0u8; 8];
+                            amount_bytes.copy_from_slice(&decoded[64..72]);
+                            return Ok(u64::from_le_bytes(amount_bytes));
+                        }
+                    }
+                    Ok(0)
+                }
+                _ => Ok(0),
             }
         } else {
             Ok(0) // No account found, zero balance
+        }
+    }
+
+    /// Fetches the native SOL balance for a given owner.
+    pub async fn fetch_sol_balance(&self, owner: &Pubkey) -> Result<u64> {
+        let lamports = self.rpc_client.get_balance(owner).await?;
+        Ok(lamports)
+    }
+
+    /// Fetches the balance of an SPL token (by mint) for a given owner.
+    pub async fn fetch_token_balance(&self, owner: &Pubkey, mint: &Pubkey) -> Result<u64> {
+        use solana_account_decoder::UiAccountEncoding;
+        use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
+        use solana_client::rpc_filter::{Memcmp, RpcFilterType};
+
+        let filters = Some(vec![
+            RpcFilterType::DataSize(165),
+            RpcFilterType::Memcmp(Memcmp::new(
+                32,
+                solana_client::rpc_filter::MemcmpEncodedBytes::Base58(owner.to_string()),
+            )),
+            RpcFilterType::Memcmp(Memcmp::new(
+                0,
+                solana_client::rpc_filter::MemcmpEncodedBytes::Base58(mint.to_string()),
+            )),
+        ]);
+
+        let token_program_id = Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
+
+        let accounts = self.rpc_client.get_program_ui_accounts_with_config(
+            &token_program_id,
+            RpcProgramAccountsConfig {
+                filters,
+                account_config: RpcAccountInfoConfig {
+                    encoding: Some(UiAccountEncoding::Base64),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        ).await?;
+
+        if let Some((_, account)) = accounts.first() {
+            match &account.data {
+                solana_account_decoder::UiAccountData::Binary(data, _) => {
+                    if let Ok(decoded) = base64::Engine::decode(
+                        &base64::engine::general_purpose::STANDARD, data
+                    ) {
+                        if decoded.len() >= 72 {
+                            let mut amount_bytes = [0u8; 8];
+                            amount_bytes.copy_from_slice(&decoded[64..72]);
+                            return Ok(u64::from_le_bytes(amount_bytes));
+                        }
+                    }
+                    Ok(0)
+                }
+                _ => Ok(0),
+            }
+        } else {
+            Ok(0)
         }
     }
 

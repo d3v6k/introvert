@@ -1,5 +1,6 @@
 use libp2p::{
     kad::{self, store::MemoryStore},
+    gossipsub,
     request_response,
     mdns,
     dcutr,
@@ -13,6 +14,8 @@ use libp2p::{
     PeerId,
 };
 use crate::network::{SignalingRequest, SignalingResponse};
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 #[derive(NetworkBehaviour)]
 pub struct IntrovertBehaviour {
@@ -26,24 +29,28 @@ pub struct IntrovertBehaviour {
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
     pub connection_limits: connection_limits::Behaviour,
+    pub gossipsub: gossipsub::Behaviour,
 }
 
 impl IntrovertBehaviour {
     pub fn new(
         peer_id: PeerId,
-        local_public_key: libp2p::identity::PublicKey,
+        local_keypair: libp2p::identity::Keypair,
         relay_client: relay::client::Behaviour,
         enable_mdns: bool,
         enable_relay_server: bool,
         max_connections: u32,
     ) -> Self {
-        let mut kad_config = kad::Config::new(StreamProtocol::new("/ipfs/kad/1.0.0"));
+        let mut kad_config = kad::Config::new(StreamProtocol::new("/introvert/kad/1.0.0"));
         
         kad_config.set_record_ttl(Some(std::time::Duration::from_secs(24 * 60 * 60)));
         kad_config.set_publication_interval(Some(std::time::Duration::from_secs(60 * 60)));
         kad_config.set_replication_factor(std::num::NonZeroUsize::new(5).unwrap()); // Reduced from 20 to lower overhead
         
-        let kademlia = kad::Behaviour::with_config(peer_id, MemoryStore::new(peer_id), kad_config);
+        let mut kademlia = kad::Behaviour::with_config(peer_id, MemoryStore::new(peer_id), kad_config);
+        // DEFAULT TO CLIENT MODE: Only RBNs/Anchors should be DHT servers.
+        // This prevents mobile devices from being hammered by global DHT queries.
+        kademlia.set_mode(Some(kad::Mode::Client));
         
         let rr_config = request_response::Config::default()
             .with_request_timeout(std::time::Duration::from_secs(20)); // 20s is enough for relay latency without causing long stalls
@@ -76,8 +83,8 @@ impl IntrovertBehaviour {
         let autonat = autonat::Behaviour::new(peer_id, autonat::Config::default());
         
         let identify = identify::Behaviour::new(identify::Config::new(
-            "/ipfs/id/1.0.0".to_string(),
-            local_public_key,
+            "/introvert/id/1.0.0".to_string(),
+            local_keypair.public(),
         ).with_agent_version("introvert/1.0.0".to_string()));
 
 
@@ -85,8 +92,8 @@ impl IntrovertBehaviour {
             let relay_config = relay::Config {
                 max_circuit_bytes: 1024 * 1024 * 1024, // 1GB for high-volume file relaying
                 max_circuit_duration: std::time::Duration::from_secs(60 * 60), // 1 hour per circuit
-                max_reservations: 256,
-                max_circuits: 128,
+                max_reservations: 8192,
+                max_circuits: 4096,
                 ..Default::default()
             };
             Some(relay::Behaviour::new(peer_id, relay_config))
@@ -103,6 +110,23 @@ impl IntrovertBehaviour {
                 .with_max_pending_outgoing(Some(max_connections / 10))
         );
 
+        let message_id_fn = |message: &gossipsub::Message| {
+            let mut s = DefaultHasher::new();
+            message.data.hash(&mut s);
+            gossipsub::MessageId::from(s.finish().to_string())
+        };
+        let gossipsub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(std::time::Duration::from_secs(10))
+            .validation_mode(gossipsub::ValidationMode::Strict)
+            .message_id_fn(message_id_fn)
+            .build()
+            .expect("Valid gossipsub config");
+
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(local_keypair.clone()), 
+            gossipsub_config
+        ).expect("Valid gossipsub");
+
         Self {
             kademlia,
             request_response,
@@ -114,6 +138,7 @@ impl IntrovertBehaviour {
             identify,
             ping: ping::Behaviour::default(),
             connection_limits,
+            gossipsub,
         }
     }
 

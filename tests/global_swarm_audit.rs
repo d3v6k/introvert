@@ -1,6 +1,6 @@
 use anyhow::Result;
 use introvert::identity::NodeIdentity;
-use introvert::network::{NetworkCommand, NetworkService};
+use introvert::network::{NetworkCommand, NetworkConfig, NetworkService};
 use introvert::storage::StorageService;
 use introvert::economy::RewardTracker;
 use libp2p::{PeerId, SwarmBuilder, futures::StreamExt, kad};
@@ -56,10 +56,24 @@ async fn test_global_discovery_speed() -> Result<()> {
     let tracker_target = Arc::new(RewardTracker::new(Some(storage_target.clone())));
     let (cmd_tx_target, cmd_rx_target) = mpsc::channel(100);
     
-    let service_target = NetworkService::new(
-        id_target.keypair.clone(), dummy_callback, cmd_rx_target, storage_target.clone(), tracker_target.clone(),
-        NodeIdentity::derive_e2ee_key(seed_target)?, NodeIdentity::derive_session_encryption_key(seed_target)?, false, true, 0, false
-    ).await?;
+    let service_target = NetworkService::new(NetworkConfig {
+        keypair: id_target.keypair.clone(),
+        command_rx: cmd_rx_target,
+        command_tx: cmd_tx_target.clone(),
+        storage: storage_target.clone(),
+        reward_tracker: tracker_target.clone(),
+        solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new("http://localhost:8899", "11111111111111111111111111111111", "http://localhost:8899")?),
+        local_static_secret: NodeIdentity::derive_e2ee_key(seed_target)?,
+        session_encryption_key: NodeIdentity::derive_session_encryption_key(seed_target)?,
+        enable_mdns: false,
+        enable_listeners: true,
+        tcp_port: 0,
+        enable_relay_server: false,
+        max_connections: 128,
+        liveness_interval_secs: 30,
+        downloads_dir: "/tmp".to_string(),
+        is_stress_test: false,
+    }).await?;
     tokio::spawn(service_target.run());
 
     // Register Target Node with RBN
@@ -78,10 +92,24 @@ async fn test_global_discovery_speed() -> Result<()> {
     let tracker_auditor = Arc::new(RewardTracker::new(Some(storage_auditor.clone())));
     let (cmd_tx_auditor, cmd_rx_auditor) = mpsc::channel(100);
     
-    let auditor_service = NetworkService::new(
-        id_auditor.keypair.clone(), dummy_callback, cmd_rx_auditor, storage_auditor.clone(), tracker_auditor.clone(),
-        NodeIdentity::derive_e2ee_key(seed_auditor)?, NodeIdentity::derive_session_encryption_key(seed_auditor)?, false, true, 0, false
-    ).await?;
+    let auditor_service = NetworkService::new(NetworkConfig {
+        keypair: id_auditor.keypair.clone(),
+        command_rx: cmd_rx_auditor,
+        command_tx: cmd_tx_auditor.clone(),
+        storage: storage_auditor.clone(),
+        reward_tracker: tracker_auditor.clone(),
+        solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new("http://localhost:8899", "11111111111111111111111111111111", "http://localhost:8899")?),
+        local_static_secret: NodeIdentity::derive_e2ee_key(seed_auditor)?,
+        session_encryption_key: NodeIdentity::derive_session_encryption_key(seed_auditor)?,
+        enable_mdns: false,
+        enable_listeners: true,
+        tcp_port: 0,
+        enable_relay_server: false,
+        max_connections: 128,
+        liveness_interval_secs: 30,
+        downloads_dir: "/tmp".to_string(),
+        is_stress_test: false,
+    }).await?;
     tokio::spawn(auditor_service.run());
     
     // Auditor ONLY knows the RBN

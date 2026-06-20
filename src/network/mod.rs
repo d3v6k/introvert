@@ -38,6 +38,8 @@ use noise_session::NoiseSession;
 pub use behaviour::{IntrovertBehaviour, IntrovertBehaviourEvent};
 
 pub const ANCHOR_PROVIDER_KEY: &[u8] = b"/introvert/anchor_nodes";
+pub const RBN_PEER_ID: &str = "12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a";
+pub const RBN_WS_URL: &str = "wss://47.89.252.80/tunnel";
 
 // --- Group Mesh Types ---
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,6 +285,17 @@ pub enum NetworkCommand {
         connected_peers: Vec<String>,
         mdns_discovered: Vec<String>,
     },
+    /// Toggle Intro-Claw engine active state
+    IntroClawSetActive { active: bool },
+    /// Run network recon and return the markdown report
+    IntroClawNetworkRecon {
+        result_tx: tokio::sync::oneshot::Sender<String>,
+    },
+    /// Heal connection to a specific peer using multi-strategy recovery
+    IntroClawNetworkHeal {
+        peer_id: PeerId,
+        result_tx: tokio::sync::oneshot::Sender<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -300,6 +313,8 @@ pub struct FileTransferProgress {
     pub start_time_ms: u64,
     pub speed_bps: f64,
     pub group_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -396,27 +411,45 @@ struct PendingDiagnostic {
     transport: Option<String>,
 }
 
+pub struct NetworkConfig {
+    pub keypair: Keypair,
+    pub command_rx: mpsc::Receiver<NetworkCommand>,
+    pub command_tx: mpsc::Sender<NetworkCommand>,
+    pub storage: Arc<crate::storage::StorageService>,
+    pub reward_tracker: Arc<crate::economy::RewardTracker>,
+    pub solana_client: Arc<crate::economy::solana::SolanaIncentiveEngine>,
+    pub local_static_secret: StaticSecret,
+    pub session_encryption_key: [u8; 32],
+    pub enable_mdns: bool,
+    pub enable_listeners: bool,
+    pub tcp_port: u16,
+    pub enable_relay_server: bool,
+    pub max_connections: u32,
+    pub liveness_interval_secs: u64,
+    pub downloads_dir: String,
+    pub is_stress_test: bool,
+}
+
 impl NetworkService {
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        keypair: Keypair, 
-        _callback: FfiNetworkCallback,
-        command_rx: mpsc::Receiver<NetworkCommand>,
-        command_tx: mpsc::Sender<NetworkCommand>,
-        storage: Arc<crate::storage::StorageService>,
-        reward_tracker: Arc<crate::economy::RewardTracker>,
-        solana_client: Arc<crate::economy::solana::SolanaIncentiveEngine>,
-        local_static_secret: StaticSecret,
-        session_encryption_key: [u8; 32],
-        enable_mdns: bool,
-        enable_listeners: bool,
-        tcp_port: u16,
-        enable_relay_server: bool,
-        max_connections: u32,
-        liveness_interval_secs: u64,
-        downloads_dir: String,
-        is_stress_test: bool,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(config: NetworkConfig) -> anyhow::Result<Self> {
+        let NetworkConfig {
+            keypair,
+            command_rx,
+            command_tx,
+            storage,
+            reward_tracker,
+            solana_client,
+            local_static_secret,
+            session_encryption_key,
+            enable_mdns,
+            enable_listeners,
+            tcp_port,
+            enable_relay_server,
+            max_connections,
+            liveness_interval_secs,
+            downloads_dir,
+            is_stress_test,
+        } = config;
         let local_static_public = PublicKey::from(&local_static_secret);
         let local_peer_id = PeerId::from(keypair.public());
 
@@ -428,12 +461,12 @@ impl NetworkService {
         if is_tunnel_enabled {
             println!("[Tunnel] Secure Tunnel Mode is active. Launching loopback client...");
             // Start local tunnel listener on a dynamic port (0 means dynamic)
-            let rbn_ws_url = "ws://47.89.252.80:80/tunnel".to_string();
+            let rbn_ws_url = RBN_WS_URL.to_string();
             match tunnel::start_tunnel_client(0, rbn_ws_url).await {
                 Ok((assigned_port, handle)) => {
                     tunnel_handle = Some(handle);
                     // Map RBN PeerID to localhost TCP port
-                    let rbn_peer_id: PeerId = "12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".parse().unwrap();
+                    let rbn_peer_id: PeerId = RBN_PEER_ID.parse().unwrap();
                     let local_tunnel_addr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", assigned_port).parse().unwrap();
                     bootstrap_nodes = vec![(rbn_peer_id, local_tunnel_addr)];
                     println!("[Tunnel] WebSocket Tunnel active on local port {}. Bootstrapping via localhost.", assigned_port);
@@ -1070,6 +1103,7 @@ impl NetworkService {
                                 start_time_ms: transfer.start_time.elapsed().as_millis() as u64,
                                 speed_bps: 0.0,
                                 group_id: transfer.group_id.clone(),
+                                caption: None,
                             };
                             crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
 
@@ -1147,6 +1181,7 @@ impl NetworkService {
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps,
                     group_id: transfer.group_id.clone(),
+                    caption: None,
                 };
 
                 let data = serde_json::to_vec(&progress).unwrap_or_default();
@@ -2768,6 +2803,7 @@ impl NetworkService {
                     start_time_ms: 0,
                     speed_bps: 0.0,
                     group_id: None,
+                    caption: None,
                 };
                 crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
             }
@@ -3441,6 +3477,19 @@ impl NetworkService {
                 };
                 self.intro_claw.tick(&ctx);
             }
+            NetworkCommand::IntroClawSetActive { active } => {
+                self.intro_claw.set_active(active);
+                let _ = self.storage.set_intro_claw_active(active);
+            }
+            NetworkCommand::IntroClawNetworkRecon { result_tx } => {
+                let report = format!("# Network Recon\n\nConnected peers: {}\nDiscovered anchors: {}",
+                    self.mesh_active_peers.len(), self.discovered_anchors.len());
+                let _ = result_tx.send(report);
+            }
+            NetworkCommand::IntroClawNetworkHeal { peer_id, result_tx } => {
+                let _ = self.swarm.dial(peer_id);
+                let _ = result_tx.send(format!("Healing connection to {}", peer_id));
+            }
         }
         Ok(())
     }
@@ -3915,6 +3964,7 @@ impl NetworkService {
                                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                                     speed_bps: 0.0,
                                     group_id: grp_id,
+                                    caption: None,
                                 };
 
                                 crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
@@ -3988,7 +4038,7 @@ impl NetworkService {
 
                 crate::dispatch_global_event(25, &data);
             }
-            SignalingPayload::ChatSyncRequest { chat_id, is_group, known_msg_ids, limit } => {
+            SignalingPayload::ChatSyncRequest { chat_id, is_group, known_msg_ids, limit: _ } => {
                 println!("[Mesh] Received ChatSyncRequest from {} for chat {} (group={}, {} known IDs)", peer, chat_id, is_group, known_msg_ids.len());
                 let storage = Arc::clone(&self.storage);
                 let chat_id_c = chat_id.clone();
@@ -4268,7 +4318,7 @@ impl NetworkService {
                 }
 
                 if !is_update {
-                    let progress = FileTransferProgress { 
+                    let _progress = FileTransferProgress { 
                         transfer_id: transfer_id.clone(), 
                         peer_id: actual_seeder_peer.to_string(), 
                         filename: filename.clone(), 
@@ -4282,6 +4332,7 @@ impl NetworkService {
                         start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
                         speed_bps: 0.0,
                         group_id: group_id.clone(),
+                        caption: None,
                     };
                     // Don't store in database at manifest arrival — wait for verification
                     // The verified completion handler (line ~1121) stores the message with localPath
@@ -4768,6 +4819,7 @@ impl NetworkService {
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps: 0.0,
                     group_id: grp_id.clone(), // clone here so grp_id is still usable for DB routing below
+                    caption: None,
                 };
                 if let Ok(json_str) = serde_json::to_string(&progress) {
                     let c = format!("[FILE]:{}", json_str);
@@ -5135,6 +5187,7 @@ impl NetworkService {
             start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
             speed_bps: 0.0,
             group_id: group_id.clone(),
+            caption: None,
         };
 
         // Persistent History: Save file manifest and BROADCAST TO GROUP if applicable
@@ -5233,6 +5286,7 @@ impl NetworkService {
                 start_time_ms: initial_progress.start_time_ms,
                 speed_bps,
                 group_id: group_id.clone(),
+                caption: None,
             };
             
             // Since SendFileChunk is handled via the command channel, we can't easily wait here.
