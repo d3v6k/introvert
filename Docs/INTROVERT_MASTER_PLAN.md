@@ -46,13 +46,13 @@ Restore low-latency voice and video communication.
 - [x] **Modern UI Transformation:** Human-readable aliases, bubble-side avatars, and WhatsApp-style status ticks.
 - [x] **Connection Persistence:** Added libp2p Keep-Alive (Ping) to prevent relay socket timeouts.
 
-### Phase 5: Sovereign Group Mesh & Swarm [STABLE - PHASE 1]
+### Phase 5: Sovereign Group Mesh & Swarm [STABLE]
 Extend point-to-point sovereignty to decentralized multi-user environments and high-speed swarms.
 - [x] **DHT Seeder Discovery:** Use libp2p Kademlia `start_providing` to announce file availability.
 - [x] **Participating Seeding:** Every node that verifies a file automatically joins the swarm as a provider.
 - [x] **Pipelined Pull Model:** Implemented 4-deep chunk pipelining to hide relay latency during cross-network transfers.
 - [x] **Gossipsub Integration:** Implement `libp2p-gossipsub` for efficient multi-point message propagation without central relays.
-- [ ] **Decentralized Group E2EE:** Implement MLS (Messaging Layer Security) or TreeKEM-based group key rotation.
+- [x] **Decentralized Group E2EE:** Implement TreeKEM-based key ratchet with forward secrecy and key rotation.
 
 ### Phase 6: Solana Economy & Incentives [STABLE]
 Activate the `INTR` token economy to sustain the network.
@@ -71,8 +71,9 @@ Activate the `INTR` token economy to sustain the network.
 | FFI Bridge | STABLE | Async Callbacks |
 | P2P Swarm | STABLE | libp2p v0.56 |
 | Sovereign Swarm | STABLE | DHT / Pull-Pipelining |
+| Group E2EE | STABLE | TreeKEM + AES-GCM |
 | Media / VoIP | STABLE | WebRTC / Opus |
-| Token Economy | IN PROGRESS | Solana / SPL-Token |
+| Token Economy | STABLE | Solana / SPL-Token |
 
 ## 5. Audit Log
 - **2026-06-01:** Stable Version 11 [PASS]. Integrated cross-network Smart Hybrid Pull Model (64KB chunks @ 50ms interval, 4-deep pipelining) achieving stable 1 MB/s transfer speeds. Resolved seeder resolution bug by tracking `sender_peer_id` in manifest, preventing infinite loop chunk requests to the anchor. Corrected `is_relayed_map` checks to preserve the direct P2P pathway. Added local `cargo-zigbuild` cross-compilation for Linux RBN daemons and automated static OpenSSL linking with `bundled-sqlcipher-vendored-openssl` across platforms.
