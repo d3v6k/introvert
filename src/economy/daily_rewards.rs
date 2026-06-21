@@ -309,9 +309,33 @@ impl DailyRewardEngine {
             let anti = self.anti_gaming.read();
 
             prev.activities = Self::score_activities_static(&state, &weights);
-            prev.total_points = prev.activities.iter().map(|a| a.points).sum();
-            prev.capped_points = prev.total_points.min(weights.daily_point_cap);
-            prev.intr_reward = prev.capped_points * weights.intr_per_point;
+
+            // CRITICAL: Separate social and infra points (dual-pool)
+            let social_points: f64 = prev.activities.iter()
+                .filter(|a| matches!(a.activity_type,
+                    ActivityType::MessageSent | ActivityType::MessageReceived |
+                    ActivityType::GroupMessageSent | ActivityType::GroupReaction |
+                    ActivityType::FileTransferSent | ActivityType::FileTransferRecv |
+                    ActivityType::CallDurationSecs))
+                .map(|a| a.points)
+                .sum();
+            let infra_points: f64 = prev.activities.iter()
+                .filter(|a| matches!(a.activity_type,
+                    ActivityType::RelayBytes | ActivityType::UptimeSeconds))
+                .map(|a| a.points)
+                .sum();
+
+            let social_capped = social_points.min(weights.daily_point_cap);
+            prev.total_points = social_capped + infra_points;
+            prev.capped_points = prev.total_points;
+
+            // CRITICAL: Use pool-isolated clearing
+            let is_rbn = state.is_rbn;
+            let effective_pool = if is_rbn { self.get_rbn_daily_pool_cap() } else { self.get_daily_pool_cap() };
+            let global_estimate = state.global_points_estimate.max(1.0);
+            let user_share = prev.total_points / global_estimate;
+            prev.intr_reward = user_share * effective_pool;
+
             prev.unique_peers = state.unique_peers.len() as u32;
             prev.is_eligible = prev.unique_peers >= anti.min_unique_peers && prev.capped_points > 0.0;
             prev.eligibility_reason = if !prev.is_eligible {
@@ -322,8 +346,8 @@ impl DailyRewardEngine {
             prev.ended_at = Some(Utc::now().timestamp() as u64);
             prev.submitted = prev.is_eligible;
 
-            info!("[DailyRewards] Cycle {} closed: {:.1} pts, {:.4} INTR, eligible={}",
-                prev.cycle_date, prev.capped_points, prev.intr_reward, prev.is_eligible);
+            info!("[DailyRewards] Cycle {} closed: {:.1} pts, {:.4} INTR, eligible={}, rbn={}",
+                prev.cycle_date, prev.capped_points, prev.intr_reward, prev.is_eligible, is_rbn);
 
             // Persist to DB
             let _ = self.storage.save_daily_cycle(&prev);

@@ -100,9 +100,9 @@ impl RewardTracker {
 
         let mut pending_bytes = *state.pending_per_consumer.get(consumer_peer_id).unwrap_or(&0);
 
-        // Availability Yield Logic: If node uptime > 24h, apply 1.2x multiplier
         // Availability Yield Logic: If node uptime >= 23 hours, apply 1.2x multiplier
-        // Changed from 24h (86,400s) to 23h (82,800s) to accommodate network latency and reconnects
+        // Note: The 1.2x is applied to the uptime WEIGHT in daily_rewards.rs score_activities_static()
+        // Here it is applied to pending_bytes for the relay-based reward proof system
         if state.uptime_seconds >= 82800 {
             pending_bytes = (pending_bytes as f64 * 1.2) as u64;
         }
