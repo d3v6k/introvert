@@ -13,6 +13,7 @@ import '../src/native/introvert_client.dart';
 import '../src/ui/widgets/rewards_hud.dart';
 import '../src/ui/widgets/file_transfer_bubble.dart';
 import '../src/ui/widgets/image_stack_bubble.dart';
+import '../src/ui/widgets/note_bubble.dart';
 import '../blueprint_ui.dart';
 import 'call_screen.dart';
 import 'chat_features.dart';
@@ -45,8 +46,9 @@ class _ContactInfoDialog extends StatefulWidget {
   final String peerId;
   final String peerName;
   final String? avatarBase64;
+  final BuildContext parentContext;
 
-  const _ContactInfoDialog({required this.peerId, required this.peerName, this.avatarBase64});
+  const _ContactInfoDialog({required this.peerId, required this.peerName, this.avatarBase64, required this.parentContext});
 
   @override
   State<_ContactInfoDialog> createState() => _ContactInfoDialogState();
@@ -125,6 +127,415 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
     return "${seconds ~/ 86400} days";
   }
 
+  void _showInChatSearch(BuildContext dialogContext) {
+    final searchController = TextEditingController();
+    List<dynamic> searchResults = [];
+    String query = '';
+    Timer? debounceTimer;
+
+    showDialog(
+      context: dialogContext,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppTheme.current.surface,
+            title: Row(
+              children: [
+                Icon(Icons.search, color: AppTheme.current.accent, size: 20),
+                SizedBox(width: 8),
+                Text("Search in Chat", style: TextStyle(color: AppTheme.current.text, fontSize: 16)),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+                    onChanged: (val) {
+                      query = val;
+                      if (val.isEmpty) {
+                        debounceTimer?.cancel();
+                        setDialogState(() => searchResults = []);
+                        return;
+                      }
+                      debounceTimer?.cancel();
+                      debounceTimer = Timer(Duration(milliseconds: 300), () {
+                        try {
+                          final msgs = _client.getMessages(widget.peerId);
+                          final q = val.toLowerCase();
+                          searchResults = msgs.where((m) {
+                            final content = (m['content'] as String? ?? '').toLowerCase();
+                            return content.contains(q);
+                          }).toList();
+                          setDialogState(() {});
+                        } catch (_) {}
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: "Search messages...",
+                      hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 13),
+                      prefixIcon: Icon(Icons.search, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
+                      filled: true,
+                      fillColor: AppTheme.current.text.withValues(alpha: 0.04),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  if (query.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(Icons.search, size: 14, color: AppTheme.current.accent),
+                        SizedBox(width: 6),
+                        Text(
+                          '${searchResults.length} result${searchResults.length == 1 ? '' : 's'}',
+                          style: TextStyle(color: AppTheme.current.accent, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  SizedBox(height: 8),
+                  Expanded(
+                    child: searchResults.isEmpty
+                        ? Center(
+                            child: Text(
+                              query.isEmpty ? 'Type to search messages' : 'No results found',
+                              style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: searchResults.length,
+                            itemBuilder: (ctx, i) {
+                              final msg = searchResults[i];
+                              final content = msg['content'] as String? ?? '';
+                              final isMe = msg['is_me'] == true || msg['is_me'] == 1 || msg['is_me'] == '1';
+                              final timestamp = msg['timestamp'] as String? ?? '';
+
+                              return Container(
+                                margin: EdgeInsets.only(bottom: 4),
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.current.text.withValues(alpha: 0.04),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          isMe ? 'You' : widget.peerName,
+                                          style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                        Spacer(),
+                                        Text(
+                                          timestamp.length > 16 ? timestamp.substring(11, 16) : timestamp,
+                                          style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      content,
+                                      style: TextStyle(color: AppTheme.current.text, fontSize: 12),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () { debounceTimer?.cancel(); searchController.dispose(); Navigator.pop(ctx); }, child: Text("CLOSE")),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showMediaLinksDocs(BuildContext dialogContext) {
+    // Categorize all messages into Media, Links, Docs
+    final messages = _client.getMessages(widget.peerId);
+    final List<dynamic> mediaItems = [];
+    final List<dynamic> linkItems = [];
+    final List<dynamic> docItems = [];
+
+    for (var msg in messages) {
+      final content = msg['content'] as String? ?? '';
+      final timestamp = msg['timestamp'] as String? ?? '';
+
+      if (content.startsWith('[FILE]:')) {
+        try {
+          final jsonStr = content.substring(7);
+          final meta = json.decode(jsonStr);
+          final filename = (meta['filename'] ?? '').toString().toLowerCase();
+          final ext = filename.contains('.') ? filename.split('.').last : '';
+
+          if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'heic', 'heif'].contains(ext) ||
+              ['mp4', 'mov', 'avi', 'mkv', 'webm'].contains(ext) ||
+              ['mp3', 'wav', 'm4a', 'flac', 'ogg'].contains(ext)) {
+            mediaItems.add({'type': 'media', 'filename': meta['filename'] ?? 'file', 'timestamp': timestamp, 'mime': meta['mime_type'] ?? ''});
+          } else {
+            docItems.add({'type': 'doc', 'filename': meta['filename'] ?? 'file', 'timestamp': timestamp, 'size': meta['total_size'] ?? 0});
+          }
+        } catch (_) {
+          docItems.add({'type': 'doc', 'filename': 'file', 'timestamp': timestamp});
+        }
+      } else if (content.startsWith('[STICKER]:') || content.startsWith('[GIF]:')) {
+        mediaItems.add({'type': 'media', 'filename': content.startsWith('[STICKER]:') ? 'Sticker' : 'GIF', 'timestamp': timestamp});
+      } else if (content.startsWith('[NOTE]:')) {
+        final title = content.substring(7).split('\n').first;
+        docItems.add({'type': 'doc', 'filename': 'Note: $title', 'timestamp': timestamp});
+      } else if (content.contains('http://') || content.contains('https://')) {
+        final urlPattern = RegExp(r'https?://[^\s]+');
+        final matches = urlPattern.allMatches(content);
+        for (var match in matches) {
+          linkItems.add({'type': 'link', 'url': content.substring(match.start, match.end), 'timestamp': timestamp});
+        }
+      }
+    }
+
+    final totalItems = mediaItems.length + linkItems.length + docItems.length;
+
+    showModalBottomSheet(
+      context: dialogContext,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.current.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => DefaultTabController(
+        length: 3,
+        child: SizedBox(
+          height: MediaQuery.of(ctx).size.height * 0.7,
+          child: Column(
+            children: [
+              SizedBox(height: 12),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.current.mutedText.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.perm_media_outlined, color: AppTheme.current.accent, size: 20),
+                    SizedBox(width: 8),
+                    Text('SHARED CONTENT', style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+                    Spacer(),
+                    Text('$totalItems items', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                  ],
+                ),
+              ),
+              TabBar(
+                labelColor: AppTheme.current.accent,
+                unselectedLabelColor: AppTheme.current.mutedText,
+                indicatorColor: AppTheme.current.accent,
+                tabs: [
+                  Tab(text: 'Media (${mediaItems.length})'),
+                  Tab(text: 'Links (${linkItems.length})'),
+                  Tab(text: 'Docs (${docItems.length})'),
+                ],
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildSharedList(mediaItems, 'media'),
+                    _buildSharedList(linkItems, 'links'),
+                    _buildSharedList(docItems, 'docs'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSharedList(List<dynamic> items, String type) {
+    if (items.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(type == 'media' ? Icons.photo_library_outlined : type == 'links' ? Icons.link : Icons.description_outlined,
+              size: 48, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+            SizedBox(height: 12),
+            Text('No $type shared yet', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: EdgeInsets.all(12),
+      itemCount: items.length,
+      itemBuilder: (ctx, i) {
+        final item = items[i];
+        return Container(
+          margin: EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.current.text.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: ListTile(
+            dense: true,
+            leading: Icon(
+              type == 'media' ? Icons.image_outlined : type == 'links' ? Icons.link : Icons.description_outlined,
+              color: type == 'media' ? Colors.blueAccent : type == 'links' ? Colors.cyanAccent : Colors.orangeAccent,
+              size: 20,
+            ),
+            title: Text(
+              item['filename'] ?? item['url'] ?? '',
+              style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              (item['timestamp']?.toString().length ?? 0) > 16 ? item['timestamp'].toString().substring(0, 16) : (item['timestamp'] ?? ''),
+              style: TextStyle(color: AppTheme.current.mutedText, fontSize: 10),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showElevatedMessages(BuildContext dialogContext) {
+    final elevated = _client.getElevatedMessages(widget.peerId);
+
+    showModalBottomSheet(
+      context: dialogContext,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.current.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.6,
+            child: Column(
+              children: [
+                SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.current.mutedText.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2))),
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.push_pin, color: AppTheme.current.accent, size: 20),
+                      SizedBox(width: 8),
+                      Text('ELEVATED MESSAGES', style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+                      Spacer(),
+                      Text('${elevated.length} pinned', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                Expanded(
+                  child: elevated.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.push_pin_outlined, size: 48, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                              SizedBox(height: 12),
+                              Text('No elevated messages', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
+                              SizedBox(height: 4),
+                              Text('Long-press a message and tap "Elevate"', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3), fontSize: 11)),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.all(12),
+                          itemCount: elevated.length,
+                          itemBuilder: (ctx, i) {
+                            final item = elevated[i];
+                            final content = item['content'] as String? ?? '';
+                            final isMe = item['is_me'] == true;
+                            final msgId = item['msg_id'] as String? ?? '';
+
+                            String senderName = isMe ? 'You' : (widget.peerName ?? 'Peer');
+                            String displayContent = content;
+                            if (content.startsWith('[FILE]:')) {
+                              try {
+                                final meta = json.decode(content.substring(7));
+                                displayContent = '📎 ${meta['filename'] ?? 'file'}';
+                              } catch (_) { displayContent = '📎 File'; }
+                            } else if (content.startsWith('[NOTE]:')) {
+                              displayContent = '📝 ${content.substring(7).split('\n').first}';
+                            }
+
+                            return GestureDetector(
+                              onLongPress: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dCtx) => AlertDialog(
+                                    backgroundColor: AppTheme.current.surface,
+                                    title: Text("Unelevate Message?", style: TextStyle(color: AppTheme.current.text)),
+                                    content: Text("Remove this message from elevated messages?", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13)),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text("CANCEL")),
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, true), child: Text("UNELEVATE", style: TextStyle(color: Colors.orangeAccent))),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _client.unelevateMessage(widget.peerId, msgId);
+                                  setDialogState(() {
+                                    elevated.removeWhere((e) => e['msg_id'] == msgId);
+                                  });
+                                }
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(bottom: 6),
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.current.text.withValues(alpha: 0.04),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.08)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.push_pin, size: 12, color: AppTheme.current.accent),
+                                        SizedBox(width: 4),
+                                        Text(senderName, style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                        Spacer(),
+                                        Text(
+                                          (item['timestamp']?.toString().length ?? 0) > 16 ? item['timestamp'].toString().substring(11, 16) : '',
+                                          style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      displayContent,
+                                      style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text('Long-press to unelevate', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3), fontSize: 9)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayName = _globalName?.isNotEmpty == true ? _globalName! : widget.peerName;
@@ -167,6 +578,50 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
               subtitle: Text(_formatRetention(_retentionSeconds), style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
               trailing: Icon(Icons.chevron_right, size: 18),
               onTap: _showRetentionPicker,
+            ),
+          ),
+          Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.search, color: AppTheme.current.accent),
+              title: Text("Search in Chat", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
+              subtitle: Text("Find messages in this conversation", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                _showInChatSearch(widget.parentContext);
+              },
+            ),
+          ),
+          Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.perm_media_outlined, color: AppTheme.current.accent),
+              title: Text("Media, Links & Docs", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
+              subtitle: Text("View shared files and links", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              trailing: Icon(Icons.chevron_right, size: 18),
+              onTap: () {
+                Navigator.pop(context);
+                _showMediaLinksDocs(widget.parentContext);
+              },
+            ),
+          ),
+          Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.push_pin, color: AppTheme.current.accent),
+              title: Text("Elevated Messages", style: TextStyle(color: AppTheme.current.text, fontSize: 13)),
+              subtitle: Text("View bookmarked messages", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              trailing: Icon(Icons.chevron_right, size: 18),
+              onTap: () {
+                Navigator.pop(context);
+                _showElevatedMessages(widget.parentContext);
+              },
             ),
           ),
           Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
@@ -229,8 +684,10 @@ class ChatScreen extends StatefulWidget {
   final String peerId;
   final String? peerName;
   final String? avatarBase64;
+  final String? initialReplyToContent;
+  final String? initialReplyToSender;
 
-  const ChatScreen({required this.peerId, this.peerName, this.avatarBase64, super.key});
+  const ChatScreen({required this.peerId, this.peerName, this.avatarBase64, this.initialReplyToContent, this.initialReplyToSender, super.key});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -241,6 +698,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final IntrovertClient _client = IntrovertClient();
   final List<dynamic> _messages = [];
+  int _messagesVersion = 0;
+  int _cachedDisplayVersion = -1;
+  List<dynamic>? _cachedDisplayMessages;
   bool _isLoading = false;
   bool _isSyncing = false;
   String? _myAvatar;
@@ -255,7 +715,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isInputEmpty = true;
   double _recordingDuration = 0.0;
   Timer? _recordingTimer;
+  Timer? _loadMessagesDebounce;
   final AudioRecorder _audioRecorder = AudioRecorder();
+  dynamic _selectedMsg;
   
   String? _peerName;
 
@@ -263,6 +725,8 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription? _economySubscription;
   StreamSubscription<FileTransferProgress>? _transferSubscription;
   final Map<String, Map<String, List<String>>> _polls = {};
+  final Set<String> _pullRequested = {};
+  int _elevatedCount = 0;
 
   @override
   void initState() {
@@ -274,6 +738,10 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() => _isInputEmpty = empty);
       }
     });
+    
+    if (widget.initialReplyToContent != null) {
+      _replyingTo = MessageModel(content: widget.initialReplyToContent!, isMe: false, timestamp: DateTime.now());
+    }
     
     getApplicationDocumentsDirectory().then((dir) {
     });
@@ -290,17 +758,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // Auto-sync: contacts + last 100 messages (background, discreet)
     setState(() => _isSyncing = true);
     _client.syncChatMessages(widget.peerId, widget.peerId, false);
-    Future.delayed(Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() => _isSyncing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Chat synced", style: TextStyle(color: AppTheme.current.accent)),
-            backgroundColor: AppTheme.current.surface,
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
+    Future.delayed(Duration(seconds: 3), () {
+      if (mounted) setState(() => _isSyncing = false);
     });
   }
 
@@ -310,6 +769,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _economySubscription?.cancel();
     _transferSubscription?.cancel();
     _recordingTimer?.cancel();
+    _loadMessagesDebounce?.cancel();
     _audioRecorder.dispose();
     _messageController.dispose();
     _scrollController.dispose();
@@ -341,6 +801,13 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       debugPrint("Error sending read receipts: $e");
     }
+  }
+
+  void _debouncedLoadMessages() {
+    _loadMessagesDebounce?.cancel();
+    _loadMessagesDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _loadMessages();
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -431,10 +898,11 @@ class _ChatScreenState extends State<ChatScreen> {
               thumbnail: progress.thumbnail,
             );
 
-            if (!isMe && !exists && existingIdx == -1) {
+            if (!isMe && !exists && existingIdx == -1 && !_pullRequested.contains(progress.transferId)) {
               try {
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                 final isRelayed = _status != "Direct P2P";
+                _pullRequested.add(progress.transferId);
                 _client.startPull(progress.peerId, progress.transferId, progress.filename, progress.mimeType, fileHash, totalSize, isRelayed, null);
               } catch (_) {}
             }
@@ -458,13 +926,154 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _messages.clear();
         _messages.addAll(loaded);
+        _messagesVersion++;
         _isLoading = false;
       });
+      _refreshElevatedCount();
       _scrollToBottom();
     } catch (e) {
       debugPrint("Error loading messages: $e");
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _refreshElevatedCount() {
+    try {
+      final elevated = _client.getElevatedMessages(widget.peerId);
+      if (mounted) setState(() => _elevatedCount = elevated.length);
+    } catch (_) {}
+  }
+
+  void _showElevatedMessages(BuildContext dialogContext) {
+    final elevated = _client.getElevatedMessages(widget.peerId);
+
+    showModalBottomSheet(
+      context: dialogContext,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.current.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.6,
+            child: Column(
+              children: [
+                SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.current.mutedText.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2))),
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.push_pin, color: AppTheme.current.accent, size: 20),
+                      SizedBox(width: 8),
+                      Text('ELEVATED MESSAGES', style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+                      Spacer(),
+                      Text('${elevated.length} pinned', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                Expanded(
+                  child: elevated.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.push_pin_outlined, size: 48, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                              SizedBox(height: 12),
+                              Text('No elevated messages', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
+                              SizedBox(height: 4),
+                              Text('Long-press a message and tap "Elevate"', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3), fontSize: 11)),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.all(12),
+                          itemCount: elevated.length,
+                          itemBuilder: (ctx, i) {
+                            final item = elevated[i];
+                            final content = item['content'] as String? ?? '';
+                            final isMe = item['is_me'] == true;
+                            final msgId = item['msg_id'] as String? ?? '';
+
+                            String senderName = isMe ? 'You' : (widget.peerName ?? 'Peer');
+                            String displayContent = content;
+                            if (content.startsWith('[FILE]:')) {
+                              try {
+                                final meta = json.decode(content.substring(7));
+                                displayContent = '📎 ${meta['filename'] ?? 'file'}';
+                              } catch (_) { displayContent = '📎 File'; }
+                            } else if (content.startsWith('[NOTE]:')) {
+                              displayContent = '📝 ${content.substring(7).split('\n').first}';
+                            }
+
+                            return GestureDetector(
+                              onLongPress: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dCtx) => AlertDialog(
+                                    backgroundColor: AppTheme.current.surface,
+                                    title: Text("Unelevate Message?", style: TextStyle(color: AppTheme.current.text)),
+                                    content: Text("Remove this message from elevated messages?", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13)),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text("CANCEL")),
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, true), child: Text("UNELEVATE", style: TextStyle(color: Colors.orangeAccent))),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _client.unelevateMessage(widget.peerId, msgId);
+                                  setDialogState(() {
+                                    elevated.removeWhere((e) => e['msg_id'] == msgId);
+                                  });
+                                  _refreshElevatedCount();
+                                }
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(bottom: 6),
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.current.text.withValues(alpha: 0.04),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.08)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.push_pin, size: 12, color: AppTheme.current.accent),
+                                        SizedBox(width: 4),
+                                        Text(senderName, style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                        Spacer(),
+                                        Text(
+                                          (item['timestamp']?.toString().length ?? 0) > 16 ? item['timestamp'].toString().substring(11, 16) : '',
+                                          style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      displayContent,
+                                      style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text('Long-press to unelevate', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3), fontSize: 9)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -512,6 +1121,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   List<dynamic> get _displayMessages {
+    if (_cachedDisplayVersion == _messagesVersion && _cachedDisplayMessages != null) {
+      return _cachedDisplayMessages!;
+    }
     final List<dynamic> result = [];
     int i = 0;
     while (i < _messages.length) {
@@ -551,6 +1163,8 @@ class _ChatScreenState extends State<ChatScreen> {
         i++;
       }
     }
+    _cachedDisplayMessages = result;
+    _cachedDisplayVersion = _messagesVersion;
     return result;
   }
 
@@ -628,6 +1242,38 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         } catch (_) {}
       }
+      if (content.startsWith("[NOTE]:")) {
+        try {
+          final noteData = content.substring(7);
+          final firstNewline = noteData.indexOf('\n');
+          final title = firstNewline > 0 ? noteData.substring(0, firstNewline) : noteData;
+          final rest = firstNewline > 0 ? noteData.substring(firstNewline + 1) : '';
+          // Format: [NOTE]:title\nimagePath\ncontent (if image) or [NOTE]:title\ncontent (no image)
+          String? imagePath;
+          String noteContent = rest;
+          if (rest.isNotEmpty && !rest.startsWith('http') && (rest.endsWith('.jpg') || rest.endsWith('.jpeg') || rest.endsWith('.png') || rest.endsWith('.gif') || rest.endsWith('.webp') || rest.endsWith('.heic'))) {
+            imagePath = rest;
+            noteContent = '';
+          } else if (rest.contains('\n')) {
+            final secondNewline = rest.indexOf('\n');
+            final possiblePath = rest.substring(0, secondNewline);
+            if (possiblePath.endsWith('.jpg') || possiblePath.endsWith('.jpeg') || possiblePath.endsWith('.png') || possiblePath.endsWith('.gif') || possiblePath.endsWith('.webp') || possiblePath.endsWith('.heic')) {
+              imagePath = possiblePath;
+              noteContent = rest.substring(secondNewline + 1);
+            }
+          }
+          return NoteBubble(
+            title: title,
+            content: noteContent,
+            imagePath: imagePath,
+            isMe: msg.isMe,
+            timestamp: msg.timestamp,
+            reactions: reactions,
+            msgId: msgId,
+            onReactionTap: () => _showReactionDetails(msgId!, reactions!),
+          );
+        } catch (_) {}
+      }
       if (content.startsWith("[LOCATION]:")) {
         final locData = content.substring(11);
         final commaIdx = locData.indexOf(',');
@@ -687,7 +1333,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return VoiceMemoBubble(
           filename: msg.filename,
           isMe: msg.isOutgoing,
-          timestamp: DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs),
+          timestamp: msg.startDateTime,
           localPath: msg.localPath ?? '',
           reactions: reactions,
           msgId: msgId,
@@ -698,13 +1344,13 @@ class _ChatScreenState extends State<ChatScreen> {
         return StickerBubble(
           name: msg.localPath ?? msg.filename,
           isMe: msg.isOutgoing,
-          timestamp: DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs),
+          timestamp: msg.startDateTime,
           reactions: reactions,
           msgId: msgId,
-          onReactionTap: reactions.isNotEmpty ? () => _showReactionDetails(msgId ?? '', reactions) : null,
         );
       }
       return FileTransferBubble(
+        key: ValueKey('${msg.transferId}_${msg.isVerified}_${msg.isComplete}'),
         progress: msg,
         isMe: msg.isOutgoing,
         reactions: reactions,
@@ -723,7 +1369,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 final fileHash = meta['file_hash']?.toString() ?? '';
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                 final isRelayed = _status != "Direct P2P";
-                _client.startPull(msg.peerId, msg.transferId, msg.filename, msg.mimeType, fileHash, totalSize, isRelayed, null);
+                if (!_pullRequested.contains(msg.transferId)) {
+                  _pullRequested.add(msg.transferId);
+                  _client.startPull(msg.peerId, msg.transferId, msg.filename, msg.mimeType, fileHash, totalSize, isRelayed, null);
+                }
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text("Requesting '${msg.filename}' from mesh...")),
                 );
@@ -835,6 +1484,108 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _getSelectedMsgContent() {
+    if (_selectedMsg == null) return '';
+    if (_selectedMsg is MessageModel) return _selectedMsg.content;
+    if (_selectedMsg is FileTransferProgress) return _selectedMsg.filename;
+    return '';
+  }
+
+  String? _getSelectedMsgId() {
+    if (_selectedMsg == null) return null;
+    if (_selectedMsg is MessageModel) return _selectedMsg.msgId;
+    if (_selectedMsg is FileTransferProgress) return _selectedMsg.transferId;
+    return null;
+  }
+
+  PreferredSizeWidget _buildSelectionToolbar() {
+    return AppBar(
+      backgroundColor: AppTheme.current.accent.withValues(alpha: 0.15),
+      leading: IconButton(
+        icon: Icon(Icons.close, color: AppTheme.current.accent),
+        onPressed: () => setState(() => _selectedMsg = null),
+      ),
+      title: Text("1 selected", style: TextStyle(color: AppTheme.current.accent, fontSize: 16, fontWeight: FontWeight.w500)),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.copy_rounded, color: AppTheme.current.accent),
+          tooltip: 'Copy',
+          onPressed: () {
+            final content = _getSelectedMsgContent();
+            if (content.isNotEmpty) {
+              Clipboard.setData(ClipboardData(text: content));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied to clipboard")));
+            }
+            setState(() => _selectedMsg = null);
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.reply_rounded, color: AppTheme.current.accent),
+          tooltip: 'Reply',
+          onPressed: () {
+            if (_selectedMsg != null) {
+              setState(() {
+                _replyingTo = _selectedMsg;
+                _selectedMsg = null;
+              });
+            }
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.forward, color: AppTheme.current.accent),
+          tooltip: 'Forward',
+          onPressed: () {
+            final content = _getSelectedMsgContent();
+            setState(() => _selectedMsg = null);
+            _showForwardDialog(content);
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.push_pin_outlined, color: AppTheme.current.accent),
+          tooltip: 'Elevate',
+          onPressed: () {
+            final msgId = _getSelectedMsgId();
+            final content = _getSelectedMsgContent();
+            if (msgId != null) {
+              final isMe = _selectedMsg is MessageModel ? (_selectedMsg as MessageModel).isMe : (_selectedMsg is FileTransferProgress ? (_selectedMsg as FileTransferProgress).isOutgoing : false);
+              final senderId = isMe ? (_client.localPeerId ?? '') : widget.peerId;
+              _client.elevateMessage(widget.peerId, msgId, content, senderId, isMe);
+              _refreshElevatedCount();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Message elevated")));
+            }
+            setState(() => _selectedMsg = null);
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+          tooltip: 'Delete',
+          onPressed: () async {
+            final msgId = _getSelectedMsgId();
+            if (msgId == null) return;
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: AppTheme.current.surface,
+                title: Text("Delete Message?", style: TextStyle(color: AppTheme.current.text)),
+                content: Text("This will delete the message for everyone in the chat.", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13)),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("CANCEL")),
+                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text("DELETE", style: TextStyle(color: Colors.redAccent))),
+                ],
+              ),
+            );
+            if (confirm == true) {
+              _client.deleteMessage(widget.peerId, msgId!, false);
+              setState(() => _selectedMsg = null);
+              _loadMessages();
+            }
+          },
+        ),
+        SizedBox(width: 8),
+      ],
+    );
+  }
+
   void _showMessageActions(dynamic msg) {
     String content = "";
     String? msgId;
@@ -850,7 +1601,7 @@ class _ChatScreenState extends State<ChatScreen> {
       content = "[FILE]:${msg.localPath ?? ''}";
       msgId = msg.transferId;
       isMe = msg.isOutgoing;
-      ts = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+      ts = msg.startDateTime;
     }
 
     if (msgId == null) return;
@@ -902,6 +1653,23 @@ class _ChatScreenState extends State<ChatScreen> {
               onTap: () {
                 Navigator.pop(context);
                 setState(() => _replyingTo = msg);
+              },
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: Icon(Icons.push_pin_outlined, color: AppTheme.current.accent),
+              title: Text("Elevate", style: TextStyle(color: AppTheme.current.text)),
+              subtitle: Text("Pin to elevated messages tab", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+              onTap: () {
+                Navigator.pop(context);
+                final senderId = isMe ? (_client.localPeerId ?? '') : widget.peerId;
+                _client.elevateMessage(widget.peerId, msgId!, content, senderId, isMe);
+                _refreshElevatedCount();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Message elevated"), backgroundColor: AppTheme.current.surface),
+                );
               },
             ),
           ),
@@ -970,6 +1738,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (m is FileTransferProgress) return m.transferId == msgId;
                         return (m is MessageModel && m.msgId == msgId);
                       });
+                      _messagesVersion++;
                     });
                   }
                 },
@@ -1019,6 +1788,25 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _extractLocalPathFromProgress(FileTransferProgress progress) {
+    String? localPath = progress.localPath;
+    if (localPath != null && localPath.isNotEmpty) {
+      localPath = _client.resolveSandboxPath(localPath);
+    }
+    if (localPath == null || !File(localPath).existsSync()) {
+      if (progress.fileHash.isNotEmpty) {
+        final driveInfo = _client.driveGetByHash(progress.fileHash);
+        if (driveInfo.containsKey('local_path')) {
+          final organizedPath = _client.resolveSandboxPath(driveInfo['local_path']?.toString()) ?? "";
+          if (organizedPath.isNotEmpty && File(organizedPath).existsSync()) {
+            localPath = organizedPath;
+          }
+        }
+      }
+    }
+    return localPath ?? "";
+  }
+
   String _extractLocalPath(String content) {
     if (!content.startsWith("[FILE]:")) return "";
     var pathOrJson = content.substring(7).trim();
@@ -1052,6 +1840,21 @@ class _ChatScreenState extends State<ChatScreen> {
     final contacts = _client.getContacts();
     final groups = _client.getAllGroups();
 
+    final bool isFileForward = content.startsWith("[FILE]:") || _selectedMsg is FileTransferProgress;
+    String? fileForwardPath;
+    if (_selectedMsg is FileTransferProgress) {
+      final prog = _selectedMsg as FileTransferProgress;
+      final localPath = _extractLocalPathFromProgress(prog);
+      if (localPath.isNotEmpty && File(localPath).existsSync()) {
+        fileForwardPath = localPath;
+      }
+    } else if (content.startsWith("[FILE]:")) {
+      final path = _extractLocalPath(content);
+      if (path.isNotEmpty && File(path).existsSync()) {
+        fileForwardPath = path;
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.current.surface,
@@ -1079,15 +1882,12 @@ class _ChatScreenState extends State<ChatScreen> {
                       leading: SovereignAvatar(radius: 27, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null),
                       title: Text(c['alias'] ?? c['peer_id'], style: TextStyle(color: AppTheme.current.text, fontSize: 14)),
                       onTap: () {
-                        if (content.startsWith("[FILE]:")) {
-                           final path = _extractLocalPath(content);
-                           if (path.isNotEmpty && File(path).existsSync()) {
-                             _client.sendFile(c['peer_id'], path); 
-                             Navigator.pop(ctx);
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Message forwarded")));
-                           } else {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: File not found locally")));
-                           }
+                        if (isFileForward && fileForwardPath != null) {
+                              _client.sendFile(c['peer_id'], fileForwardPath); 
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("File forwarded")));
+                        } else if (isFileForward) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: File not found locally")));
                         } else {
                            _client.sendMessage(c['peer_id'], content);
                            Navigator.pop(ctx);
@@ -1102,15 +1902,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       leading: SovereignAvatar(radius: 27, initials: g[1].isNotEmpty ? g[1][0].toUpperCase() : "G"),
                       title: Text(g[1], style: TextStyle(color: AppTheme.current.text, fontSize: 14)),
                       onTap: () {
-                        if (content.startsWith("[FILE]:")) {
-                           final path = _extractLocalPath(content);
-                           if (path.isNotEmpty && File(path).existsSync()) {
-                             _client.sendFile("", path, g[0]);
-                             Navigator.pop(ctx);
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Message forwarded to group")));
-                           } else {
-                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: File not found locally")));
-                           }
+                        if (isFileForward && fileForwardPath != null) {
+                              final transferId = "gft_${DateTime.now().millisecondsSinceEpoch}";
+                              _client.registerSeeder(transferId, fileForwardPath, "", File(fileForwardPath).lengthSync(), g[0]);
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("File forwarded to group")));
+                        } else if (isFileForward) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: File not found locally")));
                         } else {
                            _client.sendGroupMessage(g[0], content);
                            Navigator.pop(ctx);
@@ -1131,6 +1929,10 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startNetworkDiscovery() {
     _client.startNetwork();
     _client.establishSecureSession(widget.peerId);
+
+    // Auto-recon: Let Intro-Claw optimize connection on chat start
+    _runIntroClawRecon();
+
     _networkSubscription = _client.networkStream.listen((event) {
       if (event.type == 8) {
         if (event.data.isEmpty) return;
@@ -1147,12 +1949,22 @@ class _ChatScreenState extends State<ChatScreen> {
           else { _status = "Offline"; _isE2eeActive = false; }
         });
         if (statusCode == 0 || statusCode == 1) _client.establishSecureSession(widget.peerId);
-      } else if (event.type == 2 || event.type == 4 || event.type == 23) {
-        // Event 23 = sync refresh (reload from DB)
-        if (event.type == 23) {
-          _loadMessages();
-          return;
+
+        // Show Intro-Claw connection confirmation
+        if (statusCode == 0 && mounted) {
+          _showIntroClawSnack("Intro-Claw: Direct P2P connection optimized", Colors.greenAccent);
+        } else if (statusCode == 1 && mounted) {
+          _showIntroClawSnack("Intro-Claw: Connected via relay — seeking direct path", Colors.orangeAccent);
         }
+      } else if (event.type == 10) {
+        // Network status event — check for weak/slow connection
+        if (event.data.isNotEmpty) {
+          final statusCode = event.data[0];
+          if (statusCode == 2 && mounted) {
+            _showNetworkWeakAlert();
+          }
+        }
+      } else if (event.type == 2 || event.type == 4) {
         final data = event.data;
         if (data.length < 8) return;
         final timestamp = ByteData.sublistView(Uint8List.fromList(data.sublist(0, 8))).getInt64(0, Endian.big);
@@ -1181,11 +1993,25 @@ class _ChatScreenState extends State<ChatScreen> {
           
           final bool isDuplicate = msgId != null && msgId.isNotEmpty && _messages.any((m) => m is MessageModel && m.msgId == msgId);
           if (!isDuplicate) {
-            _messages.add(MessageModel(content: content, isMe: false, timestamp: eventTime, status: msgId != null ? 2 : 1, msgId: msgId, replyTo: replyTo));
+            final newMsg = MessageModel(content: content, isMe: false, timestamp: eventTime, status: msgId != null ? 2 : 1, msgId: msgId, replyTo: replyTo);
+            int insertIdx = _messages.length;
+            for (int i = _messages.length - 1; i >= 0; i--) {
+              final m = _messages[i];
+              DateTime? existingTs;
+              if (m is MessageModel) existingTs = m.timestamp;
+              else if (m is FileTransferProgress) existingTs = m.startDateTime;
+              if (existingTs != null && existingTs.isAfter(eventTime)) {
+                insertIdx = i;
+              } else {
+                break;
+              }
+            }
+            _messages.insert(insertIdx, newMsg);
+            _messagesVersion++;
           }
         });
         _scrollToBottom();
-      } else if (event.type == 35) {
+      } else if (event.type == 40) {
         if (mounted) setState(() {});
       } else if (event.type == 25) {
         if (!mounted || event.data.isEmpty) return;
@@ -1217,7 +2043,21 @@ class _ChatScreenState extends State<ChatScreen> {
             } else {
               // Only add if it's not a known message or manifest
               if (!_messages.any((m) => (m is MessageModel && m.content.contains(progress.transferId)))) {
-                _messages.add(progress);
+                final fileTs = progress.startDateTime;
+                int insertIdx = _messages.length;
+                for (int i = _messages.length - 1; i >= 0; i--) {
+                  final m = _messages[i];
+                  DateTime? existingTs;
+                  if (m is MessageModel) existingTs = m.timestamp;
+                  else if (m is FileTransferProgress) existingTs = m.startDateTime;
+                  if (existingTs != null && existingTs.isAfter(fileTs)) {
+                    insertIdx = i;
+                  } else {
+                    break;
+                  }
+                }
+                _messages.insert(insertIdx, progress);
+                _messagesVersion++;
                 _scrollToBottom();
               }
             }
@@ -1229,12 +2069,13 @@ class _ChatScreenState extends State<ChatScreen> {
         if (event.data.length < 2) return;
         final status = event.data[0];
         final mid = utf8.decode(event.data.sublist(1));
-        setState(() {
-          final idx = _messages.indexWhere((m) => m is MessageModel && m.msgId == mid);
-          if (idx != -1) (_messages[idx] as MessageModel).status = status;
-        });
+        final idx = _messages.indexWhere((m) => m is MessageModel && m.msgId == mid);
+        if (idx != -1) {
+          (_messages[idx] as MessageModel).status = status;
+          if (mounted) setState(() {});
+        }
       } else if (event.type == 37 || event.type == 38) {
-        _loadMessages();
+        _debouncedLoadMessages();
       }
     });
 
@@ -1248,6 +2089,9 @@ class _ChatScreenState extends State<ChatScreen> {
       // But we can be extra sure by checking if we have a matching outgoing message.
       setState(() {
         final idx = _messages.indexWhere((m) => m is FileTransferProgress && m.transferId == progress.transferId);
+        if (progress.isComplete || progress.isCancelled) {
+          _pullRequested.remove(progress.transferId);
+        }
         if (idx != -1) {
           final existing = _messages[idx] as FileTransferProgress;
           // Preserve isOutgoing and localPath if we already had them
@@ -1269,12 +2113,75 @@ class _ChatScreenState extends State<ChatScreen> {
             thumbnail: existing.thumbnail ?? progress.thumbnail,
           );
           _messages[idx] = updated;
+          _messagesVersion++;
         } else {
           _messages.add(progress);
+          _messagesVersion++;
         }
       });
       _scrollToBottom();
     });
+  }
+
+  void _runIntroClawRecon() async {
+    try {
+      final report = _client.runNetworkRecon();
+      if (!mounted) return;
+      // Parse report for connection quality
+      if (report.contains('OFFLINE') && widget.peerId.isNotEmpty) {
+        _showIntroClawSnack("Intro-Claw: Peer offline — messages will be queued", Colors.orangeAccent);
+      }
+    } catch (_) {}
+  }
+
+  void _showIntroClawSnack(String message, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500)),
+        backgroundColor: Color(0xFF001F2B),
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.fromLTRB(16, 0, 16, 80),
+      ),
+    );
+  }
+
+  void _showNetworkWeakAlert() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.current.surface,
+        title: Row(
+          children: [
+            Icon(Icons.signal_wifi_off_rounded, color: Colors.orangeAccent, size: 20),
+            SizedBox(width: 8),
+            Text("Weak Network", style: TextStyle(color: AppTheme.current.text, fontSize: 15)),
+          ],
+        ),
+        content: Text(
+          "Intro-Claw detected a slow or unstable connection. Messages may be delayed.\n\n"
+          "The mesh will automatically retry via relay paths when available.",
+          style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text("OK", style: TextStyle(color: AppTheme.current.accent)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _client.forceNetworkRefresh();
+              _showIntroClawSnack("Intro-Claw: Refreshing network connections...", AppTheme.current.accent);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
+            child: Text("OPTIMIZE"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _sendMessage() async {
@@ -1296,13 +2203,24 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final replyToId = _replyingTo is MessageModel ? _replyingTo.msgId : (_replyingTo is FileTransferProgress ? _replyingTo.transferId : null);
+    
+    final String payload;
+    if (replyToId == null && _replyingTo is MessageModel && _replyingTo.content.isNotEmpty) {
+      final quoted = _replyingTo.content.length > 200 ? '${_replyingTo.content.substring(0, 200)}...' : _replyingTo.content;
+      payload = '> $quoted\n\n$text';
+    } else {
+      payload = text;
+    }
+    
     try {
-      final msgId = await _client.sendMessage(widget.peerId, text, replyToId);
+      final msgId = await _client.sendMessage(widget.peerId, payload, replyToId);
+      if (!mounted) return;
       setState(() {
-        _messages.add(MessageModel(content: text, isMe: true, timestamp: DateTime.now(), status: 0, msgId: msgId, replyTo: replyToId));
+        _messages.add(MessageModel(content: payload, isMe: true, timestamp: DateTime.now(), status: 0, msgId: msgId, replyTo: replyToId));
+        _messagesVersion++;
         _messageController.clear();
         _replyingTo = null;
-        _relayedBytes += text.length;
+        _relayedBytes += payload.length;
         _solRewards = _relayedBytes * 0.0000001;
       });
       _scrollToBottom();
@@ -1317,6 +2235,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final msgId = await _client.sendMessage(widget.peerId, payload);
       setState(() {
         _messages.add(MessageModel(content: payload, isMe: true, timestamp: DateTime.now(), status: 0, msgId: msgId));
+        _messagesVersion++;
       });
       _scrollToBottom();
     } catch (_) {}
@@ -1337,17 +2256,89 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final pickedFiles = await ImagePicker().pickMultiImage(imageQuality: 100);
       if (pickedFiles.isNotEmpty) {
-        for (var file in pickedFiles) {
-          String path = file.path;
+        if (pickedFiles.length == 1) {
+          final caption = await _showCaptionDialog();
+          String path = pickedFiles.first.path;
           final ext = path.split('.').last.toLowerCase();
-          // Convert HEIC/HEIF to JPEG for universal compatibility
           if (ext == 'heic' || ext == 'heif') {
             path = await _convertHeicToJpeg(path);
           }
           _client.sendFile(widget.peerId, path);
+          if (caption != null && caption.isNotEmpty) {
+            _client.sendMessage(widget.peerId, caption);
+          }
+        } else {
+          for (var file in pickedFiles) {
+            String path = file.path;
+            final ext = path.split('.').last.toLowerCase();
+            if (ext == 'heic' || ext == 'heif') {
+              path = await _convertHeicToJpeg(path);
+            }
+            _client.sendFile(widget.peerId, path);
+          }
         }
       }
     } catch (_) {}
+  }
+
+  void _pickAndSendVideo() async {
+    try {
+      final pickedFile = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        final caption = await _showCaptionDialog();
+        _client.sendFile(widget.peerId, pickedFile.path);
+        if (caption != null && caption.isNotEmpty) {
+          _client.sendMessage(widget.peerId, caption);
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _sendFile() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.any);
+    if (result != null && result.files.single.path != null) {
+      final caption = await _showCaptionDialog();
+      _client.sendFile(widget.peerId, result.files.single.path!);
+      if (caption != null && caption.isNotEmpty) {
+        _client.sendMessage(widget.peerId, caption);
+      }
+    }
+  }
+
+  Future<String?> _showCaptionDialog() async {
+    final captionController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.current.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Add a caption', style: TextStyle(color: AppTheme.current.text, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: captionController,
+          style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
+          decoration: InputDecoration(
+            hintText: 'Write something...',
+            hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)),
+            filled: true,
+            fillColor: AppTheme.current.text.withValues(alpha: 0.05),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          autofocus: true,
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Skip', style: TextStyle(color: AppTheme.current.mutedText)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, captionController.text),
+            child: Text('Send', style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<String> _convertHeicToJpeg(String heicPath) async {
@@ -1367,12 +2358,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showInfo() async {
+    final parentCtx = context;
     final result = await showDialog<bool>(
-      context: context,
+      context: parentCtx,
       builder: (context) => _ContactInfoDialog(
         peerId: widget.peerId,
         peerName: _peerName ?? "Peer",
         avatarBase64: widget.avatarBase64,
+        parentContext: parentCtx,
       ),
     );
     if (result == true && mounted) {
@@ -1612,20 +2605,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _pickAndSendVideo() async {
-    try {
-      final pickedFile = await ImagePicker().pickVideo(source: ImageSource.gallery);
-      if (pickedFile != null) _client.sendFile(widget.peerId, pickedFile.path);
-    } catch (_) {}
-  }
-
-  void _sendFile() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.any);
-    if (result != null && result.files.single.path != null) {
-      _client.sendFile(widget.peerId, result.files.single.path!);
-    }
-  }
-
   void _shareLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -1771,7 +2750,7 @@ class _ChatScreenState extends State<ChatScreen> {
           bitRate: 128000,
           sampleRate: 44100,
         ),
-        path: '', // Let the plugin choose a temp path
+        path: '${(await getTemporaryDirectory()).path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a',
       );
 
       setState(() {
@@ -1873,8 +2852,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasSelection = _selectedMsg != null;
     return Scaffold(
-      appBar: AppBar(
+      appBar: hasSelection ? _buildSelectionToolbar() : AppBar(
         leadingWidth: 100,
         leading: Row(children: [IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)), SovereignAvatar(radius: 24, avatar: widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null)]),
         title: InkWell(
@@ -1916,7 +2896,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Stack(
         children: [
-          const SovereignWallpaper(),
+          SovereignWallpaper(),
           Column(
             children: [
               if (_isSyncing)
@@ -1948,10 +2928,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       msgDate = msg.timestamp;
                     } else if (msg is FileTransferProgress) {
                       isMe = msg.isOutgoing;
-                      msgDate = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+                      msgDate = msg.startDateTime;
                     } else if (msg is ImageGroupProgress) {
                       isMe = msg.isOutgoing;
-                      msgDate = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+                      msgDate = msg.startDateTime;
                     }
                     
                     bool showDateSeparator = false;
@@ -1963,9 +2943,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (prevMsg is MessageModel) {
                         prevDate = prevMsg.timestamp;
                       } else if (prevMsg is FileTransferProgress) {
-                        prevDate = DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs);
+                        prevDate = prevMsg.startTimeMs > 946684800000 ? DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs) : DateTime.now();
                       } else if (prevMsg is ImageGroupProgress) {
-                        prevDate = DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs);
+                        prevDate = prevMsg.startTimeMs > 946684800000 ? DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs) : DateTime.now();
                       }
                       if (msgDate.year != prevDate.year || msgDate.month != prevDate.month || msgDate.day != prevDate.day) {
                         showDateSeparator = true;
@@ -1978,7 +2958,16 @@ class _ChatScreenState extends State<ChatScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       child: GestureDetector(
                         onHorizontalDragUpdate: (details) { if (details.delta.dx > 8) setState(() => _replyingTo = msg); },
-                        onLongPress: () => _showMessageActions(msg),
+                        onLongPress: () {
+                          setState(() {
+                            _selectedMsg = (_selectedMsg == msg) ? null : msg;
+                          });
+                        },
+                        onTap: () {
+                          if (_selectedMsg != null) {
+                            setState(() => _selectedMsg = null);
+                          }
+                        },
                         child: Row(
                           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -2056,6 +3045,38 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       Positioned(top: 20, left: 0, right: 0, child: Center(child: RewardsHUD(relayedBytes: _relayedBytes.toInt(), solRewards: _solRewards))),
+      // Elevated Messages mini tab
+      Positioned(
+        top: 60,
+        right: 8,
+        child: GestureDetector(
+          onTap: () => _showElevatedMessages(context),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.current.surface.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: Offset(0, 2))],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.push_pin, size: 14, color: AppTheme.current.accent),
+                SizedBox(width: 4),
+                Text(
+                  _elevatedCount > 0 ? 'Elevated ($_elevatedCount)' : 'Elevated',
+                  style: TextStyle(
+                    color: _elevatedCount > 0 ? AppTheme.current.accent : AppTheme.current.mutedText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ],
   ),
 );

@@ -13,6 +13,7 @@ import 'package:image/image.dart' as img;
 import '../src/native/introvert_client.dart';
 import '../src/ui/widgets/file_transfer_bubble.dart';
 import '../src/ui/widgets/image_stack_bubble.dart';
+import '../src/ui/widgets/note_bubble.dart';
 import '../blueprint_ui.dart';
 import 'chat_features.dart';
 import 'media_gallery_viewer.dart';
@@ -22,6 +23,8 @@ import '../theme/app_theme.dart';
 import 'group_call_screen.dart';
 import '../src/services/group_call_service.dart';
 import 'location_picker_screen.dart';
+import 'chat_screen.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 
 class GroupChatScreen extends StatefulWidget {
@@ -47,7 +50,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   StreamSubscription<FileTransferProgress>? _transferSubscription;
   List<dynamic> _messages = [];
   List<dynamic> _members = [];
+  int _messagesVersion = 0;
+  int _cachedDisplayVersion = -1;
+  List<dynamic>? _cachedDisplayMessages;
   StreamSubscription<NetworkEvent>? _networkSubscription;
+  Timer? _loadMessagesDebounce;
   final Map<String, String> _contactNames = {};
   final Map<String, String> _contactAvatars = {}; // peer_id -> base64 avatar
   String? _myAvatar;
@@ -58,6 +65,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   bool _isInputEmpty = true;
   bool _isSyncing = false;
   bool _showPanel = false;
+  int _elevatedCount = 0;
   
   // Active List state
   String _activeListTitle = "";
@@ -71,10 +79,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   
   // Recording state
   bool _isRecording = false;
+  Timer? _recordingTimer;
+  double _recordingDuration = 0.0;
   final AudioRecorder _audioRecorder = AudioRecorder();
+  dynamic _selectedMsg;
   
   String? _docDirPath;
   final Set<String> _polledPeers = {};
+  final Set<String> _pullRequested = {};
 
   // Active group call state
   String? _activeCallId;
@@ -167,11 +179,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         _markMessagesAsRead();
         _loadMessages();
       }
-    });
-    _startListener();
-    
-    // Auto-sync: contacts + last 100 messages from all members (background, discreet)
-    Future.microtask(() async {
+
+      // Auto-sync: contacts + last 100 messages from all members (background, discreet)
       if (!mounted) return;
       final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
       if (memberIds.isNotEmpty) {
@@ -180,33 +189,26 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           _client.pollPeerProfile(memberId);
           _client.syncChatMessages(memberId, widget.groupId, true);
         }
-        Future.delayed(Duration(seconds: 2), () {
-          if (!mounted) return;
-          for (final memberId in memberIds) {
-            _client.syncChatMessages(memberId, widget.groupId, true);
-          }
-          Future.delayed(Duration(seconds: 2), () {
-            if (mounted) {
-              setState(() => _isSyncing = false);
+        Future.delayed(Duration(seconds: 5), () {
+          if (mounted) {
+            setState(() {
+              _isSyncing = false;
               _loadMessages();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Chat synced", style: TextStyle(color: AppTheme.current.accent)),
-                  backgroundColor: AppTheme.current.surface,
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            }
-          });
+            });
+          }
         });
       }
     });
+    _startListener();
     
     _transferSubscription = _client.transferStream.listen((progress) {
       if (mounted) {
-        if (progress.groupId != widget.groupId) return; // Leakage Fix: Skip 1-on-1 or other group transfers
+        if (progress.groupId != widget.groupId) return;
         setState(() {
           _groupTransfers[progress.transferId] = progress;
+          if (progress.isComplete || progress.isCancelled) {
+            _pullRequested.remove(progress.transferId);
+          }
         });
         _loadMessages();
       }
@@ -215,10 +217,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   @override
   void dispose() {
+    _loadMessagesDebounce?.cancel();
     _networkSubscription?.cancel();
     _transferSubscription?.cancel();
+    _recordingTimer?.cancel();
     _audioRecorder.dispose();
     _callExpiryTimer?.cancel();
+    _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -411,9 +417,43 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
+  void _debouncedLoadMessages() {
+    _loadMessagesDebounce?.cancel();
+    _loadMessagesDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _loadMessages();
+    });
+  }
+
+  void _debouncedReloadMessages() {
+    _loadMessagesDebounce?.cancel();
+    _loadMessagesDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _reloadMessages();
+    });
+  }
+
   void _loadMessages() {
     if (!mounted) return;
     _markMessagesAsRead();
+    _reloadMessages();
+  }
+
+  void _reloadMessages() {
+    if (!mounted) return;
+    // Check if group still exists — if deleted by admin, navigate back
+    final allGroups = _client.getAllGroups();
+    final groupExists = allGroups.any((g) => g is List && g.isNotEmpty && g[0] == widget.groupId);
+    if (!groupExists) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Group has been deleted", style: TextStyle(color: AppTheme.current.accent)),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+      return;
+    }
     final msgs = _client.getGroupMessages(widget.groupId);
     setState(() {
       final List<dynamic> processed = [];
@@ -488,8 +528,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             final filename = meta['filename']?.toString() ?? 'unknown';
             final mimeType = meta['mime_type']?.toString() ?? 'application/octet-stream';
 
-            if (!isOutgoing && !exists) {
+            if (!isOutgoing && !exists && !_pullRequested.contains(tid)) {
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
+                _pullRequested.add(tid);
                 _client.startPull(senderId, tid, filename, mimeType, fileHash, totalSize, true, widget.groupId);
             }
             
@@ -507,7 +548,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               isCancelled: false,
               localPath: localPath,
               startTimeMs: ts.millisecondsSinceEpoch,
-              isWaitingForDownload: (!isOutgoing && !exists),
+              isWaitingForDownload: false, // Auto-download silently — no "tap to download"
               thumbnail: meta['thumbnail']?.toString(),
             );
             _groupTransfers[tid] = progressObj;
@@ -520,9 +561,30 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         
         processed.add(m);
       }
+      processed.sort((a, b) {
+        DateTime? tsA;
+        DateTime? tsB;
+        if (a is FileTransferProgress) tsA = a.startDateTime;
+        else if (a is List && a.length > 3) tsA = DateTime.tryParse(a[3]?.toString() ?? '');
+        if (b is FileTransferProgress) tsB = b.startDateTime;
+        else if (b is List && b.length > 3) tsB = DateTime.tryParse(b[3]?.toString() ?? '');
+        if (tsA == null && tsB == null) return 0;
+        if (tsA == null) return 1;
+        if (tsB == null) return -1;
+        return tsA.compareTo(tsB);
+      });
       _messages = processed;
+      _messagesVersion++;
     });
+    _refreshElevatedCount();
     _scrollToBottom();
+  }
+
+  void _refreshElevatedCount() {
+    try {
+      final elevated = _client.getElevatedMessages(widget.groupId);
+      if (mounted) setState(() => _elevatedCount = elevated.length);
+    } catch (_) {}
   }
 
   void _scrollToMessage(String? msgId) {
@@ -550,7 +612,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
     if (msg is FileTransferProgress) {
       isMe = msg.peerId == _client.localPeerId;
-      ts = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+      ts = msg.startDateTime;
       msgId = msg.transferId;
       
       bool exists = false;
@@ -606,6 +668,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         );
       }
       return FileTransferBubble(
+        key: ValueKey('${updatedProgress.transferId}_${updatedProgress.isVerified}_${updatedProgress.isComplete}'),
         progress: updatedProgress,
         isMe: isMe,
         reactions: _client.getMessageReactions(msgId),
@@ -716,6 +779,37 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           }
         }
       }
+      if (content.startsWith("[NOTE]:")) {
+        try {
+          final noteData = content.substring(7);
+          final firstNewline = noteData.indexOf('\n');
+          final title = firstNewline > 0 ? noteData.substring(0, firstNewline) : noteData;
+          final rest = firstNewline > 0 ? noteData.substring(firstNewline + 1) : '';
+          String? imagePath;
+          String noteContent = rest;
+          if (rest.isNotEmpty && (rest.endsWith('.jpg') || rest.endsWith('.jpeg') || rest.endsWith('.png') || rest.endsWith('.gif') || rest.endsWith('.webp') || rest.endsWith('.heic'))) {
+            imagePath = rest;
+            noteContent = '';
+          } else if (rest.contains('\n')) {
+            final secondNewline = rest.indexOf('\n');
+            final possiblePath = rest.substring(0, secondNewline);
+            if (possiblePath.endsWith('.jpg') || possiblePath.endsWith('.jpeg') || possiblePath.endsWith('.png') || possiblePath.endsWith('.gif') || possiblePath.endsWith('.webp') || possiblePath.endsWith('.heic')) {
+              imagePath = possiblePath;
+              noteContent = rest.substring(secondNewline + 1);
+            }
+          }
+          return NoteBubble(
+            title: title,
+            content: noteContent,
+            imagePath: imagePath,
+            isMe: isMe,
+            timestamp: ts,
+            reactions: msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null,
+            msgId: msgIdVal,
+            onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, _client.getMessageReactions(msgIdVal)) : null,
+          );
+        } catch (_) {}
+      }
       if (content.startsWith("[POLL_CREATE]:")) {
         try {
           final data = json.decode(content.substring(14));
@@ -825,23 +919,148 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
+  String _getSelectedMsgContent() {
+    if (_selectedMsg == null) return '';
+    if (_selectedMsg is List && _selectedMsg.length > 2) return _selectedMsg[2]?.toString() ?? '';
+    if (_selectedMsg is FileTransferProgress) return _selectedMsg.filename;
+    return '';
+  }
+
+  String? _getSelectedMsgId() {
+    if (_selectedMsg == null) return null;
+    if (_selectedMsg is List && _selectedMsg.length > 4) return _selectedMsg[4]?.toString();
+    if (_selectedMsg is FileTransferProgress) return _selectedMsg.transferId;
+    return null;
+  }
+
+  PreferredSizeWidget _buildSelectionToolbar() {
+    final msgId = _getSelectedMsgId();
+    final isAdmin = _isAdmin;
+    final isOwnMsg = _selectedMsg is List && _selectedMsg.length > 0 && _selectedMsg[0] == _client.localPeerId;
+    String senderId = "";
+    if (_selectedMsg is List && _selectedMsg.length > 0) {
+      senderId = _selectedMsg[0]?.toString() ?? '';
+    } else if (_selectedMsg is FileTransferProgress) {
+      senderId = _selectedMsg.peerId;
+    }
+    final contacts = _client.getContacts();
+    final hasDirectConnection = !isOwnMsg && senderId.isNotEmpty && contacts.any((c) => c['peer_id'] == senderId);
+    final content = _getSelectedMsgContent();
+    return AppBar(
+      backgroundColor: AppTheme.current.accent.withValues(alpha: 0.15),
+      leading: IconButton(
+        icon: Icon(Icons.close, color: AppTheme.current.accent),
+        onPressed: () => setState(() => _selectedMsg = null),
+      ),
+      title: Text("1 selected", style: TextStyle(color: AppTheme.current.accent, fontSize: 16, fontWeight: FontWeight.w500)),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.copy_rounded, color: AppTheme.current.accent),
+          tooltip: 'Copy',
+          onPressed: () {
+            if (content.isNotEmpty) {
+              Clipboard.setData(ClipboardData(text: content));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied to clipboard")));
+            }
+            setState(() => _selectedMsg = null);
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.reply_rounded, color: AppTheme.current.accent),
+          tooltip: 'Reply',
+          onPressed: () {
+            if (_selectedMsg != null) {
+              setState(() {
+                _replyingTo = _selectedMsg;
+                _selectedMsg = null;
+              });
+            }
+          },
+        ),
+        IconButton(
+          icon: Icon(Icons.forward, color: AppTheme.current.accent),
+          tooltip: 'Forward',
+          onPressed: () {
+            setState(() => _selectedMsg = null);
+            _showForwardDialog(content);
+          },
+        ),
+        if (hasDirectConnection)
+          IconButton(
+            icon: SvgPicture.asset('assets/images/reply_privately.svg', width: 24, height: 24, colorFilter: ColorFilter.mode(AppTheme.current.accent, BlendMode.srcIn)),
+            tooltip: 'Reply Privately',
+            onPressed: () {
+              setState(() => _selectedMsg = null);
+              final contact = contacts.firstWhere((c) => c['peer_id'] == senderId, orElse: () => null);
+              final peerName = contact != null ? (contact['alias'] ?? contact['global_name'] ?? senderId) : senderId;
+              final avatar = contact != null ? contact['avatar'] : null;
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(peerId: senderId, peerName: peerName, avatarBase64: avatar, initialReplyToContent: content)));
+            },
+          ),
+        if (msgId != null)
+          IconButton(
+            icon: Icon(Icons.push_pin_outlined, color: AppTheme.current.accent),
+            tooltip: 'Elevate',
+            onPressed: () {
+              final isMe = _selectedMsg is List && _selectedMsg.length > 0 && _selectedMsg[0] == _client.localPeerId;
+              _client.elevateMessage(widget.groupId, msgId, content, senderId, isMe);
+              _refreshElevatedCount();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Message elevated")));
+              setState(() => _selectedMsg = null);
+            },
+          ),
+        if (msgId != null && (isOwnMsg || isAdmin))
+          IconButton(
+            icon: Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+            tooltip: 'Delete',
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppTheme.current.surface,
+                  title: Text("Delete Message?", style: TextStyle(color: AppTheme.current.text)),
+                  content: Text("This will delete the message for everyone in the mesh room.", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13)),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("CANCEL")),
+                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text("DELETE", style: TextStyle(color: Colors.redAccent))),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                _client.deleteMessage(widget.groupId, msgId!, true, deletedByAdmin: !isOwnMsg && isAdmin);
+                setState(() => _selectedMsg = null);
+                _loadMessages();
+              }
+            },
+          ),
+        SizedBox(width: 8),
+      ],
+    );
+  }
+
   void _showMessageActions(dynamic msg) {
     String content = "";
     String? msgId;
     bool isMe = false;
     DateTime ts = DateTime.now();
+    String senderId = "";
 
     if (msg is List && msg.length > 4) {
       msgId = msg[4].toString();
       content = msg[2].toString();
       isMe = msg[0] == _client.localPeerId;
+      senderId = msg[0]?.toString() ?? '';
       ts = DateTime.tryParse(msg[3].toString()) ?? DateTime.now();
     } else if (msg is FileTransferProgress) {
       content = "[FILE]:${msg.localPath ?? ''}";
       msgId = msg.transferId;
       isMe = msg.isOutgoing;
-      ts = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+      senderId = msg.peerId;
+      ts = msg.startDateTime;
     }
+
+    final contacts = _client.getContacts();
+    final hasDirectConnection = !isMe && senderId.isNotEmpty && contacts.any((c) => c['peer_id'] == senderId);
 
     showModalBottomSheet(
       context: context,
@@ -891,6 +1110,19 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             },
           )),
           Material(color: Colors.transparent, child: ListTile(
+            leading: Icon(Icons.push_pin_outlined, color: AppTheme.current.accent),
+            title: Text("Elevate", style: TextStyle(color: AppTheme.current.text)),
+            subtitle: Text("Pin to elevated messages tab", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+            onTap: () {
+              Navigator.pop(context);
+              _client.elevateMessage(widget.groupId, msgId!, content, senderId, isMe);
+              _refreshElevatedCount();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Message elevated"), backgroundColor: AppTheme.current.surface),
+              );
+            },
+          )),
+          Material(color: Colors.transparent, child: ListTile(
             leading: Icon(Icons.copy, color: AppTheme.current.accent),
             title: Text("Copy", style: TextStyle(color: AppTheme.current.text)),
             onTap: () {
@@ -907,6 +1139,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               _showForwardDialog(content);
             },
           )),
+          if (hasDirectConnection)
+            Material(color: Colors.transparent, child: ListTile(
+              leading: SvgPicture.asset('assets/images/reply_privately.svg', width: 24, height: 24, colorFilter: ColorFilter.mode(AppTheme.current.accent, BlendMode.srcIn)),
+              title: Text("Reply Privately", style: TextStyle(color: AppTheme.current.text)),
+              onTap: () {
+                Navigator.pop(context);
+                final contact = contacts.firstWhere((c) => c['peer_id'] == senderId, orElse: () => null);
+                final peerName = contact != null ? (contact['alias'] ?? contact['global_name'] ?? senderId) : senderId;
+                final avatar = contact != null ? contact['avatar'] : null;
+                Navigator.push(context, MaterialPageRoute(builder: (context) => ChatScreen(peerId: senderId, peerName: peerName, avatarBase64: avatar, initialReplyToContent: content)));
+              },
+            )),
           if (isMe && DateTime.now().difference(ts).inSeconds <= 60 && msg is! FileTransferProgress)
             Material(color: Colors.transparent, child: ListTile(
               leading: Icon(Icons.edit, color: AppTheme.current.accent),
@@ -949,6 +1193,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                           if (m is FileTransferProgress) return m.transferId == msgId;
                           return (m is List && m.length > 4 && m[4] == msgId);
                         });
+                        _messagesVersion++;
                       }
                     });
                   }
@@ -1109,8 +1354,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   void _startListener() {
     _networkSubscription = _client.networkStream.listen((event) {
-      if (event.type == 21 || event.type == 23) {
-         _loadMessages();
+      if (event.type == 21) {
+        _debouncedLoadMessages();
+      } else if (event.type == 23) {
+        _debouncedReloadMessages();
       } else if (event.type == 12) {
         if (!mounted) return;
         try {
@@ -1142,14 +1389,27 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             } else {
               // Check if we already have a manifest for this
               if (!_messages.any((m) => (m is List && m.length > 2 && m[2].toString().contains(progress.transferId)))) {
-                 _messages.add(progress);
+                 final fileTs = progress.startDateTime;
+                 int insertIdx = _messages.length;
+                 for (int i = _messages.length - 1; i >= 0; i--) {
+                   final m = _messages[i];
+                   DateTime? existingTs;
+                   if (m is List && m.length > 3) existingTs = DateTime.tryParse(m[3]?.toString() ?? '');
+                   else if (m is FileTransferProgress) existingTs = m.startDateTime;
+                   if (existingTs != null && existingTs.isAfter(fileTs)) {
+                     insertIdx = i;
+                   } else {
+                     break;
+                   }
+                 }
+                 _messages.insert(insertIdx, progress);
                  _scrollToBottom();
               }
             }
           });
         } catch (_) {}
-      } else if (event.type == 35 || event.type == 37 || event.type == 38) {
-        // Event 35: Message Reaction, 37: Deleted, 38: Edited
+      } else if (event.type == 40 || event.type == 37 || event.type == 38) {
+        // Event 40: Message Reaction, 37: Deleted, 38: Edited
         if (mounted) setState(() {});
         _loadMessages();
       } else if (event.type == 22) {
@@ -1168,6 +1428,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
 
     });
+  }
+
+  void _insertSorted(dynamic msg, DateTime ts) {
+    int insertIdx = _messages.length;
+    for (int i = _messages.length - 1; i >= 0; i--) {
+      final m = _messages[i];
+      DateTime? existingTs;
+      if (m is List && m.length > 3) existingTs = DateTime.tryParse(m[3]?.toString() ?? '');
+      else if (m is FileTransferProgress) existingTs = m.startDateTime;
+      if (existingTs != null && existingTs.isAfter(ts)) {
+        insertIdx = i;
+      } else {
+        break;
+      }
+    }
+    _messages.insert(insertIdx, msg);
   }
 
   void _sendMessage() {
@@ -1195,9 +1471,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
 
     final replyToId = _replyingTo is FileTransferProgress ? _replyingTo.transferId : (_replyingTo is List && _replyingTo.length > 4 ? _replyingTo[4].toString() : null);
-    final localMsg = [_client.localPeerId, "me", text, DateTime.now().toUtc().toIso8601String() + "Z", const Uuid().v4(), replyToId];
+    final now = DateTime.now();
+    final localMsg = [_client.localPeerId, "me", text, now.toUtc().toIso8601String() + "Z", const Uuid().v4(), replyToId];
     setState(() {
-      _messages.add(localMsg);
+      int insertIdx = _messages.length;
+      for (int i = _messages.length - 1; i >= 0; i--) {
+        final m = _messages[i];
+        DateTime? existingTs;
+        if (m is List && m.length > 3) existingTs = DateTime.tryParse(m[3]?.toString() ?? '');
+        else if (m is FileTransferProgress) existingTs = m.startDateTime;
+        if (existingTs != null && existingTs.isAfter(now)) {
+          insertIdx = i;
+        } else {
+          break;
+        }
+      }
+      _messages.insert(insertIdx, localMsg);
       _messageController.clear();
       _replyingTo = null;
     });
@@ -1207,9 +1496,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   void _sendSticker(String name) {
     final payload = "[STICKER]:$name";
-    final localMsg = [_client.localPeerId, "me", payload, DateTime.now().toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
+    final now = DateTime.now();
+    final localMsg = [_client.localPeerId, "me", payload, now.toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
     setState(() {
-      _messages.add(localMsg);
+      _insertSorted(localMsg, now);
     });
     _scrollToBottom();
     _client.sendGroupMessage(widget.groupId, payload);
@@ -1217,9 +1507,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   void _sendGif(String url) {
     final payload = "[GIF]:$url";
-    final localMsg = [_client.localPeerId, "me", payload, DateTime.now().toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
+    final now = DateTime.now();
+    final localMsg = [_client.localPeerId, "me", payload, now.toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
     setState(() {
-      _messages.add(localMsg);
+      _insertSorted(localMsg, now);
     });
     _scrollToBottom();
     _client.sendGroupMessage(widget.groupId, payload);
@@ -1385,6 +1676,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   List<dynamic> get _displayMessages {
+    if (_cachedDisplayVersion == _messagesVersion && _cachedDisplayMessages != null) {
+      return _cachedDisplayMessages!;
+    }
     final List<dynamic> result = [];
     int i = 0;
     while (i < _messages.length) {
@@ -1424,6 +1718,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         i++;
       }
     }
+    _cachedDisplayMessages = result;
+    _cachedDisplayVersion = _messagesVersion;
     return result;
   }
 
@@ -1959,7 +2255,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     })}";
     final localMsg = [_client.localPeerId, "me", payload, DateTime.now().toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
     setState(() {
-      _messages.add(localMsg);
+      _insertSorted(localMsg, DateTime.now());
       _polls[pollId] = {for (var opt in options) opt: <String>[]};
       _pollQuestions[pollId] = question;
       _pollOptions[pollId] = options;
@@ -1989,21 +2285,206 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
     _client.sendGroupMessage(widget.groupId, payload);
   }
+
+  Future<void> _startRecording() async {
+    try {
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Microphone permission required for voice memos")),
+          );
+        }
+        return;
+      }
+
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: '${(await getTemporaryDirectory()).path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a',
+      );
+
+      setState(() {
+        _isRecording = true;
+        _recordingDuration = 0.0;
+      });
+
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) {
+          setState(() => _recordingDuration += 1.0);
+        }
+      });
+    } catch (e) {
+      debugPrint("Error starting recording: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to start recording: $e")),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopRecordingAndSend() async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+
+    try {
+      final path = await _audioRecorder.stop();
+      if (path == null || path.isEmpty) {
+        if (mounted) setState(() => _isRecording = false);
+        return;
+      }
+
+      final duration = _recordingDuration.toInt();
+      final filename = "voice_memo_${duration}s.m4a";
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final permanentPath = '${appDir.path}/$filename';
+      final tempFile = File(path);
+      if (await tempFile.exists()) {
+        await tempFile.copy(permanentPath);
+        await tempFile.delete();
+      }
+
+      if (mounted) {
+        setState(() => _isRecording = false);
+      }
+
+      final file = File(permanentPath);
+      final size = await file.length();
+      final fileHash = _client.computeFileHash(permanentPath);
+      final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
+      _client.registerSeeder(transferId, permanentPath, fileHash, size, widget.groupId);
+      final manifest = "[FILE]:${json.encode({
+        "transfer_id": transferId,
+        "sender_peer_id": _client.localPeerId,
+        "filename": filename,
+        "mime_type": "audio/x-m4a",
+        "total_size": size,
+        "file_hash": fileHash,
+        "is_relayed": true,
+        "group_id": widget.groupId,
+      })}";
+      _client.sendGroupMessage(widget.groupId, manifest);
+      _loadMessages();
+    } catch (e) {
+      debugPrint("Error stopping recording: $e");
+      if (mounted) {
+        setState(() => _isRecording = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to save recording: $e")),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+
+    try {
+      final path = await _audioRecorder.stop();
+      if (path != null && path.isNotEmpty) {
+        final tempFile = File(path);
+        if (await tempFile.exists()) await tempFile.delete();
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() => _isRecording = false);
+    }
+  }
+
+  String _formatRecordingDuration(double seconds) {
+    final s = seconds.toInt();
+    final m = (s ~/ 60).toString().padLeft(2, '0');
+    final sec = (s % 60).toString().padLeft(2, '0');
+    return '$m:$sec';
+  }
+
+  Widget _buildRecordingOverlay() {
+    if (!_isRecording) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.current.surface,
+        border: Border(top: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3), width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: const BoxDecoration(
+                color: Colors.redAccent,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _formatRecordingDuration(_recordingDuration),
+              style: const TextStyle(color: Colors.redAccent, fontSize: 16, fontFamily: 'monospace'),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "Recording...",
+                style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 13),
+              ),
+            ),
+            IconButton(
+              onPressed: _cancelRecording,
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              tooltip: 'Cancel',
+            ),
+            GestureDetector(
+              onTap: _stopRecordingAndSend,
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.send, color: Colors.white, size: 22),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRightActionButton() {
+    if (_isRecording) {
+      return IconButton(
+        onPressed: _stopRecordingAndSend,
+        icon: const Icon(Icons.send, color: Colors.redAccent),
+      );
+    }
     if (!_isInputEmpty || _editingMsgId != null) {
       return IconButton(
         onPressed: _sendMessage,
         icon: Icon(_editingMsgId != null ? Icons.check_circle_outline : Icons.send_rounded, color: AppTheme.current.accent),
       );
     }
-    return Icon(Icons.mic_none, color: AppTheme.current.accent);
+    return IconButton(
+      onPressed: _startRecording,
+      icon: Icon(Icons.mic_none, color: AppTheme.current.accent),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool hasSelection = _selectedMsg != null;
     return Scaffold(
       backgroundColor: AppTheme.current.bg,
-      appBar: AppBar(
+      appBar: hasSelection ? _buildSelectionToolbar() : AppBar(
         backgroundColor: AppTheme.current.surface,
         title: InkWell(
           onTap: _showInfo,
@@ -2030,7 +2511,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       ),
       body: Stack(
         children: [
-          const SovereignWallpaper(),
+          SovereignWallpaper(),
           Column(
             children: [
               if (_isSyncing)
@@ -2066,11 +2547,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     if (msg is FileTransferProgress) { 
                       isMe = msg.peerId == _client.localPeerId; 
                       senderId = msg.peerId; 
-                      msgDate = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+                      msgDate = msg.startDateTime;
                     } else if (msg is ImageGroupProgress) {
                       isMe = msg.images.first.peerId == _client.localPeerId; 
                       senderId = msg.images.first.peerId; 
-                      msgDate = DateTime.fromMillisecondsSinceEpoch(msg.startTimeMs);
+                      msgDate = msg.startDateTime;
                     } else { 
                       senderId = msg[0]?.toString() ?? ''; 
                       isMe = senderId == _client.localPeerId; 
@@ -2085,9 +2566,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       final prevMsg = _displayMessages[index - 1];
                       DateTime prevDate = DateTime.now();
                       if (prevMsg is FileTransferProgress) {
-                        prevDate = DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs);
+                        prevDate = prevMsg.startTimeMs > 946684800000 ? DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs) : DateTime.now();
                       } else if (prevMsg is ImageGroupProgress) {
-                        prevDate = DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs);
+                        prevDate = prevMsg.startTimeMs > 946684800000 ? DateTime.fromMillisecondsSinceEpoch(prevMsg.startTimeMs) : DateTime.now();
                       } else {
                         prevDate = _parseTimestamp(prevMsg[3]?.toString());
                       }
@@ -2113,7 +2594,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       child: GestureDetector(
                         onHorizontalDragUpdate: (details) { if (details.delta.dx > 8) setState(() => _replyingTo = msg); },
-                        onLongPress: () => _showMessageActions(msg),
+                        onLongPress: () {
+                          setState(() {
+                            _selectedMsg = (_selectedMsg == msg) ? null : msg;
+                          });
+                        },
+                        onTap: () {
+                          if (_selectedMsg != null) {
+                            setState(() => _selectedMsg = null);
+                          }
+                        },
                         child: Row(
                           mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -2203,18 +2693,187 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 ),
             ],
           ),
+          // Elevated Messages mini tab
+          Positioned(
+            top: 12,
+            right: 8,
+            child: GestureDetector(
+              onTap: () => _showElevatedMessages(context),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.current.surface.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: Offset(0, 2))],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.push_pin, size: 14, color: AppTheme.current.accent),
+                    SizedBox(width: 4),
+                    Text(
+                      _elevatedCount > 0 ? 'Elevated ($_elevatedCount)' : 'Elevated',
+                      style: TextStyle(
+                        color: _elevatedCount > 0 ? AppTheme.current.accent : AppTheme.current.mutedText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  void _showElevatedMessages(BuildContext dialogContext) {
+    final elevated = _client.getElevatedMessages(widget.groupId);
+    final localId = _client.localPeerId ?? '';
+
+    showModalBottomSheet(
+      context: dialogContext,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.current.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.6,
+            child: Column(
+              children: [
+                SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.current.mutedText.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2))),
+                Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.push_pin, color: AppTheme.current.accent, size: 20),
+                      SizedBox(width: 8),
+                      Text('ELEVATED MESSAGES', style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.2)),
+                      Spacer(),
+                      Text('${elevated.length} pinned', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                Expanded(
+                  child: elevated.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.push_pin_outlined, size: 48, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                              SizedBox(height: 12),
+                              Text('No elevated messages', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
+                              SizedBox(height: 4),
+                              Text('Long-press a message and tap "Elevate"', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3), fontSize: 11)),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.all(12),
+                          itemCount: elevated.length,
+                          itemBuilder: (ctx, i) {
+                            final item = elevated[i];
+                            final content = item['content'] as String? ?? '';
+                            final isMe = item['is_me'] == true;
+                            final msgId = item['msg_id'] as String? ?? '';
+                            final senderId = item['sender_id'] as String? ?? '';
+
+                            String senderName = isMe ? 'You' : (_contactNames[senderId] ?? senderId.substring(0, senderId.length > 8 ? 8 : senderId.length));
+                            String displayContent = content;
+                            if (content.startsWith('[FILE]:')) {
+                              try {
+                                final meta = json.decode(content.substring(7));
+                                displayContent = '📎 ${meta['filename'] ?? 'file'}';
+                              } catch (_) { displayContent = '📎 File'; }
+                            } else if (content.startsWith('[NOTE]:')) {
+                              displayContent = '📝 ${content.substring(7).split('\n').first}';
+                            }
+
+                            return GestureDetector(
+                              onLongPress: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (dCtx) => AlertDialog(
+                                    backgroundColor: AppTheme.current.surface,
+                                    title: Text("Unelevate Message?", style: TextStyle(color: AppTheme.current.text)),
+                                    content: Text("Remove this message from elevated messages?", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13)),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, false), child: Text("CANCEL")),
+                                      TextButton(onPressed: () => Navigator.pop(dCtx, true), child: Text("UNELEVATE", style: TextStyle(color: Colors.orangeAccent))),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _client.unelevateMessage(widget.groupId, msgId);
+                                  setDialogState(() {
+                                    elevated.removeWhere((e) => e['msg_id'] == msgId);
+                                  });
+                                  _refreshElevatedCount();
+                                }
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(bottom: 6),
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.current.text.withValues(alpha: 0.04),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.08)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.push_pin, size: 12, color: AppTheme.current.accent),
+                                        SizedBox(width: 4),
+                                        Text(senderName, style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                        Spacer(),
+                                        Text(
+                                          (item['timestamp']?.toString().length ?? 0) > 16 ? item['timestamp'].toString().substring(11, 16) : '',
+                                          style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      displayContent,
+                                      style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text('Long-press to unelevate', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3), fontSize: 9)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildInput() {
+    if (_isRecording) {
+      return _buildRecordingOverlay();
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_replyingTo != null) Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: AppTheme.current.surface, border: Border(top: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1)), left: BorderSide(color: AppTheme.current.accent, width: 4))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Replying to ${_replyingTo is FileTransferProgress ? 'File' : (_replyingTo[0] == _client.localPeerId ? 'me' : (_contactNames[_replyingTo[0]] ?? 'mesh peer'))}", style: TextStyle(color: AppTheme.current.accent, fontSize: 10, fontWeight: FontWeight.bold)), Text(_replyingTo is FileTransferProgress ? _replyingTo.filename : _replyingTo[2].toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12))])), IconButton(icon: Icon(Icons.close, size: 18, color: AppTheme.current.mutedText.withValues(alpha: 0.7)), onPressed: () => setState(() => _replyingTo = null))])),
         if (_editingMsgId != null) Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), decoration: BoxDecoration(color: AppTheme.current.surface, border: Border(top: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1)), left: BorderSide(color: Colors.orangeAccent, width: 4))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("EDITING MESSAGE", style: TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.bold)), Text(_messageController.text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12))])), IconButton(icon: Icon(Icons.close, size: 18, color: AppTheme.current.mutedText.withValues(alpha: 0.7)), onPressed: () { setState(() { _editingMsgId = null; _messageController.clear(); }); })])),
-        Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: AppTheme.current.surface, border: Border(top: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1)))), child: SafeArea(child: Row(children: [IconButton(onPressed: _showAttachmentOptions, icon: Icon(Icons.attach_file_rounded, color: AppTheme.current.accent)), IconButton(onPressed: () => setState(() => _showPanel = !_showPanel), icon: Icon(_showPanel ? Icons.keyboard_rounded : Icons.sentiment_satisfied_alt_rounded, color: AppTheme.current.accent)), SizedBox(width: 8), Expanded(child: _isRecording ? SizedBox.shrink() : TextField(controller: _messageController, style: TextStyle(color: AppTheme.current.text, fontSize: 15), decoration: InputDecoration(hintText: _replyingTo != null ? "WRITE YOUR REPLY..." : (_editingMsgId != null ? "EDIT MESSAGE..." : "Broadcast to mesh..."), hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none), filled: true, fillColor: AppTheme.current.text.withValues(alpha: 0.05), contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10)), onSubmitted: (_) => _sendMessage())), SizedBox(width: 12), _buildRightActionButton()]))),
+        Container(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: AppTheme.current.surface, border: Border(top: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1)))), child: SafeArea(child: Row(children: [IconButton(onPressed: _showAttachmentOptions, icon: Icon(Icons.attach_file_rounded, color: AppTheme.current.accent)), IconButton(onPressed: () => setState(() => _showPanel = !_showPanel), icon: Icon(_showPanel ? Icons.keyboard_rounded : Icons.sentiment_satisfied_alt_rounded, color: AppTheme.current.accent)), SizedBox(width: 8), Expanded(child: TextField(controller: _messageController, style: TextStyle(color: AppTheme.current.text, fontSize: 15), decoration: InputDecoration(hintText: _replyingTo != null ? "WRITE YOUR REPLY..." : (_editingMsgId != null ? "EDIT MESSAGE..." : "Broadcast to mesh..."), hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none), filled: true, fillColor: AppTheme.current.text.withValues(alpha: 0.05), contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10)), onSubmitted: (_) => _sendMessage())), SizedBox(width: 12), _buildRightActionButton()]))),
       ],
     );
   }
@@ -2379,6 +3038,11 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
     _loadMembers();
     _loadRetention();
     _loadMuted();
+
+    // Auto-recon: Let Intro-Claw optimize group mesh connections
+    try {
+      _client.runNetworkRecon();
+    } catch (_) {}
   }
 
   void _loadMuted() {

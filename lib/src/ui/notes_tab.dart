@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../native/introvert_client.dart';
 import '../../theme/app_theme.dart';
+import '../../blueprint_ui.dart';
 
 class NotesTab extends StatefulWidget {
   const NotesTab({super.key});
@@ -94,73 +95,111 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: AppTheme.current.surface,
-        title: const Text('SOVEREIGN NOTES', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-        actions: [
-          IconButton(
-            onPressed: _showHelpDialog,
-            icon: Icon(Icons.help_outline, color: AppTheme.current.mutedText),
-            tooltip: 'Help',
-          ),
-          PopupMenuButton(
-            icon: Icon(Icons.more_vert, color: AppTheme.current.mutedText),
-            onSelected: (val) {
-              if (val == 'export') _showExportDialog();
-              if (val == 'import') _showImportDialog();
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'export', child: Text('Export Notes')),
-              const PopupMenuItem(value: 'import', child: Text('Import Notes')),
-            ],
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: Column(
+      extendBody: true,      body: Column(
         children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: AppTheme.current.text, fontSize: 13),
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val;
-                  _applyFilter();
-                });
-              },
-              decoration: InputDecoration(
-                hintText: "Search Sovereign Notes...",
-                hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 13),
-                prefixIcon: Icon(Icons.search, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                            _applyFilter();
-                          });
-                        },
-                        icon: Icon(Icons.clear, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.black26,
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+          SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+          GlassmorphicContainer(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+            borderRadius: BorderRadius.circular(16),
+            tintAlpha: 0.06,
+            borderAlpha: 0.1,
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.sticky_note_2_rounded, color: AppTheme.current.accent, size: 20),
+                    const SizedBox(width: 8),
+                    Text('SOVEREIGN NOTES', style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.bold,
+                      color: AppTheme.current.accent, letterSpacing: 1.5,
+                    )),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: _showHelpDialog,
+                      icon: Icon(Icons.help_outline, color: AppTheme.current.mutedText, size: 20),
+                      tooltip: 'Help',
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints(),
+                    ),
+                    const SizedBox(width: 8),
+                    PopupMenuButton(
+                      icon: Icon(Icons.more_vert, color: AppTheme.current.mutedText, size: 20),
+                      padding: EdgeInsets.zero,
+                      onSelected: (val) {
+                        if (val == 'export') _showExportDialog();
+                        if (val == 'import') _showImportDialog();
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'export', child: Text('Export Notes')),
+                        const PopupMenuItem(value: 'import', child: Text('Import Notes')),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val;
+                      _applyFilter();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: "Search Sovereign Notes...",
+                    hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 13),
+                    prefixIcon: Icon(Icons.search, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                                _applyFilter();
+                              });
+                            },
+                            icon: Icon(Icons.clear, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: AppTheme.current.text.withValues(alpha: 0.04),
+                    contentPadding: EdgeInsets.zero,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+          // Search results indicator
+          if (_searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 14, color: AppTheme.current.accent),
+                  SizedBox(width: 6),
+                  Text(
+                    '${_filteredNotes.length} result${_filteredNotes.length == 1 ? '' : 's'}',
+                    style: TextStyle(color: AppTheme.current.accent, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
           // Notes list
           Expanded(
             child: _isLoading
@@ -171,11 +210,15 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createNote,
-        backgroundColor: AppTheme.current.accent,
-        child: Icon(Icons.add, color: Colors.black),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: FloatingActionButton(
+          onPressed: _createNote,
+          backgroundColor: AppTheme.current.accent,
+          child: Icon(Icons.add, color: Colors.black),
+        ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -225,14 +268,14 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
         onTap: () => _openNote(note['id']),
         borderRadius: BorderRadius.circular(12),
         splashColor: AppTheme.current.accent.withValues(alpha: 0.08),
-        child: Container(
+        child: GlassmorphicContainer(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppTheme.current.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.current.mutedText.withValues(alpha: 0.08)),
-          ),
+          borderRadius: BorderRadius.circular(12),
+          tintColor: AppTheme.current.accent,
+          blur: 10,
+          tintAlpha: 0.08,
+          borderAlpha: 0.12,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

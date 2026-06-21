@@ -34,6 +34,13 @@ flutter test      # Run Flutter tests
 cargo test        # Run Rust tests
 ```
 
+### 4. Understanding the Architecture
+Before contributing, read these key documents:
+- `Docs/INTROVERT_MASTER_PLAN.md` — Vision, tech stack, and execution roadmap
+- `Docs/ARCHITECTURE_BLUEPRINT.md` — Component layers, escrow pipeline, token sink mechanics
+- `Docs/NETWORKING_&_SIGNALING.md` — Dynamic blockchain bootstrapping, Sybil resistance
+- `Docs/SECURITY_&_ENCRYPTION.md` — PDA isolation, Squads V4 governance, identity derivation
+
 ## Development Workflow
 
 ### Branch Naming

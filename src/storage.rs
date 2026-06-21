@@ -4,6 +4,8 @@ use std::path::Path;
 use parking_lot::Mutex;
 use sha2::{Sha256, Digest};
 use chrono::Utc;
+use tracing::info;
+use crate::identity::SovereignIdentity;
 
 pub struct StorageService {
     conn: Mutex<Connection>,
@@ -244,6 +246,58 @@ impl StorageService {
             )", []
         )?;
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_call_history_peer ON call_history (peer_id, timestamp DESC)", []);
+
+        // Elevated messages (persistent bookmarks, per-chat)
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS elevated_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id TEXT NOT NULL,
+                msg_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                sender_id TEXT,
+                is_me INTEGER DEFAULT 0,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                elevated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(chat_id, msg_id)
+            )", []
+        )?;
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_elevated_chat ON elevated_messages (chat_id, elevated_at DESC)", []);
+
+        // Daily rewards system
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS daily_cycles (
+                cycle_date TEXT PRIMARY KEY,
+                snapshot_balance INTEGER NOT NULL DEFAULT 0,
+                total_points REAL NOT NULL DEFAULT 0.0,
+                capped_points REAL NOT NULL DEFAULT 0.0,
+                intr_reward REAL NOT NULL DEFAULT 0.0,
+                unique_peers INTEGER NOT NULL DEFAULT 0,
+                is_eligible INTEGER NOT NULL DEFAULT 0,
+                eligibility_reason TEXT NOT NULL DEFAULT '',
+                submitted INTEGER NOT NULL DEFAULT 0,
+                started_at INTEGER NOT NULL,
+                ended_at INTEGER
+            )", []
+        )?;
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS daily_activity_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cycle_date TEXT NOT NULL,
+                activity_type INTEGER NOT NULL,
+                raw_count INTEGER NOT NULL DEFAULT 0,
+                capped_count INTEGER NOT NULL DEFAULT 0,
+                points REAL NOT NULL DEFAULT 0.0,
+                UNIQUE(cycle_date, activity_type)
+            )", []
+        )?;
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS daily_reward_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                weights_json TEXT NOT NULL,
+                anti_gaming_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )", []
+        )?;
 
         // Migrations: All ALTER TABLE ADD COLUMN failures are intentionally discarded
         // because they succeed on first run and fail with "duplicate column" on subsequent runs.
@@ -881,6 +935,46 @@ impl StorageService {
         Ok(messages)
     }
 
+    /// Retrieves only the last message for a specific peer (optimized for chat list preview).
+    pub fn get_last_message_for_peer(&self, peer_id: &str) -> Result<Option<(String, String, bool, Option<String>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT content, timestamp, is_me, msg_id FROM messages WHERE peer_id = ?1 ORDER BY timestamp DESC LIMIT 1"
+        )?;
+        let mut rows = stmt.query_map(params![peer_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i32>(2)? != 0,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves only the last message for a group (optimized for chat list preview).
+    pub fn get_last_message_for_group(&self, group_id: &str) -> Result<Option<(String, String, String, Option<String>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT sender_id, content, timestamp, msg_id FROM group_messages WHERE group_id = ?1 ORDER BY timestamp DESC LIMIT 1"
+        )?;
+        let mut rows = stmt.query_map(params![group_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
     /// Retrieves unread message counts for all contacts and groups.
     pub fn get_unread_counts(&self) -> Result<serde_json::Value> {
         let conn = self.conn.lock();
@@ -941,10 +1035,14 @@ impl StorageService {
     pub fn update_group_member_profile(&self, peer_id: &str, name: &str, avatar: Option<&str>) -> Result<()> {
         let conn = self.conn.lock();
         
+        // Pre-filter: only scan groups whose members_json contains the peer_id
+        // This avoids deserializing ALL groups when only a few contain this peer
+        let peer_pattern = format!("%{}%", peer_id);
+        
         let mut updates = Vec::new();
         {
-            let mut stmt = conn.prepare("SELECT group_id, members_json FROM groups")?;
-            let rows = stmt.query_map([], |row| {
+            let mut stmt = conn.prepare("SELECT group_id, members_json FROM groups WHERE members_json LIKE ?1")?;
+            let rows = stmt.query_map(params![peer_pattern], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })?;
 
@@ -1072,9 +1170,9 @@ impl StorageService {
     pub fn delete_group(&self, group_id: &str) -> Result<()> {
         let conn = self.conn.lock();
         let rows = conn.execute("DELETE FROM groups WHERE group_id = ?1", params![group_id])?;
-        println!("[Storage] Deleted group {}: {} rows", group_id, rows);
+        info!("[Storage] Deleted group {}: {} rows", group_id, rows);
         let msg_rows = conn.execute("DELETE FROM group_messages WHERE group_id = ?1", params![group_id])?;
-        println!("[Storage] Deleted messages for group {}: {} rows", group_id, msg_rows);
+        info!("[Storage] Deleted messages for group {}: {} rows", group_id, msg_rows);
         conn.execute("DELETE FROM group_secrets WHERE group_id = ?1", params![group_id])?;
         conn.execute("DELETE FROM pending_group_invites WHERE group_id = ?1", params![group_id])?;
         
@@ -1332,7 +1430,8 @@ impl StorageService {
         let conn = self.conn.lock();
         let drive_bytes: i64 = conn.query_row("SELECT COALESCE(SUM(total_size), 0) FROM drive_files", [], |row| row.get(0)).unwrap_or(0);
         let mesh_bytes: i64 = conn.query_row("SELECT COALESCE(SUM(LENGTH(data)), 0) FROM mesh_chunks", [], |row| row.get(0)).unwrap_or(0);
-        let total_disk = std::fs::metadata("/").map(|m| m.len()).unwrap_or(0);
+        // Use drive + mesh as approximate total (avoids unreliable fs::metadata on mobile)
+        let total_disk = (drive_bytes.max(0) as u64) + (mesh_bytes.max(0) as u64);
         (drive_bytes.max(0) as u64, mesh_bytes.max(0) as u64, total_disk)
     }
 
@@ -1764,5 +1863,336 @@ impl StorageService {
         let mut messages = Vec::new();
         for row in rows { messages.push(row?); }
         Ok(messages)
+    }
+
+    pub fn search_all_messages(&self, query: &str, limit: i32) -> Result<Vec<(String, String, String, bool, i32, Option<String>, Option<String>)>> {
+        let conn = self.conn.lock();
+        let query_lower = query.to_lowercase();
+        let is_generic = ["messages", "message", "texts", "text", "recent", "latest", "chat", "chats"].iter()
+            .any(|kw| query_lower.contains(kw));
+
+        let mut sql = String::from(
+            "SELECT peer_id, content, timestamp, is_me, status, msg_id, reply_to_msg_id FROM messages"
+        );
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
+
+        if !is_generic && !query.is_empty() {
+            let search_pattern = format!("%{}%", query);
+            sql.push_str(" WHERE content LIKE ?");
+            param_values.push(Box::new(search_pattern));
+        }
+
+        sql.push_str(" ORDER BY timestamp DESC LIMIT ?");
+        param_values.push(Box::new(limit));
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params_slice: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt.query_map(params_slice.as_slice(), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i32>(3)? != 0,
+                row.get::<_, i32>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+            ))
+        })?;
+        let mut messages = Vec::new();
+        for row in rows { messages.push(row?); }
+        Ok(messages)
+    }
+
+    pub fn search_all_group_messages(&self, query: &str, limit: i32) -> Result<Vec<(String, String, String, String, String, Option<String>)>> {
+        let conn = self.conn.lock();
+        let search_pattern = format!("%{}%", query);
+        let mut stmt = conn.prepare(
+            "SELECT group_id, sender_id, msg_id, content, timestamp, reply_to_msg_id FROM group_messages WHERE content LIKE ?1 ORDER BY timestamp DESC LIMIT ?2"
+        )?;
+        let rows = stmt.query_map(params![search_pattern, limit], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(5)?,
+            ))
+        })?;
+        let mut messages = Vec::new();
+        for row in rows { messages.push(row?); }
+        Ok(messages)
+    }
+
+    pub fn search_drive_files(&self, query: &str, mime_filter: Option<&str>, days_ago: Option<i32>, limit: i32) -> Result<Vec<DriveFileMetadata>> {
+        let conn = self.conn.lock();
+
+        let type_keywords = ["photos", "images", "pictures", "videos", "clips", "files", "documents", "pdfs", "audio", "recordings"];
+        let is_generic_type = type_keywords.iter().any(|kw| query.to_lowercase().contains(kw));
+
+        let mut sql = String::from(
+            "SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp FROM drive_files WHERE 1=1"
+        );
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
+
+        if is_generic_type {
+            // When query is a generic type reference, just filter by mime type — no filename search
+        } else if !query.is_empty() {
+            sql.push_str(" AND filename LIKE ?");
+            let search_pattern = format!("%{}%", query);
+            param_values.push(Box::new(search_pattern));
+        }
+
+        if let Some(mime) = mime_filter {
+            sql.push_str(" AND mime_type LIKE ?");
+            param_values.push(Box::new(mime.to_string()));
+        }
+        if let Some(days) = days_ago {
+            sql.push_str(" AND timestamp >= datetime('now', ?)");
+            param_values.push(Box::new(format!("-{} days", days)));
+        }
+        sql.push_str(" ORDER BY timestamp DESC LIMIT ?");
+        param_values.push(Box::new(limit));
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params_slice: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt.query_map(params_slice.as_slice(), |row| {
+            Ok(DriveFileMetadata {
+                filename: row.get(0)?,
+                file_hash: row.get(1)?,
+                mime_type: row.get(2)?,
+                total_size: row.get(3)?,
+                local_path: row.get(4)?,
+                is_backed_up: row.get::<_, i32>(5)? != 0,
+                timestamp: row.get(6)?,
+            })
+        })?;
+        let mut files = Vec::new();
+        for row in rows { files.push(row?); }
+        Ok(files)
+    }
+
+    pub fn search_contacts(&self, query: &str) -> Result<Vec<SovereignIdentity>> {
+        let conn = self.conn.lock();
+        let query_lower = query.to_lowercase();
+        let is_generic = ["contacts", "contact", "who", "people", "person", "friends", "peers"].iter()
+            .any(|kw| query_lower.contains(kw));
+
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if is_generic {
+            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle FROM contacts ORDER BY global_name ASC".to_string(), vec![])
+        } else {
+            let search_pattern = format!("%{}%", query);
+            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle FROM contacts WHERE global_name LIKE ?1 OR local_alias LIKE ?1 OR handle LIKE ?1 OR peer_id LIKE ?1".to_string(), vec![Box::new(search_pattern)])
+        };
+
+        let mut stmt = conn.prepare(&sql)?;
+        let params_slice: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt.query_map(params_slice.as_slice(), |row| {
+            let pubkey: Vec<u8> = row.get(1)?;
+            let static_key_blob: Vec<u8> = row.get(2)?;
+            let mut sk = [0u8; 32];
+            let copy_len = static_key_blob.len().min(32);
+            sk[..copy_len].copy_from_slice(&static_key_blob[..copy_len]);
+            Ok(SovereignIdentity {
+                peer_id: row.get(0)?,
+                p2p_pubkey: pubkey,
+                static_key: sk,
+                solana_address: row.get(3)?,
+                global_name: row.get(4)?,
+                local_alias: row.get(5)?,
+                avatar_base64: row.get(6)?,
+                is_anchor_capable: row.get::<_, i32>(7)? != 0,
+                retention_seconds: 0,
+                handle: row.get(8)?,
+            })
+        })?;
+        let mut contacts = Vec::new();
+        for row in rows { contacts.push(row?); }
+        Ok(contacts)
+    }
+
+    // ── Elevated Messages ──────────────────────────────────────────────
+
+    pub fn elevate_message(&self, chat_id: &str, msg_id: &str, content: &str, sender_id: &str, is_me: bool) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR IGNORE INTO elevated_messages (chat_id, msg_id, content, sender_id, is_me) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![chat_id, msg_id, content, sender_id, if is_me { 1 } else { 0 }],
+        )?;
+        Ok(())
+    }
+
+    pub fn unelevate_message(&self, chat_id: &str, msg_id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM elevated_messages WHERE chat_id = ?1 AND msg_id = ?2",
+            params![chat_id, msg_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_elevated_messages(&self, chat_id: &str) -> Result<serde_json::Value> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT msg_id, content, sender_id, is_me, timestamp, elevated_at FROM elevated_messages WHERE chat_id = ?1 ORDER BY elevated_at DESC"
+        )?;
+        let rows = stmt.query_map(params![chat_id], |row| {
+            Ok(serde_json::json!({
+                "msg_id": row.get::<_, String>(0)?,
+                "content": row.get::<_, String>(1)?,
+                "sender_id": row.get::<_, String>(2)?,
+                "is_me": row.get::<_, i32>(3)? != 0,
+                "timestamp": row.get::<_, String>(4)?,
+                "elevated_at": row.get::<_, String>(5)?
+            }))
+        })?;
+        let mut results = Vec::new();
+        for row in rows { results.push(row?); }
+        Ok(serde_json::Value::Array(results))
+    }
+
+    pub fn is_message_elevated(&self, chat_id: &str, msg_id: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare("SELECT 1 FROM elevated_messages WHERE chat_id = ?1 AND msg_id = ?2")?;
+        let exists = stmt.exists(params![chat_id, msg_id])?;
+        Ok(exists)
+    }
+
+    // ── Daily Rewards ──────────────────────────────────────────────────
+
+    pub fn save_daily_cycle(&self, cycle: &crate::economy::daily_rewards::DailyCycle) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO daily_cycles (cycle_date, snapshot_balance, total_points, capped_points, intr_reward, unique_peers, is_eligible, eligibility_reason, submitted, started_at, ended_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                cycle.cycle_date,
+                cycle.snapshot_balance as i64,
+                cycle.total_points,
+                cycle.capped_points,
+                cycle.intr_reward,
+                cycle.unique_peers as i64,
+                if cycle.is_eligible { 1 } else { 0 },
+                cycle.eligibility_reason,
+                if cycle.submitted { 1 } else { 0 },
+                cycle.started_at as i64,
+                cycle.ended_at.map(|v| v as i64),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn load_daily_cycle(&self, date: &str) -> Result<Option<crate::economy::daily_rewards::DailyCycle>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT cycle_date, snapshot_balance, total_points, capped_points, intr_reward, unique_peers, is_eligible, eligibility_reason, submitted, started_at, ended_at FROM daily_cycles WHERE cycle_date = ?1"
+        )?;
+        let mut rows = stmt.query_map(params![date], |row| {
+            Ok(crate::economy::daily_rewards::DailyCycle {
+                cycle_date: row.get(0)?,
+                snapshot_balance: row.get::<_, i64>(1)? as u64,
+                activities: Vec::new(),
+                total_points: row.get(2)?,
+                capped_points: row.get(3)?,
+                intr_reward: row.get(4)?,
+                unique_peers: row.get::<_, i64>(5)? as u32,
+                is_eligible: row.get::<_, i64>(6)? != 0,
+                eligibility_reason: row.get(7)?,
+                submitted: row.get::<_, i64>(8)? != 0,
+                started_at: row.get::<_, i64>(9)? as u64,
+                ended_at: row.get::<_, Option<i64>>(10)?.map(|v| v as u64),
+            })
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    pub fn save_daily_activities(&self, date: &str, activities: &[crate::economy::daily_rewards::DailyActivityCount]) -> Result<()> {
+        let conn = self.conn.lock();
+        for act in activities {
+            conn.execute(
+                "INSERT OR REPLACE INTO daily_activity_log (cycle_date, activity_type, raw_count, capped_count, points) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![date, act.activity_type as u8, act.raw_count as i64, act.capped_count as i64, act.points],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn load_daily_activities(&self, date: &str) -> Result<Vec<crate::economy::daily_rewards::DailyActivityCount>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT activity_type, raw_count, capped_count, points FROM daily_activity_log WHERE cycle_date = ?1"
+        )?;
+        let rows = stmt.query_map(params![date], |row| {
+            let at_u8: u8 = row.get(0)?;
+            Ok(crate::economy::daily_rewards::DailyActivityCount {
+                activity_type: crate::economy::daily_rewards::ActivityType::from_u8(at_u8)
+                    .unwrap_or(crate::economy::daily_rewards::ActivityType::UptimeSeconds),
+                raw_count: row.get::<_, i64>(1)? as u64,
+                capped_count: row.get::<_, i64>(2)? as u64,
+                points: row.get(3)?,
+            })
+        })?;
+        let mut results = Vec::new();
+        for row in rows { results.push(row?); }
+        Ok(results)
+    }
+
+    pub fn save_daily_reward_config(&self, weights: &crate::economy::daily_rewards::ActivityWeights, anti_gaming: &crate::economy::daily_rewards::AntiGamingConfig) -> Result<()> {
+        let conn = self.conn.lock();
+        let w_json = serde_json::to_string(weights).unwrap_or_default();
+        let ag_json = serde_json::to_string(anti_gaming).unwrap_or_default();
+        let now = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT OR REPLACE INTO daily_reward_config (id, weights_json, anti_gaming_json, updated_at) VALUES (1, ?1, ?2, ?3)",
+            params![w_json, ag_json, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn load_daily_reward_config(&self) -> Result<Option<(crate::economy::daily_rewards::ActivityWeights, crate::economy::daily_rewards::AntiGamingConfig)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare("SELECT weights_json, anti_gaming_json FROM daily_reward_config WHERE id = 1")?;
+        let mut rows = stmt.query_map([], |row| {
+            let w_json: String = row.get(0)?;
+            let ag_json: String = row.get(1)?;
+            Ok((w_json, ag_json))
+        })?;
+        match rows.next() {
+            Some(row) => {
+                let (w_json, ag_json) = row?;
+                let weights = serde_json::from_str(&w_json).unwrap_or_default();
+                let anti_gaming = serde_json::from_str(&ag_json).unwrap_or_default();
+                Ok(Some((weights, anti_gaming)))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub fn get_recent_daily_cycles(&self, days: u32) -> Result<Vec<crate::economy::daily_rewards::DailyCycle>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT cycle_date, snapshot_balance, total_points, capped_points, intr_reward, unique_peers, is_eligible, eligibility_reason, submitted, started_at, ended_at FROM daily_cycles ORDER BY cycle_date DESC LIMIT ?1"
+        )?;
+        let rows = stmt.query_map(params![days as i64], |row| {
+            Ok(crate::economy::daily_rewards::DailyCycle {
+                cycle_date: row.get(0)?,
+                snapshot_balance: row.get::<_, i64>(1)? as u64,
+                activities: Vec::new(),
+                total_points: row.get(2)?,
+                capped_points: row.get(3)?,
+                intr_reward: row.get(4)?,
+                unique_peers: row.get::<_, i64>(5)? as u32,
+                is_eligible: row.get::<_, i64>(6)? != 0,
+                eligibility_reason: row.get(7)?,
+                submitted: row.get::<_, i64>(8)? != 0,
+                started_at: row.get::<_, i64>(9)? as u64,
+                ended_at: row.get::<_, Option<i64>>(10)?.map(|v| v as u64),
+            })
+        })?;
+        let mut cycles = Vec::new();
+        for row in rows { cycles.push(row?); }
+        Ok(cycles)
     }
 }

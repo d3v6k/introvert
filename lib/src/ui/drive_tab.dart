@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
 import '../native/introvert_client.dart';
 import '../../theme/app_theme.dart';
+import '../../blueprint_ui.dart';
 
 
 class DriveTab extends StatefulWidget {
@@ -21,6 +22,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _allFiles = [];
   List<dynamic> _filteredFiles = [];
+  String _searchQuery = '';
   int _seedingCount = 0;
   int _sovereignRemaining = 0;
   bool _isLoading = true;
@@ -39,7 +41,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     _initPath();
     _loadFiles();
     _startListeners();
-    _refreshTimer = Timer.periodic(Duration(seconds: 30), (_) => _loadFiles()); // 30s (was 5s) — battery optimization
+    _refreshTimer = Timer.periodic(Duration(seconds: 120), (_) => _loadFiles()); // 2 min (FCM replaces frequent polling)
   }
 
   Future<void> _initPath() async {
@@ -87,16 +89,10 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
       _client.requestSwarmStats();
       final files = _client.driveGetAll();
       
-      int seeding = 0;
-      int used = 0;
-      for (var f in files) {
-        final path = _client.resolveSandboxPath(f['local_path']?.toString()) ?? "";
-        final size = f['total_size'] as int? ?? 0;
-        if (path.isNotEmpty && File(path).existsSync()) {
-          seeding++;
-          used += size;
-        }
-      }
+      // Move file existence checks to background isolate to avoid UI jank
+      final counts = await _countSeedingFiles(files, _client);
+      final seeding = counts['seeding'] ?? 0;
+      final used = counts['used'] ?? 0;
 
       const int sovereignLimit = 1024 * 1024 * 1024; // 1GB
       final remaining = (sovereignLimit - used).clamp(0, sovereignLimit);
@@ -116,7 +112,22 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     }
   }
 
+  static Future<Map<String, int>> _countSeedingFiles(List<dynamic> files, IntrovertClient client) async {
+    int seeding = 0;
+    int used = 0;
+    for (var f in files) {
+      final path = client.resolveSandboxPath(f['local_path']?.toString()) ?? "";
+      final size = f['total_size'] as int? ?? 0;
+      if (path.isNotEmpty && await File(path).exists()) {
+        seeding++;
+        used += size;
+      }
+    }
+    return {'seeding': seeding, 'used': used};
+  }
+
   void _filterFiles(String query) {
+    _searchQuery = query;
     if (query.isEmpty) {
       _filteredFiles = List.from(_allFiles);
     } else {
@@ -277,19 +288,29 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     super.build(context);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Column(
+      extendBody: true,      body: Column(
         children: [
+          SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
           _buildMeshCapacityCard(),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
               controller: _searchController,
               style: TextStyle(color: AppTheme.current.text, fontSize: 13),
-              onChanged: _filterFiles,
+              onChanged: (val) { setState(() => _filterFiles(val)); },
               decoration: InputDecoration(
                 hintText: "Search Sovereign Drive...",
                 hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 13),
                 prefixIcon: Icon(Icons.search, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _filterFiles(''));
+                        },
+                        icon: Icon(Icons.clear, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
+                      )
+                    : null,
                 filled: true,
                 fillColor: Colors.black26,
                 contentPadding: EdgeInsets.zero,
@@ -297,6 +318,21 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
               ),
             ),
           ),
+          // Search results indicator
+          if (_searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 14, color: AppTheme.current.accent),
+                  SizedBox(width: 6),
+                  Text(
+                    '${_filteredFiles.length} result${_filteredFiles.length == 1 ? '' : 's'}',
+                    style: TextStyle(color: AppTheme.current.accent, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: _isLoading 
                 ? Center(child: CircularProgressIndicator(color: AppTheme.current.accent))
@@ -306,11 +342,15 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _pickAndUpload,
-        backgroundColor: AppTheme.current.accent,
-        child: Icon(Icons.add, color: Colors.black),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: FloatingActionButton(
+          onPressed: _pickAndUpload,
+          backgroundColor: AppTheme.current.accent,
+          child: Icon(Icons.add, color: Colors.black),
+        ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -401,7 +441,15 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
                 }
               }
 
-              return Material(
+              return GlassmorphicContainer(
+                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.zero,
+                borderRadius: BorderRadius.circular(12),
+                tintColor: AppTheme.current.accent,
+                blur: 10,
+                tintAlpha: 0.08,
+                borderAlpha: 0.12,
+                child: Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
@@ -540,6 +588,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
                       : null,
                   ),
                 ),
+              ),
               );
             }).toList(),
             SizedBox(height: 16),
@@ -550,19 +599,12 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildMeshCapacityCard() {
-    return Container(
-      width: double.infinity,
+    return GlassmorphicContainer(
       margin: EdgeInsets.all(16),
       padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppTheme.current.accent.withValues(alpha: 0.15), Colors.transparent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.2)),
-      ),
+      borderRadius: BorderRadius.circular(20),
+      tintAlpha: 0.08,
+      borderAlpha: 0.15,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

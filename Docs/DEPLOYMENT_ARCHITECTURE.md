@@ -4,9 +4,11 @@
 
 Introvert's deployment model is fundamentally different from traditional applications: there are no central servers to deploy. Instead, the network consists of:
 
-1. **User Nodes** — Mobile and desktop clients
-2. **Root Bootstrap Nodes (RBNs)** — Network anchors
+1. **User Nodes** — Mobile and desktop clients that discover infrastructure dynamically via Solana on-chain registry queries
+2. **Root Bootstrap Nodes (RBNs)** — Community-operated network anchors, registered on-chain with 50,000 $INTR stake in the PDA escrow vault
 3. **Anchor Nodes** — Optional mailbox storage
+
+All RBN addresses are fetched dynamically from the `introvert-registry` Solana program at app startup. There are no hardcoded bootstrap IPs — the network is resistant to DNS/IP blacklisting.
 
 ## Network Topology
 
@@ -16,6 +18,7 @@ Introvert's deployment model is fundamentally different from traditional applica
                     │     Alibaba Cloud RBN        │
                     │     47.89.252.80:443         │
                     │     (Primary Bootstrap)      │
+                    │     50,000 $INTR Staked      │
                     └──────────────┬──────────────┘
                                    │
                     ┌──────────────┼──────────────┐
@@ -23,6 +26,7 @@ Introvert's deployment model is fundamentally different from traditional applica
               ┌─────▼─────┐ ┌─────▼─────┐ ┌─────▼─────┐
               │  Asia RBN  │ │  EU RBN   │ │  US RBN   │
               │  (Future)  │ │  (Future) │ │  (Future) │
+              │ 50k $INTR  │ │ 50k $INTR │ │ 50k $INTR │
               └─────┬─────┘ └─────┬─────┘ └─────┬─────┘
                     │              │              │
     ┌───────────────┼──────────────┼──────────────┼───────────────┐
@@ -30,12 +34,22 @@ Introvert's deployment model is fundamentally different from traditional applica
 ┌───▼───┐       ┌───▼───┐     ┌───▼───┐     ┌───▼───┐       ┌───▼───┐
 │Mobile │       │Desktop│     │Mobile │     │Desktop│       │Mobile │
 │Node   │       │Node   │     │Node   │     │Node   │       │Node   │
+│500INTR│       │500INTR│     │500INTR│     │500INTR│       │500INTR│
 └───────┘       └───────┘     └───────┘     └───────┘       └───────┘
+
+All RBN addresses discovered dynamically via Solana introvert-registry program.
+No hardcoded IPs — clients query on-chain registry at startup.
+Escrow PDA vault controlled by Squads V4 (3-of-5) Multisig.
 ```
 
 ## Component Specifications
 
 ### Root Bootstrap Node (RBN)
+
+#### Prerequisites
+- **$INTR Stake:** 50,000 $INTR bonded into the PDA escrow vault via the `introvert-registry` Anchor program
+- **Unbonding Period:** 7-day cooldown for any withdrawal (prevents exit-scams)
+- **Registration:** On-chain multiaddress declaration (`/ip4/x.x.x.x/tcp/443/p2p/PeerId`)
 
 #### Hardware Requirements
 - **CPU:** 2+ vCPU
@@ -262,7 +276,8 @@ tar -czf /secure/backup/introvert-config-$(date +%Y%m%d).tar.gz \
 2. Install `introvertd` binary
 3. Restore seed file from backup
 4. Start service
-5. Update bootstrap list if IP changed
+5. Re-register on-chain if IP changed (requires 50,000 $INTR stake in PDA escrow)
+6. Old multiaddress pruned from registry automatically on unstake (7-day cooldown)
 
 ### Client Recovery
 1. Reinstall app

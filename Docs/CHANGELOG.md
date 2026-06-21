@@ -2,7 +2,206 @@
 
 All notable changes to Introvert will be documented in this file.
 
-## [0.7.0] - 2026-06-18 — MAJOR STABLE RELEASE
+## [0.12.0] - 2026-06-21 — STABLE v35 "Sovereign Audit"
+
+### Added
+- **$INTR Token Whitepaper**: Full economic blueprint (`Docs/INTROVERT_TOKEN_WHITEPAPER.md`) with 50/20/10/5/15 allocation matrix, 10-year emission schedule, 4-tier ownership system, gasless flow, and developer launch strategy
+- **Daily Rewards System**: New `src/economy/daily_rewards.rs` module tracking 9 activity types with configurable weights, daily caps, anti-gaming measures, and dynamic pool-clearing formula. Integrated with existing RewardTracker and Solana claim flow
+- **Economy Blueprint v5.0**: Updated `Docs/INTROVERT_ECONOMY_BLUEPRINT.md` with full allocation matrix, emission schedule, RBN staking parameters, and 4-tier token ownership
+- **Universal Search across all tabs**: Chats tab search bar (filters by alias/peerId/handle/globalName/lastMessage), Notes/Drive tabs show "X results" indicator
+- **Semantic Search tile in CLAW tab**: Combines exact substring matching with Intro-Claw `processAssistantQuery()` semantic search, deduplicates overlapping results
+- **In-chat search**: Search within a conversation via 3-dots menu with 300ms debounce
+- **Media, Links & Docs viewer**: 3-dots menu option showing all shared content categorized into Media/Links/Docs tabs
+- **Elevated Messages**: Bookmark messages via long-press → "Elevate", view in dedicated tab, long-press to unelevate. Persists across sessions in `elevated_messages` SQLite table
+- **INTR balance in header**: Live $INTR balance display with accent glow effects, updated via economy stream
+- **Network status indicator**: Minimal dot + status text in header, tapping opens Network Tune/Heal bottom sheet
+- **`getLastMessage` / `getLastGroupMessage` FFI**: Optimized LIMIT 1 queries for chat list previews (replaced O(N*M) pattern)
+- **Avatar decode cache**: `_avatarCache` Map with LRU eviction (100 entries max)
+- **Wormhole 4-word codes**: Increased from 2 to 4 words (~52 bits entropy)
+
+### Changed
+- **Sovereign P2P Architecture docs**: All project documentation updated to reflect autonomous, crowdsourced, self-healing mesh with Solana-based dynamic RBN discovery
+- **Master Plan**: Vision reframed around dynamic blockchain bootstrapping, token gating, PDA escrow vault, Squads V4 governance
+- **Gossipsub security**: Sender membership verification before processing messages, max_transmit_size 1MB, heartbeat 10s→30s
+- **PoW difficulty**: Increased from 4 to 6 hex chars (24-bit) with ±5 minute timestamp validation
+- **Request-Response codec**: Reduced from 10MB to 2MB max payload
+- **Relay server limits**: Reduced from 1GB/1h/8192/4096 to 100MB/30min/256/100
+- **Tunnel server**: Binds to 127.0.0.1 only (was 0.0.0.0)
+- **Group secret**: Removed from GroupManifest wire format — only delivered via ECDH-wrapped GroupInvite
+- **fetch_balance**: Replaced `getProgramAccounts` with lightweight `getAccountInfo` using derived ATA address
+- **reqwest::Client**: Reused in SolanaIncentiveEngine instead of creating per-request
+- **bootstrap_nodes**: Iterated by reference instead of cloning Vec
+- **get_profile()**: Called once per event handler instead of triple
+- **HashMap eviction**: Uses `indexmap::IndexMap` with `shift_remove` for true FIFO ordering on bounded buffers
+- **INTROVERT_TRUST_ALL_WITNESSES**: Gated behind `#[cfg(debug_assertions)]` to prevent production use
+
+### Fixed
+- **54 audit issues resolved across 3 rounds** (24 Critical, 19 Medium, 11 Low)
+- **FFI memory leaks**: 6 methods missing `_freeBinary`, `_handleFfiResult` success path, ~10 error-path leaks, pollPeerProfile/syncChatMessages Arena conversion
+- **Null pointer checks**: Added to `intro_claw_process_query`, `intro_claw_heal_peer`, `intro_claw_voip_start_call`, `intro_claw_voip_record_sample`
+- **`std::thread::sleep` in async**: Replaced with `tokio::time::sleep` at 3 locations
+- **DuplicateSuppressor**: O(n) Vec → O(1) HashSet+VecDeque
+- **GroupChatScreen**: Added `_messageController` and `_scrollController` dispose, `_displayMessages` version caching
+- **`_applySearchFilter`**: Moved inside `setState` block
+- **Dialog controller leaks**: `_showInChatSearch` and `_showMasterSearch` set `barrierDismissible: false`
+- **`setState` after `await`**: Added `mounted` check in `_sendMessage`
+- **Error swallowing**: Replaced `let _ =` with `tracing::error!` in economy module
+- **GroupChatSync authorization**: Verifies sender is group member or known contact
+- **FileChunkRequest authorization**: Verifies contact for Sovereign Drive fallback AND active seeder path
+- **Bounded buffers**: early_chunks (100/1000/50MB), pending_messages (50/peer), incoming_transfers (50), resolved_group_codes (500), active_providers (1000), pending_claims (1000)
+- **`get_storage_usage`**: Removed unreliable `fs::metadata("/")` call
+- **N+1 contact query**: Pre-fetch contacts into HashMap for group messages
+- **Drive file existence**: Moved to async helper to avoid UI thread blocking
+- **In-chat search**: Added 300ms debounce timer
+- **ClawTerminalDialog**: Cursor animation stops when final report is shown
+
+### Security
+- Gossipsub sender membership verification (non-members rejected)
+- Group secret removed from plaintext wire format
+- ChatSyncResponse sender authorization
+- FileChunkRequest contact/group membership verification
+- PoW 24-bit difficulty with timestamp staleness check
+- Tunnel server localhost-only binding
+- All bounded buffers with FIFO eviction (IndexMap)
+- Request-Response 2MB limit
+- Relay 100MB/circuit limit
+- `INTROVERT_TRUST_ALL_WITNESSES` debug-only
+
+## [0.11.0] - 2026-06-20 — STABLE v34 "Iron Claw"
+
+### Changed
+- **Master Plan overhaul:** Vision reframed around autonomous, crowdsourced, self-healing mesh with dynamic Solana-based infrastructure coordination
+- **Architecture Blueprint:** Replaced hardcoded bootstrap nodes with dynamic blockchain bootstrapping via `introvert-registry` Solana program. Added Token Gating Engine, Unified Escrow PDA Vault, and Token Sink Mechanics sections. Removed detailed UI/storage/economy/automation layer sections (moved to Module Reference)
+- **Economy Blueprint:** Streamlined to core token specs and self-sustaining utility loops. Removed peer lifecycle phases, prestige plane, and staking module (pending finalization). Added Squads V4 multisig address
+- **Networking & Signaling:** Replaced peer discovery/signaling/file transfer sections with Dynamic Blockchain Bootstrapping and Financial Shielding Against Sybil Floods sections
+- **Protocol Specification:** Replaced messaging/file/mailbox/group/media lifecycles with Decentralized RBN Infrastructure Lifecycle (on-chain init, dynamic directory, work verification, governance-gated upgrades)
+- **Security & Encryption:** Replaced E2EE/storage/mailbox/FFI sections with Autonomous Infrastructure Safeguards (PDA isolation, Squads V4 governance, time-locked unstaking)
+- **README.md:** Updated intro, core features, and tech stack to reflect sovereign P2P architecture with Solana-based dynamic bootstrapping, PDA vault, and token gating
+- **Deployment Architecture:** RBN deployment now requires 50,000 $INTR stake in PDA escrow. Added on-chain registration and governance sections
+- **Rebuild Guide:** RBN setup now requires $INTR tokens and on-chain registration instead of hardcoded IP lists
+- **Configuration Reference:** Bootstrap nodes section updated to reflect dynamic Solana-based discovery with legacy fallback
+- **Module Reference:** `network/config.rs` noted as legacy fallback; dynamic discovery is primary
+- **Contributing:** Added architecture reading list for new contributors
+
+### Architecture Decisions
+- Bootstrap nodes are discovered dynamically from Solana on-chain registry at app startup
+- Hardcoded IP arrays in `network/config.rs` serve as fallback only when Solana RPC is unreachable
+- RBN operators must bond 50,000 $INTR into PDA escrow with 7-day unbonding cooldown
+- Edge nodes require 500 $INTR minimum for active relay routing (Event Code 22)
+- Contract upgrades controlled by Squads V4 3-of-5 Multisig — no single developer override
+
+## [0.11.0] - 2026-06-20 — STABLE v34 "Iron Claw"
+
+### Added
+- 10 new Intro-Claw intelligence modules: offline queue, dead letter detection, peer reconnection scoring, bandwidth-aware transfer, group sync optimization, connection pre-warming, storage-aware caching, night maintenance window, VoIP call quality monitor, pre-call network check
+- VoIP Intro-Claw integration: call quality tracking (RTT, loss, jitter, bitrate), activity log entries, adaptive bitrate detection, pre-call network check, call history analytics
+- Real network recon implementation: live ReconContext from swarm state, peer routing table, connection analysis, storage metrics, security audit
+- Real network heal implementation: multi-strategy execution (direct dial → relay → anchor routing), detailed heal reports
+- Network change detection: connectivity_plus listener, auto-recon on WiFi↔Cellular↔None transitions
+- Auto-recon on chat start for 1:1 and group chats
+- CLAW tab live tile values: Engine shows Active/Inactive, Storage shows MB, Battery shows status, Bandwidth shows quality
+- CLAW tab activity log: real-time view of all Intro-Claw operations, LOG toggle in header
+- 17 MODULES info button in settings with all module descriptions and active/inactive explanations
+- Anchor Mode INFO button in settings with full explanation of relay, DHT, mailbox, group storage functions
+- CLAW tab result items are tappable: contacts open chat, files open, groups open group chat
+- VoIP FFI functions: voip_start_call, voip_end_call, voip_record_sample, voip_get_quality
+- VoIP NetworkCommand variants for all VoIP operations
+- Idle mode: FCM replaces background mailbox polling and heartbeat when app is idle
+- Anchor mode battery protection: auto-disable at 30% battery with activity log warning
+- Anchor nodes keep 30s heartbeat (regular devices use 5 min with FCM)
+
+### Changed
+- Hybrid AI mode completely removed — Intro-Claw now 100% local, sandboxed, zero external calls
+- process_assistant_query() simplified to local-only (2 parameters, was 5)
+- intro_claw_get_status() returns { "is_active": bool, "mode": "local" }
+- CLAW tab description updated to remove external LLM reference
+- Settings Intro-Claw section simplified — removed hybrid toggle, endpoint, API key fields
+- GlassmorphicContainer now uses two-layer approach: overlay + accent tint
+- Network intervals optimized for FCM: heartbeat 30s→300s, republication 60s→300s, mailbox 120s→300s
+- Intro-Claw tick runs idle-only maintenance when backgrounded (DB pruning, dead letters, offline queue only)
+- Drive tab refresh reduced from 30s to 120s
+- Background sync service disabled polling — FCM handles all wake-ups
+
+### Removed
+- llm_query() async function and all LLM integration code
+- intro_claw_get_endpoint(), intro_claw_set_endpoint() FFI functions
+- Hybrid mode toggle, endpoint URL field, API key field from settings UI
+- _isHybridMode variable and _loadAiMode() from assistant tab
+- _setIntroClawMode(), _saveIntroClawApiKey() methods from settings
+- Background mailbox polling timer (FCM replaces it)
+
+### Architecture Decisions
+- DO NOT TOUCH: Direct P2P 1:1 file transfer pipeline is locked. Intro-Claw must not modify, intercept, or throttle direct 1:1 transfers.
+- FCM push replaces all idle polling — devices sleep when backgrounded, wake on push
+- Anchor nodes are exempt from idle mode — they maintain full mesh presence
+- Battery <30% auto-disables anchor mode to protect device
+
+## [0.10.0] - 2026-06-20 — STABLE v33 "Sovereign Palette"
+
+### Added
+- 5 new image themes: Canyon, Desert, Winter Wonderland, Morning Dew, Golden Hour, Azure Sky, Cyber City II, Cyber City III
+- GlassmorphicContainer overlay layer — theme-aware (black 30% for dark, white 30% for light) for legibility
+- overlayAlpha parameter for per-widget tint tuning
+
+### Changed
+- All 17 themes sorted alphabetically in picker (Introvert Dark stays as default)
+- All theme images optimized: PNG→JPEG, 720px width, quality 80 (95% size reduction, 11.3MB→1.5MB)
+- All Rust/RBN logging migrated from println!/eprintln! to tracing macros (info!/warn!/error!/debug!)
+- Structured logging with tracing-subscriber EnvFilter initialization
+
+### Removed
+- Linen Mist, Glacier Bloom, Rose Quartz plain white themes (replaced by image themes)
+- macOS Finder (1) duplicate files from project tree
+- .stable, .bak, .clean, .tail backup files from project tree
+- solana (Copy).rs junk files
+
+### Fixed
+- Event type 35/40 verified consistent (35=Handle Resolve Failed, 40=Message Reaction)
+
+### Architecture Decisions
+- **DO NOT TOUCH**: Direct P2P 1:1 file transfer pipeline is locked. Intro-Claw must not modify, intercept, or throttle direct 1:1 transfers. Only observation for health scoring is permitted.
+
+## [0.9.0] - 2026-06-20 — STABLE v32 "Sovereign Glass"
+
+### Added
+- Glassmorphism UI across all tabs — reusable GlassmorphicContainer widget with BackdropFilter blur
+- 5 new image themes: Beach House (light), Cyber City, Mountain Peak, Mountain Ridge, Forest
+- SovereignWallpaper supports both asset paths and file paths for built-in and custom themes
+- CLAW tab dual-mode: Local mode shows 3x3 query tile grid, Hybrid mode shows chat interface
+- CLAW tile results shown in floating overlay dialog (not chat mode)
+- Brain logo (psychology icon) above CLAW tile grid
+- Network recon/heal terminal overlay with detailed milestones, timestamps, and confirmations
+- Network Tune/Heal popup menu replacing NetworkOptimizationButton in top bar
+- ZeroClaw attribution in Info & Legal with full MIT/Apache 2.0 license text
+- Custom theme editing auto-generates custom name (custom01, custom02) — defaults never overwritten
+- Delete button only shown for custom themes
+- Notes tab inline header matching Drive tab style (no AppBar)
+- Combined header glassmorphic boxes for Notes tab and CLAW tab
+- FAB consistent positioning across all tabs (bottom: 80, endFloat)
+- All tabs start below Introvert top bar (MediaQuery padding + kToolbarHeight)
+
+### Changed
+- AppBar transparent with BackdropFilter(blur: 20) at 60% opacity, extendBodyBehindAppBar: true
+- Bottom navigation frosted glass pill with ClipRRect + BackdropFilter(blur: 20)
+- Scaffold backgroundColor changed from Colors.transparent to AppTheme.current.bg
+- Light themes show clean white bg (no dark default wallpaper)
+- Light theme wallpaper opacity set to 0.45 (Linen Mist, Glacier Bloom, Rose Quartz)
+- Image themes use wallpaperOpacity: 1.0 (full image, no overlay)
+- SovereignEarnings Card color changed to Colors.transparent for glassmorphism
+- Drive mesh capacity card wrapped with GlassmorphicContainer
+- Settings merged 5 sections into "Introvert Mesh Swarm Settings"
+- Settings Fano icon pushed below AppBar (SizedBox height: padding.top + kToolbarHeight + 16)
+- CLAW bottom bar buttons use GlassmorphicContainer (no outer box)
+- FAB padding increased from 48px to 80px for Android compatibility
+
+### Fixed
+- Android ForegroundServiceDidNotStartInTimeException — startForeground() now passes FOREGROUND_SERVICE_TYPE_SPECIAL_USE on API 34
+- Light themes showing dark wallpaper bg
+- FAB partially covered by navigation bar on Android
+- Tab content covered by top bar on all tabs
+- Notes tab title styling inconsistent with Drive tab
+
+## [0.8.0] - 2026-06-19 — STABLE v31 "Intelligent Mesh"
 
 ### Added
 - Direct P2P file transfer speed restored to 70+ Mbps (removed app-level Noise double-encryption on FileChunk)
@@ -169,6 +368,10 @@ All notable changes to Introvert will be documented in this file.
 
 | Version | Date | Codename | Key Features |
 |---------|------|----------|--------------|
+| 0.11.0 | 2026-06-20 | Iron Claw | Local-only Intro-Claw, 10 intelligence modules, VoIP monitoring, real recon/heal, network change detection |
+| 0.10.0 | 2026-06-20 | Sovereign Palette | 17 themes, glassmorphism overlay, tracing logging, theme optimization |
+| 0.9.0 | 2026-06-20 | Sovereign Glass | Glassmorphism UI, 5 image themes, CLAW redesign, terminal overlay, Android 14 fix |
+| 0.8.0 | 2026-06-19 | Intelligent Mesh | Intro-Claw AI engine, local assistant, BERT semantic search, FCM push |
 | 0.7.1 | 2026-06-19 | Intro-Claw | Automation engine, local assistant, semantic AI, FCM push |
 | 0.7.0 | 2026-06-18 | Sovereign Velocity | 70+ Mbps P2P, silent download, custom wallpapers |
 | 0.6.0 | 2026-06-18 | Sovereign Velocity | Voice memos, themes, forward, reply privately |

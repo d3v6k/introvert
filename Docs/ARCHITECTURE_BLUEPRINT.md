@@ -1,75 +1,61 @@
 # Introvert Architecture Blueprint
 
 ## 1. System Overview
-Introvert is a decentralized, P2P communication system designed for high-privacy and carrier-grade reachability. It consists of a high-performance Rust core (`libintrovert`) and a modern Flutter-based user interface. The system avoids central servers entirely, relying on a distributed mesh of user nodes and Root Bootstrap Nodes (RBNs).
+**Million-Node Mandate:** Introvert MUST scale flawlessly for **over 1,000,000 active users**. All features, routing protocols (e.g., Gossipsub), and database interactions are designed against this extreme scale to prevent loop starvation or O(N) degradation.
+
+Introvert avoids central servers entirely, relying on a distributed mesh of user nodes and dynamic, community-operated Root Bootstrap Nodes (RBNs). The infrastructure layer is entirely automated; regular user app clients discover the network geometry by fetching signed, active multiaddresses directly from an immutable Solana registry contract, eliminating static points of failure.
 
 ## 2. Component Layers
 
 ### A. Core Engine (Rust)
 The engine is responsible for all heavy lifting:
-- **Networking Swarm:** Managed by `libp2p`, handling discovery, routing (Kademlia), and transport (TCP/QUIC/WebRTC).
-- **Security Enclave:** Handles deterministic key derivation (HKDF), E2EE Noise sessions, and SQLCipher management.
-- **Protocol Logic:** Implements the messaging lifecycle, file transfer pacing, and mailbox synchronization.
-- **FFI Bridge:** An asynchronous interface providing thread-safe communication with the Dart/Flutter layer.
+- **Networking Swarm:** Managed by `libp2p` v0.56, handling discovery (mDNS), multi-source routing (Kademlia DHT), and transport (QUIC/TCP/WebRTC on Port 443).
+- **Dynamic Bootstrapping:** Replaces hardcoded bootnode arrays with a real-time, block-queried lookup routine during swarm initialization.
+- **Token Gating Engine:** Interlaces local SQLCipher wallet states with the networking layer. If the local balance falls below the specified tier threshold, the core enforces strict client-only constraints, preserving mesh bandwidth.
+- **Security Enclave:** Handles deterministic key derivation (HKDF-SHA256) and E2EE Noise sessions.
+- **FFI Bridge:** An asynchronous interface providing thread-safe communication with the Dart/Flutter layer via 50+ exported C functions.
 
 ### B. UI Layer (Flutter)
 The frontend handles user interaction and presentation:
-- **Main Shell:** Orchestrates the app lifecycle and background service status.
-- **Chat Engine:** Manages real-time message rendering, media previews, and transfer progress.
-- **Native Interface:** Uses `dart:ffi` with `NativeCallable` to listen for Rust events without blocking the UI thread.
-- **State Management:** Reactive updates based on event codes dispatched from the Rust core.
+- **Main Shell (`lib/src/ui/main_shell.dart`):** Handles UI loops and serves as the presentation entry point.
+- **Sovereign Local Moderation:** To remain fully compliant with Apple and Google User-Generated Content (UGC) regulations without engineering a central censorship master-key, the client manages a localized block list inside SQLCipher. When a user blocks an offender, Flutter instructs the Rust core to drop all incoming Gossipsub frames from that specific `PeerId`.
 
-### C. Persistent Storage (SQLCipher)
-All data is stored in an encrypted SQLite database:
-- **Messages:** Thread-indexed history with functional status ticks.
-- **Contacts:** Verified identities with permanent public keys.
-- **Mailbox:** A zero-knowledge store-and-forward buffer for offline peers.
-- **Introvert Drive:** Metadata for personal files stored locally and backed up across the mesh swarm.
-- **Mesh Chunks:** A 1GB communal storage commitment (per node) for torrent-like file distribution.
-- **Session Cache:** Persisted Noise handshake states to minimize re-handshakes.
+---
 
-### D. Sovereign Group Mesh (Phase 5)
-Architecture for decentralized multi-user communication:
-- **Propagation:** Uses `libp2p-gossipsub` to broadcast messages across unique topics (hash of Group ID).
-- **Decentralized Admin Model:** Only the group Creator or appointed Admins can perform control actions (Add/Remove). These actions are **cryptographically signed** using the admin's Ed25519 key.
-- **Group Privacy:** E2EE using AES-256-GCM with a shared master secret. 
-- **Mesh Discovery:** Supports "Join by Code" via Kademlia DHT. Manifests are encrypted with a human passphrase and stored on Anchor nodes.
+## 3. The Autonomous Escrow & Reward Pipeline
 
-### E. Automation Layer (Intro-Claw)
-Local automation engine running 12 maintenance modules on 5-minute tick loop. Semantic intent engine with BERT embeddings for natural language queries. Network recon and self-healing for connection recovery. Hybrid AI mode with optional external LLM integration. All processing stays on-device in Offline mode.
-
-### F. Sovereign Swarm & Mesh Storage (Latest)
-Decentralized file storage and retrieval strategy:
-- **Hybrid P2P Engine:** 
-    - **Direct/WebRTC:** Utilizes a high-speed sequential **PUSH** model (256KB chunks @ 20ms) to maximize local throughput.
-    - **Relayed/Swarm:** Automatically falls back to an ultra-stable **Redundancy-Filtered PULL** model for cross-network reliability.
-- **Relay Performance Profile:**
-    - **Chunk Size:** 16KB (MTU Safe) for maximum packet delivery success on mobile networks.
-    - **Pacing:** 250ms sender delay to prevent relay circuit saturation.
-    - **Sliding Window:** 2 chunks in-flight to maintain a lean, non-congestive flow.
-- **DHT-Based Discovery:** Uses Kademlia `start_providing` to announce file availability based on SHA-256 hashes. Receivers query the mesh to find all available seeders.
-- **Distributed Seeding & Mandates:** 
-    - **1-to-1 Mode:** Seeding is strictly limited to the sender-receiver pair and stops upon receipt confirmation to preserve individual privacy.
-    - **Group Mode:** Every group member that verifies a file via SHA-256 automatically becomes a provider on the DHT, creating a resilient group-wide mesh.
-- **Redundancy Filtered Pull:**
-    - The engine tracks pending chunk requests in RAM.
-    - During network transitions, older redundant requests are purged to prevent "Thundering Herd" congestion upon reconnection.
-- **Auto-Resumption:** The pull-based engine proactively tracks missing chunks and handles seeder timeouts via an 8-second watchdog, allowing transfers to self-heal and resume gracefully.
-- **Mailbox Isolation:** Large data payloads are strictly RAM-buffered and prohibited from entering the persistent anchor mailbox, ensuring the signaling path remains clear.
-- **Self-Cleaning Mesh:** In Group Mode, once all members confirm receipt and verification, the mesh triggers a `MeshCleanup` signal, purging chunks from participating anchors based on a 1GB LRU quota.
+To insulate developers from hosting liability, the platform uses an automated, on-chain smart contract framework to run its backbone.
 
 
-## 3. Data Flow
 
-1.  **Identity Derivation:** Seed (32 bytes) -> HKDF-SHA256 -> {libp2p Key, X25519 Static Key, Solana Wallet, Storage Key}.
-2.  **Peer Discovery:** mDNS (Local) + Kademlia DHT (Global) -> Verified Contact Lookup -> Auto-Dial.
-3.  **Messaging:** UI Input -> FFI Send -> Rust Encryption -> libp2p Signaling -> Remote Node.
-4.  **Event Loop:** Rust Swarm Event -> Event Type Mapping -> Global Dispatch -> Dart Stream -> UI Update.
++---------------------------------------------------------------------------------+
+|                              SOLANA MAINNET-BETA                                |
+|                                                                                 |
+|   +--------------------------+               +------------------------------+   |
+|   |   Squads V4 Multisig     | ------------> |  Introvert Registry Program  |   |
+|   |     (3-of-5 Admin)       |  (Upgrades)   | (RBN Staking & Lookup State) |   |
+|   +--------------------------+               +------------------------------+   |
+|                                                              |                  |
+|                                                              v (Controls via)   |
+|                                              +------------------------------+   |
+|                                              |  Program-Derived Address     |   |
+|                                              |      (PDA Escrow Vault)      |   |
+|                                              +------------------------------+   |
+|                                                /                          \     |
+|                   (Stakes 50k $INTR to Vault) /                            \    |
+|                                              /                              \   |
+|                                             v                                v  |
+|                                    +-----------------+              +-----------------+
+|                                    | Community RBNs  |              |   Edge Nodes    |
+|                                    | (Server Daemon) |              | (Mobile Client) |
+|                                    +-----------------+              +-----------------+
++---------------------------------------------------------------------------------+
 
-## 4. Logical Modules
 
-- `src/identity.rs`: The root of sovereignty.
-- `src/network/mod.rs`: The heartbeat of the system.
-- `src/storage.rs`: The source of truth.
-- `src/media/mod.rs`: Low-latency VoIP and streaming.
-- `src/economy/mod.rs`: Incentive tracking and Solana integration.
+#### The Unified Escrow PDA Vault
+All network stakes and emission balances are consolidated into a single **Program-Derived Address (PDA)** on Solana. This account has no cryptographic private key; it is governed purely by the execution parameters of the immutable `introvert-registry` program.
+
+#### The Token Sink Mechanics
+1. **RBN Bonding Sinks:** Operators must transfer and bond exactly 50,000 $INTR into the PDA Escrow to declare their multiaddress on the active network directory.
+2. **Unbonding Cooldown:** If an RBN withdraws from the network, their stake enters an unalterable 7-day on-chain cooldown state. This prevents exit-scams if the node drops offline or serves faulty data blocks.
+3. **Edge Node Tiers:** Standard client apps query the blockchain to check token balances. Mobile devices must maintain a fixed amount of $INTR to qualify for active P2P background relay features.

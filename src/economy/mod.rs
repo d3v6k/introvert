@@ -4,6 +4,7 @@ use parking_lot::RwLock;
 use crate::storage::StorageService;
 
 pub mod solana;
+pub mod daily_rewards;
 
 use std::collections::HashMap;
 
@@ -20,6 +21,7 @@ struct EconomyState {
     mailbox_storage_bytes_seconds: u64,
     uptime_seconds: u64,
     pending_per_consumer: HashMap<String, u64>,
+    pending_daily_reward_nano_intr: u64,  // Daily rewards tracked in nano-INTR (1 INTR = 1,000,000,000 nano-INTR, matching Solana 9-decimal SPL)
     last_claim_timestamp: u64,
 }
 
@@ -45,10 +47,11 @@ impl RewardTracker {
                 mailbox_storage_bytes_seconds: 0,
                 uptime_seconds: 0,
                 pending_per_consumer: HashMap::new(),
+                pending_daily_reward_nano_intr: 0,
                 last_claim_timestamp: 0,
             })),
             storage,
-            threshold: 1_048_576, // 1MB
+            threshold: 10_000_000_000, // 10 INTR (nano-INTR units, matching Solana 9-decimal precision)
             cooldown_secs: 300, // 5 minutes
             start_time: std::time::Instant::now(),
         }
@@ -62,7 +65,9 @@ impl RewardTracker {
         *entry += bytes;
 
         if let Some(ref s) = self.storage {
-            let _ = s.log_reward(bytes);
+            if let Err(e) = s.log_reward(bytes) {
+                tracing::error!("[Economy] Failed to log reward: {}", e);
+            }
         }
     }
 
@@ -72,7 +77,9 @@ impl RewardTracker {
         state.mailbox_storage_bytes_seconds += bytes * seconds;
         
         if let Some(ref s) = self.storage {
-            let _ = s.record_mailbox_storage(bytes * seconds);
+            if let Err(e) = s.record_mailbox_storage(bytes * seconds) {
+                tracing::error!("[Economy] Failed to record mailbox storage: {}", e);
+            }
         }
     }
 
@@ -94,7 +101,9 @@ impl RewardTracker {
         let mut pending_bytes = *state.pending_per_consumer.get(consumer_peer_id).unwrap_or(&0);
 
         // Availability Yield Logic: If node uptime > 24h, apply 1.2x multiplier
-        if state.uptime_seconds > 86400 {
+        // Availability Yield Logic: If node uptime >= 23 hours, apply 1.2x multiplier
+        // Changed from 24h (86,400s) to 23h (82,800s) to accommodate network latency and reconnects
+        if state.uptime_seconds >= 82800 {
             pending_bytes = (pending_bytes as f64 * 1.2) as u64;
         }
 
@@ -177,6 +186,23 @@ impl RewardTracker {
     pub fn simulate_uptime(&self, seconds: u64) {
         let mut state = self.state.write();
         state.uptime_seconds = seconds;
+    }
+
+    /// Records a daily reward amount into the pending claim pool.
+    /// Called by DailyRewardEngine at cycle close.
+    /// Tracks in nano-INTR units (1 INTR = 1,000,000,000 nano-INTR), matching Solana's 9-decimal SPL standard.
+    pub fn record_daily_reward(&self, intr_amount: f64) {
+        let nano_intr = (intr_amount * 1_000_000_000.0) as u64;
+        if nano_intr == 0 { return; }
+        let mut state = self.state.write();
+        state.pending_daily_reward_nano_intr += nano_intr;
+        tracing::info!("[Economy] Daily reward recorded: {:.9} INTR ({} nano-INTR)", intr_amount, nano_intr);
+    }
+
+    /// Returns pending daily rewards in INTR units.
+    pub fn get_pending_daily_reward_intr(&self) -> f64 {
+        let state = self.state.read();
+        state.pending_daily_reward_nano_intr as f64 / 1_000_000_000.0
     }
 }
 

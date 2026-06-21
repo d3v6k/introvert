@@ -138,7 +138,7 @@ pub enum SignalingPayload {
     GroupManifestRequest { group_id: String, alias: Option<String>, avatar: Option<String>, #[serde(default)] handle: Option<String> },
     GroupInvite { group_id: String, name: String, description: String, inviter_peer_id: String, group_secret_wrapped: Vec<u8>, members: Vec<GroupMemberMetadata> },
     GroupAction(SignedGroupAction),
-    GroupManifest { group_id: String, name: String, description: String, members: Vec<GroupMemberMetadata>, secret: [u8; 32] },
+    GroupManifest { group_id: String, name: String, description: String, members: Vec<GroupMemberMetadata> },
     GroupJoinRejected { group_id: String, group_name: String, reason: String },
     RequestHandshake,
     ProfileRequest,
@@ -242,6 +242,25 @@ pub enum NetworkCommand {
     },
     IntroClawNetworkHeal {
         peer_id: PeerId,
+        result_tx: tokio::sync::oneshot::Sender<String>,
+    },
+    IntroClawGetActivityLog {
+        result_tx: tokio::sync::oneshot::Sender<String>,
+    },
+    IntroClawVoipStartCall {
+        peer_id: String,
+        is_video: bool,
+    },
+    IntroClawVoipEndCall,
+    IntroClawVoipRecordSample {
+        rtt_ms: u64,
+        packet_loss_pct: f64,
+        jitter_ms: u64,
+        bitrate_kbps: u64,
+        is_relayed: bool,
+        codec: String,
+    },
+    IntroClawVoipGetQuality {
         result_tx: tokio::sync::oneshot::Sender<String>,
     },
 }

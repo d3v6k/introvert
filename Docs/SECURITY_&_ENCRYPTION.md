@@ -1,48 +1,29 @@
 # Security & Encryption Enclave
 
 ## 1. Zero-Knowledge Foundation
-Introvert is built on the principle that no intermediary, including RBN nodes, should ever be able to read user data.
+Introvert is built on the principle that no intermediary, including community-operated RBN nodes, should ever be able to decrypt or read user content, files, or link network identity to real-world profiles.
 
 ## 2. Deterministic Identity Derivation
-Identity is not stored as a single file; it is derived mathematically from a **32-byte Master Seed**.
+Identity is never derived from or associated with an email address, phone number, or centralized server account. Onboarding utilizes a purely sovereign **32-byte Master Seed** (BIP-39). Introducing an email address establishes a central database vector, creating liabilities under global compliance parameters (GDPR/CCPA).
 
 ### HKDF-SHA256 Derivation Paths
 Using distinct salt strings to ensure domain separation:
 - **libp2p Identity:** `b"introvert_p2p_identity"` -> Ed25519 Keypair (PeerId + **p2p_pubkey**).
 - **E2EE Identity:** `b"introvert_e2ee_identity"` -> X25519 Static Secret (Noise IK).
 - **Storage Key:** `b"introvert_storage_key"` -> 256-bit SQLCipher Key.
-- **Solana Wallet:** `b"introvert_solana_wallet"` -> Ed25519 Signing Key.
-- **Session Encryption:** `b"introvert_session_encryption"` -> Key for persisting session blobs.
+- **Solana Wallet:** `b"introvert_solana_wallet"` -> Ed25519 Signing Key (Manages $INTR balance checks).
 
-## 3. Mandatory End-to-End Encryption
-Introvert enforces **Strict E2EE** for all sensitive payloads. Plaintext fallback is architecturally prohibited for Chat, Group actions, and File Metadata.
+---
 
-### A. Point-to-Point (Noise IK)
-Standard E2EE for 1-on-1 chats. If a Noise session is not active, payloads are automatically buffered in the `pending_messages` enclave while a secure handshake is initiated. Data never leaves the node in plaintext.
+## 3. Autonomous Infrastructure Safeguards
 
-### B. Sovereign Group Mesh (AES-GCM)
-Multi-user encryption using a shared Group Master Secret.
-- **Verification:** All group control actions (Add/Remove) are signed with the admin's Ed25519 `p2p_pubkey` and ordered via **Lamport Clocks** to prevent malicious mesh injection or replay attacks.
-- **Key Distribution:** New keys are individually wrapped (X25519 DH) for each member when a group is formed or rotated.
-- **Forward Secrecy:** Evicting a member triggers immediate group secret rotation and re-distribution.
+### A. Program-Derived Address (PDA) Isolation
+The protocol's funds, operator stakes, and token distributions are entirely segregated inside a Program-Derived Address (PDA) account. This ensures that no individual developer, node operator, or compromised user wallet possesses the private key required to authorize token transfers out of the ecosystem vault. All transfers are hardcoded via on-chain contract logic.
 
-## 4. Persistent Storage Security (SQLCipher)
-Local data is protected using SQLCipher (SQLite with AES-256 encryption).
-- **Thread Safety:** All database access is wrapped in a thread-safe `Mutex` or `RwLock`.
-- **Integrity:** Non-blocking storage updates prevent swarm loop starvation during high-frequency writes.
-- **Convergence:** Lamport Clock logic ensures that history stays consistent across multiple devices without a central server.
+### B. Governance Decoupling (Squads V4 Standard)
+The smart contract registry program and the upgrade tokens are bound to the **Squads V4 Multisig Program** (`SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf`) on Solana Mainnet. 
+- **Threshold Rule:** Administrative state updates require a strict **3-of-5 vote threshold**.
+- **The Cryptographic Shield:** By removing individual developer keys from the contract's upgrade track, the author achieves full legal separation as a software publisher, protecting the codebase from developer-level vulnerabilities or external legal targeting.
 
-## 5. Zero-Knowledge Mailbox
-When a peer is offline, encrypted messages are stored on an **Anchor Node**.
-- **Indexing:** Messages are indexed using a truncated hash of the recipient's PeerId.
-- **Privacy:** The Anchor node knows *who* has a message waiting but cannot read the content, as it remains encrypted with the recipient's Noise session keys.
-- **Authentication:** Only the node possessing the private key corresponding to the PeerId can drain the mailbox.
-
-## 6. FFI Memory Safety
-- **Binary Buffers:** Memory transferred between Rust and Dart is explicitly managed. Rust allocates memory using `libc::malloc`, and the Dart layer is responsible for calling `introvert_free_binary` once the data is copied.
-- **Opaque Pointers:** The `Engine` state is stored as a global `Lazy<RwLock<Option<Arc<Engine>>>>`, ensuring safe access across FFI boundaries.
-
-## 7. Intro-Claw Security Sandbox
-- **Zero Access:** Intro-Claw has no access to master keys, message content, or session blobs.
-- **Network Isolation:** Network isolation enforced in Offline mode.
-- **On-Device Processing:** All AI/automation runs locally without external data transmission.
+### C. Time-Locked Unstaking Controls
+To prevent infrastructure churn or sudden dropouts that could disrupt the Kademlia DHT routing plane, the registry contract implements an unalterable **7-day unbonding cooldown period**. When an RBN operator initiates an unstake, the node is pruned from user lookup directories instantly, but the 50,000 $INTR token bond is held inside the PDA vault for 604,800 seconds to allow final cycle verification.

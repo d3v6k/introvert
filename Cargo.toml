@@ -1,6 +1,6 @@
 [package]
 name = "introvert"
-version = "0.7.0"
+version = "0.12.0"
 edition = "2021"
 
 [dependencies]
@@ -37,6 +37,7 @@ parking_lot = "0.12"
 
 # Utilities
 libc = "0.2"
+indexmap = "2"
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

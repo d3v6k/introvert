@@ -13,6 +13,7 @@ use libp2p::{
     StreamProtocol,
     PeerId,
 };
+use tracing::debug;
 use crate::network::{SignalingRequest, SignalingResponse};
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
@@ -56,8 +57,8 @@ impl IntrovertBehaviour {
             .with_request_timeout(std::time::Duration::from_secs(20)); // 20s is enough for relay latency without causing long stalls
         
         let codec = request_response::json::codec::Codec::<SignalingRequest, SignalingResponse>::default()
-            .set_request_size_maximum(10 * 1024 * 1024) // 10MB limit for requests
-            .set_response_size_maximum(10 * 1024 * 1024); // 10MB limit for responses
+            .set_request_size_maximum(2 * 1024 * 1024) // 2MB limit for requests
+            .set_response_size_maximum(2 * 1024 * 1024); // 2MB limit for responses
 
         let request_response = request_response::json::Behaviour::with_codec(
             codec,
@@ -90,10 +91,10 @@ impl IntrovertBehaviour {
 
         let relay_server = if enable_relay_server {
             let relay_config = relay::Config {
-                max_circuit_bytes: 1024 * 1024 * 1024, // 1GB for high-volume file relaying
-                max_circuit_duration: std::time::Duration::from_secs(60 * 60), // 1 hour per circuit
-                max_reservations: 8192,
-                max_circuits: 4096,
+                max_circuit_bytes: 100 * 1024 * 1024, // 100MB per circuit (was 1GB)
+                max_circuit_duration: std::time::Duration::from_secs(30 * 60), // 30 min per circuit (was 1 hour)
+                max_reservations: 256, // Was 8192
+                max_circuits: 100, // Was 4096
                 ..Default::default()
             };
             Some(relay::Behaviour::new(peer_id, relay_config))
@@ -116,9 +117,10 @@ impl IntrovertBehaviour {
             gossipsub::MessageId::from(s.finish().to_string())
         };
         let gossipsub_config = gossipsub::ConfigBuilder::default()
-            .heartbeat_interval(std::time::Duration::from_secs(10))
+            .heartbeat_interval(std::time::Duration::from_secs(30)) // 30s for battery savings
             .validation_mode(gossipsub::ValidationMode::Strict)
             .message_id_fn(message_id_fn)
+            .max_transmit_size(1024 * 1024) // 1MB max message size
             .build()
             .expect("Valid gossipsub config");
 
@@ -144,6 +146,6 @@ impl IntrovertBehaviour {
 
     pub fn prune_stale_peers(&mut self) {
         let _ = self.kademlia.bootstrap();
-        println!("Swarm Maintenance: K-Bucket liveness check performed.");
+        debug!("Swarm Maintenance: K-Bucket liveness check performed.");
     }
 }

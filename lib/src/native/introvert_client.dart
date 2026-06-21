@@ -236,6 +236,36 @@ typedef IntroClawSetActiveDart = FfiResult Function(bool active);
 typedef IntroClawGetStatusC = FfiResult Function();
 typedef IntroClawGetStatusDart = FfiResult Function();
 
+typedef IntroClawGetEndpointC = Pointer<Utf8> Function();
+typedef IntroClawGetEndpointDart = Pointer<Utf8> Function();
+
+typedef IntroClawSetEndpointC = FfiResult Function(Pointer<Utf8> endpoint);
+typedef IntroClawSetEndpointDart = FfiResult Function(Pointer<Utf8> endpoint);
+
+typedef IntroClawProcessQueryC = FfiResult Function(Pointer<Utf8> query);
+typedef IntroClawProcessQueryDart = FfiResult Function(Pointer<Utf8> query);
+
+typedef IntroClawRunNetworkReconC = FfiResult Function();
+typedef IntroClawRunNetworkReconDart = FfiResult Function();
+
+typedef IntroClawHealPeerC = FfiResult Function(Pointer<Utf8> peerId);
+typedef IntroClawHealPeerDart = FfiResult Function(Pointer<Utf8> peerId);
+
+typedef IntroClawGetActivityLogC = FfiResult Function();
+typedef IntroClawGetActivityLogDart = FfiResult Function();
+
+typedef IntroClawVoipStartCallC = FfiResult Function(Pointer<Utf8> peerId, Int32 isVideo);
+typedef IntroClawVoipStartCallDart = FfiResult Function(Pointer<Utf8> peerId, int isVideo);
+
+typedef IntroClawVoipEndCallC = FfiResult Function();
+typedef IntroClawVoipEndCallDart = FfiResult Function();
+
+typedef IntroClawVoipRecordSampleC = FfiResult Function(Uint64 rttMs, Double packetLossPct, Uint64 jitterMs, Uint64 bitrateKbps, Int32 isRelayed, Pointer<Utf8> codec);
+typedef IntroClawVoipRecordSampleDart = FfiResult Function(int rttMs, double packetLossPct, int jitterMs, int bitrateKbps, int isRelayed, Pointer<Utf8> codec);
+
+typedef IntroClawVoipGetQualityC = FfiResult Function();
+typedef IntroClawVoipGetQualityDart = FfiResult Function();
+
 typedef IntrovertGroupCreateC = FfiResult Function(Pointer<Utf8> name, Pointer<Utf8> description, Pointer<Utf8> membersJson);
 typedef IntrovertGroupCreateDart = FfiResult Function(Pointer<Utf8> name, Pointer<Utf8> description, Pointer<Utf8> membersJson);
 
@@ -329,6 +359,44 @@ typedef IntrovertStorageUpdateGroupMessageStatusByIdDart = FfiResult Function(Po
 typedef IntrovertStorageUpdateMessageStatusForPeerC = FfiResult Function(Pointer<Utf8> peerId, Uint8 status);
 typedef IntrovertStorageUpdateMessageStatusForPeerDart = FfiResult Function(Pointer<Utf8> peerId, int status);
 
+// Elevated Messages
+typedef IntrovertElevateMessageC = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> msgId, Pointer<Utf8> content, Pointer<Utf8> senderId, Bool isMe);
+typedef IntrovertElevateMessageDart = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> msgId, Pointer<Utf8> content, Pointer<Utf8> senderId, bool isMe);
+
+typedef IntrovertUnelevateMessageC = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> msgId);
+typedef IntrovertUnelevateMessageDart = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> msgId);
+
+typedef IntrovertGetElevatedMessagesC = FfiResult Function(Pointer<Utf8> chatId);
+typedef IntrovertGetElevatedMessagesDart = FfiResult Function(Pointer<Utf8> chatId);
+
+typedef IntrovertIsMessageElevatedC = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> msgId);
+typedef IntrovertIsMessageElevatedDart = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> msgId);
+
+typedef IntrovertStorageGetLastMessageC = FfiResult Function(Pointer<Utf8> peerId);
+typedef IntrovertStorageGetLastMessageDart = FfiResult Function(Pointer<Utf8> peerId);
+
+typedef IntrovertStorageGetLastGroupMessageC = FfiResult Function(Pointer<Utf8> groupId);
+typedef IntrovertStorageGetLastGroupMessageDart = FfiResult Function(Pointer<Utf8> groupId);
+
+// Daily Rewards
+typedef IntrovertDailyRewardGetStatusC = FfiResult Function();
+typedef IntrovertDailyRewardGetStatusDart = FfiResult Function();
+
+typedef IntrovertDailyRewardGetHistoryC = FfiResult Function(Uint32 days);
+typedef IntrovertDailyRewardGetHistoryDart = FfiResult Function(int days);
+
+typedef IntrovertDailyRewardRecordActivityC = FfiResult Function(Pointer<Uint8> jsonPtr, IntPtr jsonLen);
+typedef IntrovertDailyRewardRecordActivityDart = FfiResult Function(Pointer<Uint8> jsonPtr, int jsonLen);
+
+typedef IntrovertDailyRewardUpdateWeightsC = FfiResult Function(Pointer<Uint8> jsonPtr, IntPtr jsonLen);
+typedef IntrovertDailyRewardUpdateWeightsDart = FfiResult Function(Pointer<Uint8> jsonPtr, int jsonLen);
+
+typedef IntrovertDailyRewardUpdateAntiGamingC = FfiResult Function(Pointer<Uint8> jsonPtr, IntPtr jsonLen);
+typedef IntrovertDailyRewardUpdateAntiGamingDart = FfiResult Function(Pointer<Uint8> jsonPtr, int jsonLen);
+
+typedef IntrovertDailyRewardGetRealtimeEarningsC = FfiResult Function();
+typedef IntrovertDailyRewardGetRealtimeEarningsDart = FfiResult Function();
+
 // --- Event Models ---
 
 
@@ -375,6 +443,7 @@ class FileTransferProgress {
   final bool isWaitingForDownload;
   final String? thumbnail;
   final String? groupId;
+  final String? caption;
 
   FileTransferProgress({
     required this.transferId,
@@ -393,6 +462,7 @@ class FileTransferProgress {
     this.isWaitingForDownload = false,
     this.thumbnail,
     this.groupId,
+    this.caption,
   });
 
   factory FileTransferProgress.fromJson(Map<String, dynamic> json) {
@@ -413,8 +483,13 @@ class FileTransferProgress {
       isWaitingForDownload: false,
       thumbnail: json['thumbnail']?.toString(),
       groupId: json['group_id']?.toString(),
+      caption: json['caption']?.toString(),
     );
   }
+
+  DateTime get startDateTime => startTimeMs > 946684800000
+      ? DateTime.fromMillisecondsSinceEpoch(startTimeMs)
+      : DateTime.now();
 }
 
 // --- Main Client Implementation ---
@@ -557,6 +632,34 @@ class IntrovertClient {
   late IntroClawTriggerTickDart _clawTriggerTick;
   late IntroClawSetActiveDart _clawSetActive;
   late IntroClawGetStatusDart _clawGetStatus;
+  late IntroClawGetEndpointDart _clawGetEndpoint;
+  late IntroClawSetEndpointDart _clawSetEndpoint;
+  late IntroClawProcessQueryDart _clawProcessQuery;
+  late IntroClawRunNetworkReconDart _clawRunNetworkRecon;
+  late IntroClawHealPeerDart _clawHealPeer;
+  late IntroClawGetActivityLogDart _clawGetActivityLog;
+  late IntroClawVoipStartCallDart _clawVoipStartCall;
+  late IntroClawVoipEndCallDart _clawVoipEndCall;
+  late IntroClawVoipRecordSampleDart _clawVoipRecordSample;
+  late IntroClawVoipGetQualityDart _clawVoipGetQuality;
+
+  // Elevated Messages
+  late IntrovertElevateMessageDart _elevateMessage;
+  late IntrovertUnelevateMessageDart _unelevateMessage;
+  late IntrovertGetElevatedMessagesDart _getElevatedMessages;
+  late IntrovertIsMessageElevatedDart _isMessageElevated;
+
+  // Optimized last message queries
+  late IntrovertStorageGetLastMessageDart _getLastMessage;
+  late IntrovertStorageGetLastGroupMessageDart _getLastGroupMessage;
+
+  // Daily Rewards
+  late IntrovertDailyRewardGetStatusDart _dailyRewardGetStatus;
+  late IntrovertDailyRewardGetHistoryDart _dailyRewardGetHistory;
+  late IntrovertDailyRewardRecordActivityDart _dailyRewardRecordActivity;
+  late IntrovertDailyRewardUpdateWeightsDart _dailyRewardUpdateWeights;
+  late IntrovertDailyRewardUpdateAntiGamingDart _dailyRewardUpdateAntiGaming;
+  late IntrovertDailyRewardGetRealtimeEarningsDart _dailyRewardGetRealtimeEarnings;
 
   NativeCallable<NativeNetworkCallback>? _unifiedCallable;
 
@@ -896,6 +999,35 @@ class IntrovertClient {
       _clawTriggerTick = safeLookup('claw_trigger_tick', () => _dylib.lookupFunction<IntroClawTriggerTickC, IntroClawTriggerTickDart>('intro_claw_trigger_tick'), () => FfiResult.dummy);
       _clawSetActive = safeLookup('claw_set_active', () => _dylib.lookupFunction<IntroClawSetActiveC, IntroClawSetActiveDart>('intro_claw_set_active'), (a) => FfiResult.dummy);
       _clawGetStatus = safeLookup('claw_get_status', () => _dylib.lookupFunction<IntroClawGetStatusC, IntroClawGetStatusDart>('intro_claw_get_status'), () => FfiResult.dummy);
+      _clawGetEndpoint = safeLookup('claw_get_endpoint', () => _dylib.lookupFunction<IntroClawGetEndpointC, IntroClawGetEndpointDart>('intro_claw_get_endpoint'), () => nullptr);
+      _clawSetEndpoint = safeLookup('claw_set_endpoint', () => _dylib.lookupFunction<IntroClawSetEndpointC, IntroClawSetEndpointDart>('intro_claw_set_endpoint'), (e) => FfiResult.dummy);
+      _clawProcessQuery = safeLookup('claw_process_query', () => _dylib.lookupFunction<IntroClawProcessQueryC, IntroClawProcessQueryDart>('intro_claw_process_query'), (q) => FfiResult.dummy);
+      _clawRunNetworkRecon = safeLookup('claw_run_network_recon', () => _dylib.lookupFunction<IntroClawRunNetworkReconC, IntroClawRunNetworkReconDart>('intro_claw_run_network_recon'), () => FfiResult.dummy);
+      _clawHealPeer = safeLookup('claw_heal_peer', () => _dylib.lookupFunction<IntroClawHealPeerC, IntroClawHealPeerDart>('intro_claw_heal_peer'), (p) => FfiResult.dummy);
+      _clawGetActivityLog = safeLookup('claw_get_activity_log', () => _dylib.lookupFunction<IntroClawGetActivityLogC, IntroClawGetActivityLogDart>('intro_claw_get_activity_log'), () => FfiResult.dummy);
+      _clawVoipStartCall = safeLookup('claw_voip_start_call', () => _dylib.lookupFunction<IntroClawVoipStartCallC, IntroClawVoipStartCallDart>('intro_claw_voip_start_call'), (p, v) => FfiResult.dummy);
+      _clawVoipEndCall = safeLookup('claw_voip_end_call', () => _dylib.lookupFunction<IntroClawVoipEndCallC, IntroClawVoipEndCallDart>('intro_claw_voip_end_call'), () => FfiResult.dummy);
+      _clawVoipRecordSample = safeLookup('claw_voip_record_sample', () => _dylib.lookupFunction<IntroClawVoipRecordSampleC, IntroClawVoipRecordSampleDart>('intro_claw_voip_record_sample'), (r, p, j, b, rel, c) => FfiResult.dummy);
+      _clawVoipGetQuality = safeLookup('claw_voip_get_quality', () => _dylib.lookupFunction<IntroClawVoipGetQualityC, IntroClawVoipGetQualityDart>('intro_claw_voip_get_quality'), () => FfiResult.dummy);
+
+      // Elevated Messages
+      _elevateMessage = safeLookup('elevate_message', () => _dylib.lookupFunction<IntrovertElevateMessageC, IntrovertElevateMessageDart>('introvert_elevate_message'), (c, m, co, s, i) => FfiResult.dummy);
+      _unelevateMessage = safeLookup('unelevate_message', () => _dylib.lookupFunction<IntrovertUnelevateMessageC, IntrovertUnelevateMessageDart>('introvert_unelevate_message'), (c, m) => FfiResult.dummy);
+      _getElevatedMessages = safeLookup('get_elevated_messages', () => _dylib.lookupFunction<IntrovertGetElevatedMessagesC, IntrovertGetElevatedMessagesDart>('introvert_get_elevated_messages'), (c) => FfiResult.dummy);
+      _isMessageElevated = safeLookup('is_message_elevated', () => _dylib.lookupFunction<IntrovertIsMessageElevatedC, IntrovertIsMessageElevatedDart>('introvert_is_message_elevated'), (c, m) => FfiResult.dummy);
+
+      // Optimized last message queries
+      _getLastMessage = safeLookup('get_last_message', () => _dylib.lookupFunction<IntrovertStorageGetLastMessageC, IntrovertStorageGetLastMessageDart>('introvert_storage_get_last_message'), (p) => FfiResult.dummy);
+      _getLastGroupMessage = safeLookup('get_last_group_message', () => _dylib.lookupFunction<IntrovertStorageGetLastGroupMessageC, IntrovertStorageGetLastGroupMessageDart>('introvert_storage_get_last_group_message'), (g) => FfiResult.dummy);
+
+      // Daily Rewards
+      _dailyRewardGetStatus = safeLookup('daily_reward_get_status', () => _dylib.lookupFunction<IntrovertDailyRewardGetStatusC, IntrovertDailyRewardGetStatusDart>('introvert_daily_reward_get_status'), () => FfiResult.dummy);
+      _dailyRewardGetHistory = safeLookup('daily_reward_get_history', () => _dylib.lookupFunction<IntrovertDailyRewardGetHistoryC, IntrovertDailyRewardGetHistoryDart>('introvert_daily_reward_get_history'), (d) => FfiResult.dummy);
+      _dailyRewardRecordActivity = safeLookup('daily_reward_record_activity', () => _dylib.lookupFunction<IntrovertDailyRewardRecordActivityC, IntrovertDailyRewardRecordActivityDart>('introvert_daily_reward_record_activity'), (p, l) => FfiResult.dummy);
+      _dailyRewardUpdateWeights = safeLookup('daily_reward_update_weights', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateWeightsC, IntrovertDailyRewardUpdateWeightsDart>('introvert_daily_reward_update_weights'), (p, l) => FfiResult.dummy);
+      _dailyRewardUpdateAntiGaming = safeLookup('daily_reward_update_anti_gaming', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateAntiGamingC, IntrovertDailyRewardUpdateAntiGamingDart>('introvert_daily_reward_update_anti_gaming'), (p, l) => FfiResult.dummy);
+      _dailyRewardGetRealtimeEarnings = safeLookup('daily_reward_get_realtime_earnings', () => _dylib.lookupFunction<IntrovertDailyRewardGetRealtimeEarningsC, IntrovertDailyRewardGetRealtimeEarningsDart>('introvert_daily_reward_get_realtime_earnings'), () => FfiResult.dummy);
+
       debugPrint('✅ All native functions bound successfully.');
     } catch (e) {
       debugPrint('❌ Error binding native functions: $e');
@@ -926,8 +1058,8 @@ class IntrovertClient {
 
   List<dynamic> getPendingGroupInvites() {
     final res = _groupGetPendingInvites();
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -989,8 +1121,8 @@ class IntrovertClient {
 
   List<dynamic> getAllGroups() {
     final res = _groupGetAll();
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1000,8 +1132,8 @@ class IntrovertClient {
   List<dynamic> getGroupMessages(String groupId) {
     late FfiResult res;
     using((Arena arena) => res = _groupGetMessages(groupId.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1079,8 +1211,8 @@ class IntrovertClient {
   List<String> getGroupMutedMembers(String groupId) {
     late FfiResult res;
     using((Arena arena) => res = _groupGetMutedMembers(groupId.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       final jsonStr = utf8.decode(res.data.asTypedList(res.len));
       return List<String>.from(json.decode(jsonStr));
     } finally {
@@ -1123,8 +1255,8 @@ class IntrovertClient {
 
   Map<String, int> getUnreadCounts() {
     final res = _getUnreadCounts();
-    if (res.code != 0) return {};
     try {
+      if (res.code != 0) return {};
       final jsonStr = utf8.decode(res.data.asTypedList(res.len));
       final Map<String, dynamic> raw = json.decode(jsonStr);
       return raw.map((k, v) => MapEntry(k, v as int));
@@ -1178,8 +1310,8 @@ class IntrovertClient {
 
   Map<String, dynamic> driveGetByHash(String fileHash) {
     final res = using((Arena arena) => _driveGetByHash(fileHash.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return {};
     try {
+      if (res.code != 0) return {};
       final decoded = json.decode(utf8.decode(res.data.cast<Uint8>().asTypedList(res.len)));
       if (decoded is Map<String, dynamic>) return decoded;
       return {};
@@ -1327,8 +1459,12 @@ class IntrovertClient {
 
   List<dynamic> getContacts() {
     final res = _getContacts();
-    if (res.code != 0) return [];
-    try { return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>; } finally { _freeBinary(res.data, res.len); }
+    try {
+      if (res.code != 0) return [];
+      return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
   }
 
   Future<void> deleteContact(String id) async => using((Arena arena) => _handleFfiResult(_deleteContact(id.toNativeUtf8(allocator: arena)), context: "Delete Contact"));
@@ -1455,7 +1591,90 @@ class IntrovertClient {
   void setIntroClawActive(bool active) => _handleFfiResult(_clawSetActive(active), context: "IntroClaw Active");
   String getIntroClawStatus() {
     final result = _clawGetStatus();
-    return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  String getIntroClawEndpoint() {
+    final ptr = _clawGetEndpoint();
+    if (ptr.address == 0) return '';
+    try { return ptr.toDartString(); } finally { _freeString(ptr); }
+  }
+
+  void setIntroClawEndpoint(String endpoint) {
+    using((Arena arena) {
+      _handleFfiResult(_clawSetEndpoint(endpoint.toNativeUtf8(allocator: arena)), context: "Set IntroClaw Endpoint");
+    });
+  }
+
+  String processAssistantQuery(String query) {
+    final result = using((Arena arena) => _clawProcessQuery(query.toNativeUtf8(allocator: arena)));
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  String runNetworkRecon() {
+    final result = _clawRunNetworkRecon();
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  String healPeer(String peerId) {
+    final result = using((Arena arena) => _clawHealPeer(peerId.toNativeUtf8(allocator: arena)));
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  String getIntroClawActivityLog() {
+    final result = _clawGetActivityLog();
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  void voipStartCall(String peerId, bool isVideo) {
+    using((Arena arena) {
+      _handleFfiResult(
+        _clawVoipStartCall(peerId.toNativeUtf8(allocator: arena), isVideo ? 1 : 0),
+        context: "VoIP Start Call",
+      );
+    });
+  }
+
+  void voipEndCall() {
+    _handleFfiResult(_clawVoipEndCall(), context: "VoIP End Call");
+  }
+
+  void voipRecordSample(int rttMs, double packetLossPct, int jitterMs, int bitrateKbps, bool isRelayed, String codec) {
+    using((Arena arena) {
+      _handleFfiResult(
+        _clawVoipRecordSample(rttMs, packetLossPct, jitterMs, bitrateKbps, isRelayed ? 1 : 0, codec.toNativeUtf8(allocator: arena)),
+        context: "VoIP Record Sample",
+      );
+    });
+  }
+
+  String voipGetQuality() {
+    final result = _clawVoipGetQuality();
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
   }
 
   void setTunnelMode(bool enabled) => _handleFfiResult(_setTunnelMode(enabled), context: "Set Tunnel Mode");
@@ -1474,23 +1693,23 @@ class IntrovertClient {
   }
 
   void pollPeerProfile(String peerId) {
-    final ptr = peerId.toNativeUtf8();
-    try {
-      _handleFfiResult(_pollPeerProfile(ptr), context: "Poll Peer Profile");
-    } finally {
-      malloc.free(ptr);
-    }
+    using((Arena arena) {
+      _handleFfiResult(_pollPeerProfile(peerId.toNativeUtf8(allocator: arena)), context: "Poll Peer Profile");
+    });
   }
 
   void syncChatMessages(String peerId, String chatId, bool isGroup, {bool isFull = false}) {
-    final pidPtr = peerId.toNativeUtf8();
-    final cidPtr = chatId.toNativeUtf8();
-    try {
-      _handleFfiResult(_syncChatMessages(pidPtr, cidPtr, isGroup ? 1 : 0, isFull ? 1 : 0), context: "Sync Chat Messages");
-    } finally {
-      malloc.free(pidPtr);
-      malloc.free(cidPtr);
-    }
+    using((Arena arena) {
+      _handleFfiResult(
+        _syncChatMessages(
+          peerId.toNativeUtf8(allocator: arena),
+          chatId.toNativeUtf8(allocator: arena),
+          isGroup ? 1 : 0,
+          isFull ? 1 : 0,
+        ),
+        context: "Sync Chat Messages",
+      );
+    });
   }
 
   void resolveHandle(String handle) {
@@ -1546,9 +1765,146 @@ class IntrovertClient {
 
   List<dynamic> getMessageReactions(String msgId) {
     final res = using((Arena arena) => _getReactions(msgId.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.cast<Uint8>().asTypedList(res.len))) as List<dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  // ── Elevated Messages ──────────────────────────────────────────────
+
+  void elevateMessage(String chatId, String msgId, String content, String senderId, bool isMe) {
+    using((Arena arena) => _handleFfiResult(_elevateMessage(
+      chatId.toNativeUtf8(allocator: arena),
+      msgId.toNativeUtf8(allocator: arena),
+      content.toNativeUtf8(allocator: arena),
+      senderId.toNativeUtf8(allocator: arena),
+      isMe,
+    ), context: "Elevate Message"));
+  }
+
+  void unelevateMessage(String chatId, String msgId) {
+    using((Arena arena) => _handleFfiResult(_unelevateMessage(
+      chatId.toNativeUtf8(allocator: arena),
+      msgId.toNativeUtf8(allocator: arena),
+    ), context: "Unelevate Message"));
+  }
+
+  List<dynamic> getElevatedMessages(String chatId) {
+    final res = using((Arena arena) => _getElevatedMessages(chatId.toNativeUtf8(allocator: arena)));
+    try {
+      if (res.code != 0) return [];
+      return json.decode(utf8.decode(res.data.cast<Uint8>().asTypedList(res.len))) as List<dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  bool isMessageElevated(String chatId, String msgId) {
+    final res = using((Arena arena) => _isMessageElevated(
+      chatId.toNativeUtf8(allocator: arena),
+      msgId.toNativeUtf8(allocator: arena),
+    ));
+    try {
+      if (res.code != 0) return false;
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      return data == '1';
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  // ── Optimized Last Message Queries ──────────────────────────────────
+
+  Map<String, dynamic>? getLastMessage(String peerId) {
+    final res = using((Arena arena) => _getLastMessage(peerId.toNativeUtf8(allocator: arena)));
+    try {
+      if (res.code != 0 || res.len == 0) return null;
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      if (data == 'null') return null;
+      return json.decode(data) as Map<String, dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  Map<String, dynamic>? getLastGroupMessage(String groupId) {
+    final res = using((Arena arena) => _getLastGroupMessage(groupId.toNativeUtf8(allocator: arena)));
+    try {
+      if (res.code != 0 || res.len == 0) return null;
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      if (data == 'null') return null;
+      return json.decode(data) as Map<String, dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  // ── Daily Rewards ──────────────────────────────────────────────
+
+  Map<String, dynamic>? getDailyRewardStatus() {
+    final res = _dailyRewardGetStatus();
+    try {
+      if (res.code != 0 || res.len == 0) return null;
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      if (data == '{}' || data.isEmpty) return null;
+      return json.decode(data) as Map<String, dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  List<dynamic> getDailyRewardHistory(int days) {
+    final res = _dailyRewardGetHistory(days);
+    try {
+      if (res.code != 0 || res.len == 0) return [];
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      return json.decode(data) as List<dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  bool recordDailyActivity(Map<String, dynamic> event) {
+    final jsonStr = json.encode(event);
+    final res = using((Arena arena) => _dailyRewardRecordActivity(
+      jsonStr.toNativeUtf8(allocator: arena).cast<Uint8>(),
+      jsonStr.length,
+    ));
+    try {
+      if (res.code != 0) return false;
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      return data == '1';
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  void updateDailyRewardWeights(Map<String, dynamic> weights) {
+    final jsonStr = json.encode(weights);
+    using((Arena arena) => _handleFfiResult(
+      _dailyRewardUpdateWeights(jsonStr.toNativeUtf8(allocator: arena).cast<Uint8>(), jsonStr.length),
+      context: "Update Daily Reward Weights",
+    ));
+  }
+
+  void updateDailyRewardAntiGaming(Map<String, dynamic> config) {
+    final jsonStr = json.encode(config);
+    using((Arena arena) => _handleFfiResult(
+      _dailyRewardUpdateAntiGaming(jsonStr.toNativeUtf8(allocator: arena).cast<Uint8>(), jsonStr.length),
+      context: "Update Daily Reward Anti-Gaming",
+    ));
+  }
+
+  Map<String, dynamic>? getDailyRewardRealtimeEarnings() {
+    final res = _dailyRewardGetRealtimeEarnings();
+    try {
+      if (res.code != 0 || res.len == 0) return null;
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      if (data == '{}' || data.isEmpty) return null;
+      return json.decode(data) as Map<String, dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
     }
@@ -1568,8 +1924,8 @@ class IntrovertClient {
       h = "i@$h";
     }
     final res = using((Arena arena) => _getHandleStatus(h.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return {};
     try {
+      if (res.code != 0) return {};
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as Map<String, dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1578,8 +1934,12 @@ class IntrovertClient {
 
   Map<String, dynamic> getProfile() {
     final res = _getProfile();
-    if (res.code != 0) return {};
-    try { return json.decode(utf8.decode(res.data.asTypedList(res.len))) as Map<String, dynamic>; } finally { _freeBinary(res.data, res.len); }
+    try {
+      if (res.code != 0) return {};
+      return json.decode(utf8.decode(res.data.asTypedList(res.len))) as Map<String, dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
   }
 
   void setProfile(String? name, String? handle, String? avatar, int privacyMode) {
@@ -1662,13 +2022,17 @@ class IntrovertClient {
   void _handleFfiResult(FfiResult result, {String context = "Rust Core"}) {
     if (result.code != 0) {
       String msg = "Unknown error";
-      if (result.data.address != 0) {
+      if (result.data.address != 0 && result.len > 0) {
         msg = utf8.decode(result.data.asTypedList(result.len));
         _freeBinary(result.data, result.len);
       }
       debugPrint('❌ $context Error (${result.code}): $msg');
       throw Exception('$context Error (${result.code}): $msg');
     } else {
+      // Free any data returned on success path (defensive)
+      if (result.data.address != 0 && result.len > 0) {
+        _freeBinary(result.data, result.len);
+      }
       debugPrint('✅ $context: Success');
     }
   }
@@ -1699,8 +2063,8 @@ class IntrovertClient {
 
   Map<String, dynamic>? noteGet(String id) {
     final res = using((Arena arena) => _notesGet(id.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return null;
     try {
+      if (res.code != 0) return null;
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as Map<String, dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1709,8 +2073,8 @@ class IntrovertClient {
 
   List<dynamic> notesGetAll() {
     final res = _notesGetAll();
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1719,8 +2083,8 @@ class IntrovertClient {
 
   List<dynamic> notesSearch(String query) {
     final res = using((Arena arena) => _notesSearch(query.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1732,8 +2096,8 @@ class IntrovertClient {
       noteId.toNativeUtf8(allocator: arena), title.toNativeUtf8(allocator: arena),
       content.toNativeUtf8(allocator: arena), tags.toNativeUtf8(allocator: arena),
     ));
-    if (res.code != 0) return 0;
     try {
+      if (res.code != 0) return 0;
       return int.tryParse(utf8.decode(res.data.asTypedList(res.len))) ?? 0;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1742,8 +2106,8 @@ class IntrovertClient {
 
   List<dynamic> noteGetVersions(String noteId) {
     final res = using((Arena arena) => _notesGetVersions(noteId.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1770,8 +2134,8 @@ class IntrovertClient {
 
   List<dynamic> callHistoryGet([int limit = 50]) {
     final res = _callHistoryGet(limit);
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1780,8 +2144,8 @@ class IntrovertClient {
 
   int callHistoryCount() {
     final res = _callHistoryCount();
-    if (res.code != 0) return 0;
     try {
+      if (res.code != 0) return 0;
       return int.tryParse(utf8.decode(res.data.asTypedList(res.len))) ?? 0;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1794,8 +2158,8 @@ class IntrovertClient {
     final res = using((Arena arena) => _searchMessages(
       peerId.toNativeUtf8(allocator: arena), query.toNativeUtf8(allocator: arena),
     ));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1806,8 +2170,8 @@ class IntrovertClient {
     final res = using((Arena arena) => _searchGroupMessages(
       groupId.toNativeUtf8(allocator: arena), query.toNativeUtf8(allocator: arena),
     ));
-    if (res.code != 0) return [];
     try {
+      if (res.code != 0) return [];
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
@@ -1826,8 +2190,8 @@ class IntrovertClient {
 
   int getLastSeen(String peerId) {
     final res = using((Arena arena) => _getLastSeen(peerId.toNativeUtf8(allocator: arena)));
-    if (res.code != 0) return 0;
     try {
+      if (res.code != 0) return 0;
       return int.tryParse(utf8.decode(res.data.asTypedList(res.len))) ?? 0;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);

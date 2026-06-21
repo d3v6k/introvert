@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 pub struct SolanaIncentiveEngine {
     rpc_client: Arc<RpcClient>,
+    http_client: reqwest::Client,
     intr_mint: Pubkey,
     treasury_pubkey: Pubkey,
     treasury_api_url: String, // Endpoint for fee-payer co-signing
@@ -23,6 +24,10 @@ impl SolanaIncentiveEngine {
     pub fn new(rpc_url: &str, treasury_pubkey: &str, treasury_api_url: &str) -> Result<Self> {
         Ok(Self {
             rpc_client: Arc::new(RpcClient::new_with_timeout(rpc_url.to_string(), std::time::Duration::from_secs(3))),
+            http_client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .unwrap_or_default(),
             intr_mint: Pubkey::from_str("NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn")?,
             treasury_pubkey: Pubkey::from_str(treasury_pubkey)?,
             treasury_api_url: treasury_api_url.to_string(),
@@ -34,57 +39,30 @@ impl SolanaIncentiveEngine {
     }
 
     /// Fetches the INTR token balance for a given owner.
+    /// Uses lightweight getAccountInfo with known ATA address instead of heavy getProgramAccounts.
     pub async fn fetch_balance(&self, owner: &Pubkey) -> Result<u64> {
-        use solana_account_decoder::UiAccountEncoding;
-        use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
-        use solana_client::rpc_filter::{Memcmp, RpcFilterType};
-
-        // Find the Associated Token Account (ATA) or any token account for this mint
-        let filters = Some(vec![
-            RpcFilterType::DataSize(165), // SPL Token account size
-            RpcFilterType::Memcmp(Memcmp::new(
-                32, // offset for owner
-                solana_client::rpc_filter::MemcmpEncodedBytes::Base58(owner.to_string()),
-            )),
-            RpcFilterType::Memcmp(Memcmp::new(
-                0, // offset for mint
-                solana_client::rpc_filter::MemcmpEncodedBytes::Base58(self.intr_mint.to_string()),
-            )),
-        ]);
-
-        let token_program_id = Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
+        // Derive the Associated Token Account (ATA) address
+        // ATA = find_program_address(&[owner, TOKEN_PROGRAM_ID, mint], ASSOCIATED_TOKEN_PROGRAM_ID)
+        let token_program = Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")?;
+        let ata_program = Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL")?;
         
-        let accounts = self.rpc_client.get_program_ui_accounts_with_config(
-            &token_program_id,
-            RpcProgramAccountsConfig {
-                filters,
-                account_config: RpcAccountInfoConfig {
-                    encoding: Some(UiAccountEncoding::Base64),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        ).await?;
-
-        if let Some((_, account)) = accounts.first() {
-            // Parse token balance from account data (offset 64, 8 bytes)
-            match &account.data {
-                solana_account_decoder::UiAccountData::Binary(data, _) => {
-                    if let Ok(decoded) = base64::Engine::decode(
-                        &base64::engine::general_purpose::STANDARD, data
-                    ) {
-                        if decoded.len() >= 72 {
-                            let mut amount_bytes = [0u8; 8];
-                            amount_bytes.copy_from_slice(&decoded[64..72]);
-                            return Ok(u64::from_le_bytes(amount_bytes));
-                        }
-                    }
+        let (ata, _) = Pubkey::find_program_address(
+            &[&owner.to_bytes(), &token_program.to_bytes(), &self.intr_mint.to_bytes()],
+            &ata_program,
+        );
+        
+        match self.rpc_client.get_account(&ata).await {
+            Ok(account) => {
+                // SPL Token account: amount is at bytes 64..72 (little-endian u64)
+                if account.data.len() >= 72 {
+                    let mut amount_bytes = [0u8; 8];
+                    amount_bytes.copy_from_slice(&account.data[64..72]);
+                    Ok(u64::from_le_bytes(amount_bytes))
+                } else {
                     Ok(0)
                 }
-                _ => Ok(0),
             }
-        } else {
-            Ok(0) // No account found, zero balance
+            Err(_) => Ok(0), // Account doesn't exist yet (no tokens)
         }
     }
 
@@ -181,12 +159,11 @@ impl SolanaIncentiveEngine {
     }
 
     async fn relay_to_treasury(&self, base64_tx: String) -> Result<String> {
-        let client = reqwest::Client::new();
         let payload = json!({
             "transaction": base64_tx,
         });
 
-        let response = client.post(&self.treasury_api_url)
+        let response = self.http_client.post(&self.treasury_api_url)
             .json(&payload)
             .send()
             .await

@@ -1,10 +1,14 @@
 # Introvert: Sovereign P2P Mesh
 
-Introvert is a privacy-first, decentralized communication ecosystem. It eliminates central intermediaries by utilizing a high-performance peer-to-peer (P2P) mesh architecture, ensuring data ownership and network control remain exclusively with the user.
+Introvert is a privacy-first, decentralized communication ecosystem. It eliminates central servers entirely by utilizing true Peer-to-Peer (P2P) networking, end-to-end encryption (E2EE), and a dynamic, sovereign Solana-based token economy. The network operates via a crowdsourced, incentivized, self-healing mesh layer, with entry points dynamically coordinated on-chain — transforming Introvert from an isolated chat application into a zero-knowledge, autonomous utility network.
 
 ## Core Features
 - **Zero-Knowledge Privacy:** End-to-end encryption (E2EE) using the Noise Protocol (Noise_IK_25519_ChaChaPoly_BLAKE2s).
 - **Sovereign Identity:** Deterministic identity derived from a 32-byte master seed via HKDF-SHA256. No phone number, email, or central authority required.
+- **Dynamic Blockchain Bootstrapping:** Eliminates hardcoded bootstrap IPs. Clients discover RBN nodes dynamically via Solana on-chain registry queries, making the network resistant to DNS/IP blacklisting.
+- **Token Gating Engine:** Structural Sybil resistance requiring 500 $INTR minimum for edge routing (Event Code 22) and 50,000 $INTR for RBN operators.
+- **Autonomous Escrow Vault:** Unified Program-Derived Address (PDA) on Solana holding all network stakes and emissions — no single key controls the vault.
+- **Squads V4 Governance:** 3-of-5 multisig controls contract upgrades, ensuring full legal separation for the software publisher.
 - **Messenger-Grade Hardening:** libp2p v0.56 mesh standardized on **Port 443 (HTTPS Bypass)** for global reachability through carrier firewalls.
 - **Dark Mesh Isolation:** Completely shielded from global DHT noise via custom `/introvert/kad/1.0.0` protocols and client-only mode for edge devices.
 - **Real-time Delivery/Read Receipts:** Functional 'Acknowledgement' protocol for WhatsApp-style UI ticks (Sent, Delivered, Read).
@@ -12,7 +16,7 @@ Introvert is a privacy-first, decentralized communication ecosystem. It eliminat
 - **Relay-Aware Connectivity:** Automatic construction of relay paths via RBN nodes, ensuring Mac-to-Android and multi-network reliability.
 - **Direct Dial Auto-Upgrades:** Connections automatically upgrade from relayed to direct P2P when direct addresses are discovered.
 - **Persistent History:** Encrypted local storage using SQLCipher (AES-256-CBC) with CRDT-based synchronization.
-- **Economic Incentives:** Built-in Solana-based $INTR token economy (Mint: `NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn`) for network contributors.
+- **Economic Incentives:** Built-in Solana-based $INTR token economy (100M fixed supply, Mint: `NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn`). 50% allocation (50M) for ecosystem rewards over 10 years. Dynamic pool-clearing daily rewards. Gasless transactions via Treasury Fee Payer. See `Docs/INTROVERT_TOKEN_WHITEPAPER.md`.
 - **Sovereign Drive:** Encrypted file storage with automatic organization into context-aware subfolders.
 - **Encrypted Groups:** Gossipsub-based mesh group rooms with signed actions, role management, and shared secrets.
 - **Mesh Reactions:** Decentralized emoji reaction propagation across the mesh network.
@@ -25,9 +29,10 @@ Introvert is a privacy-first, decentralized communication ecosystem. It eliminat
 ## Technical Stack
 - **Backend:** Rust (libp2p v0.56, SQLite/SQLCipher, Noise IK, WebRTC, Solana SDK 4.0)
 - **Frontend:** Flutter (Dart) with dart:ffi bridge
-- **Networking:** Port 443 TCP/UDP (QUIC), WebSocket tunnel fallback
+- **Networking:** Port 443 TCP/UDP (QUIC), WebSocket tunnel fallback, dynamic Solana-based bootstrapping
 - **Storage:** SQLCipher encrypted database (18 tables)
-- **Identity:** HKDF-SHA256 deterministic derivation from master seed
+- **Identity:** HKDF-SHA256 deterministic derivation from master seed (Zero Phone/Email)
+- **Consensus & Economy:** Solana Mainnet-Beta via unified PDA escrow vault, Squads V4 (3-of-5) Multisig governance
 
 ## Getting Started
 
