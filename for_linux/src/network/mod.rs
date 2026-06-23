@@ -23,6 +23,7 @@ use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::data_channel::data_channel_state::RTCDataChannelState;
 use libp2p::{autonat, identify};
 use x25519_dalek::{StaticSecret, PublicKey};
+use tracing::{info, warn, error, debug};
 
 pub mod noise_session;
 pub mod wormhole;
@@ -185,6 +186,8 @@ pub enum SignalingPayload {
         name: String,
         handle: String,
         avatar_base64: Option<String>,
+        #[serde(default)]
+        prestige_tier: u8,
     },
     ChatSyncRequest {
         chat_id: String,
@@ -289,6 +292,8 @@ pub struct FileTransferProgress {
     pub start_time_ms: u64,
     pub speed_bps: f64,
     pub group_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -363,6 +368,7 @@ pub struct NetworkService {
     _tunnel_handle: Option<tokio::task::JoinHandle<Result<(), anyhow::Error>>>,
     pending_diagnostics: HashMap<PeerId, PendingDiagnostic>,
     registry: registry::RegistryManager,
+    fcm: Arc<crate::fcm::FcmPushService>,
     pending_claims: HashMap<String, HashSet<String>>, // Handle -> RBN Witnesses
     #[allow(dead_code)]
     diagnostic_requests: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, Instant)>,
@@ -406,7 +412,7 @@ impl NetworkService {
         let mut bootstrap_nodes = config::get_bootstrap_nodes();
 
         if is_tunnel_enabled {
-            println!("[Tunnel] Secure Tunnel Mode is active. Launching loopback client...");
+            info!("[Tunnel] Secure Tunnel Mode is active. Launching loopback client...");
             // Start local tunnel listener on a dynamic port (0 means dynamic)
             let rbn_ws_url = "ws://47.89.252.80:80/tunnel".to_string();
             match tunnel::start_tunnel_client(0, rbn_ws_url).await {
@@ -416,10 +422,10 @@ impl NetworkService {
                     let rbn_peer_id: PeerId = "12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".parse().unwrap();
                     let local_tunnel_addr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", assigned_port).parse().unwrap();
                     bootstrap_nodes = vec![(rbn_peer_id, local_tunnel_addr)];
-                    println!("[Tunnel] WebSocket Tunnel active on local port {}. Bootstrapping via localhost.", assigned_port);
+                    info!("[Tunnel] WebSocket Tunnel active on local port {}. Bootstrapping via localhost.", assigned_port);
                 }
                 Err(e) => {
-                    eprintln!("[Tunnel] Failed to start WebSocket tunnel: {}", e);
+                    error!("[Tunnel] Failed to start WebSocket tunnel: {}", e);
                 }
             }
         }
@@ -481,9 +487,9 @@ impl NetworkService {
             for (group_id, _, _, _, _) in groups {
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-                    eprintln!("[Mesh] Failed to subscribe to gossipsub topic {}: {}", group_id, e);
+                    error!("[Mesh] Failed to subscribe to gossipsub topic {}: {}", group_id, e);
                 } else {
-                    println!("[Mesh] Subscribed to gossipsub topic {}", group_id);
+                    info!("[Mesh] Subscribed to gossipsub topic {}", group_id);
                 }
             }
         }
@@ -524,6 +530,7 @@ impl NetworkService {
             _tunnel_handle: tunnel_handle,
             pending_diagnostics: HashMap::new(),
             registry: registry::RegistryManager::new(storage.clone()),
+            fcm: Arc::new(crate::fcm::FcmPushService::new()),
             pending_claims: HashMap::new(),
             diagnostic_requests: HashMap::new(),
             is_stress_test,
@@ -568,10 +575,10 @@ impl NetworkService {
         let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
         
         // Check Kademlia DHT for restored handle claim: ph_<peer_id>
-        let has_handle = self.storage.get_profile().ok().flatten().and_then(|(_, h, _, _)| h).is_some();
+        let has_handle = self.storage.get_profile().ok().flatten().and_then(|(_, h, _, _, _)| h).is_some();
         if !has_handle {
             let my_pid = local_peer_id.to_string();
-            println!("[Mesh] No local handle set. Querying Kademlia DHT for restored handle claim ph_{}...", my_pid);
+            info!("[Mesh] No local handle set. Querying Kademlia DHT for restored handle claim ph_{}...", my_pid);
             let ph_key = RecordKey::new(&format!("ph_{}", my_pid).as_bytes());
             let _ = self.swarm.behaviour_mut().kademlia.get_record(ph_key);
         }
@@ -580,8 +587,8 @@ impl NetworkService {
 
         // RBN HARDENING: Always provide Anchor Node service if we are a relay server
         if self.storage.is_anchor_mode_enabled() || self.swarm.behaviour().relay_server.as_ref().is_some() {
-            println!("[Network] Sovereign Anchor Mode: Providing Anchor Node service.");
-            println!("[Network] 🛡️  ISOLATION ACTIVE: Protocol set to /introvert/kad/1.0.0");
+            info!("[Network] Sovereign Anchor Mode: Providing Anchor Node service.");
+            info!("[Network] 🛡️  ISOLATION ACTIVE: Protocol set to /introvert/kad/1.0.0");
             self.swarm.behaviour_mut().kademlia.set_mode(Some(kad::Mode::Server)); // Act as full DHT server
             let key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
             let _ = self.swarm.behaviour_mut().kademlia.start_providing(key);
@@ -607,7 +614,7 @@ impl NetworkService {
             tokio::select! {
                 _ = heartbeat_interval.tick() => {
                     let peers = self.swarm.connected_peers().count();
-                    println!("[Swarm Heartbeat] Connected peers: {}", peers);
+                    debug!("[Swarm Heartbeat] Connected peers: {}", peers);
                 }
                 _ = fast_poll_interval.tick() => {
                     let has_active_incoming = self.incoming_transfers.values().any(|t| t.is_relayed);
@@ -693,7 +700,7 @@ impl NetworkService {
                         }
                         
                         for (tid, peer, providers, first_missing_idx, limit, csize) in stalled {
-                            println!("[Mesh] Transfer {} stalled. Retrying PULL for chunks {}..{} from {} providers", 
+                            info!("[Mesh] Transfer {} stalled. Retrying PULL for chunks {}..{} from {} providers", 
                                      tid, first_missing_idx, limit - 1, providers.len());
                             
                             // REDUNDANCY FILTER: Remove old requests for this transfer from RAM buffer
@@ -748,7 +755,7 @@ impl NetworkService {
                     let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
                     let we_are_anchor = self.swarm.behaviour().relay_server.as_ref().is_some() || self.storage.is_anchor_mode_enabled();
                     if !has_relay_listener && !we_are_anchor {
-                        println!("[Mesh] Relay reachability lost. Re-requesting reservations on bootstrap nodes...");
+                        info!("[Mesh] Relay reachability lost. Re-requesting reservations on bootstrap nodes...");
                         for (rbn_id, _) in self.bootstrap_nodes.clone() {
                             if let Ok(addr) = format!("/p2p/{}/p2p-circuit", rbn_id).parse() {
                                 let _ = self.swarm.listen_on(addr);
@@ -786,7 +793,7 @@ impl NetworkService {
                     let local_pubkey = solana_client.get_treasury_pubkey();
                     if let Ok(balance) = solana_client.fetch_balance(&local_pubkey).await {
                         if !self.reward_tracker.is_lease_valid(balance) {
-                            println!("[Economy] Identity Lease EXPIRED. Pruning node from mesh.");
+                            info!("[Economy] Identity Lease EXPIRED. Pruning node from mesh.");
                             let local_peer_id = *self.swarm.local_peer_id();
                             self.swarm.behaviour_mut().kademlia.remove_peer(&local_peer_id);
                             let anchor_key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
@@ -810,7 +817,7 @@ impl NetworkService {
                     let _ = self.swarm.behaviour_mut().kademlia.put_record(pubkey_record, kad::Quorum::One);
 
                     // Periodically republish HANDLE if set
-                    if let Ok(Some((_, Some(handle), _, _))) = self.storage.get_profile() {
+                    if let Ok(Some((_, Some(handle), _, _, _))) = self.storage.get_profile() {
                         if handle.starts_with("i@") {
                             let h_key = RecordKey::new(&handle.as_bytes());
                             let mut h_value = local_peer_id.to_string().into_bytes();
@@ -871,13 +878,13 @@ impl NetworkService {
                 }
                 event = self.swarm.select_next_some() => {
                     if let Err(e) = self.handle_swarm_event(event).await {
-                        eprintln!("Error handling swarm event: {:?}", e);
+                        error!("Error handling swarm event: {:?}", e);
                     }
                 }
                 command = self.command_rx.recv() => {
                     if let Some(cmd) = command {
                         if let Err(e) = self.handle_command(cmd).await {
-                            eprintln!("Command error: {:?}", e);
+                            error!("Command error: {:?}", e);
                         }
                     } else {
                         break;
@@ -917,47 +924,47 @@ impl NetworkService {
                     let actual_hash = format!("{:x}", hasher.finalize());
 
                     if actual_hash == transfer.file_hash {
-                        println!("✅ File integrity VERIFIED for transfer {}", transfer_id);
+                        info!("✅ File integrity VERIFIED for transfer {}", transfer_id);
                         is_verified = true;
                         
                         let subfolder = if let Some(ref gid) = transfer.group_id {
-                            println!("[Mesh] Identifying group for organization: {}", gid);
+                            info!("[Mesh] Identifying group for organization: {}", gid);
                             if let Ok(Some(group)) = self.storage.get_group(gid) {
                                 let g_name = group.name.replace(" ", "_");
-                                println!("[Mesh] Organized into group folder: {}_Media", g_name);
+                                info!("[Mesh] Organized into group folder: {}_Media", g_name);
                                 format!("{}_Media", g_name)
                             } else {
-                                println!("[Mesh] ⚠️ Group not found in storage for folder organization: {}", gid);
+                                info!("[Mesh] ⚠️ Group not found in storage for folder organization: {}", gid);
                                 "Group_Media".to_string()
                             }
                         } else {
                             let peer_str = peer.to_string();
-                            println!("[Mesh] Identifying contact for organization: {}", peer_str);
+                            info!("[Mesh] Identifying contact for organization: {}", peer_str);
                             if let Ok(Some(contact)) = self.storage.get_contact(&peer_str) {
                                 let alias = contact.local_alias.as_deref().or(contact.global_name.as_deref()).unwrap_or("Direct");
                                 let s_name = alias.replace(" ", "_");
-                                println!("[Mesh] Organized into contact folder: {}_Media", s_name);
+                                info!("[Mesh] Organized into contact folder: {}_Media", s_name);
                                 format!("{}_Media", s_name)
                             } else {
-                                println!("[Mesh] ⚠️ Contact not found in storage for folder organization: {}", peer_str);
+                                info!("[Mesh] ⚠️ Contact not found in storage for folder organization: {}", peer_str);
                                 "Direct_Media".to_string()
                             }
                         };
 
                         let safe_subfolder = Self::sanitize_filename(&subfolder);
                         let dir_path = format!("{}/{}", self.downloads_dir, safe_subfolder);
-                        println!("[Mesh] Creating Drive directory: {}", dir_path);
+                        info!("[Mesh] Creating Drive directory: {}", dir_path);
                         if let Err(e) = std::fs::create_dir_all(&dir_path) {
-                            eprintln!("[Mesh] ❌ Failed to create Drive subfolder {}: {:?}", dir_path, e);
+                            error!("[Mesh] ❌ Failed to create Drive subfolder {}: {:?}", dir_path, e);
                         }
 
                         let safe_filename = Self::sanitize_filename(&transfer.filename);
                         let path = format!("{}/introvert_{}", dir_path, safe_filename);
-                        println!("[Mesh] Automatic Drive Organization: Saving to {}", path);
+                        info!("[Mesh] Automatic Drive Organization: Saving to {}", path);
 
                         // SOVEREIGN SWARM: Seeding logic depends on group context
                         if let Some(ref gid) = transfer.group_id {
-                            println!("[Mesh] Group transfer complete. Joining swarm as seeder for group: {}", gid);
+                            info!("[Mesh] Group transfer complete. Joining swarm as seeder for group: {}", gid);
                             let key = RecordKey::new(&transfer.file_hash.as_bytes());
                             let _ = self.swarm.behaviour_mut().kademlia.start_providing(key);
                             
@@ -972,7 +979,7 @@ impl NetworkService {
                                 group_id: Some(gid.clone()),
                             }).await;
                         } else {
-                            println!("[Mesh] 1-to-1 transfer complete. Skipping mesh seeding to preserve privacy.");
+                            info!("[Mesh] 1-to-1 transfer complete. Skipping mesh seeding to preserve privacy.");
                         }
 
                         if std::fs::write(&path, full_data).is_ok() { 
@@ -993,6 +1000,7 @@ impl NetworkService {
                                 start_time_ms: transfer.start_time.elapsed().as_millis() as u64,
                                 speed_bps: 0.0,
                                 group_id: transfer.group_id.clone(),
+                                caption: None,
                             };
                             crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
 
@@ -1013,7 +1021,7 @@ impl NetworkService {
                             tokio::spawn(async move { let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: peer, payload: ack }).await; });
                         }
                     } else {
-                        eprintln!("❌ File integrity FAILED for transfer {}. Expected {}, got {}", transfer_id, transfer.file_hash, actual_hash);
+                        error!("❌ File integrity FAILED for transfer {}. Expected {}, got {}", transfer_id, transfer.file_hash, actual_hash);
                         let error = SignalingPayload::FileTransferError { transfer_id: transfer_id.clone(), reason: "Integrity verification failed".to_string() };
                         let tx = self.command_tx.clone();
                         tokio::spawn(async move { let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: peer, payload: error }).await; });
@@ -1047,7 +1055,7 @@ impl NetworkService {
 
                 let progress = FileTransferProgress { 
                     transfer_id: transfer_id.clone(), 
-                    peer_id: peer.to_string(), 
+                    peer_id: transfer.peer_id.to_string(),  // Use original sender, not chunk relay peer
                     filename: transfer.filename.clone(), 
                     mime_type: transfer.mime_type.clone(),
                     file_hash: transfer.file_hash.clone(),
@@ -1059,6 +1067,7 @@ impl NetworkService {
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps,
                     group_id: transfer.group_id.clone(),
+                    caption: None,
                 };
 
                 let data = serde_json::to_vec(&progress).unwrap_or_default();
@@ -1069,7 +1078,7 @@ impl NetworkService {
                         let content = format!("[FILE]:{}", json_str);
                         let storage = Arc::clone(&self.storage);
                         let gid_clone = gid.clone();
-                        let peer_str = peer.to_string();
+                        let peer_str = transfer.peer_id.to_string();  // Use original sender for DB storage
                         let tid_clone = transfer_id.clone();
                         if !self.is_stress_test {
                             tokio::task::spawn_blocking(move || {
@@ -1081,7 +1090,7 @@ impl NetworkService {
                     if let Ok(json_str) = serde_json::to_string(&progress) {
                         let content = format!("[FILE]:{}", json_str);
                         let storage = Arc::clone(&self.storage);
-                        let peer_str = peer.to_string();
+                        let peer_str = transfer.peer_id.to_string();  // Use original sender for DB storage
                         let tid_clone = transfer_id.clone();
                         if !self.is_stress_test {
                             tokio::task::spawn_blocking(move || {
@@ -1114,17 +1123,17 @@ impl NetworkService {
                             grouped.entry(peer_id).or_default().push(addr);
                         }
                         for (peer_id, addrs) in grouped {
-                            println!("mDNS discovered peer: {} with {} addresses", peer_id, addrs.len());
+                            debug!("mDNS discovered peer: {} with {} addresses", peer_id, addrs.len());
                             
                             // Check if this peer is a static bootstrap node to prevent clearing its bootstrap configuration
                             let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id);
                             if !is_bootstrap {
-                                println!("[Mesh] Clearing stale addresses for peer {} prior to applying new mDNS discoveries.", peer_id);
+                                info!("[Mesh] Clearing stale addresses for peer {} prior to applying new mDNS discoveries.", peer_id);
                                 self.swarm.behaviour_mut().kademlia.remove_peer(&peer_id);
                             }
 
                             for addr in addrs {
-                                println!("  address: {}", addr);
+                                debug!("  address: {}", addr);
                                 self.swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());
                                 // Dial the specific active address directly to bypass PeerId dial backoff
                                 let _ = self.swarm.dial(addr);
@@ -1132,7 +1141,7 @@ impl NetworkService {
                         }
                     }
                     IntrovertBehaviourEvent::Autonat(autonat::Event::StatusChanged { old, new }) => {
-                        println!("[AutoNAT] Reachability changed: {:?} -> {:?}", old, new);
+                        info!("[AutoNAT] Reachability changed: {:?} -> {:?}", old, new);
                         
                         // Clear all WebRTC connections since our network interface changed
                         // CRITICAL: Avoid clearing WebRTC connections during initial boot transition from Unknown.
@@ -1160,7 +1169,7 @@ impl NetworkService {
                         }
                     }
                     IntrovertBehaviourEvent::Identify(identify::Event::Received { peer_id, info, .. }) => {
-                        println!("Identify received from {}: Protocols={:?}", peer_id, info.protocols);
+                        debug!("Identify received from {}: Protocols={:?}", peer_id, info.protocols);
                         self.mesh_active_peers.insert(peer_id);
                         
                         // Add addresses to both Kademlia AND the swarm's direct address book
@@ -1170,7 +1179,7 @@ impl NetworkService {
                         // Clear old Kademlia addresses first to avoid dialing stale dynamic ports (Connection Refused errors)
                         let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id);
                         if !is_bootstrap {
-                            println!("[Mesh] Clearing stale addresses for peer {} prior to applying new Identify listen addresses.", peer_id);
+                            info!("[Mesh] Clearing stale addresses for peer {} prior to applying new Identify listen addresses.", peer_id);
                             self.swarm.behaviour_mut().kademlia.remove_peer(&peer_id);
                         }
 
@@ -1181,7 +1190,7 @@ impl NetworkService {
                             if currently_relayed {
                                 let is_circuit = addr.iter().any(|proto| matches!(proto, libp2p::multiaddr::Protocol::P2pCircuit));
                                 if !is_circuit {
-                                    println!("[Mesh] Attempting direct dial to upgrade relayed connection to {}: {}", peer_id, addr);
+                                    info!("[Mesh] Attempting direct dial to upgrade relayed connection to {}: {}", peer_id, addr);
                                     let _ = self.swarm.dial(addr.clone());
                                 }
                             }
@@ -1191,7 +1200,7 @@ impl NetworkService {
                         let supports_signaling = info.protocols.iter().any(|p| p.to_string().contains("/introvert/signaling/1.0.0"));
                         let supports_hop = info.protocols.iter().any(|p| p.to_string().contains("/libp2p/circuit/relay/0.2.0/hop"));
                         if supports_signaling && supports_hop {
-                            println!("✨ Peer {} supports Introvert Signaling and HOP. Discovered as Anchor.", peer_id);
+                            info!("✨ Peer {} supports Introvert Signaling and HOP. Discovered as Anchor.", peer_id);
                             if !self.discovered_anchors.contains(&peer_id) {
                                 self.discovered_anchors.push(peer_id);
                             }
@@ -1202,7 +1211,7 @@ impl NetworkService {
 
                         if info.protocols.iter().any(|p| p.to_string().contains("/libp2p/circuit/relay/0.2.0/hop")) {
                             if !self.relay_reservations.contains(&peer_id) {
-                                println!("Relay node {} supports HOP. Requesting reservation...", peer_id);
+                                info!("Relay node {} supports HOP. Requesting reservation...", peer_id);
 
                                 // BUG FIX: Construct the FULL multiaddr for the relay reservation.
                                 // We prioritize the first address that looks like a public IP.
@@ -1226,18 +1235,18 @@ impl NetworkService {
 
                                 match self.swarm.listen_on(relay_addr.clone()) {
                                     Ok(id) => {
-                                        println!("[Mesh] Relay listen request SUCCESS. Address: {}, Listener ID: {:?}", relay_addr, id);
+                                        info!("[Mesh] Relay listen request SUCCESS. Address: {}, Listener ID: {:?}", relay_addr, id);
                                         self.relay_reservations.insert(peer_id);
                                         self.relay_listeners.insert(id, peer_id);
                                     },
-                                    Err(e) => println!("[Mesh] Relay listen request FAILED on {}: {:?}", relay_addr, e),
+                                    Err(e) => info!("[Mesh] Relay listen request FAILED on {}: {:?}", relay_addr, e),
                                 }
                             }
                         }
                         // --- RELIABILITY FIX: Flush pending messages only AFTER Identify succeeds ---
                         if supports_signaling {
                             if let Some(payloads) = self.pending_messages.remove(&peer_id) {
-                                println!("[Mesh] Peer {} identified. Flushing {} pending messages.", peer_id, payloads.len());
+                                info!("[Mesh] Peer {} identified. Flushing {} pending messages.", peer_id, payloads.len());
                                 for payload in payloads {
                                     let _ = self.handle_command(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
                                 }
@@ -1247,7 +1256,7 @@ impl NetworkService {
                             let is_anchor = self.discovered_anchors.contains(&peer_id) || 
                                            self.storage.fetch_all_anchor_nodes().map(|nodes| nodes.iter().any(|n| n.peer_id == peer_id.to_string())).unwrap_or(false);
                             if is_anchor {
-                                println!("[Mesh] Anchor {} identified. Draining mailbox...", peer_id);
+                                info!("[Mesh] Anchor {} identified. Draining mailbox...", peer_id);
                                 self.swarm.behaviour_mut().request_response.send_request(&peer_id, SignalingRequest(SignalingPayload::MailboxDrain));
 
                                 // Flush ONLY non-file-chunk payloads for other blocked peers via mailbox.
@@ -1291,7 +1300,7 @@ impl NetworkService {
                     IntrovertBehaviourEvent::RelayClient(event) => {
                         match event {
                             libp2p::relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
-                                println!("✅ Relay reservation ACCEPTED by {}. Renewal: {}", relay_peer_id, renewal);
+                                info!("✅ Relay reservation ACCEPTED by {}. Renewal: {}", relay_peer_id, renewal);
                                 let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
                                 let mut data = relay_peer_id.to_string().into_bytes();
                                 data.push(b':');
@@ -1300,10 +1309,10 @@ impl NetworkService {
                                 crate::dispatch_global_event(10, &[2]);
                             }
                             libp2p::relay::client::Event::OutboundCircuitEstablished { relay_peer_id, .. } => {
-                                println!("🔌 Outbound relay circuit established via {}", relay_peer_id);
+                                info!("🔌 Outbound relay circuit established via {}", relay_peer_id);
                             }
                             libp2p::relay::client::Event::InboundCircuitEstablished { src_peer_id, .. } => {
-                                println!("🔌 Inbound relay circuit established from {}", src_peer_id);
+                                info!("🔌 Inbound relay circuit established from {}", src_peer_id);
                             }
                         }
                     }
@@ -1351,11 +1360,11 @@ impl NetworkService {
                             }
                             if !self.swarm.is_connected(&peer_id) {
                                 if dial_count < 3 {
-                                    println!("[Mesh] Provider {} found via DHT. Constructing relay path dial...", peer_id);
+                                    info!("[Mesh] Provider {} found via DHT. Constructing relay path dial...", peer_id);
                                     self.dial_relay_path(peer_id);
                                     dial_count += 1;
                                 } else {
-                                    println!("[Mesh] Provider {} found via DHT, but dial limit (3) reached. Skipping dial.", peer_id);
+                                    info!("[Mesh] Provider {} found via DHT, but dial limit (3) reached. Skipping dial.", peer_id);
                                 }
                             }
                             
@@ -1364,9 +1373,9 @@ impl NetworkService {
                                 let tx = self.command_tx.clone();
                                 if let Some(gid) = self.resolved_group_codes.get(&key_str).cloned() {
                                     let local_profile = self.storage.get_profile().ok().flatten();
-                                    let alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-                                    let handle = local_profile.as_ref().and_then(|(_, h, _, _)| h.clone());
-                                    let avatar = local_profile.and_then(|(_, _, a, _)| a);
+                                    let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                                    let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                                    let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
                                     tokio::spawn(async move {
                                         let req = SignalingPayload::GroupManifestRequest { group_id: gid, alias, avatar, handle };
                                         let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload: req }).await;
@@ -1388,7 +1397,7 @@ impl NetworkService {
                     IntrovertBehaviourEvent::Kademlia(kad::Event::OutboundQueryProgressed { id, result: kad::QueryResult::GetRecord(Ok(kad::GetRecordOk::FoundRecord(record))), .. }) => {
                         let key_str = String::from_utf8_lossy(record.record.key.as_ref()).into_owned();
                         let value_str = String::from_utf8_lossy(&record.record.value).into_owned();
-                        println!("[Mesh] Kademlia resolved record key: {}, value: {}", key_str, value_str);
+                        info!("[Mesh] Kademlia resolved record key: {}, value: {}", key_str, value_str);
                         
                         // Handle resolution logic
                         if key_str.starts_with("i@") {
@@ -1421,12 +1430,12 @@ impl NetworkService {
                             let handle_resolved = value_str.clone();
                             let my_peer_id = self.swarm.local_peer_id().to_string();
                             if target_peer_id == my_peer_id {
-                                let name = self.storage.get_profile().ok().flatten().and_then(|(n, _, _, _)| n);
-                                let avatar = self.storage.get_profile().ok().flatten().and_then(|(_, _, a, _)| a);
-                                let privacy = self.storage.get_profile().ok().flatten().map(|(_, _, _, p)| p).unwrap_or(1);
+                                let name = self.storage.get_profile().ok().flatten().and_then(|(n, _, _, _, _)| n);
+                                let avatar = self.storage.get_profile().ok().flatten().and_then(|(_, _, a, _, _)| a);
+                                let privacy = self.storage.get_profile().ok().flatten().map(|(_, _, _, p, _)| p).unwrap_or(1);
                                 let _ = self.storage.set_profile(name.as_deref(), Some(&handle_resolved), avatar.as_deref(), privacy);
                                 let _ = self.storage.upsert_handle_claim(&handle_resolved, &my_peer_id, chrono::Utc::now().timestamp(), "[]", true);
-                                println!("[Mesh] Restored handle {} for local profile!", handle_resolved);
+                                info!("[Mesh] Restored handle {} for local profile!", handle_resolved);
                             }
                             
                             // Send Event 37: Peer Handle Restored/Resolved
@@ -1442,9 +1451,9 @@ impl NetworkService {
                         // If we have providers already discovered for this key, query them immediately
                         if let Some(providers) = self.active_providers.get(&key_str).cloned() {
                             let local_profile = self.storage.get_profile().ok().flatten();
-                            let alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-                            let handle = local_profile.as_ref().and_then(|(_, h, _, _)| h.clone());
-                            let avatar = local_profile.and_then(|(_, _, a, _)| a);
+                            let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                            let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                            let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
                             for peer_id in providers {
                                 let tx = self.command_tx.clone();
                                 let gid = value_str.clone();
@@ -1501,7 +1510,7 @@ impl NetworkService {
                         }
                     }
                     IntrovertBehaviourEvent::RequestResponse(request_response::Event::OutboundFailure { request_id, peer, error, .. }) => {
-                        println!("[Mesh] Outbound Request-Response FAILURE to {}: {:?}", peer, error);
+                        info!("[Mesh] Outbound Request-Response FAILURE to {}: {:?}", peer, error);
                         
                         // Decrement in-flight counter for this peer
                         if let Some(count) = self.inflight_requests.get_mut(&peer) {
@@ -1533,28 +1542,28 @@ impl NetworkService {
                             let is_sent_to_anchor = target_peer != peer;
                             if is_file_chunk {
                                 // Pull model: receiver will retry via FileChunkRequest — don't re-queue
-                                println!("[Mesh] FileChunk/Request send failed for {}. Receiver will re-request via pull model.", peer);
+                                info!("[Mesh] FileChunk/Request send failed for {}. Receiver will re-request via pull model.", peer);
                             } else if is_unexpected_eof && is_sent_to_anchor {
-                                println!("[Mesh] Outbound failure to anchor {} was UnexpectedEof. Bypassing re-queue as anchor likely processed it.", peer);
+                                info!("[Mesh] Outbound failure to anchor {} was UnexpectedEof. Bypassing re-queue as anchor likely processed it.", peer);
                             } else {
                                 // For relay peers: force-store in mailbox (bypasses direct delivery entirely).
                                 // Using StoreInMailbox avoids the ForwardMeshSignaling → direct retry → EOF loop.
                                 let is_relay_target = self.is_relayed_map.read().get(&target_peer).cloned().unwrap_or(false);
                                 if is_relay_target {
-                                    println!("[Mesh] Direct relay send failed for {}. Force-storing in mailbox.", peer);
+                                    info!("[Mesh] Direct relay send failed for {}. Force-storing in mailbox.", peer);
                                     let tx = self.command_tx.clone();
                                     tokio::spawn(async move {
                                         let _ = tx.send(NetworkCommand::StoreInMailbox { peer_id: target_peer, payload }).await;
                                     });
                                 } else {
-                                    println!("[Mesh] Re-queuing failed payload for Mailbox routing...");
+                                    info!("[Mesh] Re-queuing failed payload for Mailbox routing...");
                                     self.pending_messages.entry(target_peer).or_default().push(payload);
                                 }
                             }
                         }
 
                         if is_network_failure {
-                            println!("[Mesh] Network failure (Ghost Connection) detected for {}. Forcing disconnect to trigger clean reconnect.", peer);
+                            info!("[Mesh] Network failure (Ghost Connection) detected for {}. Forcing disconnect to trigger clean reconnect.", peer);
                             let _ = self.swarm.disconnect_peer_id(peer);
                         } else if !self.swarm.is_connected(&peer) {
                             self.is_relayed_map.write().remove(&peer);
@@ -1583,7 +1592,7 @@ impl NetworkService {
                         };
                         let key_str = String::from_utf8_lossy(key.as_ref()).into_owned();
                         if key_str.starts_with("i@") {
-                            println!("[Mesh] Failed to resolve handle {}: {:?}", key_str, e);
+                            info!("[Mesh] Failed to resolve handle {}: {:?}", key_str, e);
                             let mut data = key_str.into_bytes();
                             crate::dispatch_global_event(35, &data); // Event 35: Handle Resolve Failed
                         }
@@ -1593,17 +1602,17 @@ impl NetworkService {
                     IntrovertBehaviourEvent::Identify(identify::Event::Sent { .. }) => {}
                     IntrovertBehaviourEvent::Identify(identify::Event::Pushed { .. }) => {}
                     IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Message { propagation_source, message_id, message }) => {
-                        println!("[Mesh] Received gossipsub message from {} with id {}", propagation_source, message_id);
+                        info!("[Mesh] Received gossipsub message from {} with id {}", propagation_source, message_id);
+                        // Use message.source (original author) when available, fall back to propagation_source (relay peer)
+                        let author_peer = message.source.unwrap_or(propagation_source);
                         self.mesh_active_peers.insert(propagation_source);
                         if let Ok(payload) = serde_json::from_slice::<SignalingPayload>(&message.data) {
-                            // Determine the peer id from the message source or payload if applicable.
                             // The actual signer is verified inside handle_single_payload via GroupManager::verify_action.
-                            // We can pass propagation_source as the "peer" for now.
-                            self.handle_single_payload(propagation_source, payload, false).await;
+                            self.handle_single_payload(author_peer, payload, false).await;
                         }
                     }
                     IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Subscribed { peer_id, topic }) => {
-                        println!("[Mesh] Peer {} subscribed to topic {}", peer_id, topic);
+                        info!("[Mesh] Peer {} subscribed to topic {}", peer_id, topic);
                         self.mesh_active_peers.insert(peer_id);
                     }
                     IntrovertBehaviourEvent::Gossipsub(_) => {}
@@ -1612,15 +1621,15 @@ impl NetworkService {
                     IntrovertBehaviourEvent::Autonat(_) => {}
                     _ => {
                         // Only log truly unexpected behaviour events
-                        println!("[Swarm Debug] Unhandled behaviour event: {:?}", b_event);
+                        debug!("[Swarm Debug] Unhandled behaviour event: {:?}", b_event);
                     }
                 }
             }
             SwarmEvent::NewListenAddr { address, .. } => {
-                println!("[Swarm] New listen address: {}", address);
+                debug!("[Swarm] New listen address: {}", address);
             }
             SwarmEvent::ExternalAddrConfirmed { address } => {
-                println!("[Swarm] External address CONFIRMED: {}", address);
+                debug!("[Swarm] External address CONFIRMED: {}", address);
                 // Proactively bootstrap and re-dial RBNs on address confirmation to update DHT/Relay
                 let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
                 for (_, addr) in self.bootstrap_nodes.clone() {
@@ -1628,10 +1637,10 @@ impl NetworkService {
                 }
             }
             SwarmEvent::ExternalAddrExpired { address } => {
-                println!("[Swarm] External address EXPIRED: {}", address);
+                debug!("[Swarm] External address EXPIRED: {}", address);
                 // If our only external address expired, we might be transitioning networks
                 if self.swarm.external_addresses().count() == 0 {
-                    println!("[Swarm] All external addresses expired. Forcing mesh re-entry...");
+                    debug!("[Swarm] All external addresses expired. Forcing mesh re-entry...");
                     for (peer_id, addr) in self.bootstrap_nodes.clone() {
                         self.swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
                     }
@@ -1640,17 +1649,17 @@ impl NetworkService {
             }
 
             SwarmEvent::ListenerError { listener_id, error, .. } => {
-                println!("[Swarm] Listener error ({:?}): {:?}", listener_id, error);
+                debug!("[Swarm] Listener error ({:?}): {:?}", listener_id, error);
             }
             SwarmEvent::ListenerClosed { listener_id, reason, .. } => {
-                println!("[Swarm] Listener closed ({:?}): {:?}", listener_id, reason);
+                debug!("[Swarm] Listener closed ({:?}): {:?}", listener_id, reason);
                 if let Some(peer_id) = self.relay_listeners.remove(&listener_id) {
-                    println!("[Mesh] Relay listener for {} closed. Clearing reservation record.", peer_id);
+                    info!("[Mesh] Relay listener for {} closed. Clearing reservation record.", peer_id);
                     self.relay_reservations.remove(&peer_id);
                 }
             }
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                println!("[Swarm] Connection established with {}", peer_id);
+                debug!("[Swarm] Connection established with {}", peer_id);
 
                 // If this is a direct (non-relayed) connection, save the address as a potential relay mapping
                 if !endpoint.is_relayed() {
@@ -1678,14 +1687,14 @@ impl NetworkService {
                 let we_are_anchor = self.storage.is_anchor_mode_enabled();
 
                 if (is_rbn || is_anchor) && !we_are_anchor && !self.relay_reservations.contains(&peer_id) {
-                    println!("[Mesh] Requesting RELAY RESERVATION from anchor: {}", peer_id);
+                    info!("[Mesh] Requesting RELAY RESERVATION from anchor: {}", peer_id);
                     if let Ok(addr) = format!("/p2p/{}/p2p-circuit", peer_id).parse() {
                         match self.swarm.listen_on(addr) {
                             Ok(id) => {
                                 self.relay_reservations.insert(peer_id);
                                 self.relay_listeners.insert(id, peer_id);
                             }
-                            Err(e) => println!("[Mesh] Relay reservation failed: {:?}", e),
+                            Err(e) => info!("[Mesh] Relay reservation failed: {:?}", e),
                         }
                     }
                 }
@@ -1767,7 +1776,7 @@ impl NetworkService {
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
                    self.is_relayed_map.write().remove(&peer_id);
                    self.direct_conn_count.remove(&peer_id);
-                   println!("[Swarm] Connection lost with {}. Peer is now truly offline.", peer_id);
+                   debug!("[Swarm] Connection lost with {}. Peer is now truly offline.", peer_id);
 
                     let mut data = peer_id.to_string().into_bytes();
                     data.push(b':');
@@ -1800,12 +1809,12 @@ impl NetworkService {
             SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
                 if let Some(pid) = peer_id {
                     if pid == *self.swarm.local_peer_id() { return Ok(()); }
-                    println!("[Swarm] Outgoing connection error for peer {}: {:?}", pid, error);
+                    debug!("[Swarm] Outgoing connection error for peer {}: {:?}", pid, error);
 
                     // Clean up the failed address from Kademlia to stop propagating stale routes
                     if let libp2p::swarm::DialError::Transport(errors) = &error {
                         for (addr, _) in errors {
-                            println!("[Mesh] Removing failed address {} from Kademlia for peer {}", addr, pid);
+                            info!("[Mesh] Removing failed address {} from Kademlia for peer {}", addr, pid);
                             self.swarm.behaviour_mut().kademlia.remove_address(&pid, addr);
                         }
                     }
@@ -1836,7 +1845,7 @@ impl NetworkService {
         }
         self.relay_dial_limiter.insert(recipient_id, Instant::now());
 
-        println!("[Mesh] Peer {} not connected. Constructing relay paths...", recipient_str);
+        info!("[Mesh] Peer {} not connected. Constructing relay paths...", recipient_str);
 
         // 1. Dial ALL port 443 RBN nodes (matching stable v11 robustness)
         for (rbn_id, rbn_addr) in self.bootstrap_nodes.clone() {
@@ -1875,7 +1884,7 @@ impl NetworkService {
                         .with(libp2p::multiaddr::Protocol::P2pCircuit)
                         .with(libp2p::multiaddr::Protocol::P2p(recipient_id));
                     
-                    println!("[Mesh] Dialing recipient {} via extra anchor relay: {}", recipient_id, relay_addr);
+                    info!("[Mesh] Dialing recipient {} via extra anchor relay: {}", recipient_id, relay_addr);
                     let _ = self.swarm.dial(relay_addr);
                     extra_dial_count += 1;
                 }
@@ -1891,7 +1900,7 @@ impl NetworkService {
 
         // LOOPBACK PROTECTION: If sending to ourselves, handle locally
         if recipient_id == *self.swarm.local_peer_id() {
-             println!("[Mesh] Loopback payload detected for {}. Routing to local handler.", recipient_str);
+             info!("[Mesh] Loopback payload detected for {}. Routing to local handler.", recipient_str);
              let tx = self.command_tx.clone();
              let p = payload.clone();
              tokio::spawn(async move {
@@ -1921,10 +1930,10 @@ impl NetworkService {
                         }
                         if let Ok(bytes) = serde_json::to_vec(&payload) {
                             if dc.send(&bytes.into()).await.is_ok() {
-                                println!("[Mesh] Delivered payload to {} via WebRTC Data Channel", recipient_str);
+                                info!("[Mesh] Delivered payload to {} via WebRTC Data Channel", recipient_str);
                                 return Ok(());
                             } else {
-                                println!("[Mesh] WebRTC Data Channel send FAILED for {}. Removing and closing WebRTC resources.", recipient_str);
+                                info!("[Mesh] WebRTC Data Channel send FAILED for {}. Removing and closing WebRTC resources.", recipient_str);
                                 self.data_channels.write().remove(&recipient_id);
                                 let pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&recipient_id) };
                                 if let Some(pc) = pc {
@@ -1944,13 +1953,13 @@ impl NetworkService {
                     let inflight = self.inflight_requests.get(&recipient_id).cloned().unwrap_or(0);
                     let limit = if is_relayed_conn { 4 } else { 8 };
                     if inflight >= limit {
-                        println!("[Mesh] In-flight limit ({}) reached for {}. Buffering chunk.", limit, recipient_str);
+                        info!("[Mesh] In-flight limit ({}) reached for {}. Buffering chunk.", limit, recipient_str);
                         self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
                         return Ok(());
                     }
                 }
 
-                println!("[Mesh] Peer {} is connected. Attempting direct delivery...", recipient_str);
+                info!("[Mesh] Peer {} is connected. Attempting direct delivery...", recipient_str);
                 let mut sent = false;
                 // If it's a message/ack that can be encrypted, try Noise.
                 // NOTE: FileChunk is intentionally excluded from Noise on relay connections:
@@ -1968,8 +1977,8 @@ impl NetworkService {
                     SignalingPayload::SetRetention { .. } |
                     SignalingPayload::ChatSyncRequest { .. } |
                     SignalingPayload::ChatSyncResponse { .. } => true,
-                    // Only encrypt FileChunk over direct (non-relay) connections
-                    SignalingPayload::FileChunk { .. } => !is_relayed_conn,
+                    // FileChunk never uses app-level Noise — libp2p already encrypts
+                    SignalingPayload::FileChunk { .. } => false,
                     _ => false,
                 };
                 if noise_eligible {
@@ -1978,12 +1987,12 @@ impl NetworkService {
                         if session.is_finished() {
                             if let Ok(bytes) = serde_json::to_vec(&payload) {
                                 if let Ok(encrypted) = session.send_message(&bytes) {
-                                    println!("[Mesh] Sending ENCRYPTED payload to {}", recipient_str);
+                                    info!("[Mesh] Sending ENCRYPTED payload to {}", recipient_str);
                                     let req_id = self.swarm.behaviour_mut().request_response.send_request(&recipient_id, SignalingRequest(SignalingPayload::Secure(SecureMessage::Transport(encrypted))));
                                     self.outbound_tracker.insert(req_id, (recipient_id, payload.clone()));
                                     sent = true;
                                 } else {
-                                    println!("[Mesh] Noise encryption FAILED for {}. Clearing session and starting a new handshake.", recipient_str);
+                                    info!("[Mesh] Noise encryption FAILED for {}. Clearing session and starting a new handshake.", recipient_str);
                                     self.noise_sessions.remove(&recipient_id);
                                     let storage = Arc::clone(&self.storage);
                                     let pid_str = recipient_id.to_string();
@@ -2001,7 +2010,7 @@ impl NetworkService {
                 }
 
                 if !sent {
-                    println!("[Mesh] Sending PLAIN payload to {}", recipient_str);
+                    info!("[Mesh] Sending PLAIN payload to {}", recipient_str);
                     let req_id = self.swarm.behaviour_mut().request_response.send_request(&recipient_id, SignalingRequest(payload.clone()));
                     self.outbound_tracker.insert(req_id, (recipient_id, payload.clone()));
                 }
@@ -2018,32 +2027,21 @@ impl NetworkService {
         }
         // 4. Fallback: Persistent Mesh Storage (Mailbox)
         
-        // Check for Push Token to trigger background wakeup (iOS/Android parity)
+        // Send FCM push notification to wake the recipient's device
         if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-            println!("[Registry] 🔔 Triggering Push Wakeup for {} ({})", recipient_str, device_type);
-            let client = reqwest::Client::new();
-            let peer_id_clone = recipient_str.clone();
+            let fcm = self.fcm.clone();
+            let peer_id_str = self.swarm.local_peer_id().to_string();
+            let device_type = device_type.clone();
+            let token = token.clone();
+            info!("[FCM] Triggering Push Wakeup for {} ({})", recipient_str, device_type);
             tokio::spawn(async move {
-                // Send generic wakeup trigger to the sovereign push bridge (Anonymized)
-                use sha2::{Sha256, Digest};
-                let anonymized_peer_id = hex::encode(Sha256::digest(peer_id_clone.as_bytes()));
-                
-                let payload = serde_json::json!({
-                    "device_type": device_type,
-                    "token": token,
-                    "peer_id_hash": anonymized_peer_id
-                });
-                let _ = client.post("https://push.introvert.network/wakeup")
-                    .json(&payload)
-                    .timeout(Duration::from_secs(5))
-                    .send()
-                    .await;
+                fcm.send_push(&device_type, &token, &peer_id_str).await;
             });
         }
 
         // WebRTC signaling and handle claims are transient and should never be stored in persistent mailboxes.
         if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. }) {
-            println!("[Mesh] Buffering real-time signaling/handle registry payload for {} in RAM...", recipient_str);
+            info!("[Mesh] Buffering real-time signaling/handle registry payload for {} in RAM...", recipient_str);
             self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
             return Ok(());
         }
@@ -2051,7 +2049,7 @@ impl NetworkService {
         // CRITICAL: File data and requests must NEVER be stored in the persistent mailbox.
         // They are buffered in RAM (pending_messages) and flushed only upon circuit establishment.
         if matches!(payload, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
-            println!("[Mesh] Path not ready. Buffering file chunk/request for {} in RAM...", recipient_str);
+            info!("[Mesh] Path not ready. Buffering file chunk/request for {} in RAM...", recipient_str);
             // REDUNDANCY FILTER: If adding a Request, remove older Requests for the same transfer to prevent buffer bloat
             if let SignalingPayload::FileChunkRequest { ref transfer_id, .. } = payload {
                 if let Some(pending) = self.pending_messages.get_mut(&recipient_id) {
@@ -2102,7 +2100,7 @@ impl NetworkService {
                 return Ok(());
             }
 
-            println!("[Mesh] Storing message for {} on Anchor {}", recipient_str, anchor_id);
+            info!("[Mesh] Storing message for {} on Anchor {}", recipient_str, anchor_id);
             
             // Ensure Mailbox payloads are only ENCRYPTED if they are noise-eligible (Messages/Standard)
             // and a session exists. Transient payloads like Acknowledgements should remain PLAIN 
@@ -2124,7 +2122,7 @@ impl NetworkService {
                     // Proactively initiate session for contacts
                     if let Ok(contacts) = self.storage.get_all_contacts() {
                         if contacts.iter().any(|c| c.peer_id == recipient_str) {
-                            println!("[Mesh] Initiating Noise session with contact {} for Mailbox delivery", recipient_str);
+                            info!("[Mesh] Initiating Noise session with contact {} for Mailbox delivery", recipient_str);
                             let tx = self.command_tx.clone();
                             let rid = recipient_id;
                             tokio::spawn(async move { let _ = tx.send(NetworkCommand::EstablishSecureSession { peer_id: rid }).await; });
@@ -2148,7 +2146,7 @@ impl NetworkService {
             Ok(())
         } else {
             // No connected anchors for storage. Queue locally in RAM for when we eventually connect.
-            println!("[Mesh] No connected anchors for storage. Queuing locally for {}.", recipient_str);
+            info!("[Mesh] No connected anchors for storage. Queuing locally for {}.", recipient_str);
             let pending = self.pending_messages.entry(recipient_id).or_default();
             
             // Deduplicate Chunks/Requests to keep RAM lean
@@ -2178,7 +2176,7 @@ impl NetworkService {
         
         for peer_id in anchor_ids {
             if self.swarm.is_connected(&peer_id) { 
-                println!("[Mesh] Draining verified anchor: {}", peer_id);
+                info!("[Mesh] Draining verified anchor: {}", peer_id);
                 self.swarm.behaviour_mut().request_response.send_request(&peer_id, SignalingRequest(SignalingPayload::MailboxDrain));
             } else { 
                 let _ = self.swarm.dial(peer_id); 
@@ -2221,10 +2219,10 @@ impl NetworkService {
                 let key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
                 
                 if enabled {
-                    println!("[Mesh] Opting in as Anchor Node. Advertising to DHT...");
+                    info!("[Mesh] Opting in as Anchor Node. Advertising to DHT...");
                     let _ = self.swarm.behaviour_mut().kademlia.start_providing(key);
                 } else {
-                    println!("[Mesh] Opting out of Anchor services.");
+                    info!("[Mesh] Opting out of Anchor services.");
                     let _ = self.swarm.behaviour_mut().kademlia.stop_providing(&key);
                 }
 
@@ -2232,19 +2230,19 @@ impl NetworkService {
                 crate::dispatch_global_event(11, &payload);
             }
             NetworkCommand::AddGroupMember { group_id, peer_id } => {
-                println!("[Mesh] Adding member {} to group {}", peer_id, group_id);
+                info!("[Mesh] Adding member {} to group {}", peer_id, group_id);
                 if let Ok(Some(group_info)) = self.storage.get_group(&group_id) {
                     let mut members: Vec<GroupMemberMetadata> = serde_json::from_str(&group_info.members_json).unwrap_or_default();
                     let my_peer_id = self.swarm.local_peer_id().to_string();
                     
                     let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                     if !is_admin {
-                        eprintln!("[Mesh] Permission denied: Only admins can add members");
+                        error!("[Mesh] Permission denied: Only admins can add members");
                         return Ok(());
                     }
 
                     if members.iter().any(|m| m.peer_id == peer_id) {
-                        println!("[Mesh] Peer {} is already a member", peer_id);
+                        info!("[Mesh] Peer {} is already a member", peer_id);
                         return Ok(());
                     }
 
@@ -2286,18 +2284,18 @@ impl NetworkService {
                             }
                         }
                     } else {
-                        eprintln!("[Mesh] Cannot add member: Peer {} is not in contacts list", peer_id);
+                        error!("[Mesh] Cannot add member: Peer {} is not in contacts list", peer_id);
                     }
                 }
             }
             NetworkCommand::ApproveGroupJoin { group_id, requester_peer_id, alias, avatar, handle: _handle } => {
-                println!("[Mesh] Admin approving group join request for {} to group {}", requester_peer_id, group_id);
+                info!("[Mesh] Admin approving group join request for {} to group {}", requester_peer_id, group_id);
                 if let Ok(Some(group_info)) = self.storage.get_group(&group_id) {
                     let mut members: Vec<GroupMemberMetadata> = serde_json::from_str(&group_info.members_json).unwrap_or_default();
                     let my_peer_id = self.swarm.local_peer_id().to_string();
 
                     if members.iter().any(|m| m.peer_id == requester_peer_id) {
-                        println!("[Mesh] Peer {} is already a member", requester_peer_id);
+                        info!("[Mesh] Peer {} is already a member", requester_peer_id);
                         return Ok(());
                     }
 
@@ -2348,7 +2346,7 @@ impl NetworkService {
                 }
             }
             NetworkCommand::RejectGroupJoin { group_id, requester_peer_id, reason } => {
-                println!("[Mesh] Admin rejecting group join request for {} to group {}", requester_peer_id, group_id);
+                info!("[Mesh] Admin rejecting group join request for {} to group {}", requester_peer_id, group_id);
                 if let Ok(Some(group_info)) = self.storage.get_group(&group_id) {
                     if let Ok(peer) = requester_peer_id.parse::<PeerId>() {
                         let reject_payload = SignalingPayload::GroupJoinRejected {
@@ -2361,7 +2359,7 @@ impl NetworkService {
                 }
             }
             NetworkCommand::RemoveGroupMember { group_id, peer_id, members_json } => {
-                println!("[Mesh] Removing member {} from group {}", peer_id, group_id);
+                info!("[Mesh] Removing member {} from group {}", peer_id, group_id);
                 
                 let group_data = if let Some(mj) = members_json {
                     Some(mj)
@@ -2378,13 +2376,13 @@ impl NetworkService {
                     
                     let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                     if !is_admin && !is_self {
-                        eprintln!("[Mesh] Permission denied: Only admins can remove members");
+                        error!("[Mesh] Permission denied: Only admins can remove members");
                         return Ok(());
                     }
 
                     if let Some(pos) = members.iter().position(|m| m.peer_id == peer_id) {
                         if members[pos].role == GroupRole::Creator {
-                            eprintln!("[Mesh] Permission denied: Creator cannot leave or be removed from the group");
+                            error!("[Mesh] Permission denied: Creator cannot leave or be removed from the group");
                             return Ok(());
                         }
 
@@ -2420,20 +2418,20 @@ impl NetworkService {
                 }
             }
             NetworkCommand::UpdateGroupRole { group_id, peer_id, role } => {
-                println!("[Mesh] Updating member {} role in group {} to {:?}", peer_id, group_id, role);
+                info!("[Mesh] Updating member {} role in group {} to {:?}", peer_id, group_id, role);
                 if let Ok(Some(group_info)) = self.storage.get_group(&group_id) {
                     let mut members: Vec<GroupMemberMetadata> = serde_json::from_str(&group_info.members_json).unwrap_or_default();
                     let my_peer_id = self.swarm.local_peer_id().to_string();
                     
                     let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                     if !is_admin {
-                        eprintln!("[Mesh] Permission denied: Only admins can update roles");
+                        error!("[Mesh] Permission denied: Only admins can update roles");
                         return Ok(());
                     }
 
                     if let Some(pos) = members.iter().position(|m| m.peer_id == peer_id) {
                         if members[pos].role == GroupRole::Creator {
-                            eprintln!("[Mesh] Permission denied: Cannot change creator's role");
+                            error!("[Mesh] Permission denied: Cannot change creator's role");
                             return Ok(());
                         }
 
@@ -2456,7 +2454,7 @@ impl NetworkService {
             }
         }
             NetworkCommand::PublishGroupManifest { group_id, code } => {
-                println!("[Mesh] Publishing discovery record for Sovereign Group: {}", group_id);
+                info!("[Mesh] Publishing discovery record for Sovereign Group: {}", group_id);
                 // SECURITY HARDENING: Never publish the group secret to the DHT.
                 let key = RecordKey::new(&code.as_bytes());
                 let record = libp2p::kad::Record {
@@ -2469,13 +2467,13 @@ impl NetworkService {
                 let _ = self.swarm.behaviour_mut().kademlia.start_providing(key);
             }
             NetworkCommand::JoinMeshByCode { code } => {
-                println!("[Mesh] Searching for Sovereign Group via code: {}", code);
+                info!("[Mesh] Searching for Sovereign Group via code: {}", code);
                 let key = RecordKey::new(&code.as_bytes());
                 let _ = self.swarm.behaviour_mut().kademlia.get_providers(key.clone());
                 let _ = self.swarm.behaviour_mut().kademlia.get_record(key);
             }
             NetworkCommand::ResolveHandle { handle } => {
-                println!("[Mesh] Resolving handle {} via DHT...", handle);
+                info!("[Mesh] Resolving handle {} via DHT...", handle);
                 let key = RecordKey::new(&handle.as_bytes());
                 let _ = self.swarm.behaviour_mut().kademlia.get_record(key);
             }
@@ -2488,7 +2486,7 @@ impl NetworkService {
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
             NetworkCommand::ClaimHandle { handle } => {
-                println!("[Registry] Initiating claim for handle: {}", handle);
+                info!("[Registry] Initiating claim for handle: {}", handle);
                 let my_peer_id = self.swarm.local_peer_id().to_string();
                 let timestamp = Utc::now().timestamp();
                 
@@ -2534,7 +2532,7 @@ impl NetworkService {
                  }
             }
             NetworkCommand::AcceptGroupInvite { group_id } => {
-                println!("[Mesh] Accepting group invite for: {}", group_id);
+                info!("[Mesh] Accepting group invite for: {}", group_id);
                 if let Ok(Some(invite)) = self.storage.get_pending_invite(&group_id) {
                     if let Ok(group_secret) = group::GroupManager::unwrap_group_secret(&invite.group_secret_wrapped, &self.local_static_secret) {
                         let _ = self.storage.save_group_secret(&group_id, &group_secret);
@@ -2542,7 +2540,7 @@ impl NetworkService {
                         let _ = self.storage.delete_pending_invite(&group_id);
                         let _ = self.storage.untombstone_group(&group_id);
                         crate::dispatch_global_event(23, group_id.as_bytes());
-                        println!("[Mesh] ✅ Group invite accepted: {}", invite.name);
+                        info!("[Mesh] ✅ Group invite accepted: {}", invite.name);
 
                         // --- RELIABILITY FIX: Proactive Member Discovery ---
                         // Immediately attempt to dial all group members to establish the mesh.
@@ -2551,30 +2549,30 @@ impl NetworkService {
                         for m in members {
                             if m.peer_id == my_peer_id { continue; }
                             if let Ok(pid) = m.peer_id.parse::<PeerId>() {
-                                println!("[Mesh] Proactively dialing group member {} for mesh {}", pid, invite.name);
+                                info!("[Mesh] Proactively dialing group member {} for mesh {}", pid, invite.name);
                                 self.dial_relay_path(pid);
                             }
                         }
                     } else {
-                        eprintln!("[Mesh] ❌ Failed to unwrap group secret for {}", group_id);
+                        error!("[Mesh] ❌ Failed to unwrap group secret for {}", group_id);
                     }
                 } else {
-                    eprintln!("[Mesh] No pending invite found for group: {}", group_id);
+                    error!("[Mesh] No pending invite found for group: {}", group_id);
                 }
             }
             NetworkCommand::DeclineGroupInvite { group_id } => {
-                println!("[Mesh] Declining group invite for: {}", group_id);
+                info!("[Mesh] Declining group invite for: {}", group_id);
                 let _ = self.storage.delete_pending_invite(&group_id);
-                println!("[Mesh] ✅ Group invite declined and removed.");
+                info!("[Mesh] ✅ Group invite declined and removed.");
             }
             NetworkCommand::PublishGossipsub { topic, data } => {
                 let ident_topic = libp2p::gossipsub::IdentTopic::new(topic.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.publish(ident_topic, data) {
-                    eprintln!("[Mesh] ❌ Failed to publish gossipsub message to topic {}: {:?}", topic, e);
+                    error!("[Mesh] ❌ Failed to publish gossipsub message to topic {}: {:?}", topic, e);
                 }
             }
             NetworkCommand::BroadcastGroupMessage { group_id, message, reply_to } => {
-                println!("[Mesh] Internal Broadcast for group {}: {}", group_id, message);
+                info!("[Mesh] Internal Broadcast for group {}: {}", group_id, message);
                 let storage = self.storage.clone();
                 let gid = group_id.clone();
                 let keypair = self.local_keypair.clone();
@@ -2585,7 +2583,7 @@ impl NetworkService {
                     // Check if we are muted before broadcasting
                     if let Ok(muted) = storage.get_group_muted_members(&gid) {
                         if muted.contains(&my_peer_id) {
-                            eprintln!("[Mesh] ❌ Blocked broadcast: User is MUTED in group {}", gid);
+                            error!("[Mesh] ❌ Blocked broadcast: User is MUTED in group {}", gid);
                             return;
                         }
                     }
@@ -2657,7 +2655,7 @@ impl NetworkService {
                 self.active_seeders.remove(&transfer_id);
             }
             NetworkCommand::FindProviders { file_hash } => {
-                println!("[Mesh] Searching Sovereign Swarm for providers of file: {}", file_hash);
+                info!("[Mesh] Searching Sovereign Swarm for providers of file: {}", file_hash);
                 let key = RecordKey::new(&file_hash.as_bytes());
                 let _ = self.swarm.behaviour_mut().kademlia.get_providers(key);
             }
@@ -2666,7 +2664,7 @@ impl NetworkService {
                 
                 // If peer_id == local_id, it's a group broadcast share from Drive.
                 if peer_id == local_id && group_id.is_some() {
-                     println!("[Mesh] Group-wide file share detected for {}. Bypassing direct negotiation.", group_id.as_ref().unwrap());
+                     info!("[Mesh] Group-wide file share detected for {}. Bypassing direct negotiation.", group_id.as_ref().unwrap());
                      let tx = self.command_tx.clone();
                      let storage = self.storage.clone();
                      let is_stress = self.is_stress_test;
@@ -2691,7 +2689,7 @@ impl NetworkService {
 
                 if !has_dc_already && !already_direct {
                     // Kick off WebRTC negotiation — the spawn below will wait for it
-                    println!("[Mesh] File transfer to {} initiated. Auto-negotiating WebRTC Data Channel...", peer_id);
+                    info!("[Mesh] File transfer to {} initiated. Auto-negotiating WebRTC Data Channel...", peer_id);
                     let tx_webrtc = self.command_tx.clone();
                     let pid_webrtc = peer_id;
                     tokio::spawn(async move {
@@ -2777,7 +2775,7 @@ impl NetworkService {
                 let _ = self.forward_to_mesh(peer_id, payload, true).await;
             }
             NetworkCommand::CancelFileTransfer { transfer_id } => {
-                println!("[Mesh] Cancelling file transfer: {}", transfer_id);
+                info!("[Mesh] Cancelling file transfer: {}", transfer_id);
                 self.active_seeders.remove(&transfer_id);
                 self.incoming_transfers.remove(&transfer_id);
             }
@@ -2788,7 +2786,7 @@ impl NetworkService {
                 self.handle_signaling_payload(peer_id, payload, true).await;
             }
             NetworkCommand::ForceMeshRefresh => {
-                println!("[Network] Force Mesh Refresh triggered. Performing HARD RESET of networking stack.");
+                info!("[Network] Force Mesh Refresh triggered. Performing HARD RESET of networking stack.");
                 // Immediately notify UI we are connecting
                 crate::dispatch_global_event(10, &[3]); 
 
@@ -2807,7 +2805,7 @@ impl NetworkService {
                     self.swarm.behaviour_mut().kademlia.add_address(&peer_id, addr.clone());
                     // Aggressively dial Introvert RBN node first
                     if addr.to_string().contains("443") {
-                        println!("[Network] Aggressively dialing hardened RBN: {}", addr);
+                        info!("[Network] Aggressively dialing hardened RBN: {}", addr);
                         let _ = self.swarm.dial(addr);
                     }
                 }
@@ -2826,12 +2824,13 @@ impl NetworkService {
                 });
 
                 if let Err(e) = MediaManager::add_media_tracks(Arc::clone(&pc), media_type).await {
-                    eprintln!("❌ Failed to add media tracks: {:?}", e);
+                    error!("❌ Failed to add media tracks: {:?}", e);
                 }
 
                 let offer_sdp = MediaManager::create_offer(Arc::clone(&pc)).await?;
                 self.peer_connections.write().insert(peer_id, pc);
-                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp };
+                let purpose = if media_type == 3 { Some("file_transfer".to_string()) } else { None };
+                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp, purpose };
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
                     if session.is_finished() {
@@ -2862,12 +2861,12 @@ impl NetworkService {
                         });
 
                         if let Err(e) = MediaManager::add_media_tracks(Arc::clone(&pc), media_type).await {
-                            eprintln!("❌ Failed to add media tracks: {:?}", e);
+                            error!("❌ Failed to add media tracks: {:?}", e);
                         }
 
                         if let Ok(answer_sdp) = MediaManager::handle_offer(offer_sdp, Arc::clone(&pc)).await {
                             self.peer_connections.write().insert(peer_id, pc);
-                            let response = WebRtcSignal { signal_type: "answer".to_owned(), sdp: answer_sdp };
+                            let response = WebRtcSignal { signal_type: "answer".to_owned(), sdp: answer_sdp, purpose: None };
                             
                             let mut is_secure = false;
                             if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
@@ -2889,7 +2888,7 @@ impl NetworkService {
             }
             NetworkCommand::RejectWebRtc { peer_id } => {
                 self.pending_offers.remove(&peer_id);
-                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned() };
+                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned(), purpose: None };
                 
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
@@ -2907,7 +2906,7 @@ impl NetworkService {
                 }
             }
             NetworkCommand::CloseWebRtc { peer_id } => { 
-                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned() };
+                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned(), purpose: None };
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
                     if session.is_finished() {
@@ -2931,7 +2930,7 @@ impl NetworkService {
                 crate::dispatch_global_event(16, &data);
             }
             NetworkCommand::WebRtcFailed { peer_id } => {
-                println!("Peer Connection State has changed: failed");
+                info!("Peer Connection State has changed: failed");
                 self.data_channels.write().remove(&peer_id);
                 let pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer_id) };
                 if let Some(pc) = pc { let _ = pc.close().await; }
@@ -2997,7 +2996,7 @@ impl NetworkService {
 
                 let offer_sdp = MediaManager::create_offer(Arc::clone(&pc)).await?;
                 self.peer_connections.write().insert(peer_id, pc);
-                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp };
+                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp, purpose: None };
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
                     if session.is_finished() {
@@ -3028,7 +3027,7 @@ impl NetworkService {
                     let pid_str = peer_id_str.clone();
                     let contact = tokio::task::spawn_blocking(move || storage_contact.get_contact(&pid_str)).await??;
                     if let Some(identity) = contact {
-                        println!("[Mesh] Establishing secure session: Initiator role for peer {}", peer_id_str);
+                        info!("[Mesh] Establishing secure session: Initiator role for peer {}", peer_id_str);
                         let mut session = NoiseSession::initiator(self.local_static_secret.to_bytes().as_slice(), &identity.static_key)?;
                         let handshake_msg = session.send_message(&[])?;
                         let storage_save = Arc::clone(&self.storage);
@@ -3050,7 +3049,7 @@ impl NetworkService {
                                 if let Ok(decrypted) = cipher.decrypt(nonce, &encrypted_blob[12..]) {
                                     if let Ok(state) = bincode::deserialize::<crate::network::noise_session::NoiseSessionState>(&decrypted) {
                                         if let Some(remote_pk) = &state.remote_public {
-                                            println!("[Mesh] Establishing secure session: Initiator role (loaded from cache) for peer {}", peer_id_str);
+                                            info!("[Mesh] Establishing secure session: Initiator role (loaded from cache) for peer {}", peer_id_str);
                                             let mut session = NoiseSession::initiator(self.local_static_secret.to_bytes().as_slice(), remote_pk)?;
                                             let handshake_msg = session.send_message(&[])?;
                                             let storage_save = Arc::clone(&self.storage);
@@ -3066,20 +3065,20 @@ impl NetworkService {
                             }
                         }
 
-                        println!("[Mesh] Peer {} not in contacts. Querying Kademlia for identity...", peer_id_str);
+                        info!("[Mesh] Peer {} not in contacts. Querying Kademlia for identity...", peer_id_str);
                         let key = RecordKey::new(&peer_id.to_bytes());
                         let query_id = self.swarm.behaviour_mut().kademlia.get_record(key);
                         self.pending_handshakes.insert(query_id, peer_id);
                     }
                 } else {
-                    println!("[Mesh] Establishing secure session: Responder role for peer {}", peer_id_str);
+                    info!("[Mesh] Establishing secure session: Responder role for peer {}", peer_id_str);
                     if let Ok(session) = NoiseSession::responder(self.local_static_secret.to_bytes().as_slice()) {
                         self.noise_sessions.insert(peer_id, session);
                     }
                 }
             }
             NetworkCommand::RecheckConnection { peer_id } => {
-                println!("[Diagnostics] Starting connection recheck for peer {}", peer_id);
+                info!("[Diagnostics] Starting connection recheck for peer {}", peer_id);
 
                 // Register diagnostic state
                 self.pending_diagnostics.insert(peer_id, PendingDiagnostic {
@@ -3150,12 +3149,12 @@ impl NetworkService {
                 }
             }
             NetworkCommand::PollPeerProfile { peer_id } => {
-                println!("[Mesh] Polling profile for peer: {}", peer_id);
+                info!("[Mesh] Polling profile for peer: {}", peer_id);
                 let payload = SignalingPayload::ProfileRequest;
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
             NetworkCommand::SyncChatMessages { peer_id, chat_id, is_group, is_full } => {
-                println!("[Mesh] Syncing messages for chat: {} (group={}, full={})", chat_id, is_group, is_full);
+                info!("[Mesh] Syncing messages for chat: {} (group={}, full={})", chat_id, is_group, is_full);
                 let storage = Arc::clone(&self.storage);
                 let chat_id_clone = chat_id.clone();
                 let is_group_clone = is_group;
@@ -3178,7 +3177,7 @@ impl NetworkService {
                     }).await.unwrap_or_default()
                 };
 
-                println!("[Mesh] Sending sync request with {} known IDs (full={})", known_ids.len(), is_full);
+                info!("[Mesh] Sending sync request with {} known IDs (full={})", known_ids.len(), is_full);
                 let payload = SignalingPayload::ChatSyncRequest {
                     chat_id,
                     is_group,
@@ -3190,7 +3189,7 @@ impl NetworkService {
             NetworkCommand::RelaySyncedMessages { chat_id, messages } => {
                 let connected_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
                 let my_id = *self.swarm.local_peer_id();
-                println!("[Mesh] Relaying {} synced messages to {} peers for group {}", messages.len(), connected_peers.len(), chat_id);
+                info!("[Mesh] Relaying {} synced messages to {} peers for group {}", messages.len(), connected_peers.len(), chat_id);
                 for pid in connected_peers {
                     if pid == my_id { continue; }
                     let response = SignalingPayload::ChatSyncResponse {
@@ -3329,7 +3328,7 @@ impl NetworkService {
                             let mut success = false;
                             if let Some(session) = self.noise_sessions.get_mut(&p) {
                                 if session.recv_message(&handshake_payload).is_ok() {
-                                    println!("E2EE Handshake COMPLETED with peer: {}", p);
+                                    info!("E2EE Handshake COMPLETED with peer: {}", p);
                                     let storage = Arc::clone(&self.storage);
                                     let enc_key = self.session_encryption_key;
                                     let session_state = session.get_state();
@@ -3350,7 +3349,7 @@ impl NetworkService {
                                 if let Ok(mut session) = NoiseSession::responder(self.local_static_secret.to_bytes().as_slice()) {
                                     if session.recv_message(&handshake_payload).is_ok() {
                                         if let Ok(response) = session.send_message(&[]) {
-                                            println!("E2EE Handshake (New/Re-key) COMPLETED as responder with peer: {}", p);
+                                            info!("E2EE Handshake (New/Re-key) COMPLETED as responder with peer: {}", p);
                                             let storage = Arc::clone(&self.storage);
                                             let enc_key = self.session_encryption_key;
                                             let session_state = session.get_state();
@@ -3390,7 +3389,7 @@ impl NetworkService {
                                         }
                                     }
                                     Err(e) => {
-                                        eprintln!("❌ Noise decryption FAILED for {}: {:?}", p, e);
+                                        error!("❌ Noise decryption FAILED for {}: {:?}", p, e);
                                         self.noise_sessions.remove(&p);
                                         let storage = Arc::clone(&self.storage);
                                         let pid_str = p.to_string();
@@ -3408,7 +3407,7 @@ impl NetworkService {
                                     }
                                 }
                             } else {
-                                println!("[Mesh] Received Transport payload from {} but no active Noise session. Requesting handshake.", p);
+                                info!("[Mesh] Received Transport payload from {} but no active Noise session. Requesting handshake.", p);
                                 let tx = self.command_tx.clone();
                                 tokio::spawn(async move {
                                     let _ = tx.send(NetworkCommand::ForwardMeshSignaling { 
@@ -3423,13 +3422,13 @@ impl NetworkService {
                 SignalingPayload::MailboxStore { recipient_id, payload } => {
                     let is_anchor = self.swarm.behaviour().relay_server.as_ref().is_some() || self.storage.is_anchor_mode_enabled();
                     if !is_anchor {
-                        println!("[Mesh] Warning: Received MailboxStore but we are NOT an anchor node. Ignoring.");
+                        info!("[Mesh] Warning: Received MailboxStore but we are NOT an anchor node. Ignoring.");
                     } else if let Ok(recipient) = recipient_id.parse::<PeerId>() {
                         // --- RELIABILITY FIX: Loopback Protection ---
                         // If we are an anchor and we receive a message for ourselves,
                         // unwrap it and handle it immediately.
                         if recipient == *self.swarm.local_peer_id() {
-                            println!("[Mesh] Received MailboxStore for OURSELVES. Routing to local handler.");
+                            info!("[Mesh] Received MailboxStore for OURSELVES. Routing to local handler.");
                             if let Ok(inner) = serde_json::from_slice::<SignalingPayload>(&payload) {
                                 // Recursive push to process the inner signaling (e.g. ChatMessage)
                                 queue.push((peer, inner, false));
@@ -3449,7 +3448,7 @@ impl NetworkService {
                 }
                 SignalingPayload::MailboxDrained(messages) => {
                     let count = messages.len();
-                    println!("📦 Drained {} messages from mesh mailbox", count);
+                    info!("📦 Drained {} messages from mesh mailbox", count);
                     for msg in messages {
                         if let Ok(sender_peer) = msg.sender_id.parse::<PeerId>() {
                             if let Ok(signaling) = serde_json::from_slice::<SignalingPayload>(&msg.payload) {
@@ -3493,16 +3492,29 @@ impl NetworkService {
             SignalingPayload::WebRtc(signal) => {
                 match signal.signal_type.as_str() {
                     "offer" => {
-                        self.data_channels.write().remove(&peer);
-                        let old_pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer) };
-                        if let Some(pc) = old_pc {
-                            let _ = pc.close().await;
+                        // Distinguish file transfer data channel offers from VoIP call offers.
+                        if signal.purpose.as_deref() == Some("file_transfer") {
+                            info!("[Mesh] Received file transfer WebRTC offer from {}", peer);
+                            self.data_channels.write().remove(&peer);
+                            let old_pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer) };
+                            if let Some(pc) = old_pc {
+                                let _ = pc.close().await;
+                            }
+                            self.pending_offers.insert(peer, signal.sdp.clone());
+                            // Event 39 = File transfer WebRTC offer (auto-accept, no call UI)
+                            let data = peer.to_string().into_bytes();
+                            crate::dispatch_global_event(39, &data);
+                        } else {
+                            self.data_channels.write().remove(&peer);
+                            let old_pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer) };
+                            if let Some(pc) = old_pc {
+                                let _ = pc.close().await;
+                            }
+                            self.pending_offers.insert(peer, signal.sdp.clone());
+                            // Event 14 = Incoming VoIP call
+                            let data = peer.to_string().into_bytes();
+                            crate::dispatch_global_event(14, &data);
                         }
-
-                        self.pending_offers.insert(peer, signal.sdp.clone());
-
-                        let data = peer.to_string().into_bytes();
-                        crate::dispatch_global_event(14, &data);
                     }
                     "answer" => {
                         let pc_opt = self.peer_connections.read().get(&peer).cloned();
@@ -3549,7 +3561,7 @@ impl NetworkService {
                 }).await.unwrap_or(Ok(None)).unwrap_or(None);
 
                 if contact.is_none() {
-                    println!("[Privacy] Blocked individual ChatMessage from non-contact group peer: {}", peer_id_str);
+                    info!("[Privacy] Blocked individual ChatMessage from non-contact group peer: {}", peer_id_str);
                     return;
                 }
 
@@ -3576,7 +3588,7 @@ impl NetworkService {
                 crate::dispatch_global_event(2, &data);
             }
             SignalingPayload::FileChunkRequest { transfer_id, chunk_index, chunk_size } => {
-                println!("[Mesh] Received chunk request for {} (index {}) from {}", transfer_id, chunk_index, peer);
+                info!("[Mesh] Received chunk request for {} (index {}) from {}", transfer_id, chunk_index, peer);
                 
                 // 1. Try active seeder first (session-specific)
                 let seeder_info = self.active_seeders.get(&transfer_id).map(|s| {
@@ -3616,7 +3628,7 @@ impl NetworkService {
 
                         if let Some(ref hash) = hash_opt {
                             if let Ok(Some(file)) = storage.get_drive_file_by_hash(hash) {
-                                println!("[Mesh] Fallback seeder matched DB record by hash for {}: {:?}", tid, file.filename);
+                                info!("[Mesh] Fallback seeder matched DB record by hash for {}: {:?}", tid, file.filename);
                                 return Some(file);
                             }
                         }
@@ -3624,17 +3636,17 @@ impl NetworkService {
                         let files = match storage.get_all_drive_files() {
                             Ok(f) => f,
                             Err(e) => {
-                                println!("[Mesh] ❌ Fallback seeder DB error: {}", e);
+                                info!("[Mesh] ❌ Fallback seeder DB error: {}", e);
                                 return None;
                             }
                         };
-                        println!("[Mesh] Fallback seeder checking {} drive files for transfer_id: {}", files.len(), tid);
+                        info!("[Mesh] Fallback seeder checking {} drive files for transfer_id: {}", files.len(), tid);
                         files.into_iter().find(|f| {
                             let h_low = f.file_hash.to_lowercase();
                             let tid_low = tid.to_lowercase();
                             // Robust hash matching
                             if tid_low.contains(&h_low) || h_low.contains(&tid_low) || (h_low.len() > 10 && tid_low.contains(&h_low[..10])) {
-                                println!("[Mesh] Fallback seeder matched DB record for {}: {:?}", tid, f.filename);
+                                info!("[Mesh] Fallback seeder matched DB record for {}: {:?}", tid, f.filename);
                                 true
                             } else {
                                 false
@@ -3651,7 +3663,7 @@ impl NetworkService {
                         let tchunks = (size as f32 / requested_csize as f32).ceil() as u32;
                         
                         if path.is_empty() || !std::path::Path::new(&path).exists() {
-                            println!("[Mesh] ❌ Fallback seeder found drive record but file is missing on disk: {}", path);
+                            info!("[Mesh] ❌ Fallback seeder found drive record but file is missing on disk: {}", path);
                             return;
                         }
 
@@ -3669,7 +3681,7 @@ impl NetworkService {
 
                         (path, requested_csize, tchunks, hash)
                     } else {
-                        println!("[Mesh] ❌ Rejected chunk request: No seeder or drive file found for {}", transfer_id);
+                        info!("[Mesh] ❌ Rejected chunk request: No seeder or drive file found for {}", transfer_id);
                         return;
                     }
                 };
@@ -3713,6 +3725,7 @@ impl NetworkService {
                                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                                     speed_bps: 0.0,
                                     group_id: None,
+                                    caption: None,
                                 };
 
                                 crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
@@ -3722,7 +3735,7 @@ impl NetworkService {
                 });
             }
             SignalingPayload::RequestHandshake => {
-                println!("[Mesh] Received RequestHandshake from {}. Clearing session and initiating new handshake.", peer);
+                info!("[Mesh] Received RequestHandshake from {}. Clearing session and initiating new handshake.", peer);
                 self.noise_sessions.remove(&peer);
                 let storage = Arc::clone(&self.storage);
                 let pid_str = peer.to_string();
@@ -3735,23 +3748,25 @@ impl NetworkService {
                 });
             }
             SignalingPayload::ProfileRequest => {
-                println!("[Mesh] Received ProfileRequest from {}", peer);
+                info!("[Mesh] Received ProfileRequest from {}", peer);
                 if let Ok(Some(profile)) = self.storage.get_profile() {
-                    let (name, handle, avatar, _) = profile;
+                    let (name, handle, avatar, _, tier) = profile;
                     let response = SignalingPayload::ProfileResponse {
                         name: name.unwrap_or_else(|| "Unknown".to_string()),
                         handle: handle.unwrap_or_else(|| "".to_string()),
                         avatar_base64: avatar,
+                        prestige_tier: tier as u8,
                     };
                     let _ = self.forward_to_mesh(peer, response, false).await;
                 }
             }
-            SignalingPayload::ProfileResponse { name, handle, avatar_base64 } => {
-                println!("[Mesh] Received ProfileResponse from {}: {} ({})", peer, name, handle);
+            SignalingPayload::ProfileResponse { name, handle, avatar_base64, prestige_tier } => {
+                info!("[Mesh] Received ProfileResponse from {}: {} ({}) tier={}", peer, name, handle, prestige_tier);
                 let peer_id_str = peer.to_string();
                 let storage = Arc::clone(&self.storage);
                 let n = name.clone();
                 let a = avatar_base64.clone();
+                let t = prestige_tier;
                 let peer_id_clone = peer_id_str.clone();
                 
                 tokio::task::spawn_blocking(move || {
@@ -3759,6 +3774,7 @@ impl NetworkService {
                     if let Ok(Some(mut contact)) = storage.get_contact(&peer_id_clone) {
                         contact.global_name = Some(n.clone());
                         contact.avatar_base64 = a.clone();
+                        contact.prestige_tier = Some(t);
                         let alias_is_empty_or_id = contact.local_alias.as_deref().map_or(true, |a| a.is_empty() || a == peer_id_clone);
                         if alias_is_empty_or_id {
                             contact.local_alias = Some(n.clone());
@@ -3783,11 +3799,12 @@ impl NetworkService {
                 let avatar_bytes = avatar_base64.as_deref().unwrap_or("").as_bytes();
                 data.extend(&(avatar_bytes.len() as u32).to_be_bytes());
                 data.extend(avatar_bytes);
+                data.push(prestige_tier);
 
                 crate::dispatch_global_event(25, &data);
             }
             SignalingPayload::ChatSyncRequest { chat_id, is_group, known_msg_ids, limit } => {
-                println!("[Mesh] Received ChatSyncRequest from {} for chat {} (group={}, {} known IDs)", peer, chat_id, is_group, known_msg_ids.len());
+                info!("[Mesh] Received ChatSyncRequest from {} for chat {} (group={}, {} known IDs)", peer, chat_id, is_group, known_msg_ids.len());
                 let storage = Arc::clone(&self.storage);
                 let chat_id_c = chat_id.clone();
                 let is_group_c = is_group;
@@ -3824,12 +3841,12 @@ impl NetworkService {
                     .take(50)
                     .collect();
 
-                println!("[Mesh] Sync response: sending {} messages, requesting {} missing", to_send.len(), missing_on_us.len());
+                info!("[Mesh] Sync response: sending {} messages, requesting {} missing", to_send.len(), missing_on_us.len());
                 let response = SignalingPayload::ChatSyncResponse { chat_id, is_group, messages: to_send, missing_ids: missing_on_us, is_relay: false };
                 let _ = self.forward_to_mesh(peer, response, false).await;
             }
             SignalingPayload::ChatSyncResponse { chat_id, is_group, messages, missing_ids, is_relay } => {
-                println!("[Mesh] Received ChatSyncResponse for {} with {} messages, {} missing IDs (relay={})", chat_id, messages.len(), missing_ids.len(), is_relay);
+                info!("[Mesh] Received ChatSyncResponse for {} with {} messages, {} missing IDs (relay={})", chat_id, messages.len(), missing_ids.len(), is_relay);
                 let storage = Arc::clone(&self.storage);
                 let chat_id_clone = chat_id.clone();
                 let is_group_c = is_group;
@@ -3896,7 +3913,7 @@ impl NetworkService {
 
                 // LOOPBACK PROTECTION: If we are the sender of this file transfer manifest (gossiped back to us in a group chat), ignore it.
                 if actual_seeder_peer == *self.swarm.local_peer_id() {
-                    println!("[Mesh] Loopback FileTransfer manifest detected for transfer_id={}. Ignoring.", transfer_id);
+                    info!("[Mesh] Loopback FileTransfer manifest detected for transfer_id={}. Ignoring.", transfer_id);
                     return;
                 }
 
@@ -3905,7 +3922,7 @@ impl NetworkService {
 
                 let mut is_update = false;
                 if let Some(existing) = self.incoming_transfers.get_mut(&transfer_id) {
-                    println!("[Mesh] FileTransfer manifest update for existing transfer {}. Updating config and preserving progress.", transfer_id);
+                    info!("[Mesh] FileTransfer manifest update for existing transfer {}. Updating config and preserving progress.", transfer_id);
                     is_update = true;
                     let was_relayed = existing.is_relayed;
                     existing.is_relayed = is_relayed;
@@ -3925,7 +3942,7 @@ impl NetworkService {
                         };
                         existing.next_pull_idx = limit;
                         
-                        println!("[Mesh] Transitioned to relay mode. Initiating primed pull sequence for chunks {}..{}", next, limit - 1);
+                        info!("[Mesh] Transitioned to relay mode. Initiating primed pull sequence for chunks {}..{}", next, limit - 1);
                         let tx = self.command_tx.clone();
                         let tid = transfer_id.clone();
                         let selected_providers = Self::select_best_providers_static(&self.swarm, &self.is_relayed_map, &existing.providers);
@@ -3987,6 +4004,7 @@ impl NetworkService {
                         start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
                         speed_bps: 0.0,
                         group_id: group_id.clone(),
+                        caption: None,
                     };
                     let peer_id_str = actual_seeder_peer.to_string();
                     let storage = Arc::clone(&self.storage);
@@ -4012,7 +4030,7 @@ impl NetworkService {
 
                     // Start pulling chunks ONLY if the sender is not pushing them directly
                     if is_relayed {
-                        println!("[Mesh] Relay transfer detected. Initiating primed pull sequence (4 deep) for {}", transfer_id);
+                        info!("[Mesh] Relay transfer detected. Initiating primed pull sequence (4 deep) for {}", transfer_id);
                         let tx = self.command_tx.clone();
                         let tid = transfer_id.clone();
                         let total_chunks_val = total_chunks;
@@ -4027,12 +4045,12 @@ impl NetworkService {
                             }
                         });
                     } else {
-                        println!("[Mesh] Direct transfer detected. Waiting for chunks to be pushed for {}", transfer_id);
+                        info!("[Mesh] Direct transfer detected. Waiting for chunks to be pushed for {}", transfer_id);
                     }
                 }
             }
             SignalingPayload::FileChunk { transfer_id, chunk_index, total_chunks, data_base64 } => {
-                println!("[Mesh] Received chunk {}/{} for {}", chunk_index, total_chunks, transfer_id);
+                info!("[Mesh] Received chunk {}/{} for {}", chunk_index, total_chunks, transfer_id);
                 self.handle_file_chunk(peer, transfer_id, chunk_index, total_chunks, data_base64).await;
             }
             SignalingPayload::GroupManifestRequest { group_id, alias, avatar, handle } => {
@@ -4055,7 +4073,7 @@ impl NetworkService {
                         let my_peer_id = self.swarm.local_peer_id().to_string();
                         let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                         if is_admin {
-                            println!("[Mesh] Group join request from {} for group {}", requester_peer_id, group_id);
+                            info!("[Mesh] Group join request from {} for group {}", requester_peer_id, group_id);
                             let mut data = group_id.clone().into_bytes();
                             data.push(0);
                             data.extend(requester_peer_id.as_bytes());
@@ -4071,7 +4089,7 @@ impl NetworkService {
                 }
             }
             SignalingPayload::GroupJoinRejected { group_id, group_name, reason } => {
-                println!("[Mesh] Group join request rejected for {}: {}", group_name, reason);
+                info!("[Mesh] Group join request rejected for {}: {}", group_name, reason);
                 let mut data = group_id.into_bytes();
                 data.push(0);
                 data.extend(group_name.as_bytes());
@@ -4080,11 +4098,11 @@ impl NetworkService {
                 crate::dispatch_global_event(27, &data);
             }
             SignalingPayload::GroupInvite { group_id, name, description, inviter_peer_id, group_secret_wrapped, members } => {
-                println!("[Mesh] Received GroupInvite for group: {} from {}", name, inviter_peer_id);
+                info!("[Mesh] Received GroupInvite for group: {} from {}", name, inviter_peer_id);
                 // Subscribe to Gossipsub topic for this group immediately to start receiving mesh traffic
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-                    eprintln!("[Mesh] Failed to subscribe to gossipsub topic for invited group {}: {:?}", group_id, e);
+                    error!("[Mesh] Failed to subscribe to gossipsub topic for invited group {}: {:?}", group_id, e);
                 }
                 // Privacy-First: Store as pending invite — user must explicitly accept
                 let members_json = serde_json::to_string(&members).unwrap_or_default();
@@ -4184,7 +4202,7 @@ impl NetworkService {
                                                             let tid_clone = tid.clone();
                                                             
                                                             tokio::spawn(async move {
-                                                                println!("[Registry] Anchor Auto-Pull: Initiating mesh cache for {} from {}", tid_clone, sid);
+                                                                info!("[Registry] Anchor Auto-Pull: Initiating mesh cache for {} from {}", tid_clone, sid);
                                                                 let payload = SignalingPayload::FileTransfer {
                                                                     transfer_id: tid_clone,
                                                                     filename,
@@ -4221,7 +4239,7 @@ impl NetworkService {
                                     // Dial the new member proactively
                                     if let Ok(pid) = metadata.peer_id.parse::<PeerId>() {
                                         if pid != *self.swarm.local_peer_id() {
-                                            println!("[Mesh] Proactively dialing NEW group member: {}", pid);
+                                            info!("[Mesh] Proactively dialing NEW group member: {}", pid);
                                             self.dial_relay_path(pid);
                                         }
                                     }
@@ -4263,11 +4281,11 @@ impl NetworkService {
                                     tokio::task::spawn_blocking(move || storage.add_message_reaction(&mid, &sid, &em));
                                 }
 
-                                // Pack [msg_id_len, msg_id, emoji] for UI (Event 35)
+                                // Pack [msg_id_len, msg_id, emoji] for UI (Event 40)
                                 let mut data = vec![msg_id.len() as u8];
                                 data.extend(msg_id.as_bytes());
                                 data.extend(emoji.as_bytes());
-                                crate::dispatch_global_event(35, &data);
+                                crate::dispatch_global_event(40, &data);
                             }
                             GroupAction::SetRetention { seconds } => {
                                 let signer = signed_action.signer_peer_id.clone();
@@ -4335,10 +4353,10 @@ impl NetworkService {
 
                     }
                     Ok(false) => {
-                        eprintln!("[Mesh] ❌ GroupAction signature verification failed for signer {}", signed_action.signer_peer_id);
+                        error!("[Mesh] ❌ GroupAction signature verification failed for signer {}", signed_action.signer_peer_id);
                     }
                     Err(e) => {
-                        eprintln!("[Mesh] ❌ GroupAction verification error for signer {}: {:?}", signed_action.signer_peer_id, e);
+                        error!("[Mesh] ❌ GroupAction verification error for signer {}: {:?}", signed_action.signer_peer_id, e);
                     }
                 }
                 }
@@ -4351,7 +4369,7 @@ impl NetworkService {
                     // If we are not in the manifest, we definitely shouldn't have this group.
                     // If we had it, delete it.
                     if let Ok(Some(_)) = self.storage.get_group(&group_id) {
-                        println!("[Mesh] Removing group {} as we are no longer members in the received manifest", group_id);
+                        info!("[Mesh] Removing group {} as we are no longer members in the received manifest", group_id);
                         let _ = self.storage.delete_group(&group_id);
                         crate::dispatch_global_event(22, group_id.as_bytes());
                     }
@@ -4361,13 +4379,13 @@ impl NetworkService {
                 // Subscribe to Gossipsub topic for this group
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
-                    eprintln!("[Mesh] Failed to subscribe to gossipsub topic {}: {:?}", group_id, e);
+                    error!("[Mesh] Failed to subscribe to gossipsub topic {}: {:?}", group_id, e);
                 } else {
-                    println!("[Mesh] Dynamically subscribed to gossipsub topic {}", group_id);
+                    info!("[Mesh] Dynamically subscribed to gossipsub topic {}", group_id);
                 }
 
                 if self.storage.is_group_deleted(&group_id) {
-                    println!("[Mesh] Ignoring manifest for deleted group {}", group_id);
+                    info!("[Mesh] Ignoring manifest for deleted group {}", group_id);
                     return;
                 }
 
@@ -4390,7 +4408,7 @@ impl NetworkService {
                 for m in members {
                     if m.peer_id == my_peer_id { continue; }
                     if let Ok(pid) = m.peer_id.parse::<PeerId>() {
-                        println!("[Mesh] Proactively dialing group member {} from manifest {}", pid, name);
+                        info!("[Mesh] Proactively dialing group member {} from manifest {}", pid, name);
                         self.dial_relay_path(pid);
                     }
                 }
@@ -4423,10 +4441,10 @@ impl NetworkService {
                 // MANDATE: In 1-to-1 transfers, stop seeding once receiver confirms receipt.
                 // In group transfers, we continue seeding until the whole group is satisfied.
                 if !is_group_transfer {
-                    println!("[Mesh] 1-to-1 transfer {} complete. Removing seeder and taking off mesh.", transfer_id);
+                    info!("[Mesh] 1-to-1 transfer {} complete. Removing seeder and taking off mesh.", transfer_id);
                     self.active_seeders.remove(&transfer_id);
                 } else {
-                    println!("[Mesh] Group member received transfer {}. Continuing to seed for the rest of the group.", transfer_id);
+                    info!("[Mesh] Group member received transfer {}. Continuing to seed for the rest of the group.", transfer_id);
                 }
 
                 let peer_id_str = peer.to_string();
@@ -4446,6 +4464,7 @@ impl NetworkService {
                     start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
                     speed_bps: 0.0,
                     group_id: None,
+                    caption: None,
                 };
                 if let Ok(json_str) = serde_json::to_string(&progress) {
                     let c = format!("[FILE]:{}", json_str);
@@ -4461,7 +4480,7 @@ impl NetworkService {
                 crate::dispatch_global_event(12, &data);
             }
             SignalingPayload::FileTransferError { transfer_id, reason } => {
-                println!("❌ File transfer error for {}: {}", transfer_id, reason);
+                info!("❌ File transfer error for {}: {}", transfer_id, reason);
                 
                 // BUG 1 FIX: Remove from active seeders to stop aggressive polling
                 self.active_seeders.remove(&transfer_id);
@@ -4478,7 +4497,7 @@ impl NetworkService {
                         let _ = self.forward_to_mesh(peer, SignalingPayload::MailboxDrained(messages), false).await;
                     }
                 } else {
-                    println!("[Mesh] Warning: Received MailboxDrain but we are NOT an anchor node. Ignoring.");
+                    info!("[Mesh] Warning: Received MailboxDrain but we are NOT an anchor node. Ignoring.");
                 }
             }
             SignalingPayload::Acknowledgement { msg_id, status } => {
@@ -4511,7 +4530,7 @@ impl NetworkService {
                     if let Some(av) = avatar { data.extend(av.as_bytes()); }
                     crate::dispatch_global_event(31, &data); // Event 31: Connection Request Received
                 } else {
-                    println!("[Mesh] Privacy Mode: Ignoring DirectInviteRequest from {:?} as we are INTROVERTED.", peer_identity.global_name);
+                    info!("[Mesh] Privacy Mode: Ignoring DirectInviteRequest from {:?} as we are INTROVERTED.", peer_identity.global_name);
                 }
             }
             SignalingPayload::DirectInviteAccept(peer_identity) => {
@@ -4533,7 +4552,7 @@ impl NetworkService {
             }
             SignalingPayload::IdentifySleepState { device_type, push_token } => {
                 let peer_id_str = peer.to_string();
-                println!("[Registry] Registered Push Token for peer {}: {} ({})", peer_id_str, push_token, device_type);
+                info!("[Registry] Registered Push Token for peer {}: {} ({})", peer_id_str, push_token, device_type);
                 let _ = self.storage.save_push_token(&peer_id_str, &device_type, &push_token);
             }
             SignalingPayload::MessageReaction { msg_id, emoji } => {
@@ -4549,7 +4568,7 @@ impl NetworkService {
                 let mut data = vec![msg_id.len() as u8];
                 data.extend(msg_id.as_bytes());
                 data.extend(emoji.as_bytes());
-                crate::dispatch_global_event(35, &data); // Event Type 35: Message Reaction
+                crate::dispatch_global_event(40, &data); // Event Type 40: Message Reaction
             }
             SignalingPayload::SetRetention { seconds } => {
                 let _ = self.storage.set_contact_retention(&peer.to_string(), seconds);
@@ -4573,7 +4592,7 @@ impl NetworkService {
                 crate::dispatch_global_event(38, &data); // Event 38: Message Edited
             }
             SignalingPayload::HandleClaimRequest { handle, peer_id, timestamp, pow_nonce } => {
-                println!("[Registry] Received ClaimRequest for {} from {}", handle, peer_id);
+                info!("[Registry] Received ClaimRequest for {} from {}", handle, peer_id);
                 let claim = registry::HandleClaim { 
                     handle: handle.clone(), 
                     peer_id: peer_id.clone(), 
@@ -4584,20 +4603,20 @@ impl NetworkService {
                 
                 // 1. Verify PoW
                 if !self.registry.verify_pow(&claim) {
-                    println!("[Registry] ❌ Invalid PoW for handle claim: {}", handle);
+                    info!("[Registry] ❌ Invalid PoW for handle claim: {}", handle);
                     return;
                 }
                 
                 // 2. Check Uniqueness
                 if !self.registry.is_handle_available(&handle, &peer_id) {
-                    println!("[Registry] ❌ Handle {} already taken", handle);
+                    info!("[Registry] ❌ Handle {} already taken", handle);
                     return;
                 }
                 
                 // 3. Witness claim if we are an Anchor/RBN
                 let is_anchor_or_relay = self.storage.is_anchor_mode_enabled() || self.swarm.behaviour().relay_server.as_ref().is_some();
                 if is_anchor_or_relay {
-                    println!("[Registry] ✅ Witnessing claim for {}", handle);
+                    info!("[Registry] ✅ Witnessing claim for {}", handle);
                     let msg = format!("{}:{}:{}", handle, peer_id, timestamp);
                     if let Ok(sig) = self.local_keypair.sign(msg.as_bytes()) {
                          let pubkey = self.local_keypair.public().encode_protobuf();
@@ -4615,13 +4634,13 @@ impl NetworkService {
                 }
             }
             SignalingPayload::HandleClaimWitnessed { handle, peer_id, timestamp, rbn_peer_id, rbn_pubkey, rbn_signature } => {
-                println!("[Registry] Received Witness from {} for {}", rbn_peer_id, handle);
+                info!("[Registry] Received Witness from {} for {}", rbn_peer_id, handle);
                 
                 // SECURITY: Verify the signature!
                 let pubkey = match libp2p::identity::PublicKey::try_decode_protobuf(&rbn_pubkey) {
                     Ok(pk) => pk,
                     Err(_) => {
-                        println!("[Registry] ⚠️ Rejected witness from {}: Invalid public key encoding", rbn_peer_id);
+                        info!("[Registry] ⚠️ Rejected witness from {}: Invalid public key encoding", rbn_peer_id);
                         return;
                     }
                 };
@@ -4629,7 +4648,7 @@ impl NetworkService {
                 // Verify that the public key matches the PeerId and is an authorized RBN
                 let derived_pid = PeerId::from_public_key(&pubkey);
                 if derived_pid.to_string() != rbn_peer_id {
-                    println!("[Registry] ⚠️ Rejected witness from {}: PeerId mismatch", rbn_peer_id);
+                    info!("[Registry] ⚠️ Rejected witness from {}: PeerId mismatch", rbn_peer_id);
                     return;
                 }
 
@@ -4637,18 +4656,18 @@ impl NetworkService {
                 
                 // For local development or private meshes, allow trusting any connected anchor
                 if !is_authorized && std::env::var("INTROVERT_TRUST_ALL_WITNESSES").is_ok() {
-                    println!("[Registry] 🛠️ Trusting unauthorized witness due to INTROVERT_TRUST_ALL_WITNESSES");
+                    info!("[Registry] 🛠️ Trusting unauthorized witness due to INTROVERT_TRUST_ALL_WITNESSES");
                     is_authorized = true;
                 }
 
                 if !is_authorized {
-                    println!("[Registry] ⚠️ Rejected witness from UNAUTHORIZED node: {}", rbn_peer_id);
+                    info!("[Registry] ⚠️ Rejected witness from UNAUTHORIZED node: {}", rbn_peer_id);
                     return;
                 }
 
                 let msg = format!("{}:{}:{}", handle, peer_id, timestamp);
                 if !pubkey.verify(msg.as_bytes(), &rbn_signature) {
-                    println!("[Registry] ⚠️ INVALID signature from RBN: {}", rbn_peer_id);
+                    info!("[Registry] ⚠️ INVALID signature from RBN: {}", rbn_peer_id);
                     return;
                 }
 
@@ -4663,7 +4682,7 @@ impl NetworkService {
                 }
                 let required_quorum = if std::env::var("INTROVERT_TRUST_ALL_WITNESSES").is_ok() || connected_rbns.len() < 2 { 1 } else { 2 };
                 if witnesses.len() >= required_quorum {
-                    println!("[Registry] 🏆 Quorum reached for handle: {}", handle);
+                    info!("[Registry] 🏆 Quorum reached for handle: {}", handle);
                     let claim = registry::HandleClaim {
                         handle: handle.clone(),
                         peer_id: peer_id.clone(),
@@ -4706,7 +4725,7 @@ impl NetworkService {
                 }
             }
             SignalingPayload::Heartbeat { timestamp } => {
-                println!("[Mesh] Received Heartbeat from {} (ts={})", peer, timestamp);
+                info!("[Mesh] Received Heartbeat from {} (ts={})", peer, timestamp);
                 let storage = Arc::clone(&self.storage);
                 let peer_id_str = peer.to_string();
                 tokio::task::spawn_blocking(move || {
@@ -4801,6 +4820,7 @@ impl NetworkService {
             start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64,
             speed_bps: 0.0,
             group_id: group_id.clone(),
+            caption: None,
         };
 
         // Persistent History: Save file manifest and BROADCAST TO GROUP if applicable
@@ -4821,7 +4841,7 @@ impl NetworkService {
                     let gid_for_broadcast = gid;
                     let fname_clone = filename.clone();
                     tokio::spawn(async move {
-                        println!("[Mesh] Gossiping file manifest for {} to group {}", fname_clone, gid_for_broadcast);
+                        info!("[Mesh] Gossiping file manifest for {} to group {}", fname_clone, gid_for_broadcast);
                         // Use standard group message broadcast mechanism
                         let _ = tx_clone.send(NetworkCommand::BroadcastGroupMessage { 
                             group_id: gid_for_broadcast, 
@@ -4849,14 +4869,14 @@ impl NetworkService {
         let _ = tx.send(NetworkCommand::SendFileChunk { peer_id, payload: transfer_payload, progress: initial_progress.clone() }).await;
 
         if is_relayed {
-            println!("✅ File transfer manifest sent for {}. (Relay mode - waiting for chunk requests).", filename);
+            info!("✅ File transfer manifest sent for {}. (Relay mode - waiting for chunk requests).", filename);
             // BUG 1 FIX: Immediate mailbox fetch so we see the receiver's pull requests right away
             let _ = tx.send(NetworkCommand::FetchMailbox).await;
             return Ok(());
         }
         
         // Extended delay for manifest to propagate and relay circuits to warm up
-        tokio::time::sleep(Duration::from_millis(if is_relayed { 2000 } else { 500 })).await;
+        tokio::time::sleep(Duration::from_millis(if is_relayed { 2000 } else { 200 })).await;
 
         // BUG 4 FIX: Read chunks from disk during push loop
         let mut file = std::fs::File::open(path)?;
@@ -4890,6 +4910,7 @@ impl NetworkService {
                 start_time_ms: initial_progress.start_time_ms,
                 speed_bps,
                 group_id: group_id.clone(),
+                caption: None,
             };
             
             // Since SendFileChunk is handled via the command channel, we can't easily wait here.
@@ -4913,7 +4934,7 @@ impl NetworkService {
         
 
 
-        println!("✅ File transfer chunks sent for {}. Waiting for verification from peer...", filename);
+        info!("✅ File transfer chunks sent for {}. Waiting for verification from peer...", filename);
         Ok(())
     }
 

@@ -121,6 +121,20 @@ class WebRtcCallService extends ChangeNotifier {
     _qualitySub = NetworkQualityService.instance.eventStream.listen((event) {
       debugPrint('[WebRTC] Quality changed: ${event.previousQuality} → ${event.currentQuality}');
 
+      // Record quality sample for Intro-Claw
+      try {
+        final client = IntrovertClient();
+        final isRelayed = false; // Will be enhanced with actual relay detection
+        client.voipRecordSample(
+          event.rtt.round(),
+          event.packetLoss,
+          0, // jitter not available from this source
+          event.bitrate.round(),
+          isRelayed,
+          'opus',
+        );
+      } catch (_) {}
+
       if (event.shouldDowngradeVideo && _currentMediaType != 0) {
         _downgradeToAudio('Network quality degraded (bitrate: ${event.bitrate.round()} kbps, loss: ${event.packetLoss.round()}%)');
       }
@@ -297,6 +311,10 @@ class WebRtcCallService extends ChangeNotifier {
         _callState = CallState.connected;
         _reconnectAttempts = 0;
         _startQualityMonitoring();
+        // Notify Intro-Claw of call start
+        try {
+          IntrovertClient().voipStartCall(_currentPeerId ?? '', _currentMediaType == 2);
+        } catch (_) {}
         notifyListeners();
         onCallConnected?.call();
       } else if (state == RTCIceConnectionState.RTCIceConnectionStateFailed ||
@@ -518,6 +536,11 @@ class WebRtcCallService extends ChangeNotifier {
     debugPrint('[WebRTC] Terminating call (local=$local)');
     _callState = CallState.idle;
     _isCallActive = false;
+
+    // Notify Intro-Claw of call end
+    try {
+      IntrovertClient().voipEndCall();
+    } catch (_) {}
 
     // Stop quality monitoring
     NetworkQualityService.instance.stopMonitoring();

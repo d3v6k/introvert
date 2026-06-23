@@ -3244,7 +3244,7 @@ dependencies = [
 
 [[package]]
 name = "introvert"
-version = "0.7.0"
+version = "0.14.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3264,6 +3264,7 @@ dependencies = [
  "hex",
  "hf-hub",
  "hkdf",
+ "indexmap",
  "libc",
  "libp2p",
  "magic-wormhole",

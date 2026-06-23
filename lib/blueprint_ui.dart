@@ -1,73 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'theme/app_theme.dart';
-
-class SovereignAvatar extends StatelessWidget {
-  final double radius;
-  final ImageProvider? avatar;
-  final String? initials;
-  final double? balance;
-  final bool isSuperActive;
-
-  const SovereignAvatar({
-    this.radius = 20,
-    this.avatar,
-    this.initials,
-    this.balance,
-    this.isSuperActive = false,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          width: radius * 2,
-          height: radius * 2,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isSuperActive ? AppTheme.current.accent : AppTheme.current.accent.withValues(alpha: 0.3),
-              width: isSuperActive ? 2 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isSuperActive ? AppTheme.current.accent : AppTheme.current.accent).withValues(alpha: 0.1),
-                blurRadius: 4,
-              ),
-            ],
-          ),
-          child: CircleAvatar(
-            radius: radius,
-            backgroundColor: AppTheme.current.surface,
-            backgroundImage: avatar ?? const AssetImage('assets/images/default_avatar.png'),
-            child: (avatar == null && initials != null && initials!.isNotEmpty)
-                ? Text(
-                    initials!,
-                    style: TextStyle(
-                      color: AppTheme.current.accent,
-                      fontSize: radius * 0.8,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
-          ),
-        ),
-        if (balance != null && balance! > 0)
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: EdgeInsets.all(2),
-              decoration: BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-              child: Icon(Icons.bolt, color: Colors.yellowAccent, size: 10),
-            ),
-          ),
-      ],
-    );
-  }
-}
+import 'src/ui/widgets/sovereign_avatar.dart';
+export 'src/ui/widgets/sovereign_avatar.dart';
 
 class GlassmorphicBubble extends StatelessWidget {
   final String content;
@@ -288,14 +224,80 @@ class GlassmorphicBubble extends StatelessWidget {
   }
 }
 
-class SovereignWallpaper extends StatelessWidget {
+class SovereignWallpaper extends StatefulWidget {
   const SovereignWallpaper({super.key});
 
   @override
+  State<SovereignWallpaper> createState() => _SovereignWallpaperState();
+}
+
+class _SovereignWallpaperState extends State<SovereignWallpaper> {
+  @override
+  void initState() {
+    super.initState();
+    AppTheme.current.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    AppTheme.current.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String? _lastWallpaperPath;
+  bool? _lastWallpaperExists;
+
+  @override
   Widget build(BuildContext context) {
+    final wallpaperPath = AppTheme.current.wallpaperPath;
+    final isAsset = wallpaperPath != null && wallpaperPath.startsWith('assets/');
+    // Cache file existence check to avoid sync I/O on every rebuild
+    bool hasFileWallpaper = false;
+    if (wallpaperPath != null && !isAsset) {
+      if (_lastWallpaperPath != wallpaperPath) {
+        _lastWallpaperPath = wallpaperPath;
+        _lastWallpaperExists = File(wallpaperPath).existsSync();
+      }
+      hasFileWallpaper = _lastWallpaperExists ?? false;
+    }
+    final hasWallpaper = isAsset || hasFileWallpaper;
+    
+    if (hasWallpaper) {
+      return Positioned.fill(
+        key: ValueKey('wallpaper_$wallpaperPath'),
+        child: IgnorePointer(
+          child: Opacity(
+            opacity: AppTheme.current.wallpaperOpacity,
+            child: isAsset
+                ? Image.asset(
+                    wallpaperPath!,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    gaplessPlayback: true,
+                  )
+                : Image.file(
+                    File(wallpaperPath!),
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                    gaplessPlayback: true,
+                  ),
+          ),
+        ),
+      );
+    }
+    
+    // Light themes without custom wallpaper: no default wallpaper (bg color is already white)
+    if (!AppTheme.current.isDark) {
+      return const SizedBox.shrink();
+    }
+
     final double h = MediaQuery.of(context).size.height * 0.6;
     return Positioned(
-      bottom: h * 0.2, // Raised by 20% of the image height as requested
+      bottom: h * 0.2,
       left: 0,
       right: 0,
       height: h,
@@ -306,6 +308,63 @@ class SovereignWallpaper extends StatelessWidget {
             'assets/images/introvert_wallpaper.png',
             fit: BoxFit.fitWidth,
             alignment: Alignment.bottomCenter,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class GlassmorphicContainer extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
+  final BorderRadius? borderRadius;
+  final Color? tintColor;
+  final double blur;
+  final double tintAlpha;
+  final double borderAlpha;
+  final double overlayAlpha;
+
+  const GlassmorphicContainer({
+    required this.child,
+    this.padding,
+    this.margin,
+    this.borderRadius,
+    this.tintColor,
+    this.blur = 10,
+    this.tintAlpha = 0.08,
+    this.borderAlpha = 0.12,
+    this.overlayAlpha = 0.3,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final r = borderRadius ?? BorderRadius.circular(16);
+    final tint = tintColor ?? AppTheme.current.accent;
+    final isDark = AppTheme.current.isDark;
+    final overlay = isDark
+        ? Colors.black.withValues(alpha: overlayAlpha)
+        : Colors.white.withValues(alpha: overlayAlpha.clamp(0.0, 0.35));
+    return Container(
+      margin: margin,
+      child: ClipRRect(
+        borderRadius: r,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          child: Container(
+            padding: padding ?? EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: overlay,
+              border: Border.all(color: tint.withValues(alpha: borderAlpha)),
+              borderRadius: r,
+            ),
+            foregroundDecoration: BoxDecoration(
+              color: tint.withValues(alpha: tintAlpha),
+              borderRadius: r,
+            ),
+            child: child,
           ),
         ),
       ),

@@ -266,6 +266,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                 ),
                 SizedBox(height: 24),
+                // Intro-Claw status
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.greenAccent.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        'Intro-Claw engine powering up',
+                        style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16),
                 Text(
                   '⚠️ CAUTION: Write this down! This seed phrase is the key to your Solana wallet as well. If you lose it, your ID, wallet, and all files in the mesh drive are GONE forever. Keep it secret!',
                   textAlign: TextAlign.center,

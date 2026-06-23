@@ -17,6 +17,7 @@ pub struct SovereignIdentity {
     pub is_anchor_capable: bool, // Node supports mailbox storage
     pub retention_seconds: u32,
     pub handle: Option<String>,
+    pub prestige_tier: Option<u8>, // 0=Citizen, 1=Sentinel, 2=Silver, 3=Gold, 4=Platinum, 5=Catalyst, 6=Pulsar
 }
 
 pub struct NodeIdentity {

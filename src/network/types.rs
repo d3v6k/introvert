@@ -146,6 +146,8 @@ pub enum SignalingPayload {
         name: String,
         handle: String,
         avatar_base64: Option<String>,
+        #[serde(default)]
+        prestige_tier: u8,
     },
     ChatSyncRequest {
         chat_id: String,

@@ -57,6 +57,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Timer? _loadMessagesDebounce;
   final Map<String, String> _contactNames = {};
   final Map<String, String> _contactAvatars = {}; // peer_id -> base64 avatar
+  final Map<String, int> _contactTiers = {}; // peer_id -> prestige tier
   String? _myAvatar;
   dynamic _replyingTo;
   String? _editingMsgId;
@@ -74,6 +75,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   
   // Poll state
   final Map<String, Map<String, List<String>>> _polls = {};
+  final Map<String, List<dynamic>> _reactionsCache = {}; // msgId -> reactions
   final Map<String, String> _pollQuestions = {};
   final Map<String, List<String>> _pollOptions = {};
   
@@ -82,6 +84,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Timer? _recordingTimer;
   double _recordingDuration = 0.0;
   final AudioRecorder _audioRecorder = AudioRecorder();
+  double _myIntrBalance = 0;
+  int _myTier = 0;
+  StreamSubscription? _economySubscription;
   dynamic _selectedMsg;
   
   String? _docDirPath;
@@ -95,6 +100,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   List<String> _activeCallMembers = [];
   Timer? _callExpiryTimer;
 
+  static int _computeTier(double balance) {
+    if (balance >= 1000000) return 4;
+    if (balance >= 500000) return 3;
+    if (balance >= 250000) return 2;
+    if (balance >= 100000) return 1;
+    return 0;
+  }
+
   void _loadContactNames() {
     try {
       final profile = _client.getProfile();
@@ -106,12 +119,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         final alias = c['alias']?.toString() ?? '';
         final globalName = c['global_name']?.toString() ?? '';
         final avatar = c['avatar']?.toString() ?? '';
+        final tier = c['prestige_tier'] as int? ?? 0;
         if (pid.isNotEmpty) {
           final displayName = alias.isNotEmpty ? alias : (globalName.isNotEmpty ? globalName : pid);
           _contactNames[pid] = displayName;
           if (avatar.isNotEmpty) {
             _contactAvatars[pid] = avatar;
           }
+          _contactTiers[pid] = tier;
         }
       }
 
@@ -213,6 +228,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         _loadMessages();
       }
     });
+
+    _economySubscription = _client.economyStream.listen((stats) {
+      if (mounted) {
+        setState(() {
+          _myIntrBalance = (stats['intr_balance'] ?? 0) / 1000000000.0;
+          _myTier = _computeTier(_myIntrBalance);
+        });
+      }
+    });
   }
 
   @override
@@ -220,6 +244,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     _loadMessagesDebounce?.cancel();
     _networkSubscription?.cancel();
     _transferSubscription?.cancel();
+    _economySubscription?.cancel();
     _recordingTimer?.cancel();
     _audioRecorder.dispose();
     _callExpiryTimer?.cancel();
@@ -489,7 +514,33 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             
             if (_groupTransfers.containsKey(tid)) {
               final active = _groupTransfers[tid]!;
-              processed.add(active);
+              // FIX: Update peerId from database sender if cache has wrong value
+              // (relay peer ID can get cached before Rust fix propagates)
+              if (active.peerId != senderId && senderId.isNotEmpty) {
+                final corrected = FileTransferProgress(
+                  transferId: active.transferId,
+                  peerId: senderId,
+                  filename: active.filename,
+                  mimeType: active.mimeType,
+                  fileHash: active.fileHash,
+                  progress: active.progress,
+                  speedBps: active.speedBps,
+                  isComplete: active.isComplete,
+                  isVerified: active.isVerified,
+                  isOutgoing: active.isOutgoing,
+                  isCancelled: active.isCancelled,
+                  localPath: active.localPath,
+                  startTimeMs: active.startTimeMs,
+                  isWaitingForDownload: active.isWaitingForDownload,
+                  thumbnail: active.thumbnail,
+                  groupId: active.groupId,
+                  caption: active.caption,
+                );
+                _groupTransfers[tid] = corrected;
+                processed.add(corrected);
+              } else {
+                processed.add(active);
+              }
               continue;
             }
             
@@ -561,6 +612,37 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         
         processed.add(m);
       }
+      // Preserve local outgoing text messages not yet in the database
+      for (var existing in _messages) {
+        if (existing is List && existing.length > 4) {
+          final existingSenderId = existing[0]?.toString() ?? '';
+          final existingMsgId = existing[4]?.toString() ?? '';
+          final existingContent = existing[2]?.toString() ?? '';
+          if (existingSenderId == _client.localPeerId && !existingMsgId.startsWith('gm_')) {
+            final alreadyInDb = processed.any((m) {
+              if (m is List && m.length > 3) {
+                return m[0]?.toString() == existingSenderId &&
+                       m[2]?.toString() == existingContent;
+              }
+              return false;
+            });
+            if (!alreadyInDb) {
+              processed.add(existing);
+            }
+          }
+        }
+      }
+      // Preserve active media transfers that haven't completed yet
+      for (var existing in _messages) {
+        if (existing is FileTransferProgress && !existing.isComplete && !existing.isCancelled) {
+          final alreadyProcessed = processed.any((m) =>
+              m is FileTransferProgress && m.transferId == existing.transferId);
+          if (!alreadyProcessed) {
+            processed.add(existing);
+          }
+        }
+      }
+
       processed.sort((a, b) {
         DateTime? tsA;
         DateTime? tsB;
@@ -573,6 +655,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         if (tsB == null) return -1;
         return tsA.compareTo(tsB);
       });
+
+      // Pre-fetch reactions for all messages (avoids sync FFI in build path)
+      _reactionsCache.clear();
+      for (var m in processed) {
+        String? msgId;
+        if (m is FileTransferProgress) msgId = m.transferId;
+        else if (m is List && m.length > 4) msgId = m[4]?.toString();
+        if (msgId != null && msgId.isNotEmpty) {
+          try { _reactionsCache[msgId] = (_reactionsCache[msgId] ?? []); } catch (_) {}
+        }
+      }
+
       _messages = processed;
       _messagesVersion++;
     });
@@ -656,7 +750,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           isMe: isMe,
           timestamp: ts,
           localPath: localPath ?? '',
-          reactions: _client.getMessageReactions(msgId),
+          reactions: (_reactionsCache[msgId] ?? []),
         );
       }
       if (msg.filename.startsWith("sticker_")) {
@@ -664,14 +758,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           name: localPath ?? msg.filename,
           isMe: isMe,
           timestamp: ts,
-          reactions: _client.getMessageReactions(msgId),
+          reactions: (_reactionsCache[msgId] ?? []),
         );
       }
       return FileTransferBubble(
         key: ValueKey('${updatedProgress.transferId}_${updatedProgress.isVerified}_${updatedProgress.isComplete}'),
         progress: updatedProgress,
         isMe: isMe,
-        reactions: _client.getMessageReactions(msgId),
+        reactions: (_reactionsCache[msgId] ?? []),
         allMessages: _messages,
         onTap: () {
           if (!updatedProgress.isComplete && !updatedProgress.isVerified && !isMe) {
@@ -696,7 +790,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       return ImageStackBubble(
         group: msg,
         isMe: isMe,
-        reactions: _client.getMessageReactions(msgId),
+        reactions: (_reactionsCache[msgId] ?? []),
         onTap: () {
           final List<FileTransferProgress> mediaList = [];
           for (var m in _messages) {
@@ -745,9 +839,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           name: content.substring(10),
           isMe: isMe,
           timestamp: ts,
-          reactions: msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null,
+          reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
           msgId: msgIdVal,
-          onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, _client.getMessageReactions(msgIdVal)) : null,
+          onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
         );
       }
       if (content.startsWith("[GIF]:")) {
@@ -755,9 +849,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           url: content.substring(6),
           isMe: isMe,
           timestamp: ts,
-          reactions: msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null,
+          reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
           msgId: msgIdVal,
-          onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, _client.getMessageReactions(msgIdVal)) : null,
+          onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
         );
       }
       if (content.startsWith("[LOCATION]:")) {
@@ -772,9 +866,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               longitude: lng,
               isMe: isMe,
               timestamp: ts,
-              reactions: msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null,
+              reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
               msgId: msgIdVal,
-              onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, _client.getMessageReactions(msgIdVal)) : null,
+              onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
             );
           }
         }
@@ -804,9 +898,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             imagePath: imagePath,
             isMe: isMe,
             timestamp: ts,
-            reactions: msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null,
+            reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
             msgId: msgIdVal,
-            onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, _client.getMessageReactions(msgIdVal)) : null,
+            onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
           );
         } catch (_) {}
       }
@@ -823,9 +917,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             timestamp: ts,
             localPeerId: _client.localPeerId ?? '',
             onVote: (idx) => _votePoll(pollId, idx),
-            reactions: msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null,
+            reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
             msgId: msgIdVal,
-            onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, _client.getMessageReactions(msgIdVal)) : null,
+            onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
           );
         } catch (_) {}
       }
@@ -852,7 +946,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         } catch (_) {}
       }
 
-      final reactions = msgIdVal.isNotEmpty ? _client.getMessageReactions(msgIdVal) : null;
+      final reactions = msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null;
 
       return GlassmorphicBubble(
         content: content,
@@ -902,7 +996,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
                 return Material(color: Colors.transparent, child: ListTile(
                   leading: SovereignAvatar(
-                    radius: 24, 
+                    radius: 24,
+                    prestigeTier: isMe ? _myTier : (_contactTiers[peerId] ?? 0),
                     avatar: isMe ? (_myAvatar != null ? MemoryImage(base64Decode(_myAvatar!)) : null) : (_contactAvatars[peerId] != null ? MemoryImage(base64Decode(_contactAvatars[peerId]!)) : null),
                     initials: name == "You" ? "ME" : (name.isNotEmpty ? name[0].toUpperCase() : "?"),
                   ),
@@ -954,7 +1049,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       ),
       title: Text("1 selected", style: TextStyle(color: AppTheme.current.accent, fontSize: 16, fontWeight: FontWeight.w500)),
       actions: [
-        IconButton(
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
           icon: Icon(Icons.copy_rounded, color: AppTheme.current.accent),
           tooltip: 'Copy',
           onPressed: () {
@@ -1033,7 +1133,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               }
             },
           ),
-        SizedBox(width: 8),
+            SizedBox(width: 8),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1300,7 +1403,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   if (contacts.isNotEmpty) ...[
                     Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 8), child: Text("CONTACTS", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 10, fontWeight: FontWeight.bold))),
                     ...contacts.map((c) => Material(color: Colors.transparent, child: ListTile(
-                      leading: SovereignAvatar(radius: 27, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null),
+                      leading: SovereignAvatar(radius: 27, prestigeTier: c['prestige_tier'] as int? ?? 0, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null),
                       title: Text(c['alias'] ?? c['peer_id'], style: TextStyle(color: AppTheme.current.text, fontSize: 14)),
                       onTap: () {
                         if (content.startsWith("[FILE]:")) {
@@ -1417,9 +1520,26 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         _loadMessages();
       } else if (event.type == 25) {
         if (!mounted || event.data.isEmpty) return;
-        int offset = 0;
-        final pidLen = event.data[offset++];
-        offset += pidLen;
+        try {
+          int offset = 0;
+          final pidLen = event.data[offset++];
+          if (offset + pidLen > event.data.length) return;
+          final pId = utf8.decode(event.data.sublist(offset, offset + pidLen));
+          offset += pidLen;
+          if (offset >= event.data.length) return;
+          final nameLen = event.data[offset++];
+          if (offset + nameLen > event.data.length) return;
+          offset += nameLen;
+          if (offset >= event.data.length) return;
+          final handleLen = event.data[offset++];
+          if (offset + handleLen > event.data.length) return;
+          offset += handleLen;
+          if (offset + 4 > event.data.length) return;
+          final avatarLen = (event.data[offset] << 24) | (event.data[offset + 1] << 16) | (event.data[offset + 2] << 8) | event.data[offset + 3];
+          offset += 4 + avatarLen;
+          final tier = offset < event.data.length ? event.data[offset] : 0;
+          _contactTiers[pId] = tier;
+        } catch (_) {}
 
         // Refresh local state and trigger rebuild
         setState(() {
@@ -1487,6 +1607,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         }
       }
       _messages.insert(insertIdx, localMsg);
+      _messagesVersion++;
       _messageController.clear();
       _replyingTo = null;
     });
@@ -1500,6 +1621,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final localMsg = [_client.localPeerId, "me", payload, now.toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
     setState(() {
       _insertSorted(localMsg, now);
+      _messagesVersion++;
     });
     _scrollToBottom();
     _client.sendGroupMessage(widget.groupId, payload);
@@ -1511,6 +1633,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final localMsg = [_client.localPeerId, "me", payload, now.toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
     setState(() {
       _insertSorted(localMsg, now);
+      _messagesVersion++;
     });
     _scrollToBottom();
     _client.sendGroupMessage(widget.groupId, payload);
@@ -2256,6 +2379,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     final localMsg = [_client.localPeerId, "me", payload, DateTime.now().toUtc().toIso8601String() + "Z", const Uuid().v4(), null];
     setState(() {
       _insertSorted(localMsg, DateTime.now());
+      _messagesVersion++;
       _polls[pollId] = {for (var opt in options) opt: <String>[]};
       _pollQuestions[pollId] = question;
       _pollOptions[pollId] = options;
@@ -2491,7 +2615,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(widget.groupName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.current.text)),
+              Text(widget.groupName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.current.text), overflow: TextOverflow.ellipsis, maxLines: 1),
               Text("${_members.length} members", style: TextStyle(fontSize: 11, color: AppTheme.current.mutedText.withValues(alpha: 0.8), fontWeight: FontWeight.w400))
             ],
           ),
@@ -2585,6 +2709,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
                     final avatarWidget = SovereignAvatar(
                       radius: 21,
+                      prestigeTier: isMe ? _myTier : (_contactTiers[senderId] ?? 0),
                       avatar: isMe 
                           ? (_myAvatar != null ? MemoryImage(base64Decode(_myAvatar!)) : null) 
                           : (_contactAvatars[senderId] != null ? MemoryImage(base64Decode(_contactAvatars[senderId]!)) : null),
@@ -3032,6 +3157,15 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
   String _description = "";
   int _retentionSeconds = 0;
 
+  int _getContactTier(String peerId) {
+    try {
+      final contacts = _client.getContacts();
+      final contact = contacts.firstWhere((c) => c['peer_id'] == peerId, orElse: () => null);
+      if (contact != null) return contact['prestige_tier'] as int? ?? 0;
+    } catch (_) {}
+    return 0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3187,7 +3321,7 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
     final List<String> currentMemberIds = _members.map((m) => m['peer_id'].toString()).toList();
     final List<dynamic> available = contacts.where((c) => !currentMemberIds.contains(c['peer_id'])).toList();
     if (available.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No more contacts to add."))); return; }
-    final String? selected = await showDialog<String>(context: context, builder: (context) => AlertDialog(backgroundColor: AppTheme.current.surface, title: Text("ADD MEMBER"), content: SizedBox(width: double.maxFinite, child: ListView.builder(shrinkWrap: true, itemCount: available.length, itemBuilder: (context, index) { final c = available[index]; return Material(color: Colors.transparent, child: ListTile(leading: SovereignAvatar(radius: 24, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null), title: Text(c['alias'] ?? c['peer_id'], style: TextStyle(color: AppTheme.current.text)), onTap: () => Navigator.pop(context, c['peer_id']))); }))));
+    final String? selected = await showDialog<String>(context: context, builder: (context) => AlertDialog(backgroundColor: AppTheme.current.surface, title: Text("ADD MEMBER"), content: SizedBox(width: double.maxFinite, child: ListView.builder(shrinkWrap: true, itemCount: available.length, itemBuilder: (context, index) { final c = available[index]; return Material(color: Colors.transparent, child: ListTile(leading: SovereignAvatar(radius: 24, prestigeTier: c['prestige_tier'] as int? ?? 0, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null), title: Text(c['alias'] ?? c['peer_id'], style: TextStyle(color: AppTheme.current.text)), onTap: () => Navigator.pop(context, c['peer_id']))); }))));
     if (selected != null) { _client.addGroupMember(widget.groupId, selected); _loadMembers(); widget.onUpdate(); }
   }
 
@@ -3269,10 +3403,12 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
           final avatarData = widget.contactAvatars[pid] ?? m['avatar']?.toString();
           final isMuted = _mutedMembers.contains(pid);
 
+          final tier = pid == _client.localPeerId ? 0 : _getContactTier(pid);
           return ListTile(
             contentPadding: EdgeInsets.zero, 
             leading: SovereignAvatar(
-              radius: 21, 
+              radius: 21,
+              prestigeTier: tier,
               avatar: avatarData != null ? MemoryImage(base64Decode(avatarData)) : null,
               initials: name.isNotEmpty ? name[0].toUpperCase() : "?"
             ), 

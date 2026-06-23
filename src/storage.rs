@@ -42,6 +42,19 @@ pub struct PendingGroupInvite {
 }
 
 impl StorageService {
+    /// Escapes LIKE special characters to prevent unintended pattern matches.
+    fn escape_like(input: &str) -> String {
+        input.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+    }
+
+    /// Safely copies a byte slice to a 32-byte array, returning zeros if length mismatches.
+    fn safe_static_key(bytes: &[u8]) -> [u8; 32] {
+        let mut key = [0u8; 32];
+        let copy_len = bytes.len().min(32);
+        key[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        key
+    }
+
     /// Creates a new SQLCipher encrypted database at the given path.
     pub fn new<P: AsRef<Path>>(path: P, key: &[u8; 32]) -> Result<Self> {
         let conn = Connection::open(path)?;
@@ -49,6 +62,9 @@ impl StorageService {
         // Initialize SQLCipher encryption
         let key_hex = hex::encode(key);
         conn.pragma_update(None, "key", format!("x'{}'", key_hex))?;
+
+        // WAL mode: crash-safe, better concurrent read performance
+        conn.pragma_update(None, "journal_mode", "WAL")?;
 
         let slf = Self { conn: Mutex::new(conn), _is_ephemeral: false };
         slf.bootstrap()?;
@@ -332,6 +348,9 @@ impl StorageService {
         let _ = conn.execute("ALTER TABLE groups ADD COLUMN muted_members_json TEXT DEFAULT '[]'", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN handle TEXT", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN is_incoming INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN last_seen INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE profile ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
 
         Ok(())
     }
@@ -583,8 +602,8 @@ impl StorageService {
     pub fn upsert_sovereign_contact(&self, identity: &crate::identity::SovereignIdentity, is_verified: bool, is_incoming: bool) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
-            "INSERT INTO contacts (peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_verified, is_incoming, is_anchor_capable, handle) 
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) 
+            "INSERT INTO contacts (peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_verified, is_incoming, is_anchor_capable, handle, prestige_tier) 
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) 
              ON CONFLICT(peer_id) DO UPDATE SET 
                 p2p_pubkey = excluded.p2p_pubkey,
                 static_key = excluded.static_key, 
@@ -595,7 +614,8 @@ impl StorageService {
                 is_verified = excluded.is_verified,
                 is_incoming = excluded.is_incoming,
                 is_anchor_capable = excluded.is_anchor_capable,
-                handle = excluded.handle",
+                handle = excluded.handle,
+                prestige_tier = excluded.prestige_tier",
             params![
                 identity.peer_id, 
                 identity.p2p_pubkey,
@@ -607,7 +627,8 @@ impl StorageService {
                 if is_verified { 1 } else { 0 },
                 if is_incoming { 1 } else { 0 },
                 identity.is_anchor_capable as i32,
-                identity.handle
+                identity.handle,
+                identity.prestige_tier.unwrap_or(0) as i32
             ],
         )?;
         Ok(())
@@ -646,11 +667,11 @@ impl StorageService {
     /// Retrieves a sovereign contact by PeerId.
     pub fn get_contact(&self, peer_id: &str) -> Result<Option<crate::identity::SovereignIdentity>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle FROM contacts WHERE peer_id = ?1")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE peer_id = ?1")?;
         let mut rows = stmt.query_map(params![peer_id], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
-            static_key.copy_from_slice(&static_key_vec);
+            static_key = Self::safe_static_key(&static_key_vec);
             Ok(crate::identity::SovereignIdentity {
                 peer_id: row.get(0)?,
                 p2p_pubkey: row.get(1)?,
@@ -662,6 +683,7 @@ impl StorageService {
                 is_anchor_capable: row.get::<_, i32>(7)? != 0,
                 retention_seconds: row.get(8)?,
                 handle: row.get(9)?,
+                prestige_tier: row.get::<_, Option<i32>>(10)?.map(|v| v as u8),
             })
         })?;
 
@@ -704,11 +726,11 @@ impl StorageService {
     /// Retrieves all verified sovereign contacts.
     pub fn get_all_contacts(&self) -> Result<Vec<crate::identity::SovereignIdentity>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle FROM contacts WHERE is_verified = 1")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1")?;
         let rows = stmt.query_map([], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
-            static_key.copy_from_slice(&static_key_vec);
+            static_key = Self::safe_static_key(&static_key_vec);
             Ok(crate::identity::SovereignIdentity {
                 peer_id: row.get(0)?,
                 p2p_pubkey: row.get(1)?,
@@ -720,6 +742,7 @@ impl StorageService {
                 is_anchor_capable: row.get::<_, i32>(7)? != 0,
                 retention_seconds: row.get(8)?,
                 handle: row.get(9)?,
+                prestige_tier: row.get::<_, Option<i32>>(10)?.map(|v| v as u8),
             })
         })?;
 
@@ -733,11 +756,11 @@ impl StorageService {
     /// Fetches all verified contacts marked as Anchor Capable.
     pub fn fetch_all_anchor_nodes(&self) -> Result<Vec<crate::identity::SovereignIdentity>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle FROM contacts WHERE is_verified = 1 AND is_anchor_capable = 1")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1 AND is_anchor_capable = 1")?;
         let rows = stmt.query_map([], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
-            static_key.copy_from_slice(&static_key_vec);
+            static_key = Self::safe_static_key(&static_key_vec);
             Ok(crate::identity::SovereignIdentity {
                 peer_id: row.get(0)?,
                 p2p_pubkey: row.get(1)?,
@@ -749,6 +772,7 @@ impl StorageService {
                 is_anchor_capable: true,
                 retention_seconds: row.get(8)?,
                 handle: row.get(9)?,
+                prestige_tier: row.get::<_, Option<i32>>(10)?.map(|v| v as u8),
             })
         })?;
 
@@ -853,11 +877,11 @@ impl StorageService {
     }
 
     /// Retrieves the local profile (User's name, handle, avatar, and privacy mode).
-    pub fn get_profile(&self) -> Result<Option<(Option<String>, Option<String>, Option<String>, i32)>> {
+    pub fn get_profile(&self) -> Result<Option<(Option<String>, Option<String>, Option<String>, i32, i32)>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT name, handle, avatar_base64, privacy_mode FROM profile WHERE id = 1")?;
+        let mut stmt = conn.prepare("SELECT name, handle, avatar_base64, privacy_mode, prestige_tier FROM profile WHERE id = 1")?;
         let mut rows = stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
         })?;
 
         if let Some(row) = rows.next() {
@@ -878,6 +902,27 @@ impl StorageService {
                 avatar_base64 = COALESCE(excluded.avatar_base64, avatar_base64),
                 privacy_mode = excluded.privacy_mode",
             params![name, handle, avatar, privacy_mode],
+        )?;
+        Ok(())
+    }
+
+    /// Updates the local profile's prestige tier (called from Dart when INTR balance changes).
+    pub fn set_profile_tier(&self, tier: u8) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO profile (id, prestige_tier) VALUES (1, ?1)
+             ON CONFLICT(id) DO UPDATE SET prestige_tier = ?1",
+            params![tier as i32],
+        )?;
+        Ok(())
+    }
+
+    /// Updates a contact's prestige tier (received via ProfileResponse).
+    pub fn set_contact_tier(&self, peer_id: &str, tier: u8) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE contacts SET prestige_tier = ?1 WHERE peer_id = ?2",
+            params![tier as i32, peer_id],
         )?;
         Ok(())
     }
@@ -935,6 +980,22 @@ impl StorageService {
         Ok(messages)
     }
 
+    /// Retrieves messages for a peer with pagination (most recent first).
+    pub fn get_messages_for_peer_paginated(&self, peer_id: &str, offset: u32, limit: u32) -> Result<Vec<(String, String, bool, i32, Option<String>, Option<String>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare("SELECT content, timestamp, is_me, status, msg_id, reply_to_msg_id FROM messages WHERE peer_id = ?1 ORDER BY timestamp DESC LIMIT ?2 OFFSET ?3")?;
+        let rows = stmt.query_map(params![peer_id, limit, offset], |row| {
+            Ok((row.get(0)?, row.get::<_, String>(1)?, row.get::<_, i32>(2)? != 0, row.get::<_, i32>(3)?, row.get::<_, Option<String>>(4)?, row.get::<_, Option<String>>(5)?))
+        })?;
+
+        let mut messages = Vec::new();
+        for row in rows {
+            messages.push(row?);
+        }
+        messages.reverse(); // Return in chronological order
+        Ok(messages)
+    }
+
     /// Retrieves only the last message for a specific peer (optimized for chat list preview).
     pub fn get_last_message_for_peer(&self, peer_id: &str) -> Result<Option<(String, String, bool, Option<String>)>> {
         let conn = self.conn.lock();
@@ -973,6 +1034,62 @@ impl StorageService {
             Some(row) => Ok(Some(row?)),
             None => Ok(None),
         }
+    }
+
+    /// Retrieves the last message for every contact in a single query (batch optimization).
+    pub fn get_last_messages_all(&self) -> Result<serde_json::Value> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT peer_id, content, timestamp, is_me, msg_id FROM messages WHERE id IN (SELECT MAX(id) FROM messages GROUP BY peer_id)"
+        )?;
+        let mut map = serde_json::Map::new();
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i32>(3)? != 0,
+                row.get::<_, Option<String>>(4)?,
+            ))
+        })?;
+        for row in rows {
+            let (peer_id, content, timestamp, is_me, msg_id) = row?;
+            map.insert(peer_id, serde_json::json!({
+                "content": content,
+                "timestamp": timestamp,
+                "is_me": is_me,
+                "msg_id": msg_id,
+            }));
+        }
+        Ok(serde_json::Value::Object(map))
+    }
+
+    /// Retrieves the last message for every group in a single query (batch optimization).
+    pub fn get_last_group_messages_all(&self) -> Result<serde_json::Value> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT group_id, sender_id, content, timestamp, msg_id FROM group_messages WHERE id IN (SELECT MAX(id) FROM group_messages GROUP BY group_id)"
+        )?;
+        let mut map = serde_json::Map::new();
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
+            ))
+        })?;
+        for row in rows {
+            let (group_id, sender_id, content, timestamp, msg_id) = row?;
+            map.insert(group_id, serde_json::json!({
+                "sender_id": sender_id,
+                "content": content,
+                "timestamp": timestamp,
+                "msg_id": msg_id,
+            }));
+        }
+        Ok(serde_json::Value::Object(map))
     }
 
     /// Retrieves unread message counts for all contacts and groups.
@@ -1037,7 +1154,7 @@ impl StorageService {
         
         // Pre-filter: only scan groups whose members_json contains the peer_id
         // This avoids deserializing ALL groups when only a few contain this peer
-        let peer_pattern = format!("%{}%", peer_id);
+        let peer_pattern = format!("%{}%", Self::escape_like(&peer_id));
         
         let mut updates = Vec::new();
         {
@@ -1268,18 +1385,86 @@ impl StorageService {
         }
     }
 
-    pub fn upsert_handle_claim(&self, handle: &str, peer_id: &str, timestamp: i64, signatures_json: &str, verified: bool) -> Result<()> {
+    /// Inserts a new handle claim. IMMMUTABLE — if the handle already exists and is verified, the insert is rejected.
+    pub fn insert_handle_claim(&self, handle: &str, peer_id: &str, timestamp: i64, signatures_json: &str, verified: bool) -> Result<bool> {
         let conn = self.conn.lock();
+        // Check if handle already exists and is verified (immutable)
+        let existing: Option<(String, bool)> = conn.query_row(
+            "SELECT peer_id, verified FROM handle_registry WHERE handle = ?1",
+            params![handle],
+            |row| Ok((row.get(0)?, row.get::<_, i32>(1)? != 0)),
+        ).ok();
+
+        if let Some((existing_peer, is_verified)) = existing {
+            if is_verified {
+                // Handle is already verified and permanently claimed — reject
+                return Ok(false);
+            }
+            // Not yet verified — allow update (same peer re-claiming or conflict resolution)
+            if existing_peer == peer_id {
+                conn.execute(
+                    "UPDATE handle_registry SET timestamp = ?1, signatures_json = ?2, verified = ?3 WHERE handle = ?4",
+                    params![timestamp, signatures_json, verified as i32, handle],
+                )?;
+                return Ok(true);
+            }
+            // Different peer, not verified — allow overwrite (conflict resolved by RBN quorum)
+        }
+
         conn.execute(
-            "INSERT INTO handle_registry (handle, peer_id, timestamp, signatures_json, verified) VALUES (?1, ?2, ?3, ?4, ?5)
+            "INSERT OR REPLACE INTO handle_registry (handle, peer_id, timestamp, signatures_json, verified) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![handle, peer_id, timestamp, signatures_json, verified as i32],
+        )?;
+        Ok(true)
+    }
+
+    /// Updates a handle claim's verification status. Only allowed if not yet verified.
+    pub fn verify_handle_claim(&self, handle: &str, peer_id: &str, timestamp: i64, signatures_json: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let existing: Option<(String, bool)> = conn.query_row(
+            "SELECT peer_id, verified FROM handle_registry WHERE handle = ?1",
+            params![handle],
+            |row| Ok((row.get(0)?, row.get::<_, i32>(1)? != 0)),
+        ).ok();
+
+        if let Some((_, is_verified)) = existing {
+            if is_verified {
+                return Ok(false); // Already verified — immutable
+            }
+        }
+
+        conn.execute(
+            "INSERT INTO handle_registry (handle, peer_id, timestamp, signatures_json, verified) VALUES (?1, ?2, ?3, ?4, 1)
              ON CONFLICT(handle) DO UPDATE SET 
                 peer_id = excluded.peer_id, 
                 timestamp = excluded.timestamp, 
                 signatures_json = excluded.signatures_json, 
-                verified = excluded.verified",
-            params![handle, peer_id, timestamp, signatures_json, verified as i32],
+                verified = 1",
+            params![handle, peer_id, timestamp, signatures_json],
         )?;
-        Ok(())
+        Ok(true)
+    }
+
+    /// Checks if a handle is already permanently claimed (verified) by ANY peer.
+    pub fn is_handle_permanently_claimed(&self, handle: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let result: bool = conn.query_row(
+            "SELECT COUNT(*) FROM handle_registry WHERE handle = ?1 AND verified = 1",
+            params![handle],
+            |row| Ok(row.get::<_, i64>(0)? > 0),
+        ).unwrap_or(false);
+        Ok(result)
+    }
+
+    /// Gets the local user's verified handle (immutable once set).
+    pub fn get_local_handle(&self) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let result: Option<String> = conn.query_row(
+            "SELECT handle FROM profile WHERE id = 1 AND handle IS NOT NULL AND handle != ''",
+            [],
+            |row| row.get(0),
+        ).ok();
+        Ok(result)
     }
 
     // --- Push Tokens (Background Proxy) ---
@@ -1709,7 +1894,7 @@ impl StorageService {
 
     pub fn search_notes(&self, query: &str) -> Result<Vec<(String, String, String, String, Option<String>, String, String)>> {
         let conn = self.conn.lock();
-        let search_pattern = format!("%{}%", query);
+        let search_pattern = format!("%{}%", Self::escape_like(&query));
         let mut stmt = conn.prepare(
             "SELECT id, title, content, tags, image_path, created_at, updated_at FROM notes 
              WHERE title LIKE ?1 OR content LIKE ?1 OR tags LIKE ?1 
@@ -1826,7 +2011,7 @@ impl StorageService {
 
     pub fn search_messages(&self, peer_id: &str, query: &str) -> Result<Vec<(String, String, bool, i32, Option<String>, Option<String>)>> {
         let conn = self.conn.lock();
-        let search_pattern = format!("%{}%", query);
+        let search_pattern = format!("%{}%", Self::escape_like(&query));
         let mut stmt = conn.prepare(
             "SELECT content, timestamp, is_me, status, msg_id, reply_to_msg_id FROM messages WHERE peer_id = ?1 AND content LIKE ?2 ORDER BY timestamp ASC"
         )?;
@@ -1847,7 +2032,7 @@ impl StorageService {
 
     pub fn search_group_messages(&self, group_id: &str, query: &str) -> Result<Vec<(String, String, String, String, Option<String>)>> {
         let conn = self.conn.lock();
-        let search_pattern = format!("%{}%", query);
+        let search_pattern = format!("%{}%", Self::escape_like(&query));
         let mut stmt = conn.prepare(
             "SELECT sender_id, msg_id, content, timestamp, reply_to_msg_id FROM group_messages WHERE group_id = ?1 AND content LIKE ?2 ORDER BY timestamp ASC"
         )?;
@@ -1877,7 +2062,7 @@ impl StorageService {
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
 
         if !is_generic && !query.is_empty() {
-            let search_pattern = format!("%{}%", query);
+            let search_pattern = format!("%{}%", Self::escape_like(&query));
             sql.push_str(" WHERE content LIKE ?");
             param_values.push(Box::new(search_pattern));
         }
@@ -1905,7 +2090,7 @@ impl StorageService {
 
     pub fn search_all_group_messages(&self, query: &str, limit: i32) -> Result<Vec<(String, String, String, String, String, Option<String>)>> {
         let conn = self.conn.lock();
-        let search_pattern = format!("%{}%", query);
+        let search_pattern = format!("%{}%", Self::escape_like(&query));
         let mut stmt = conn.prepare(
             "SELECT group_id, sender_id, msg_id, content, timestamp, reply_to_msg_id FROM group_messages WHERE content LIKE ?1 ORDER BY timestamp DESC LIMIT ?2"
         )?;
@@ -1939,7 +2124,7 @@ impl StorageService {
             // When query is a generic type reference, just filter by mime type — no filename search
         } else if !query.is_empty() {
             sql.push_str(" AND filename LIKE ?");
-            let search_pattern = format!("%{}%", query);
+            let search_pattern = format!("%{}%", Self::escape_like(&query));
             param_values.push(Box::new(search_pattern));
         }
 
@@ -1979,10 +2164,10 @@ impl StorageService {
             .any(|kw| query_lower.contains(kw));
 
         let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if is_generic {
-            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle FROM contacts ORDER BY global_name ASC".to_string(), vec![])
+            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle, prestige_tier FROM contacts ORDER BY global_name ASC".to_string(), vec![])
         } else {
-            let search_pattern = format!("%{}%", query);
-            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle FROM contacts WHERE global_name LIKE ?1 OR local_alias LIKE ?1 OR handle LIKE ?1 OR peer_id LIKE ?1".to_string(), vec![Box::new(search_pattern)])
+            let search_pattern = format!("%{}%", Self::escape_like(&query));
+            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle, prestige_tier FROM contacts WHERE global_name LIKE ?1 OR local_alias LIKE ?1 OR handle LIKE ?1 OR peer_id LIKE ?1".to_string(), vec![Box::new(search_pattern)])
         };
 
         let mut stmt = conn.prepare(&sql)?;
@@ -2004,6 +2189,7 @@ impl StorageService {
                 is_anchor_capable: row.get::<_, i32>(7)? != 0,
                 retention_seconds: 0,
                 handle: row.get(8)?,
+                prestige_tier: row.get::<_, Option<i32>>(9)?.map(|v| v as u8),
             })
         })?;
         let mut contacts = Vec::new();

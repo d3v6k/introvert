@@ -135,8 +135,8 @@ class _IntrovertAppState extends State<IntrovertApp> {
       client.startEngine(seed, _dbPath!);
       client.startNetwork();
       
-      // Save Avatar Name
-      client.setProfile(avatarName, null, null, 0);
+      // Save Avatar Name (privacy_mode=1: allow unknown users to connect by default)
+      client.setProfile(avatarName, null, null, 1);
       
       // Restore saved Anchor Mode settings
       SharedPreferences.getInstance().then((prefs) {

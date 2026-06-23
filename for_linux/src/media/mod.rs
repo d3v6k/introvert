@@ -16,7 +16,7 @@ use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use serde::{Serialize, Deserialize};
 use libp2p::PeerId;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::economy::RewardTracker;
 

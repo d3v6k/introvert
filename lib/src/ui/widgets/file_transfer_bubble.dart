@@ -255,10 +255,26 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
 
   Future<void> _loadThumbnail() async {
     final progress = widget.progress;
-    final String? localPath = progress.localPath;
+    String? localPath = progress.localPath;
     final String transferId = progress.transferId;
     final String mimeType = progress.mimeType;
     final String ext = progress.filename.split('.').last.toLowerCase();
+    final String fileHash = progress.fileHash;
+
+    // Fallback: if localPath is stale, check Sovereign Drive for the organized path
+    if (localPath == null || !File(localPath).existsSync()) {
+      if (fileHash.isNotEmpty) {
+        try {
+          final driveInfo = IntrovertClient().driveGetByHash(fileHash);
+          if (driveInfo.containsKey('local_path')) {
+            final organizedPath = IntrovertClient().resolveSandboxPath(driveInfo['local_path']?.toString()) ?? "";
+            if (organizedPath.isNotEmpty && File(organizedPath).existsSync()) {
+              localPath = organizedPath;
+            }
+          }
+        } catch (_) {}
+      }
+    }
 
     final bool canShowThumbnail = localPath != null &&
         (widget.isMe || progress.isOutgoing || progress.isVerified) &&
@@ -421,34 +437,22 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
       return "transfer failed";
     }
     if (progress.isWaitingForDownload) {
-      return "tap to download";
+      return "tap to pull from mesh";
     }
     if (progress.mimeType == 'SWARM_WAIT') {
-      return "searching for swarm...";
-    }
-
-    final double mbps = progress.speedBps / 1000000.0;
-    String speedPart = "";
-    if (mbps > 0.05) {
-      speedPart = "${mbps.toStringAsFixed(1)} mbps";
-    } else if (progress.speedBps > 0) {
-      speedPart = "${(progress.speedBps / 1024).toStringAsFixed(1)} kb/s";
+      return "searching mesh swarm...";
     }
 
     if (isVerified) {
       if (isGroup && progress.isOutgoing) {
         return "all members verified ✓";
       }
-      if (speedPart.isNotEmpty) {
-        return "verified. speed : $speedPart";
-      }
-      return "verified";
+      return "verified ✓";
     }
 
     // Sender: all chunks pushed but waiting for recipient ACK(s)
     if (progress.isOutgoing && isComplete && !isVerified) {
       if (isGroup) {
-        // progress field = completions/total_members ratio for group sender
         final int pct = (progress.progress * 100).toInt();
         if (pct > 0) {
           return "delivered to $pct% of group · awaiting rest";
@@ -462,13 +466,9 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
       return "verifying...";
     }
 
-    final int pct = (progress.progress * 100).toInt();
-    final String action = progress.isOutgoing ? "seeding" : "downloading";
-    
-    if (speedPart.isNotEmpty) {
-      return "$action: $pct%. speed : $speedPart";
-    }
-    return "$action: $pct%";
+    // During transfer: minimal status, no percentage/speed
+    final String action = progress.isOutgoing ? "pushing to mesh" : "pulling from mesh";
+    return action;
   }
 
   @override
@@ -487,6 +487,11 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
     final bool isComplete = progress.isComplete;
     final bool isVerified = progress.isVerified;
     final String? localPath = progress.localPath;
+
+    // During download: show nothing — image appears when verified
+    if (!progress.isVerified && !widget.isMe) {
+      return const SizedBox.shrink();
+    }
 
     Color stateColor = isVerified 
         ? AppTheme.current.accent 
@@ -564,7 +569,6 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
                   width: MediaQuery.of(context).size.width * 0.75,
-                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isMe 
                       ? AppTheme.current.accent.withValues(alpha: isVerified ? 0.15 : 0.1) 
@@ -578,108 +582,147 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (isAudio && isVerified && localPath != null && File(localPath).existsSync())
-                        _buildAudioPlayerWidget(stateColor)
-                      else ...[
-                        // THUMBNAIL AREA
-                        _buildThumbnailWidget(stateColor),
-
-                        // INFO AREA
-                        Row(
-                          children: [
-                            if (progress.isWaitingForDownload)
-                              Icon(Icons.download_for_offline_outlined, color: stateColor, size: 20)
-                            else if (!isComplete)
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  value: progress.progress,
-                                  strokeWidth: 1.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(stateColor),
-                                ),
-                              )
-                            else
-                              Icon(
-                                isImage ? Icons.image : (isVideo ? Icons.videocam : Icons.insert_drive_file),
-                                color: stateColor,
-                                size: 20,
-                              ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (!isMedia) ...[
-                                    Text(
-                                      progress.filename.replaceFirst("ERROR:", ""),
-                                      style: TextStyle(
-                                        color: AppTheme.current.text,
-                                        fontFamily: 'monospace',
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 2),
-                                  ],
-                                  Text(
-                                    cleanStatusText,
-                                    style: TextStyle(
-                                      color: stateColor.withValues(alpha: 0.8),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isVerified && !isMedia && localPath != null)
-                              TextButton(
-                                onPressed: () => OpenFile.open(localPath),
-                                style: TextButton.styleFrom(
-                                  minimumSize: const Size(0, 24),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                ),
-                                child: Text(
-                                  "OPEN",
-                                  style: TextStyle(color: stateColor, fontSize: 10, fontWeight: FontWeight.bold),
-                                ),
-                              )
-                            else if (!isComplete && !progress.isCancelled && !progress.isWaitingForDownload)
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
-                                onPressed: () {
-                                  try {
-                                    IntrovertClient().cancelFileTransfer(progress.transferId);
-                                  } catch (e) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text("Cancel not yet available in this build")),
-                                      );
-                                    }
-                                  }
-                                },
-                                constraints: const BoxConstraints(),
-                                padding: EdgeInsets.zero,
-                              ),
-                          ],
+                      if (isAudio && isVerified && localPath != null && File(localPath).existsSync()) ...[
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: _buildAudioPlayerWidget(stateColor),
                         ),
-                        
-                        // Progress bar for transferring state
-                        if (!isComplete && !progress.isWaitingForDownload)
+                      ] else if (isMedia && _thumbnailPath != null && File(_thumbnailPath!).existsSync() && isVerified) ...[
+                        // Clean media display: image with rounded corners, no frame
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: _buildThumbnailWidget(stateColor),
+                        ),
+                        // Caption below image if present
+                        if (progress.caption != null && progress.caption!.isNotEmpty)
                           Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: progress.progress,
-                                backgroundColor: AppTheme.current.mutedText.withValues(alpha: 0.1),
-                                valueColor: AlwaysStoppedAnimation<Color>(stateColor),
-                                minHeight: 2,
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+                            child: Text(
+                              progress.caption!,
+                              style: TextStyle(
+                                color: AppTheme.current.text.withValues(alpha: 0.9),
+                                fontSize: 13,
+                                height: 1.3,
                               ),
                             ),
                           ),
+                        // Minimal status for media
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          child: Text(
+                            cleanStatusText,
+                            style: TextStyle(
+                              color: stateColor.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildThumbnailWidget(stateColor),
+
+                              Row(
+                                children: [
+                                  if (progress.isWaitingForDownload)
+                                    Icon(Icons.download_for_offline_outlined, color: stateColor, size: 20)
+                                  else if (!isComplete)
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        value: progress.progress,
+                                        strokeWidth: 1.5,
+                                        valueColor: AlwaysStoppedAnimation<Color>(stateColor),
+                                      ),
+                                    )
+                                  else
+                                    Icon(
+                                      isImage ? Icons.image : (isVideo ? Icons.videocam : Icons.insert_drive_file),
+                                      color: stateColor,
+                                      size: 20,
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isMedia) ...[
+                                          Text(
+                                            progress.filename.replaceFirst("ERROR:", ""),
+                                            style: TextStyle(
+                                              color: AppTheme.current.text,
+                                              fontFamily: 'monospace',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 2),
+                                        ],
+                                        Text(
+                                          cleanStatusText,
+                                          style: TextStyle(
+                                            color: stateColor.withValues(alpha: 0.8),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isVerified && !isMedia && localPath != null)
+                                    TextButton(
+                                      onPressed: () => OpenFile.open(localPath),
+                                      style: TextButton.styleFrom(
+                                        minimumSize: const Size(0, 24),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      ),
+                                      child: Text(
+                                        "OPEN",
+                                        style: TextStyle(color: stateColor, fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    )
+                                  else if (!isComplete && !progress.isCancelled && !progress.isWaitingForDownload)
+                                    IconButton(
+                                      icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
+                                      onPressed: () {
+                                        try {
+                                          IntrovertClient().cancelFileTransfer(progress.transferId);
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text("Cancel not yet available in this build")),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      constraints: const BoxConstraints(),
+                                      padding: EdgeInsets.zero,
+                                    ),
+                                ],
+                              ),
+
+                              if (!isComplete && !progress.isWaitingForDownload)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(2),
+                                    child: LinearProgressIndicator(
+                                      value: progress.progress,
+                                      backgroundColor: AppTheme.current.mutedText.withValues(alpha: 0.1),
+                                      valueColor: AlwaysStoppedAnimation<Color>(stateColor),
+                                      minHeight: 2,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -906,7 +949,8 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
     if (progress.isWaitingForDownload) {
       return _buildPlaceholder(progress.filename, progress.mimeType, stateColor);
     } else if (!progress.isVerified && !widget.isMe) {
-      return _buildIncomingPlaceholder(progress.filename, progress.mimeType, stateColor);
+      // Download happening silently in background — nothing shown until verified
+      return const SizedBox.shrink();
     } else {
       return _buildPlaceholder(progress.filename, progress.mimeType, stateColor);
     }
@@ -935,7 +979,7 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
     IconData icon = isImage ? Icons.image : (isVideo ? Icons.videocam : Icons.insert_drive_file);
 
     return Container(
-      height: 180,
+      height: 100,
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -951,14 +995,14 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
               ".$ext",
               style: TextStyle(
                 color: AppTheme.current.text.withValues(alpha: 0.7),
-                fontSize: 28,
+                fontSize: 22,
                 fontWeight: FontWeight.w900,
                 fontFamily: 'monospace',
                 letterSpacing: 2,
               ),
             ),
-            const SizedBox(height: 8),
-            Icon(icon, color: AppTheme.current.mutedText.withValues(alpha: 0.1), size: 24),
+            const SizedBox(height: 6),
+            Icon(icon, color: AppTheme.current.mutedText.withValues(alpha: 0.1), size: 20),
           ],
         ),
       ),

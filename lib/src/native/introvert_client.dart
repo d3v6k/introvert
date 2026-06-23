@@ -102,6 +102,9 @@ typedef IntrovertStoreMessageAsyncDart = FfiResult Function(Pointer<Utf8> peerId
 typedef IntrovertStorageGetMessagesC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertStorageGetMessagesDart = FfiResult Function(Pointer<Utf8> peerId);
 
+typedef IntrovertStorageGetMessagesPaginatedC = FfiResult Function(Pointer<Utf8> peerId, Uint32 offset, Uint32 limit);
+typedef IntrovertStorageGetMessagesPaginatedDart = FfiResult Function(Pointer<Utf8> peerId, int offset, int limit);
+
 typedef IntrovertEstablishSecureSessionC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertEstablishSecureSessionDart = FfiResult Function(Pointer<Utf8> peerId);
 
@@ -116,6 +119,9 @@ typedef IntrovertStorageGetContactsDart = FfiResult Function();
 
 typedef IntrovertDeleteContactC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertDeleteContactDart = FfiResult Function(Pointer<Utf8> peerId);
+
+typedef IntrovertSetProfileTierC = FfiResult Function(Int32 tier);
+typedef IntrovertSetProfileTierDart = FfiResult Function(int tier);
 
 typedef IntrovertDeleteChatC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertDeleteChatDart = FfiResult Function(Pointer<Utf8> peerId);
@@ -185,6 +191,12 @@ typedef IntrovertNetworkClaimHandleDart = FfiResult Function(Pointer<Utf8> handl
 
 typedef IntrovertStorageGetHandleStatusC = FfiResult Function(Pointer<Utf8> handle);
 typedef IntrovertStorageGetHandleStatusDart = FfiResult Function(Pointer<Utf8> handle);
+
+typedef IntrovertStorageGetLocalHandleC = FfiResult Function();
+typedef IntrovertStorageGetLocalHandleDart = FfiResult Function();
+
+typedef IntrovertStorageIsHandleClaimedC = FfiResult Function(Pointer<Utf8> handle);
+typedef IntrovertStorageIsHandleClaimedDart = FfiResult Function(Pointer<Utf8> handle);
 
 typedef IntrovertNetworkRequestSwarmStatsC = FfiResult Function();
 typedef IntrovertNetworkRequestSwarmStatsDart = FfiResult Function();
@@ -378,6 +390,12 @@ typedef IntrovertStorageGetLastMessageDart = FfiResult Function(Pointer<Utf8> pe
 typedef IntrovertStorageGetLastGroupMessageC = FfiResult Function(Pointer<Utf8> groupId);
 typedef IntrovertStorageGetLastGroupMessageDart = FfiResult Function(Pointer<Utf8> groupId);
 
+typedef IntrovertStorageGetLastMessagesAllC = FfiResult Function();
+typedef IntrovertStorageGetLastMessagesAllDart = FfiResult Function();
+
+typedef IntrovertStorageGetLastGroupMessagesAllC = FfiResult Function();
+typedef IntrovertStorageGetLastGroupMessagesAllDart = FfiResult Function();
+
 // Daily Rewards
 typedef IntrovertDailyRewardGetStatusC = FfiResult Function();
 typedef IntrovertDailyRewardGetStatusDart = FfiResult Function();
@@ -544,11 +562,13 @@ class IntrovertClient {
   late IntrovertClaimRewardsAsyncDart _claimRewardsAsync;
   late IntrovertStoreMessageAsyncDart _storeMessageAsync;
   late IntrovertStorageGetMessagesDart _getMessages;
+  late IntrovertStorageGetMessagesPaginatedDart _getMessagesPaginated;
   late IntrovertEstablishSecureSessionDart _establishSecureSession;
   late IntrovertFetchMailboxDart _fetchMailbox;
   late IntrovertStartMediaStreamDart _startMediaStream;
   late IntrovertStorageGetContactsDart _getContacts;
   late IntrovertDeleteContactDart _deleteContact;
+  late IntrovertSetProfileTierDart _setProfileTier;
   late IntrovertDeleteChatDart _deleteChat;
   late IntrovertClearContactsDart _clearContacts;
   late IntrovertWormholeStartDart _wormholeStart;
@@ -573,6 +593,8 @@ class IntrovertClient {
   late IntrovertStorageGetReactionsDart _getReactions;
   late IntrovertNetworkClaimHandleDart _claimHandle;
   late IntrovertStorageGetHandleStatusDart _getHandleStatus;
+  late IntrovertStorageGetLocalHandleDart _getLocalHandle;
+  late IntrovertStorageIsHandleClaimedDart _isHandleClaimed;
   late IntrovertNetworkRequestSwarmStatsDart _requestSwarmStats;
   late IntrovertNetworkPollPeerProfileDart _pollPeerProfile;
   late IntrovertNetworkSyncChatMessagesDart _syncChatMessages;
@@ -652,6 +674,8 @@ class IntrovertClient {
   // Optimized last message queries
   late IntrovertStorageGetLastMessageDart _getLastMessage;
   late IntrovertStorageGetLastGroupMessageDart _getLastGroupMessage;
+  late IntrovertStorageGetLastMessagesAllDart _getLastMessagesAll;
+  late IntrovertStorageGetLastGroupMessagesAllDart _getLastGroupMessagesAll;
 
   // Daily Rewards
   late IntrovertDailyRewardGetStatusDart _dailyRewardGetStatus;
@@ -687,7 +711,7 @@ class IntrovertClient {
   void initSandboxPaths(String supportPath, String docsPath) {
     _supportDirPath = supportPath;
     _documentsDirPath = docsPath;
-    debugPrint("📂 Sandbox Paths Initialized: Support='$_supportDirPath', Docs='$_documentsDirPath'");
+    if (kDebugMode) debugPrint("📂 Sandbox Paths Initialized: Support='$_supportDirPath', Docs='$_documentsDirPath'");
   }
 
   String? resolveSandboxPath(String? path) {
@@ -695,6 +719,11 @@ class IntrovertClient {
     
     // Normalize path separators
     final normalizedPath = path.replaceAll('\\', '/');
+    
+    // Security: reject obvious traversal attempts
+    if (normalizedPath.contains('/../') || normalizedPath.contains('\\..\\') || normalizedPath.startsWith('../')) {
+      return null;
+    }
     
     // Check if the path contains 'Library/Application Support/' or 'Documents/'
     const supportPattern = 'Library/Application Support/';
@@ -716,7 +745,12 @@ class IntrovertClient {
             }
           }
         }
-        return '${normSupport.replaceAll(RegExp(r'/+$'), '')}/${relativePart.replaceAll(RegExp(r'^/+'), '')}';
+        final resolved = '${normSupport.replaceAll(RegExp(r'/+$'), '')}/${relativePart.replaceAll(RegExp(r'^/+'), '')}';
+        // Security: verify resolved path stays within sandbox
+        if (_supportDirPath != null && !resolved.startsWith(_supportDirPath!)) {
+          return null;
+        }
+        return resolved;
       }
     } else if (normalizedPath.contains(docsPattern)) {
       final index = normalizedPath.indexOf(docsPattern) + docsPattern.length;
@@ -734,7 +768,12 @@ class IntrovertClient {
             }
           }
         }
-        return '${normDocs.replaceAll(RegExp(r'/+$'), '')}/${relativePart.replaceAll(RegExp(r'^/+'), '')}';
+        final resolved = '${normDocs.replaceAll(RegExp(r'/+$'), '')}/${relativePart.replaceAll(RegExp(r'^/+'), '')}';
+        // Security: verify resolved path stays within sandbox
+        if (_documentsDirPath != null && !resolved.startsWith(_documentsDirPath!)) {
+          return null;
+        }
+        return resolved;
       }
     }
     
@@ -768,7 +807,7 @@ class IntrovertClient {
           baseLen: dataLen,
         );
         _binaryFinalizer?.attach(event, castedPtr.cast<Void>(), externalSize: dataLen);
-        _mediaStreamController.add(event);
+        if (!_mediaStreamController.isClosed) _mediaStreamController.add(event);
       } else if (eventType == 9) { // Economy Stats
         try {
           final data = castedPtr.asTypedList(dataLen);
@@ -776,7 +815,7 @@ class IntrovertClient {
           if (!stats.containsKey('sol_balance')) {
             stats['sol_balance'] = stats['intr_balance'] ?? 0;
           }
-          _economyStreamController.add(stats);
+          if (!_economyStreamController.isClosed) _economyStreamController.add(stats);
         } catch (e) {
           debugPrint("❌ Error decoding economy stats: $e");
         } finally {
@@ -787,7 +826,7 @@ class IntrovertClient {
           final data = castedPtr.asTypedList(dataLen);
           final jsonStr = utf8.decode(data);
           final progress = FileTransferProgress.fromJson(json.decode(jsonStr));
-          _transferStreamController.add(progress);
+          if (!_transferStreamController.isClosed) _transferStreamController.add(progress);
         } catch (e) {
           debugPrint("❌ Error decoding file progress: $e");
         } finally {
@@ -797,7 +836,7 @@ class IntrovertClient {
         try {
           final data = castedPtr.asTypedList(dataLen);
           final jsonStr = utf8.decode(data);
-          _swarmStatsStreamController.add(json.decode(jsonStr) as Map<String, dynamic>);
+          if (!_swarmStatsStreamController.isClosed) _swarmStatsStreamController.add(json.decode(jsonStr) as Map<String, dynamic>);
         } catch (e) {
           debugPrint("❌ Error decoding swarm stats: $e");
         } finally {
@@ -817,7 +856,9 @@ class IntrovertClient {
         final event = NetworkEvent(eventType, eventData);
         
         // We copy the data into eventData and then free the native buffer immediately.
-        _networkStreamController.add(event);
+        if (!_networkStreamController.isClosed) {
+          _networkStreamController.add(event);
+        }
         _freeBinary(dataPtr, dataLen);
       }
     });
@@ -905,11 +946,13 @@ class IntrovertClient {
       _claimRewardsAsync = safeLookup('claim_rewards', () => _dylib.lookupFunction<IntrovertClaimRewardsAsyncC, IntrovertClaimRewardsAsyncDart>('introvert_claim_rewards_async'), (cb) => FfiResult.dummy);
       _storeMessageAsync = safeLookup('store_msg_async', () => _dylib.lookupFunction<IntrovertStoreMessageAsyncC, IntrovertStoreMessageAsyncDart>('introvert_store_message_async'), (p, m, me, cb) => FfiResult.dummy);
       _getMessages = safeLookup('get_messages', () => _dylib.lookupFunction<IntrovertStorageGetMessagesC, IntrovertStorageGetMessagesDart>('introvert_storage_get_messages'), (p) => FfiResult.dummy);
+      _getMessagesPaginated = safeLookup('get_messages_paginated', () => _dylib.lookupFunction<IntrovertStorageGetMessagesPaginatedC, IntrovertStorageGetMessagesPaginatedDart>('introvert_storage_get_messages_paginated'), (p, o, l) => FfiResult.dummy);
       _establishSecureSession = safeLookup('secure_session', () => _dylib.lookupFunction<IntrovertEstablishSecureSessionC, IntrovertEstablishSecureSessionDart>('introvert_network_establish_secure_session'), (p) => FfiResult.dummy);
       _fetchMailbox = safeLookup('fetch_mailbox', () => _dylib.lookupFunction<IntrovertFetchMailboxC, IntrovertFetchMailboxDart>('introvert_network_fetch_mailbox'), () => FfiResult.dummy);
       _startMediaStream = safeLookup('media_stream', () => _dylib.lookupFunction<IntrovertStartMediaStreamC, IntrovertStartMediaStreamDart>('introvert_network_start_media_stream'), (p, t) => FfiResult.dummy);
       _getContacts = safeLookup('get_contacts', () => _dylib.lookupFunction<IntrovertStorageGetContactsC, IntrovertStorageGetContactsDart>('introvert_storage_get_contacts'), () => FfiResult.dummy);
       _deleteContact = safeLookup('delete_contact', () => _dylib.lookupFunction<IntrovertDeleteContactC, IntrovertDeleteContactDart>('introvert_storage_delete_contact'), (p) => FfiResult.dummy);
+      _setProfileTier = safeLookup('set_profile_tier', () => _dylib.lookupFunction<IntrovertSetProfileTierC, IntrovertSetProfileTierDart>('introvert_storage_set_profile_tier'), (t) => FfiResult.dummy);
       _deleteChat = safeLookup('delete_chat', () => _dylib.lookupFunction<IntrovertDeleteChatC, IntrovertDeleteChatDart>('introvert_storage_delete_chat'), (p) => FfiResult.dummy);
       _clearContacts = safeLookup('clear_contacts', () => _dylib.lookupFunction<IntrovertClearContactsC, IntrovertClearContactsDart>('introvert_storage_clear_contacts'), () => FfiResult.dummy);
       _wormholeStart = safeLookup('wormhole_start', () => _dylib.lookupFunction<IntrovertWormholeStartC, IntrovertWormholeStartDart>('introvert_wormhole_start'), () => FfiResult.dummy);
@@ -934,6 +977,8 @@ class IntrovertClient {
       _getReactions = safeLookup('get_reactions', () => _dylib.lookupFunction<IntrovertStorageGetReactionsC, IntrovertStorageGetReactionsDart>('introvert_storage_get_reactions'), (m) => FfiResult.dummy);
       _claimHandle = safeLookup('claim_handle', () => _dylib.lookupFunction<IntrovertNetworkClaimHandleC, IntrovertNetworkClaimHandleDart>('introvert_network_claim_handle'), (h) => FfiResult.dummy);
       _getHandleStatus = safeLookup('get_handle_status', () => _dylib.lookupFunction<IntrovertStorageGetHandleStatusC, IntrovertStorageGetHandleStatusDart>('introvert_storage_get_handle_status'), (h) => FfiResult.dummy);
+      _getLocalHandle = safeLookup('get_local_handle', () => _dylib.lookupFunction<IntrovertStorageGetLocalHandleC, IntrovertStorageGetLocalHandleDart>('introvert_storage_get_local_handle'), () => FfiResult.dummy);
+      _isHandleClaimed = safeLookup('is_handle_claimed', () => _dylib.lookupFunction<IntrovertStorageIsHandleClaimedC, IntrovertStorageIsHandleClaimedDart>('introvert_storage_is_handle_claimed'), (h) => FfiResult.dummy);
       _requestSwarmStats = safeLookup('request_swarm_stats', () => _dylib.lookupFunction<IntrovertNetworkRequestSwarmStatsC, IntrovertNetworkRequestSwarmStatsDart>('introvert_network_request_swarm_stats'), () => FfiResult.dummy);
       _pollPeerProfile = safeLookup('poll_peer_profile', () => _dylib.lookupFunction<IntrovertNetworkPollPeerProfileC, IntrovertNetworkPollPeerProfileDart>('introvert_network_poll_peer_profile'), (p) => FfiResult.dummy);
       _syncChatMessages = safeLookup('sync_chat_messages', () => _dylib.lookupFunction<IntrovertNetworkSyncChatMessagesC, IntrovertNetworkSyncChatMessagesDart>('introvert_network_sync_chat_messages'), (p, a, b, c) => FfiResult.dummy);
@@ -1019,6 +1064,8 @@ class IntrovertClient {
       // Optimized last message queries
       _getLastMessage = safeLookup('get_last_message', () => _dylib.lookupFunction<IntrovertStorageGetLastMessageC, IntrovertStorageGetLastMessageDart>('introvert_storage_get_last_message'), (p) => FfiResult.dummy);
       _getLastGroupMessage = safeLookup('get_last_group_message', () => _dylib.lookupFunction<IntrovertStorageGetLastGroupMessageC, IntrovertStorageGetLastGroupMessageDart>('introvert_storage_get_last_group_message'), (g) => FfiResult.dummy);
+      _getLastMessagesAll = safeLookup('get_last_messages_all', () => _dylib.lookupFunction<IntrovertStorageGetLastMessagesAllC, IntrovertStorageGetLastMessagesAllDart>('introvert_storage_get_last_messages_all'), () => FfiResult.dummy);
+      _getLastGroupMessagesAll = safeLookup('get_last_group_messages_all', () => _dylib.lookupFunction<IntrovertStorageGetLastGroupMessagesAllC, IntrovertStorageGetLastGroupMessagesAllDart>('introvert_storage_get_last_group_messages_all'), () => FfiResult.dummy);
 
       // Daily Rewards
       _dailyRewardGetStatus = safeLookup('daily_reward_get_status', () => _dylib.lookupFunction<IntrovertDailyRewardGetStatusC, IntrovertDailyRewardGetStatusDart>('introvert_daily_reward_get_status'), () => FfiResult.dummy);
@@ -1285,7 +1332,16 @@ class IntrovertClient {
 
   void nukeIdentity(String dbPath) {
     closeCallables();
+    _disposeStreams();
     using((Arena arena) => _handleFfiResult(_nukeIdentity(dbPath.toNativeUtf8(allocator: arena)), context: "Nuke Identity"));
+  }
+
+  void _disposeStreams() {
+    _networkStreamController.close();
+    _mediaStreamController.close();
+    _transferStreamController.close();
+    _economyStreamController.close();
+    _swarmStatsStreamController.close();
   }
 
   void driveAddFile(String name, String hash, String mime, int size, String path) {
@@ -1470,6 +1526,7 @@ class IntrovertClient {
   Future<void> deleteContact(String id) async => using((Arena arena) => _handleFfiResult(_deleteContact(id.toNativeUtf8(allocator: arena)), context: "Delete Contact"));
   Future<void> deleteChat(String id) async => using((Arena arena) => _handleFfiResult(_deleteChat(id.toNativeUtf8(allocator: arena)), context: "Delete Chat"));
   Future<void> clearAllContacts() async => _handleFfiResult(_clearContacts(), context: "Clear Contacts");
+  void setProfileTier(int tier) => _handleFfiResult(_setProfileTier(tier), context: "Set Profile Tier");
 
   Future<String> sendMessage(String id, String msg, [String? replyTo]) async {
     final comp = Completer<String>();
@@ -1517,6 +1574,24 @@ class IntrovertClient {
   List<dynamic> getMessages(String peerId) {
     late FfiResult result;
     using((Arena arena) => result = _getMessages(peerId.toNativeUtf8(allocator: arena)));
+    
+    try {
+      if (result.code == 0 && result.len > 0) {
+        final data = result.data.cast<Uint8>().asTypedList(result.len);
+        final jsonStr = utf8.decode(data);
+        return json.decode(jsonStr);
+      }
+      return [];
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  /// Paginated version: returns the most recent `limit` messages starting from `offset`.
+  /// offset=0, limit=50 returns the last 50 messages.
+  List<dynamic> getMessagesPaginated(String peerId, {int offset = 0, int limit = 50}) {
+    late FfiResult result;
+    using((Arena arena) => result = _getMessagesPaginated(peerId.toNativeUtf8(allocator: arena), offset, limit));
     
     try {
       if (result.code == 0 && result.len > 0) {
@@ -1842,6 +1917,34 @@ class IntrovertClient {
     }
   }
 
+  /// Batch: get last message for ALL contacts in one FFI call.
+  Map<String, dynamic> getLastMessagesAll() {
+    final res = _getLastMessagesAll();
+    try {
+      if (res.code != 0 || res.len == 0) return {};
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      return json.decode(data) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  /// Batch: get last message for ALL groups in one FFI call.
+  Map<String, dynamic> getLastGroupMessagesAll() {
+    final res = _getLastGroupMessagesAll();
+    try {
+      if (res.code != 0 || res.len == 0) return {};
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      return json.decode(data) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
   // ── Daily Rewards ──────────────────────────────────────────────
 
   Map<String, dynamic>? getDailyRewardStatus() {
@@ -1927,6 +2030,30 @@ class IntrovertClient {
     try {
       if (res.code != 0) return {};
       return json.decode(utf8.decode(res.data.asTypedList(res.len))) as Map<String, dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  /// Returns the local user's verified handle (immutable once set). Empty string if none.
+  String getLocalHandle() {
+    final res = _getLocalHandle();
+    try {
+      if (res.code != 0 || res.len == 0) return '';
+      return utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  /// Checks if a handle is permanently claimed (verified) by any peer.
+  bool isHandleClaimed(String handle) {
+    var h = handle.trim();
+    if (!h.startsWith("i@")) h = "i@$h";
+    final res = using((Arena arena) => _isHandleClaimed(h.toNativeUtf8(allocator: arena)));
+    try {
+      if (res.code != 0 || res.len == 0) return false;
+      return res.data.cast<Uint8>()[0] == 1;
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
     }

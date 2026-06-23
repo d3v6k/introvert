@@ -28,7 +28,7 @@ pub struct NetworkService {
     pub(crate) data_channels: Arc<RwLock<HashMap<PeerId, Arc<webrtc::data_channel::RTCDataChannel>>>>,
     pub(crate) incoming_transfers: HashMap<String, IncomingTransfer>,
     pub(crate) active_seeders: HashMap<String, ActiveSeeder>,
-    pub(crate) active_providers: HashMap<String, Vec<PeerId>>,
+    pub(crate) active_providers: indexmap::IndexMap<String, Vec<PeerId>>,
     pub(crate) discovered_anchors: Vec<PeerId>,
     pub(crate) mesh_active_peers: HashSet<PeerId>,
     pub(crate) is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>>,
@@ -41,7 +41,7 @@ pub struct NetworkService {
     pub(crate) liveness_interval_secs: u64,
     pub(crate) downloads_dir: String,
     pub(crate) local_keypair: Keypair,
-    pub(crate) resolved_group_codes: HashMap<String, String>,
+    pub(crate) resolved_group_codes: indexmap::IndexMap<String, String>,
     pub(crate) anchor_mappings: HashMap<PeerId, Multiaddr>,
     pub(crate) bootstrap_nodes: Vec<(PeerId, Multiaddr)>,
     pub(crate) _tunnel_handle: Option<tokio::task::JoinHandle<Result<(), anyhow::Error>>>,
@@ -52,7 +52,7 @@ pub struct NetworkService {
     pub(crate) diagnostic_requests: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, Instant)>,
     pub(crate) is_stress_test: bool,
     pub(crate) pending_offers: HashMap<PeerId, String>,
-    pub(crate) early_chunks: HashMap<String, Vec<(u32, u32, String)>>,
+    pub(crate) early_chunks: indexmap::IndexMap<String, Vec<(u32, u32, String)>>,
     pub(crate) intro_claw: crate::intro_claw::IntroClawService,
 }
 

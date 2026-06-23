@@ -613,7 +613,8 @@ class _StickerEmojiPanelState extends State<StickerEmojiPanel> {
 
   void _fetchTrendingGifs() async {
     final prefs = await SharedPreferences.getInstance();
-    String apiKey = prefs.getString('klipy_api_key') ?? 'lh4LISPXX2wQQFRZ6JCfqmUeKNeHUJ2Ht8i3dxSqadvlKJC4T5jJLzDxx2jRfW5b';
+    String apiKey = prefs.getString('klipy_api_key') ?? '';
+    if (apiKey.isEmpty) { debugPrint('Klipy API key not configured'); if (mounted) setState(() => _loadingGifs = false); return; }
     setState(() => _loadingGifs = true);
     final client = HttpClient();
     try {
@@ -636,7 +637,8 @@ class _StickerEmojiPanelState extends State<StickerEmojiPanel> {
   void _searchGifs(String query) async {
     if (query.isEmpty) { _fetchTrendingGifs(); return; }
     final prefs = await SharedPreferences.getInstance();
-    String apiKey = prefs.getString('klipy_api_key') ?? 'lh4LISPXX2wQQFRZ6JCfqmUeKNeHUJ2Ht8i3dxSqadvlKJC4T5jJLzDxx2jRfW5b';
+    String apiKey = prefs.getString('klipy_api_key') ?? '';
+    if (apiKey.isEmpty) { debugPrint('Klipy API key not configured'); if (mounted) setState(() => _loadingGifs = false); return; }
     setState(() => _loadingGifs = true);
     final client = HttpClient();
     try {

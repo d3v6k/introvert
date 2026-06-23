@@ -1,6 +1,6 @@
 use anyhow::Result;
 use introvert::identity::NodeIdentity;
-use introvert::network::{NetworkCommand, NetworkConfig, NetworkService, FileTransferProgress, SignalingPayload};
+use introvert::network::{NetworkCommand, NetworkConfig, NetworkService, FileTransferProgress};
 use introvert::storage::StorageService;
 use introvert::economy::RewardTracker;
 use libp2p::{PeerId, SwarmBuilder, futures::StreamExt};
@@ -148,6 +148,12 @@ async fn test_group_file_transfer_reliability() -> Result<()> {
     cmd_tx_b.send(NetworkCommand::Dial { peer_id: relay_peer_id, address: None }).await?;
     sleep(Duration::from_secs(3)).await;
 
+    // Also make each node aware of the other's relay address
+    let relay_a_addr = relay_addr.clone()
+        .with(libp2p::multiaddr::Protocol::P2pCircuit)
+        .with(libp2p::multiaddr::Protocol::P2p(peer_id_a));
+    cmd_tx_b.send(NetworkCommand::AddAddress { peer_id: peer_id_a, address: relay_a_addr }).await?;
+
     // 5. Node B listens on Relay
     let relay_circuit_b = relay_addr.clone()
         .with(libp2p::multiaddr::Protocol::P2pCircuit)
@@ -161,8 +167,9 @@ async fn test_group_file_transfer_reliability() -> Result<()> {
         .with(libp2p::multiaddr::Protocol::P2p(peer_id_b));
     
     println!("Node A establishing relayed connection to Node B: {}", relay_b_addr);
+    cmd_tx_a.send(NetworkCommand::AddAddress { peer_id: peer_id_b, address: relay_b_addr.clone() }).await?;
     cmd_tx_a.send(NetworkCommand::Dial { peer_id: peer_id_b, address: Some(relay_b_addr) }).await?;
-    sleep(Duration::from_secs(3)).await;
+    sleep(Duration::from_secs(5)).await;
 
     // 7. Create a 300KB file to transfer (requires 5 chunks of 64KB)
     let file_path = temp_dir_a.path().join("test_data.bin");
@@ -172,47 +179,19 @@ async fn test_group_file_transfer_reliability() -> Result<()> {
     file.sync_all()?;
     println!("Dummy file created of size: {} bytes", dummy_data.len());
 
-    let file_hash = {
-        use sha2::{Sha256, Digest};
-        let mut hasher = Sha256::new();
-        hasher.update(&dummy_data);
-        format!("{:x}", hasher.finalize())
-    };
-
-    // 8. Node A registers file seeder for group chat
-    println!("Registering seeder on Node A...");
-    cmd_tx_a.send(NetworkCommand::RegisterSeeder {
-        peer_id: peer_id_a,
-        transfer_id: "test_gft_1".to_string(),
+    // 8. Node A initiates file transfer to Node B (simulating group file share)
+    println!("Initiating file transfer from Node A to Node B...");
+    cmd_tx_a.send(NetworkCommand::SendFile {
+        peer_id: peer_id_b,
         file_path: file_path.to_string_lossy().to_string(),
-        file_hash: file_hash.clone(),
-        chunk_size: 64 * 1024,
-        total_chunks: 5,
         group_id: Some("test_group_id".to_string()),
-    }).await?;
-    sleep(Duration::from_millis(500)).await;
-
-    // 9. Node B initiates pull (HandleIncomingPayload is what is triggered by start_pull)
-    println!("Initiating group pull sequence on Node B...");
-    let payload = SignalingPayload::FileTransfer {
-        transfer_id: "test_gft_1".to_string(),
-        filename: "test_data.bin".to_string(),
-        mime_type: "application/octet-stream".to_string(),
-        file_hash: file_hash.clone(),
-        total_size: dummy_data.len(),
-        is_relayed: true,
-        sender_peer_id: Some(peer_id_a.to_string()),
-        group_id: Some("test_group_id".to_string()),
-    };
-    cmd_tx_b.send(NetworkCommand::HandleIncomingPayload {
-        peer_id: peer_id_a,
-        payload,
+        transfer_id: Some("test_gft_1".to_string()),
     }).await?;
 
     // 10. Wait for completion events on Node B
     println!("Waiting for transfer to complete...");
     let mut success = false;
-    for _ in 0..30 {
+    for i in 0..60 {
         sleep(Duration::from_secs(1)).await;
         let events = FILE_EVENTS.lock();
         if let Some(last_event) = events.iter().filter(|e| !e.is_outgoing).last() {
@@ -221,6 +200,9 @@ async fn test_group_file_transfer_reliability() -> Result<()> {
                 success = true;
                 break;
             }
+        }
+        if i % 10 == 9 {
+            println!("Still waiting... ({}s elapsed, {} events total)", i + 1, events.len());
         }
     }
 

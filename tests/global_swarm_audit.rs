@@ -27,8 +27,7 @@ async fn test_global_discovery_speed() -> Result<()> {
             libp2p::yamux::Config::default,
         )?
         .with_behaviour(|_| {
-            let mut kad_config = kad::Config::default();
-            kad_config.set_protocol_names(vec![libp2p::StreamProtocol::new("/introvert/kad/1.0.0")]);
+            let kad_config = kad::Config::new(libp2p::StreamProtocol::new("/introvert/kad/1.0.0"));
             kad::Behaviour::with_config(rbn_peer_id, kad::store::MemoryStore::new(rbn_peer_id), kad_config)
         })?
         .build();

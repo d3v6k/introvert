@@ -11,6 +11,10 @@ class ImageGroupProgress {
   bool get isOutgoing => images.first.isOutgoing;
   String get peerId => images.first.peerId;
   int get startTimeMs => images.first.startTimeMs;
+
+  DateTime get startDateTime => startTimeMs > 946684800000
+      ? DateTime.fromMillisecondsSinceEpoch(startTimeMs)
+      : DateTime.now();
 }
 
 class ImageStackBubble extends StatelessWidget {

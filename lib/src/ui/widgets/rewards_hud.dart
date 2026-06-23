@@ -69,11 +69,10 @@ class SovereignEarnings extends StatelessWidget {
     final tokenName = economyStats['token_name'] ?? "INTR";
 
     return Card(
-      color: AppTheme.current.surface,
+      color: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
       ),
       child: Padding(
         padding: EdgeInsets.all(16.0),

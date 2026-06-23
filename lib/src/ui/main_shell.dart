@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -257,7 +258,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     _networkSubscription = client.networkStream.listen((event) {
       // Suppress routine high-frequency events (Type 1 and 8) to prevent terminal log flooding
-      if (event.type != 1 && event.type != 8 && event.type != 13 && event.type != 23) {
+      if (kDebugMode && event.type != 1 && event.type != 8 && event.type != 13 && event.type != 23) {
         debugPrint("🌐 Swarm Event Received: Type=${event.type}, DataLen=${event.data.length}");
       }
       if (event.type == 2 || event.type == 4) {
@@ -396,6 +397,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         } catch (e) {
           debugPrint("Error handling incoming call event: $e");
         }
+      } else if (event.type == 39) {
+        // Event Code 39: File Transfer WebRTC Offer — auto-accept as data channel (no call UI)
+        try {
+          final peerId = utf8.decode(event.data);
+          debugPrint("📁 Auto-accepting file transfer WebRTC from $peerId");
+          _client.acceptCall(peerId, 3); // media_type 3 = data channel only
+        } catch (e) {
+          debugPrint("Error auto-accepting file transfer WebRTC: $e");
+        }
       } else if (event.type == 10) {
         // Event 10: Local Node Status
         if (event.data.isEmpty) return;
@@ -436,6 +446,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     BackgroundSyncService.instance.initialize();
   }
 
+  int _getContactTier(String peerId) {
+    try {
+      final contacts = _client.getContacts();
+      final contact = contacts.firstWhere((c) => c['peer_id'] == peerId, orElse: () => null);
+      if (contact != null) return contact['prestige_tier'] as int? ?? 0;
+    } catch (_) {}
+    return 0;
+  }
+
   void _handleConnectionRequest(Uint8List data) {
     try {
       final parts = utf8.decode(data).split('\x00');
@@ -467,6 +486,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             children: [
               SovereignAvatar(
                 radius: 60,
+                prestigeTier: _getContactTier(peerId),
                 avatar: avatar != null && avatar.isNotEmpty
                     ? MemoryImage(_decodeAvatar(avatar))
                     : null,
@@ -625,6 +645,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           callId: callId,
           groupId: groupId,
           groupName: groupName,
+          callerPeerId: callerId,
           callerName: callerName,
           callerAvatar: callerAvatar,
           mediaType: mediaType,
@@ -703,6 +724,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             children: [
               SovereignAvatar(
                 radius: 60,
+                prestigeTier: _getContactTier(requesterPeerId),
                 avatar: avatar != null && avatar.isNotEmpty
                     ? MemoryImage(_decodeAvatar(avatar))
                     : null,
@@ -807,6 +829,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
       if (mounted) {
         _isHandleResolvedDialogOpen = true;
+        final parentContext = context;
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -831,9 +854,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       TextSpan(text: "Handle "),
                       TextSpan(text: handle, style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold)),
                       TextSpan(text: " points to peer:\n\n"),
-                      TextSpan(text: peerId, style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
                     ],
                   ),
+                ),
+                SelectableText(
+                  peerId,
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
                 ),
                 if (isVerified)
                   Padding(
@@ -857,10 +883,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               TextButton(onPressed: () => Navigator.pop(context), child: Text("CANCEL")),
               ElevatedButton(
                 onPressed: () {
-                  final messenger = ScaffoldMessenger.of(context);
                   IntrovertClient().sendDirectInvite(peerId);
                   Navigator.pop(context);
-                  messenger.showSnackBar(SnackBar(content: Text("Invite sent!")));
+                  if (mounted) {
+                    ScaffoldMessenger.of(parentContext).showSnackBar(SnackBar(content: Text("Invite sent to $handle!")));
+                  }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
                 child: Text("SEND INVITE"),
@@ -934,44 +961,48 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             ),
             SizedBox(width: 8),
             // INTR Balance + Daily Earnings
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.08 : 0.04),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.15 : 0.08)),
-                  ),
-                  child: Text(
-                    '${_intrBalance} INTR',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 1.0 : 0.4),
-                      letterSpacing: 0.5,
-                      shadows: _intrBalance > 0 ? [
-                        Shadow(color: AppTheme.current.accent.withValues(alpha: 0.6), blurRadius: 6),
-                        Shadow(color: AppTheme.current.accent.withValues(alpha: 0.3), blurRadius: 12),
-                      ] : [],
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.08 : 0.04),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.15 : 0.08)),
                     ),
-                  ),
-                ),
-                if (_dailyIntrEarned > 0)
-                  Padding(
-                    padding: EdgeInsets.only(top: 2, left: 2),
                     child: Text(
-                      '+${_dailyIntrEarned.toStringAsFixed(4)} today',
+                      '${_intrBalance} INTR',
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.greenAccent.withValues(alpha: 0.8),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 1.0 : 0.4),
+                        letterSpacing: 0.5,
+                        shadows: _intrBalance > 0 ? [
+                          Shadow(color: AppTheme.current.accent.withValues(alpha: 0.6), blurRadius: 6),
+                          Shadow(color: AppTheme.current.accent.withValues(alpha: 0.3), blurRadius: 12),
+                        ] : [],
                       ),
                     ),
                   ),
-              ],
+                  if (_dailyIntrEarned > 0)
+                    Padding(
+                      padding: EdgeInsets.only(top: 2, left: 2),
+                      child: Text(
+                        '+${_dailyIntrEarned.toStringAsFixed(4)} today',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.greenAccent.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             Spacer(),
             // Network status dot + label
@@ -1077,11 +1108,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final accent = AppTheme.current.accent;
     final muted = AppTheme.current.mutedText;
 
-    return GestureDetector(
-      onTap: () => _onDestinationSelected(index),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 60,
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onDestinationSelected(index),
+        behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1109,6 +1139,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
                 letterSpacing: 0.3,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ],
         ),
@@ -1580,34 +1612,30 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
         }
       }).toList();
 
-      // Fetch last message for each contact (optimized: single query per contact)
-      for (var c in contacts) {
-        final peerId = c['peer_id'] as String?;
-        if (peerId == null || peerId.isEmpty) continue;
-        try {
-          final last = _client.getLastMessage(peerId);
-          if (last != null) {
-            final content = last['content'] as String? ?? '';
-            final isMe = last['is_me'] == true || last['is_me'] == 1 || last['is_me'] == '1';
-            lastMsgs[peerId] = _friendlyMessagePreview(content);
-            lastMsgIsMe[peerId] = isMe;
-          }
-        } catch (_) {}
+      // Batch: fetch all last messages in ONE FFI call (replaces N individual calls)
+      final allLastMsgs = _client.getLastMessagesAll();
+      for (var entry in allLastMsgs.entries) {
+        final peerId = entry.key;
+        final msg = entry.value as Map<String, dynamic>?;
+        if (msg != null) {
+          final content = msg['content'] as String? ?? '';
+          final isMe = msg['is_me'] == true || msg['is_me'] == 1 || msg['is_me'] == '1';
+          lastMsgs[peerId] = _friendlyMessagePreview(content);
+          lastMsgIsMe[peerId] = isMe;
+        }
       }
 
-      // Fetch last message for each group (optimized: single query per group)
-      for (var g in groups) {
-        final groupId = g[0] as String?;
-        if (groupId == null || groupId.isEmpty) continue;
-        try {
-          final last = _client.getLastGroupMessage(groupId);
-          if (last != null) {
-            final senderId = last['sender_id']?.toString() ?? '';
-            final content = last['content']?.toString() ?? '';
-            lastMsgs[groupId] = _friendlyMessagePreview(content);
-            lastMsgIsMe[groupId] = senderId == localId;
-          }
-        } catch (_) {}
+      // Batch: fetch all last group messages in ONE FFI call
+      final allLastGroupMsgs = _client.getLastGroupMessagesAll();
+      for (var entry in allLastGroupMsgs.entries) {
+        final groupId = entry.key;
+        final msg = entry.value as Map<String, dynamic>?;
+        if (msg != null) {
+          final senderId = msg['sender_id']?.toString() ?? '';
+          final content = msg['content']?.toString() ?? '';
+          lastMsgs[groupId] = _friendlyMessagePreview(content);
+          lastMsgIsMe[groupId] = senderId == localId;
+        }
       }
 
       if (mounted) {
@@ -1999,6 +2027,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                     child: ListTile(
                     leading: SovereignAvatar(
                       radius: 30,
+                      prestigeTier: contact['prestige_tier'] as int? ?? 0,
                       avatar: avatar != null ? MemoryImage(_decodeAvatar(avatar)) : null,
                       initials: (alias == null || alias.isEmpty) ? "?" : alias[0].toUpperCase(),
                     ),
@@ -2549,6 +2578,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   int _clawDriveBytes = 0;
   int _clawMeshBytes = 0;
   Timer? _clawStatusTimer;
+  StreamSubscription? _economySubscription;
   Map<String, dynamic> _economyStats = {
     'intr_balance': 0,
     'sol_balance': 0,
@@ -2593,6 +2623,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   @override
   void dispose() {
     _swarmStatsSubscription?.cancel();
+    _economySubscription?.cancel();
     _clawStatusTimer?.cancel();
     super.dispose();
   }
@@ -2977,7 +3008,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
 
   void _startMonitoring() {
     // Economy monitoring is started by MainShell — just listen to the stream here
-    IntrovertClient().economyStream.listen((stats) {
+    _economySubscription = IntrovertClient().economyStream.listen((stats) {
       if (mounted) {
         setState(() {
           _economyStats = stats;
@@ -3386,7 +3417,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ),
                 ListTile(
                   leading: Icon(Icons.storage, size: 20),
-                  title: Text('SQLCipher Storage Encrypted', style: TextStyle(fontSize: 13)),
+                  title: Text('SQLCipher Encrypted', style: TextStyle(fontSize: 13)),
                   trailing: Icon(Icons.check_circle, color: AppTheme.current.accent, size: 20),
                   dense: true,
                 ),
@@ -3395,7 +3426,9 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 SwitchListTile(
                   title: Row(
                     children: [
-                      Text('Participate as Anchor Node', style: TextStyle(fontSize: 13)),
+                      Flexible(
+                        child: Text('Participate as Anchor Node', style: TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                      ),
                       SizedBox(width: 6),
                       GestureDetector(
                         onTap: _showAnchorModeInfo,
@@ -3514,6 +3547,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                         dbPath = "./introvert.db";
                       }
                       IntrovertClient().nukeIdentity(dbPath);
+                      _avatarCache.clear();
                       await IdentityManager().clearIdentity();
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(
@@ -4771,29 +4805,39 @@ class _IncomingCallOverlay extends StatefulWidget {
 class _IncomingCallOverlayState extends State<_IncomingCallOverlay> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   StreamSubscription? _subscription;
+  int _peerTier = 0;
 
   @override
   void initState() {
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-
+    _loadPeerTier();
     _subscription = IntrovertClient().networkStream.listen((event) {
-      if (event.type == 16) {
+      if (event.type == 32) {
         try {
-          final rejectedPeerId = utf8.decode(event.data);
+          final parts = utf8.decode(event.data).split('\x00');
+          final rejectedPeerId = parts[0];
           if (rejectedPeerId == widget.peerId) {
-            if (mounted) {
-              Navigator.of(context).pop();
-            }
+            if (mounted) Navigator.of(context).pop();
           }
         } catch (e) {
           debugPrint("Error decoding call rejection: $e");
         }
       }
     });
+  }
+
+  void _loadPeerTier() {
+    try {
+      final contacts = IntrovertClient().getContacts();
+      final contact = contacts.firstWhere((c) => c['peer_id'] == widget.peerId, orElse: () => null);
+      if (contact != null && mounted) {
+        setState(() => _peerTier = contact['prestige_tier'] as int? ?? 0);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -4846,6 +4890,7 @@ class _IncomingCallOverlayState extends State<_IncomingCallOverlay> with SingleT
                     ),
                     child: SovereignAvatar(
                       radius: 50,
+                      prestigeTier: _peerTier,
                       avatar: avatarImage,
                       initials: widget.name.isNotEmpty ? widget.name[0].toUpperCase() : "?",
                     ),
@@ -4945,6 +4990,7 @@ class _IncomingGroupCallOverlay extends StatefulWidget {
   final String callId;
   final String groupId;
   final String groupName;
+  final String callerPeerId;
   final String callerName;
   final String? callerAvatar;
   final int mediaType;
@@ -4956,6 +5002,7 @@ class _IncomingGroupCallOverlay extends StatefulWidget {
     required this.callId,
     required this.groupId,
     required this.groupName,
+    required this.callerPeerId,
     required this.callerName,
     this.callerAvatar,
     required this.mediaType,
@@ -4970,6 +5017,7 @@ class _IncomingGroupCallOverlay extends StatefulWidget {
 
 class _IncomingGroupCallOverlayState extends State<_IncomingGroupCallOverlay> with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
+  int _callerTier = 0;
 
   @override
   void initState() {
@@ -4978,6 +5026,17 @@ class _IncomingGroupCallOverlayState extends State<_IncomingGroupCallOverlay> wi
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+    _loadCallerTier();
+  }
+
+  void _loadCallerTier() {
+    try {
+      final contacts = IntrovertClient().getContacts();
+      final contact = contacts.firstWhere((c) => c['peer_id'] == widget.callerPeerId, orElse: () => null);
+      if (contact != null && mounted) {
+        setState(() => _callerTier = contact['prestige_tier'] as int? ?? 0);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -5029,6 +5088,7 @@ class _IncomingGroupCallOverlayState extends State<_IncomingGroupCallOverlay> wi
                     ),
                     child: SovereignAvatar(
                       radius: 50,
+                      prestigeTier: _callerTier,
                       avatar: avatarImage,
                       initials: widget.callerName.isNotEmpty ? widget.callerName[0].toUpperCase() : "?",
                     ),

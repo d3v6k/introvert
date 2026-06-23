@@ -85,7 +85,7 @@ fn test_economic_cohesion_audit() {
     let tracker = introvert::economy::RewardTracker::new(Some(storage));
     
     let consumer_id = "12D3KooWTEST_CONSUMER_PEER_ID";
-    let bytes_to_relay = 10 * 1024 * 1024; // 10 MB
+    let bytes_to_relay = 15_000_000_000u64; // 15 GB — must exceed threshold (10 INTR = 10,000,000,000 nano-INTR)
     
     println!("Recording relay of {} bytes for consumer {}...", bytes_to_relay, consumer_id);
     tracker.record_relay(consumer_id, bytes_to_relay);

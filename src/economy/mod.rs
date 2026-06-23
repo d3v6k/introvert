@@ -73,11 +73,12 @@ impl RewardTracker {
 
     /// Records mailbox storage usage. Anchor nodes earn yield based on bytes * seconds.
     pub fn record_mailbox_storage(&self, bytes: u64, seconds: u64) {
+        let product = bytes.saturating_mul(seconds);
         let mut state = self.state.write();
-        state.mailbox_storage_bytes_seconds += bytes * seconds;
+        state.mailbox_storage_bytes_seconds = state.mailbox_storage_bytes_seconds.saturating_add(product);
         
         if let Some(ref s) = self.storage {
-            if let Err(e) = s.record_mailbox_storage(bytes * seconds) {
+            if let Err(e) = s.record_mailbox_storage(product) {
                 tracing::error!("[Economy] Failed to record mailbox storage: {}", e);
             }
         }
@@ -100,11 +101,11 @@ impl RewardTracker {
 
         let mut pending_bytes = *state.pending_per_consumer.get(consumer_peer_id).unwrap_or(&0);
 
-        // Availability Yield Logic: If node uptime >= 23 hours, apply 1.2x multiplier
-        // Note: The 1.2x is applied to the uptime WEIGHT in daily_rewards.rs score_activities_static()
+        // Availability Yield Logic (v3.0.1): If node uptime >= 22 hours, apply 1.5x multiplier
+        // Note: The 1.5x is applied to the uptime WEIGHT in daily_rewards.rs score_activities_static()
         // Here it is applied to pending_bytes for the relay-based reward proof system
-        if state.uptime_seconds >= 82800 {
-            pending_bytes = (pending_bytes as f64 * 1.2) as u64;
+        if state.uptime_seconds >= 79200 {
+            pending_bytes = (pending_bytes as f64 * 1.5) as u64;
         }
 
         // Check threshold and cooldown

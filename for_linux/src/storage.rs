@@ -4,6 +4,7 @@ use std::path::Path;
 use parking_lot::Mutex;
 use sha2::{Sha256, Digest};
 use chrono::Utc;
+use tracing::info;
 
 pub struct StorageService {
     conn: Mutex<Connection>,
@@ -40,6 +41,14 @@ pub struct PendingGroupInvite {
 }
 
 impl StorageService {
+    /// Safely copies a byte slice to a 32-byte array, returning zeros if length mismatches.
+    fn safe_static_key(bytes: &[u8]) -> [u8; 32] {
+        let mut key = [0u8; 32];
+        let copy_len = bytes.len().min(32);
+        key[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        key
+    }
+
     /// Creates a new SQLCipher encrypted database at the given path.
     pub fn new<P: AsRef<Path>>(path: P, key: &[u8; 32]) -> Result<Self> {
         let conn = Connection::open(path)?;
@@ -234,6 +243,8 @@ impl StorageService {
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN handle TEXT", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN is_incoming INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN last_seen INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE contacts ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
+        let _ = conn.execute("ALTER TABLE profile ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
 
         Ok(())
     }
@@ -249,6 +260,50 @@ impl StorageService {
             }
         }
         false
+    }
+
+    /// Gets the Intro-Claw AI mode: 0 = Offline (Deterministic), 1 = Hybrid AI Assistant.
+    pub fn get_intro_claw_ai_mode(&self) -> i32 {
+        let conn = self.conn.lock();
+        if let Ok(mut stmt) = conn.prepare("SELECT value FROM economy_meta WHERE key = 'intro_claw_ai_mode'") {
+            if let Ok(mut rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                if let Some(Ok(val)) = rows.next() {
+                    return val.parse::<i32>().unwrap_or(0);
+                }
+            }
+        }
+        0
+    }
+
+    /// Sets the Intro-Claw AI mode (0 = Offline, 1 = Hybrid) and optionally the encrypted API key.
+    pub fn set_intro_claw_ai_mode(&self, mode: i32, api_key: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO economy_meta (key, value) VALUES ('intro_claw_ai_mode', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![mode.to_string()],
+        )?;
+        if !api_key.is_empty() {
+            conn.execute(
+                "INSERT INTO economy_meta (key, value) VALUES ('intro_claw_api_key', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                params![api_key],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Gets the Intro-Claw API key (stored encrypted via SQLCipher).
+    pub fn get_intro_claw_api_key(&self) -> String {
+        let conn = self.conn.lock();
+        if let Ok(mut stmt) = conn.prepare("SELECT value FROM economy_meta WHERE key = 'intro_claw_api_key'") {
+            if let Ok(mut rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                if let Some(Ok(val)) = rows.next() {
+                    return val;
+                }
+            }
+        }
+        String::new()
     }
 
     pub fn is_privacy_mode_extroverted(&self) -> bool {
@@ -394,8 +449,8 @@ impl StorageService {
     pub fn upsert_sovereign_contact(&self, identity: &crate::identity::SovereignIdentity, is_verified: bool, is_incoming: bool) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
-            "INSERT INTO contacts (peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_verified, is_incoming, is_anchor_capable, handle) 
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11) 
+            "INSERT INTO contacts (peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_verified, is_incoming, is_anchor_capable, handle, prestige_tier) 
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) 
              ON CONFLICT(peer_id) DO UPDATE SET 
                 p2p_pubkey = excluded.p2p_pubkey,
                 static_key = excluded.static_key, 
@@ -406,7 +461,8 @@ impl StorageService {
                 is_verified = excluded.is_verified,
                 is_incoming = excluded.is_incoming,
                 is_anchor_capable = excluded.is_anchor_capable,
-                handle = excluded.handle",
+                handle = excluded.handle,
+                prestige_tier = excluded.prestige_tier",
             params![
                 identity.peer_id, 
                 identity.p2p_pubkey,
@@ -418,7 +474,8 @@ impl StorageService {
                 if is_verified { 1 } else { 0 },
                 if is_incoming { 1 } else { 0 },
                 identity.is_anchor_capable as i32,
-                identity.handle
+                identity.handle,
+                identity.prestige_tier.unwrap_or(0) as i32
             ],
         )?;
         Ok(())
@@ -476,11 +533,11 @@ impl StorageService {
     /// Retrieves a sovereign contact by PeerId.
     pub fn get_contact(&self, peer_id: &str) -> Result<Option<crate::identity::SovereignIdentity>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle FROM contacts WHERE peer_id = ?1")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE peer_id = ?1")?;
         let mut rows = stmt.query_map(params![peer_id], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
-            static_key.copy_from_slice(&static_key_vec);
+            let static_key = Self::safe_static_key(&static_key_vec);
             Ok(crate::identity::SovereignIdentity {
                 peer_id: row.get(0)?,
                 p2p_pubkey: row.get(1)?,
@@ -492,6 +549,7 @@ impl StorageService {
                 is_anchor_capable: row.get::<_, i32>(7)? != 0,
                 retention_seconds: row.get(8)?,
                 handle: row.get(9)?,
+                prestige_tier: row.get::<_, Option<i32>>(10)?.map(|v| v as u8),
             })
         })?;
 
@@ -534,11 +592,11 @@ impl StorageService {
     /// Retrieves all verified sovereign contacts.
     pub fn get_all_contacts(&self) -> Result<Vec<crate::identity::SovereignIdentity>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle FROM contacts WHERE is_verified = 1")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1")?;
         let rows = stmt.query_map([], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
-            static_key.copy_from_slice(&static_key_vec);
+            let static_key = Self::safe_static_key(&static_key_vec);
             Ok(crate::identity::SovereignIdentity {
                 peer_id: row.get(0)?,
                 p2p_pubkey: row.get(1)?,
@@ -550,6 +608,7 @@ impl StorageService {
                 is_anchor_capable: row.get::<_, i32>(7)? != 0,
                 retention_seconds: row.get(8)?,
                 handle: row.get(9)?,
+                prestige_tier: row.get::<_, Option<i32>>(10)?.map(|v| v as u8),
             })
         })?;
 
@@ -563,11 +622,11 @@ impl StorageService {
     /// Fetches all verified contacts marked as Anchor Capable.
     pub fn fetch_all_anchor_nodes(&self) -> Result<Vec<crate::identity::SovereignIdentity>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle FROM contacts WHERE is_verified = 1 AND is_anchor_capable = 1")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1 AND is_anchor_capable = 1")?;
         let rows = stmt.query_map([], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
-            static_key.copy_from_slice(&static_key_vec);
+            let static_key = Self::safe_static_key(&static_key_vec);
             Ok(crate::identity::SovereignIdentity {
                 peer_id: row.get(0)?,
                 p2p_pubkey: row.get(1)?,
@@ -579,6 +638,7 @@ impl StorageService {
                 is_anchor_capable: true,
                 retention_seconds: row.get(8)?,
                 handle: row.get(9)?,
+                prestige_tier: row.get::<_, Option<i32>>(10)?.map(|v| v as u8),
             })
         })?;
 
@@ -683,11 +743,11 @@ impl StorageService {
     }
 
     /// Retrieves the local profile (User's name, handle, avatar, and privacy mode).
-    pub fn get_profile(&self) -> Result<Option<(Option<String>, Option<String>, Option<String>, i32)>> {
+    pub fn get_profile(&self) -> Result<Option<(Option<String>, Option<String>, Option<String>, i32, i32)>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT name, handle, avatar_base64, privacy_mode FROM profile WHERE id = 1")?;
+        let mut stmt = conn.prepare("SELECT name, handle, avatar_base64, privacy_mode, prestige_tier FROM profile WHERE id = 1")?;
         let mut rows = stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
         })?;
 
         if let Some(row) = rows.next() {
@@ -708,6 +768,27 @@ impl StorageService {
                 avatar_base64 = COALESCE(excluded.avatar_base64, avatar_base64),
                 privacy_mode = excluded.privacy_mode",
             params![name, handle, avatar, privacy_mode],
+        )?;
+        Ok(())
+    }
+
+    /// Updates the local profile's prestige tier.
+    pub fn set_profile_tier(&self, tier: u8) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO profile (id, prestige_tier) VALUES (1, ?1)
+             ON CONFLICT(id) DO UPDATE SET prestige_tier = ?1",
+            params![tier as i32],
+        )?;
+        Ok(())
+    }
+
+    /// Updates a contact's prestige tier.
+    pub fn set_contact_tier(&self, peer_id: &str, tier: u8) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE contacts SET prestige_tier = ?1 WHERE peer_id = ?2",
+            params![tier as i32, peer_id],
         )?;
         Ok(())
     }
@@ -956,9 +1037,9 @@ impl StorageService {
     pub fn delete_group(&self, group_id: &str) -> Result<()> {
         let conn = self.conn.lock();
         let rows = conn.execute("DELETE FROM groups WHERE group_id = ?1", params![group_id])?;
-        println!("[Storage] Deleted group {}: {} rows", group_id, rows);
+        info!("[Storage] Deleted group {}: {} rows", group_id, rows);
         let msg_rows = conn.execute("DELETE FROM group_messages WHERE group_id = ?1", params![group_id])?;
-        println!("[Storage] Deleted messages for group {}: {} rows", group_id, msg_rows);
+        info!("[Storage] Deleted messages for group {}: {} rows", group_id, msg_rows);
         conn.execute("DELETE FROM group_secrets WHERE group_id = ?1", params![group_id])?;
         conn.execute("DELETE FROM pending_group_invites WHERE group_id = ?1", params![group_id])?;
         

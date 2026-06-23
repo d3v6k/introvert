@@ -19,7 +19,7 @@ fn test_cold_start_persistence_audit() {
     let db_path_str = db_path.to_str().unwrap();
     let db_path_c = CString::new(db_path_str).unwrap();
     
-    let seed = [0u8; 32]; // Fixed seed for audit repeatability
+    let seed = [42u8; 32]; // Fixed non-zero seed for audit repeatability
 
     // --- LIFE 1: Establish and Save ---
     println!("--- Starting Life 1 ---");

@@ -15,12 +15,19 @@ static SEEN_RELAYED: AtomicBool = AtomicBool::new(false);
 static SEEN_DIRECT: AtomicBool = AtomicBool::new(false);
 
 extern "C" fn audit_callback(event_type: i32, data_ptr: *const u8, data_len: usize) {
-    if event_type == 8 && data_len == 1 {
-        let status = unsafe { *data_ptr };
-        if status == 1 {
-            SEEN_RELAYED.store(true, Ordering::SeqCst);
-        } else if status == 0 {
-            SEEN_DIRECT.store(true, Ordering::SeqCst);
+    if event_type == 8 && data_len >= 2 {
+        // Event 8 format: [peer_id_bytes, ':', status_byte]
+        // Status byte is the last byte after the ':' separator
+        let data_slice = unsafe { std::slice::from_raw_parts(data_ptr, data_len) };
+        if let Some(colon_pos) = data_slice.iter().rposition(|&b| b == b':') {
+            if colon_pos + 1 < data_len {
+                let status = data_slice[colon_pos + 1];
+                if status == 1 {
+                    SEEN_RELAYED.store(true, Ordering::SeqCst);
+                } else if status == 0 {
+                    SEEN_DIRECT.store(true, Ordering::SeqCst);
+                }
+            }
         }
     }
 }
@@ -224,8 +231,8 @@ async fn test_nat_traversal_and_dcutr_upgrade() -> Result<()> {
     println!("Expected Solana Address (from seed): {}", expected_address);
 
     // Check 2: Work Proof Accuracy
-    // Record some dummy relay usage to test persistence and proof generation
-    let dummy_bytes = 5 * 1024 * 1024; // 5 MB
+    // Record relay usage exceeding threshold (10 INTR = 10,000,000,000 nano-INTR)
+    let dummy_bytes = 15_000_000_000u64;
     tracker_a.record_relay(&peer_id_b.to_string(), dummy_bytes);
     
     let total_relayed = tracker_a.get_total_relayed();

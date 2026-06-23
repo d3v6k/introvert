@@ -1,3 +1,7 @@
+// SAFETY: All extern "C" functions take raw pointers from Dart FFI.
+// Each function validates null pointers before dereferencing (see individual functions).
+// The clippy lint is overly strict for FFI boundary functions where the caller (Dart)
+// is responsible for passing valid pointers from the managed side.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod identity;
@@ -31,6 +35,16 @@ use serde_json::json;
 
 // --- FFI Types & Callbacks ---
 
+/// FFI return type for all functions that return data to Dart.
+///
+/// # Memory Ownership Contract
+///
+/// - `data` is allocated with `libc::malloc` when `len > 0`
+/// - **Dart MUST call `introvert_free_binary(data, len)` after reading the data**
+/// - If `code != 0`, `data` may contain an error message (also must be freed)
+/// - If `len == 0`, `data` is null and no free is needed
+/// - Rust NEVER frees `data` — ownership transfers to the caller
+/// - Double-free is prevented by Dart setting its local pointer to null after free
 #[derive(Debug)]
 #[repr(C)]
 pub struct FfiResult {
@@ -150,8 +164,14 @@ pub fn dispatch_debug_log(msg: &str) {
 pub extern "C" fn introvert_generate_mnemonic() -> *mut c_char {
     let mut entropy = [0u8; 16];
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut entropy);
-    let mnemonic = Mnemonic::from_entropy_in(Language::English, &entropy).unwrap();
-    CString::new(mnemonic.to_string()).unwrap().into_raw()
+    let mnemonic = match Mnemonic::from_entropy_in(Language::English, &entropy) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    match CString::new(mnemonic.to_string()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
 /// Converts a mnemonic phrase to a 32-byte master seed.
@@ -970,8 +990,8 @@ pub extern "C" fn introvert_storage_get_profile() -> FfiResult {
     };
 
     match engine.storage.get_profile() {
-        Ok(Some((name, handle, avatar, privacy_mode))) => {
-            let json = json!({ "name": name, "handle": handle, "avatar": avatar, "privacy_mode": privacy_mode }).to_string();
+        Ok(Some((name, handle, avatar, privacy_mode, prestige_tier))) => {
+            let json = json!({ "name": name, "handle": handle, "avatar": avatar, "privacy_mode": privacy_mode, "prestige_tier": prestige_tier }).to_string();
             FfiResult::binary(json.into_bytes())
         }
         Ok(None) => FfiResult::binary(b"{}".to_vec()),
@@ -1025,6 +1045,7 @@ pub extern "C" fn introvert_storage_get_contacts() -> FfiResult {
                     "is_anchor_capable": c.is_anchor_capable,
                     "retention_hours": c.retention_seconds,
                     "handle": c.handle,
+                    "prestige_tier": c.prestige_tier.unwrap_or(0),
                 })
             }).collect();
             let json = serde_json::to_string(&mapped_contacts).unwrap_or_default();
@@ -1049,6 +1070,25 @@ pub extern "C" fn introvert_storage_delete_contact(peer_id_ptr: *const c_char) -
     match engine.storage.delete_contact(&peer_id) {
         Ok(_) => FfiResult::success(),
         Err(e) => FfiResult::error(-1, &format!("Delete error: {}", e)),
+    }
+}
+
+/// Updates the local profile's prestige tier (called from Dart when INTR balance changes).
+#[no_mangle]
+pub extern "C" fn introvert_storage_set_profile_tier(tier: i32) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if tier < 0 || tier > 6 {
+        return FfiResult::error(-2, "Tier must be 0-6");
+    }
+
+    match engine.storage.set_profile_tier(tier as u8) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Set tier error: {}", e)),
     }
 }
 
@@ -1307,6 +1347,46 @@ pub extern "C" fn introvert_storage_get_messages(peer_id_ptr: *const c_char) -> 
     }
 }
 
+/// Paginated version of get_messages — returns the most recent `limit` messages starting from `offset`.
+/// offset=0, limit=50 returns the last 50 messages. offset=50 returns the next 50, etc.
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_messages_paginated(
+    peer_id_ptr: *const c_char,
+    offset: u32,
+    limit: u32,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+
+    let effective_limit = if limit == 0 { 50 } else { limit.min(500) };
+
+    match engine.storage.get_messages_for_peer_paginated(&peer_id, offset, effective_limit) {
+        Ok(messages) => {
+            let json_messages: Vec<serde_json::Value> = messages.into_iter().map(|(content, timestamp, is_me, status, msg_id, reply_to)| {
+                let iso_timestamp = timestamp.replace(" ", "T") + "Z";
+                serde_json::json!({
+                    "content": content,
+                    "timestamp": iso_timestamp,
+                    "is_me": is_me,
+                    "status": status,
+                    "msg_id": msg_id,
+                    "reply_to": reply_to
+                })
+            }).collect();
+
+            let json = serde_json::to_string(&json_messages).unwrap_or_else(|_| "[]".to_string());
+            FfiResult::binary(json.into_bytes())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn introvert_storage_get_last_message(peer_id_ptr: *const c_char) -> FfiResult {
     let lock = ENGINE.read();
@@ -1363,6 +1443,42 @@ pub extern "C" fn introvert_storage_get_last_group_message(group_id_ptr: *const 
     }
 }
 
+/// Batch: returns last message for ALL contacts in one call (replaces N individual calls).
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_last_messages_all() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    match engine.storage.get_last_messages_all() {
+        Ok(json) => {
+            let json_str = serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_string());
+            FfiResult::binary(json_str.into_bytes())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
+/// Batch: returns last message for ALL groups in one call.
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_last_group_messages_all() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    match engine.storage.get_last_group_messages_all() {
+        Ok(json) => {
+            let json_str = serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_string());
+            FfiResult::binary(json_str.into_bytes())
+        }
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
 fn build_local_sovereign_identity(engine: &Engine) -> anyhow::Result<crate::identity::SovereignIdentity> {
     let identity = &engine.identity;
     let storage = &engine.storage;
@@ -1373,7 +1489,7 @@ fn build_local_sovereign_identity(engine: &Engine) -> anyhow::Result<crate::iden
     let solana_signing_key = NodeIdentity::derive_solana_keypair(identity.seed)?;
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+    let (local_name, local_handle, local_avatar, _, local_tier) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0, 0));
 
     Ok(crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -1386,6 +1502,7 @@ fn build_local_sovereign_identity(engine: &Engine) -> anyhow::Result<crate::iden
         is_anchor_capable: true,
         retention_seconds: 0,
         handle: local_handle,
+        prestige_tier: Some(local_tier as u8),
     })
 }
 
@@ -1760,7 +1877,10 @@ pub extern "C" fn intro_claw_get_api_key() -> *mut c_char {
     if let Some(engine) = lock.as_ref() {
         let storage = Arc::clone(&engine.storage);
         let key = storage.get_intro_claw_api_key();
-        CString::new(key).unwrap().into_raw()
+        match CString::new(key) {
+            Ok(s) => s.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
     } else {
         std::ptr::null_mut()
     }
@@ -1932,7 +2052,10 @@ pub extern "C" fn introvert_get_peer_id() -> *mut c_char {
     let lock = ENGINE.read();
     if let Some(engine) = lock.as_ref() {
         let peer_id = engine.identity.peer_id.to_string();
-        CString::new(peer_id).unwrap().into_raw()
+        match CString::new(peer_id) {
+            Ok(s) => s.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
     } else {
         std::ptr::null_mut()
     }
@@ -1947,7 +2070,7 @@ pub extern "C" fn introvert_free_string(s: *mut c_char) {
 
 /// Notify Intro-Claw that a VoIP call has started
 #[no_mangle]
-pub extern "C" fn intro_claw_voip_start_call(peer_id_ptr: *const c_char, is_video: bool) -> FfiResult {
+pub extern "C" fn intro_claw_voip_start_call(peer_id_ptr: *const c_char, is_video: i32) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() {
         Some(e) => e,
@@ -1955,11 +2078,12 @@ pub extern "C" fn intro_claw_voip_start_call(peer_id_ptr: *const c_char, is_vide
     };
     if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
     let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+    let is_video_bool = is_video != 0;
     let tx_lock = engine.network_tx.read();
     if let Some(tx) = tx_lock.as_ref() {
         let tx = tx.clone();
         engine.runtime.spawn(async move {
-            let _ = tx.send(NetworkCommand::IntroClawVoipStartCall { peer_id, is_video }).await;
+            let _ = tx.send(NetworkCommand::IntroClawVoipStartCall { peer_id, is_video: is_video_bool }).await;
         });
     }
     FfiResult::success()
@@ -1990,7 +2114,7 @@ pub extern "C" fn intro_claw_voip_record_sample(
     packet_loss_pct: f64,
     jitter_ms: u64,
     bitrate_kbps: u64,
-    is_relayed: bool,
+    is_relayed: i32,
     codec_ptr: *const c_char,
 ) -> FfiResult {
     let lock = ENGINE.read();
@@ -2000,12 +2124,13 @@ pub extern "C" fn intro_claw_voip_record_sample(
     };
     if codec_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
     let codec = unsafe { CStr::from_ptr(codec_ptr).to_string_lossy().into_owned() };
+    let is_relayed_bool = is_relayed != 0;
     let tx_lock = engine.network_tx.read();
     if let Some(tx) = tx_lock.as_ref() {
         let tx = tx.clone();
         engine.runtime.spawn(async move {
             let _ = tx.send(NetworkCommand::IntroClawVoipRecordSample {
-                rtt_ms, packet_loss_pct, jitter_ms, bitrate_kbps, is_relayed, codec,
+                rtt_ms, packet_loss_pct, jitter_ms, bitrate_kbps, is_relayed: is_relayed_bool, codec,
             }).await;
         });
     }
@@ -2287,8 +2412,8 @@ pub extern "C" fn introvert_group_create(
     let creator_peer_id = engine.identity.peer_id.to_string();
     let creator_pubkey = engine.identity.keypair.public().encode_protobuf();
     let local_profile = engine.storage.get_profile().ok().flatten();
-    let creator_alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-    let creator_avatar = local_profile.and_then(|(_, _, a, _)| a);
+    let creator_alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+    let creator_avatar = local_profile.and_then(|(_, _, a, _, _)| a);
 
     let creator_member = crate::network::GroupMemberMetadata {
         peer_id: creator_peer_id,
@@ -2591,9 +2716,9 @@ pub extern "C" fn introvert_group_get_messages(
                 let (sender_name, sender_avatar) = if sender_id == my_peer_id {
                     // Local user name & avatar resolution
                     let profile = engine.storage.get_profile().ok().flatten();
-                    let name = profile.as_ref().and_then(|(n, _, _, _)| n.clone().filter(|n| !n.is_empty()))
+                    let name = profile.as_ref().and_then(|(n, _, _, _, _)| n.clone().filter(|n| !n.is_empty()))
                         .unwrap_or_else(|| "me".to_string());
-                    let avatar = profile.and_then(|(_, _, a, _)| a);
+                    let avatar = profile.and_then(|(_, _, a, _, _)| a);
                     (name, avatar)
                 } else {
                     // Resolution Priority:
@@ -3462,6 +3587,40 @@ pub extern "C" fn introvert_storage_get_handle_status(
     }
 }
 
+/// Returns the local user's verified handle (immutable once set). Returns empty string if none.
+#[no_mangle]
+pub extern "C" fn introvert_storage_get_local_handle() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    match engine.storage.get_local_handle() {
+        Ok(Some(handle)) => FfiResult::binary(handle.into_bytes()),
+        Ok(None) => FfiResult::binary(b"".to_vec()),
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
+/// Checks if a handle is permanently claimed (verified) by any peer.
+#[no_mangle]
+pub extern "C" fn introvert_storage_is_handle_claimed(handle_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if handle_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let handle = unsafe { CStr::from_ptr(handle_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.is_handle_permanently_claimed(&handle) {
+        Ok(claimed) => FfiResult::binary(vec![if claimed { 1 } else { 0 }]),
+        Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
+    }
+}
+
 /// Registers a mobile push token with the RBN backbone for background wakeups.
 #[no_mangle]
 pub extern "C" fn introvert_network_register_push_token(
@@ -3629,7 +3788,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
     };
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+    let (local_name, local_handle, local_avatar, _, local_tier) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0, 0));
 
     let my_identity = crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -3642,6 +3801,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
         is_anchor_capable: true, 
         retention_seconds: 0,
         handle: local_handle,
+        prestige_tier: Some(local_tier as u8),
     };
 
     let tx_lock = engine.network_tx.read();
@@ -3669,6 +3829,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
                     is_anchor_capable: false,
                     retention_seconds: 0,
                     handle: None,
+                    prestige_tier: None,
                 };
                 let _ = storage.upsert_sovereign_contact(&placeholder, false, false);
             }

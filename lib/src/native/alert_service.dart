@@ -25,7 +25,8 @@ class AlertService {
       switch (call.method) {
         case 'onDeviceToken':
           _apnsToken = call.arguments as String;
-          debugPrint("🔔 AlertService: Received APNs Token: $_apnsToken");
+          final masked = _apnsToken!.length > 8 ? '...${_apnsToken!.substring(_apnsToken!.length - 8)}' : _apnsToken;
+          debugPrint("🔔 AlertService: Received APNs Token: $masked");
           IntrovertClient().registerPushToken(Platform.isIOS ? "ios" : "android", _apnsToken!);
           break;
         case 'onWakeup':

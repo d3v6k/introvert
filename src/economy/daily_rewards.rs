@@ -89,6 +89,7 @@ pub struct ActivityWeights {
     pub cap_file_transfer_recv: u32,
     pub cap_call_duration_secs: u32,
     pub cap_relay_bytes: u64,
+    pub cap_relay_bytes_rbn: u64,
     pub cap_uptime_seconds: u32,
 
     pub min_message_length: usize,
@@ -110,7 +111,7 @@ impl Default for ActivityWeights {
             file_transfer_recv: 10.0,
             call_duration_secs: 1.0,
             relay_bytes: 0.01,
-            uptime_seconds: 0.001,
+            uptime_seconds: 0.005,
 
             cap_message_sent: 200,
             cap_message_received: 300,
@@ -120,6 +121,7 @@ impl Default for ActivityWeights {
             cap_file_transfer_recv: 20,
             cap_call_duration_secs: 3600,
             cap_relay_bytes: 10240,  // 10,240 KB = 10 MB cap for edge nodes
+            cap_relay_bytes_rbn: 51200,  // 51,200 KB = 50 MB cap for RBN nodes (v3.0.1)
             cap_uptime_seconds: 86400,
 
             min_message_length: 5,
@@ -127,7 +129,7 @@ impl Default for ActivityWeights {
             rapid_fire_max_per_window: 10,
             daily_point_cap: 5000.0,
             intr_per_point: 0.001,
-            edge_infra_multiplier: 30.0,
+            edge_infra_multiplier: 38.0,
         }
     }
 }
@@ -226,6 +228,10 @@ impl RapidFireWindow {
 }
 
 // ─── Engine State ────────────────────────────────────────────
+
+// v3.0.1 phase-in: 90-day linear blend from old weights to new weights
+const V3_PHASE_IN_DAYS: u64 = 90;
+const V3_PHASE_IN_START: &str = "2026-07-01"; // Date when v3.0.1 weights begin phase-in
 
 struct DailyRewardState {
     current_cycle: Option<DailyCycle>,
@@ -453,9 +459,16 @@ impl DailyRewardEngine {
         }
 
         // Per-type cap check
-        // RBN operators: skip cap on RelayBytes and UptimeSeconds (infrastructure work is uncapped)
-        let is_rbn_uncapped = event.is_rbn && matches!(event.activity_type, ActivityType::RelayBytes | ActivityType::UptimeSeconds);
-        let cap = if is_rbn_uncapped { u64::MAX } else { Self::get_cap_static(&event.activity_type, &weights) };
+        // RBN operators: RelayBytes capped at 51,200 KB (v3.0.1), UptimeSeconds uncapped
+        let cap = if event.is_rbn {
+            match event.activity_type {
+                ActivityType::RelayBytes => weights.cap_relay_bytes_rbn,
+                ActivityType::UptimeSeconds => u64::MAX,
+                _ => Self::get_cap_static(&event.activity_type, &weights),
+            }
+        } else {
+            Self::get_cap_static(&event.activity_type, &weights)
+        };
         
         // Update raw count
         let raw = state.per_type_counts.entry(at_u8).or_insert(0);
@@ -632,9 +645,21 @@ impl DailyRewardEngine {
     }
 
     pub fn score_activities_static(state: &DailyRewardState, w: &ActivityWeights) -> Vec<DailyActivityCount> {
+        Self::score_activities_with_blend(state, w, None)
+    }
+
+    fn score_activities_with_blend(state: &DailyRewardState, w: &ActivityWeights, blend_override: Option<f64>) -> Vec<DailyActivityCount> {
         let is_rbn = state.is_rbn;
         let is_edge = state.is_edge_node;
         let uptime_raw = state.per_type_counts.get(&(ActivityType::UptimeSeconds as u8)).copied().unwrap_or(0);
+
+        // v3.0.1 phase-in: compute blended weights during 90-day transition
+        let blend = blend_override.unwrap_or_else(Self::get_phase_in_blend);
+        let uptime_weight = Self::blend_weight(0.001, w.uptime_seconds, blend);
+        let edge_mult = Self::blend_weight(30.0, w.edge_infra_multiplier, blend);
+        // Availability yield: old = 1.2x at >=82800, new = 1.5x at >=79200
+        let yield_threshold = Self::blend_weight(82800.0, 79200.0, blend) as u64;
+        let yield_multiplier = Self::blend_weight(1.2, 1.5, blend);
 
         ActivityType::all().iter().map(|at| {
             let at_u8 = *at as u8;
@@ -649,17 +674,17 @@ impl DailyRewardEngine {
                 ActivityType::FileTransferRecv => w.file_transfer_recv,
                 ActivityType::CallDurationSecs => w.call_duration_secs,
                 ActivityType::RelayBytes => w.relay_bytes,
-                ActivityType::UptimeSeconds => w.uptime_seconds,
+                ActivityType::UptimeSeconds => uptime_weight,
             };
 
-            // Apply 1.2x availability yield to uptime weight for RBN nodes with 23h+ uptime
-            if matches!(at, ActivityType::UptimeSeconds) && is_rbn && uptime_raw >= 82800 {
-                weight *= 1.2;
+            // Apply availability yield to uptime weight for RBN nodes with sufficient uptime
+            if matches!(at, ActivityType::UptimeSeconds) && is_rbn && uptime_raw >= yield_threshold {
+                weight *= yield_multiplier;
             }
 
             // Apply edge infra multiplier for non-RBN edge nodes
             if !is_rbn && is_edge && matches!(at, ActivityType::RelayBytes | ActivityType::UptimeSeconds) {
-                weight *= w.edge_infra_multiplier;
+                weight *= edge_mult;
             }
 
             DailyActivityCount {
@@ -669,6 +694,20 @@ impl DailyRewardEngine {
                 points: capped as f64 * weight,
             }
         }).collect()
+    }
+
+    /// Returns blend factor (0.0 = old weights, 1.0 = new weights) based on days since phase-in start.
+    fn get_phase_in_blend() -> f64 {
+        let start = NaiveDate::parse_from_str(V3_PHASE_IN_START, "%Y-%m-%d")
+            .unwrap_or(NaiveDate::from_ymd_opt(2026, 7, 1).unwrap());
+        let today = Utc::now().date_naive();
+        let days = today.signed_duration_since(start).num_days().max(0) as u64;
+        if days >= V3_PHASE_IN_DAYS { 1.0 } else { days as f64 / V3_PHASE_IN_DAYS as f64 }
+    }
+
+    /// Linear interpolation between old and new weight based on blend factor.
+    fn blend_weight(old: f64, new: f64, blend: f64) -> f64 {
+        old * (1.0 - blend) + new * blend
     }
 }
 
@@ -701,16 +740,16 @@ mod tests {
         engine.record_activity(ActivityEvent { activity_type: ActivityType::UptimeSeconds, peer_id: None, value: 86400, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: None });
 
         let state = engine.state.read();
-        let activities = DailyRewardEngine::score_activities_static(&state, &weights);
+        let activities = DailyRewardEngine::score_activities_with_blend(&state, &weights, Some(1.0));
         let social: f64 = activities.iter().filter(|a| matches!(a.activity_type, ActivityType::MessageSent | ActivityType::MessageReceived | ActivityType::GroupMessageSent | ActivityType::GroupReaction | ActivityType::FileTransferSent | ActivityType::FileTransferRecv | ActivityType::CallDurationSecs)).map(|a| a.points).sum();
         let infra: f64 = activities.iter().filter(|a| matches!(a.activity_type, ActivityType::RelayBytes | ActivityType::UptimeSeconds)).map(|a| a.points).sum();
         assert_eq!(social, 3705.0);
-        // Edge node: infra = (5120 * 0.01 * 30) + (86400 * 0.001 * 30) = 1536 + 2592 = 4128
-        assert!((infra - 4128.0).abs() < 0.1, "infra={}", infra);
+        // Edge node (v3.0.1): infra = (5120 * 0.01 * 38) + (86400 * 0.005 * 38) = 1945.6 + 16416 = 18361.6
+        assert!((infra - 18361.6).abs() < 0.1, "infra={}", infra);
         let total = social.min(5000.0) + infra;
         let nano: u64 = (total / 100_000.0 * 16_438_000_000_000.0) as u64;
-        // Expected: floor(7833 / 100000 * 16438000000000) = 1287588540000
-        assert_eq!(nano, 1_287_588_540_000, "Test Vector 1 failed: {}", nano);
+        // Expected: floor(22066.6 / 100000 * 16438000000000) = 3627307707999 (f64 precision)
+        assert_eq!(nano, 3_627_307_707_999, "Test Vector 1 failed: {}", nano);
     }
 
     #[test]
@@ -732,16 +771,17 @@ mod tests {
         engine.record_activity(ActivityEvent { activity_type: ActivityType::UptimeSeconds, peer_id: None, value: 86400, is_foreground: true, message_len: None, is_self: false, is_rbn: true, proof_hash: None });
 
         let state = engine.state.read();
-        let activities = DailyRewardEngine::score_activities_static(&state, &weights);
+        let activities = DailyRewardEngine::score_activities_with_blend(&state, &weights, Some(1.0));
         let social: f64 = activities.iter().filter(|a| matches!(a.activity_type, ActivityType::MessageSent | ActivityType::MessageReceived | ActivityType::GroupMessageSent | ActivityType::GroupReaction | ActivityType::FileTransferSent | ActivityType::FileTransferRecv | ActivityType::CallDurationSecs)).map(|a| a.points).sum();
         let infra: f64 = activities.iter().filter(|a| matches!(a.activity_type, ActivityType::RelayBytes | ActivityType::UptimeSeconds)).map(|a| a.points).sum();
         assert_eq!(social, 900.0);
-        let expected_infra = 104_857.6 + 103.68;
+        // RBN (v3.0.1): infra = (min(10485760,51200) * 0.01) + (86400 * 0.005 * 1.5) = 512 + 648 = 1160
+        let expected_infra = 512.0 + 648.0;
         assert!((infra - expected_infra).abs() < 0.1, "infra={}", infra);
         let total = social.min(5000.0) + infra;
         let nano: u64 = (total / 100_000.0 * 8_219_000_000_000.0) as u64;
-        // Allow small floating point tolerance
-        assert!((nano as f64 - 8_700_738_503_296.0).abs() < 100_000.0, "Test Vector 2 failed: {}", nano);
+        // Expected: floor(2060 / 100000 * 8219000000000) = 169311400000
+        assert_eq!(nano, 169_311_400_000, "Test Vector 2 failed: {}", nano);
     }
 
     #[test]

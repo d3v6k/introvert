@@ -5,6 +5,7 @@ pub mod storage;
 pub mod economy;
 pub mod network;
 pub mod media;
+pub mod fcm;
 
 use std::sync::Arc;
 use std::ffi::{CStr, CString};
@@ -25,6 +26,7 @@ use crate::network::{FfiNetworkCallback, NetworkCommand, NetworkService};
 use crate::economy::RewardTracker;
 use crate::economy::solana::SolanaIncentiveEngine;
 use serde_json::json;
+use tracing::{info, warn, error};
 
 // --- FFI Types & Callbacks ---
 
@@ -92,7 +94,7 @@ pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle
 /// and ownership is transferred to Dart (Dart will call libc::free).
 pub fn dispatch_global_event_raw(event_type: i32, data_ptr: *const u8, data_len: usize) {
     if data_ptr.is_null() && data_len > 0 {
-        println!("FFI Warning: Null data_ptr for non-zero data_len in event {}", event_type);
+        warn!("FFI Warning: Null data_ptr for non-zero data_len in event {}", event_type);
         return;
     }
     
@@ -104,10 +106,10 @@ pub fn dispatch_global_event_raw(event_type: i32, data_ptr: *const u8, data_len:
         if let Some(callback) = *engine.network_callback.read() {
             callback(event_type, data_ptr, data_len);
         } else {
-            println!("FFI Warning: No callback registered in engine for event {}", event_type);
+            warn!("FFI Warning: No callback registered in engine for event {}", event_type);
         }
     } else {
-        println!("FFI Warning: Engine not initialized for event {}", event_type);
+        warn!("FFI Warning: Engine not initialized for event {}", event_type);
     }
 }
 
@@ -122,7 +124,7 @@ pub fn dispatch_global_event(event_type: i32, data: &[u8]) {
 
     let ptr = unsafe { libc::malloc(len) as *mut u8 };
     if ptr.is_null() {
-        eprintln!("FFI Error: libc::malloc failed for event {}", event_type);
+        error!("FFI Error: libc::malloc failed for event {}", event_type);
         return;
     }
 
@@ -143,8 +145,14 @@ pub fn dispatch_debug_log(msg: &str) {
 pub extern "C" fn introvert_generate_mnemonic() -> *mut c_char {
     let mut entropy = [0u8; 16];
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut entropy);
-    let mnemonic = Mnemonic::from_entropy_in(Language::English, &entropy).unwrap();
-    CString::new(mnemonic.to_string()).unwrap().into_raw()
+    let mnemonic = match Mnemonic::from_entropy_in(Language::English, &entropy) {
+        Ok(m) => m,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    match CString::new(mnemonic.to_string()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
 /// Converts a mnemonic phrase to a 32-byte master seed.
@@ -360,7 +368,7 @@ pub extern "C" fn introvert_network_start_production(
             }
             Err(e) => {
                 let err_msg = format!("Failed to start network service: {}", e);
-                eprintln!("{}", err_msg);
+                error!("{}", err_msg);
                 dispatch_debug_log(&err_msg);
             }
         }
@@ -869,8 +877,8 @@ pub extern "C" fn introvert_storage_get_profile() -> FfiResult {
     };
 
     match engine.storage.get_profile() {
-        Ok(Some((name, handle, avatar, privacy_mode))) => {
-            let json = json!({ "name": name, "handle": handle, "avatar": avatar, "privacy_mode": privacy_mode }).to_string();
+        Ok(Some((name, handle, avatar, privacy_mode, prestige_tier))) => {
+            let json = json!({ "name": name, "handle": handle, "avatar": avatar, "privacy_mode": privacy_mode, "prestige_tier": prestige_tier }).to_string();
             FfiResult::binary(json.into_bytes())
         }
         Ok(None) => FfiResult::binary(b"{}".to_vec()),
@@ -924,6 +932,7 @@ pub extern "C" fn introvert_storage_get_contacts() -> FfiResult {
                     "is_anchor_capable": c.is_anchor_capable,
                     "retention_hours": c.retention_seconds,
                     "handle": c.handle,
+                    "prestige_tier": c.prestige_tier.unwrap_or(0),
                 })
             }).collect();
             let json = serde_json::to_string(&mapped_contacts).unwrap_or_default();
@@ -1185,7 +1194,7 @@ pub extern "C" fn introvert_storage_get_messages(peer_id_ptr: *const c_char) -> 
 
     match engine.storage.get_messages_for_peer(&peer_id) {
         Ok(messages) => {
-            println!("FFI: get_messages for peer {} returned {} rows", peer_id, messages.len());
+            info!("FFI: get_messages for peer {} returned {} rows", peer_id, messages.len());
             let json_messages: Vec<serde_json::Value> = messages.into_iter().map(|(content, timestamp, is_me, status, msg_id, reply_to)| {
                 // Convert SQLite timestamp (YYYY-MM-DD HH:MM:SS) to ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
                 let iso_timestamp = timestamp.replace(" ", "T") + "Z";
@@ -1230,7 +1239,7 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
     };
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+    let (local_name, local_handle, local_avatar, _, local_tier) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0, 0));
 
     let my_identity = crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -1243,6 +1252,7 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
         is_anchor_capable: true, 
         retention_seconds: 0,
         handle: local_handle,
+        prestige_tier: Some(local_tier as u8),
     };
 
     let handle = engine.runtime.spawn(async move {
@@ -1278,22 +1288,22 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
                     }
                     Ok(Err(e)) => {
                         let err_msg = format!("ERROR:HANDSHAKE_FAILED:{}", e);
-                        eprintln!("Wormhole handshake failed: {}", e);
+                        error!("Wormhole handshake failed: {}", e);
                         dispatch_global_event(6, err_msg.as_bytes());
                     }
                     Err(_) => {
-                        eprintln!("Wormhole handshake timed out");
+                        error!("Wormhole handshake timed out");
                         dispatch_global_event(6, "ERROR:TIMEOUT:Handshake timed out. Peer might have disconnected.".as_bytes());
                     }
                 }
             }
             Ok(Err(e)) => {
                 let err_msg = format!("ERROR:CREATE_FAILED:{}", e);
-                eprintln!("Failed to create Wormhole invite: {}", e);
+                error!("Failed to create Wormhole invite: {}", e);
                 dispatch_global_event(6, err_msg.as_bytes());
             }
             Err(_) => {
-                eprintln!("Wormhole invite creation timed out");
+                error!("Wormhole invite creation timed out");
                 dispatch_global_event(6, "ERROR:TIMEOUT:Mailbox relay unreachable. Please check your connection or firewall (Port 443/WSS).".as_bytes());
             }
         }
@@ -1303,7 +1313,7 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
         let mut task_lock = WORMHOLE_TASK.lock();
         if let Some(h) = task_lock.replace(handle) {
             h.abort();
-            println!("Wormhole: Aborted previous active session/task.");
+            info!("Wormhole: Aborted previous active session/task.");
         }
     }
 
@@ -1356,7 +1366,7 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
     };
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+    let (local_name, local_handle, local_avatar, _, local_tier) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0, 0));
 
     let my_identity = crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -1369,6 +1379,7 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
         is_anchor_capable: true, 
         retention_seconds: 0,
         handle: local_handle,
+        prestige_tier: Some(local_tier as u8),
     };
 
     let handle = engine.runtime.spawn(async move {
@@ -1397,22 +1408,22 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
                     }
                     Ok(Err(e)) => {
                         let err_msg = format!("ERROR:JOIN_HANDSHAKE_FAILED:{}", e);
-                        eprintln!("Wormhole join handshake failed: {}", e);
+                        error!("Wormhole join handshake failed: {}", e);
                         dispatch_global_event(6, err_msg.as_bytes());
                     }
                     Err(_) => {
-                        eprintln!("Wormhole join handshake timed out");
+                        error!("Wormhole join handshake timed out");
                         dispatch_global_event(6, "ERROR:TIMEOUT:Join handshake timed out".as_bytes());
                     }
                 }
             }
             Ok(Err(e)) => {
                 let err_msg = format!("ERROR:JOIN_FAILED:{}", e);
-                eprintln!("Failed to join Wormhole session: {}", e);
+                error!("Failed to join Wormhole session: {}", e);
                 dispatch_global_event(6, err_msg.as_bytes());
             }
             Err(_) => {
-                eprintln!("Wormhole join connection timed out");
+                error!("Wormhole join connection timed out");
                 dispatch_global_event(6, "ERROR:TIMEOUT:Join connection timed out. Please check your connection or firewall (Port 443/WSS).".as_bytes());
             }
         }
@@ -1422,7 +1433,7 @@ pub extern "C" fn introvert_wormhole_join(code_ptr: *const c_char) -> FfiResult 
         let mut task_lock = WORMHOLE_TASK.lock();
         if let Some(h) = task_lock.replace(handle) {
             h.abort();
-            println!("Wormhole: Aborted previous active session/task.");
+            info!("Wormhole: Aborted previous active session/task.");
         }
     }
 
@@ -1435,7 +1446,7 @@ pub extern "C" fn introvert_wormhole_abort() -> FfiResult {
     let mut task_lock = WORMHOLE_TASK.lock();
     if let Some(h) = task_lock.take() {
         h.abort();
-        println!("Wormhole: Aborted active session/task on user request.");
+        info!("Wormhole: Aborted active session/task on user request.");
     }
     FfiResult::success()
 }
@@ -1582,7 +1593,10 @@ pub extern "C" fn introvert_get_peer_id() -> *mut c_char {
     let lock = ENGINE.read();
     if let Some(engine) = lock.as_ref() {
         let peer_id = engine.identity.peer_id.to_string();
-        CString::new(peer_id).unwrap().into_raw()
+        match CString::new(peer_id) {
+            Ok(s) => s.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
     } else {
         std::ptr::null_mut()
     }
@@ -1838,8 +1852,8 @@ pub extern "C" fn introvert_group_create(
     let creator_peer_id = engine.identity.peer_id.to_string();
     let creator_pubkey = engine.identity.keypair.public().encode_protobuf();
     let local_profile = engine.storage.get_profile().ok().flatten();
-    let creator_alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-    let creator_avatar = local_profile.and_then(|(_, _, a, _)| a);
+    let creator_alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+    let creator_avatar = local_profile.and_then(|(_, _, a, _, _)| a);
 
     let creator_member = crate::network::GroupMemberMetadata {
         peer_id: creator_peer_id,
@@ -2069,7 +2083,7 @@ pub extern "C" fn introvert_group_get_all() -> FfiResult {
 
     match engine.storage.get_all_groups() {
         Ok(groups) => {
-            println!("[FFI] Found {} groups in database", groups.len());
+            info!("[FFI] Found {} groups in database", groups.len());
             let mut groups_json = Vec::new();
             for (gid, name, members, desc, retention) in groups {
                 groups_json.push(vec![
@@ -2122,9 +2136,9 @@ pub extern "C" fn introvert_group_get_messages(
                 let (sender_name, sender_avatar) = if sender_id == my_peer_id {
                     // Local user name & avatar resolution
                     let profile = engine.storage.get_profile().ok().flatten();
-                    let name = profile.as_ref().and_then(|(n, _, _, _)| n.clone().filter(|n| !n.is_empty()))
+                    let name = profile.as_ref().and_then(|(n, _, _, _, _)| n.clone().filter(|n| !n.is_empty()))
                         .unwrap_or_else(|| "me".to_string());
-                    let avatar = profile.and_then(|(_, _, a, _)| a);
+                    let avatar = profile.and_then(|(_, _, a, _, _)| a);
                     (name, avatar)
                 } else {
                     // Resolution Priority:
@@ -2459,16 +2473,16 @@ pub extern "C" fn introvert_group_delete(
 
     let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
     let my_peer_id = engine.identity.peer_id.to_string();
-    println!("[FFI] Attempting to delete group: {}", group_id);
+    info!("[FFI] Attempting to delete group: {}", group_id);
 
     if let Ok(Some(group_info)) = engine.storage.get_group(&group_id) {
         let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&group_info.members_json).unwrap_or_default();
         let is_creator = members.iter().any(|m| m.peer_id == my_peer_id && m.role == crate::network::GroupRole::Creator);
-        println!("[FFI] Group found. Is creator: {}", is_creator);
+        info!("[FFI] Group found. Is creator: {}", is_creator);
         
         // Only signal the mesh if we are the creator. 
         if is_creator {
-            println!("[FFI] Signaling mesh about group deletion");
+            info!("[FFI] Signaling mesh about group deletion");
             let tx_lock = engine.network_tx.read();
             if let Some(tx) = tx_lock.as_ref() {
                 let tx = tx.clone();
@@ -2489,17 +2503,17 @@ pub extern "C" fn introvert_group_delete(
             }
         }
     } else {
-        println!("[FFI] Group {} not found in storage during delete attempt", group_id);
+            warn!("[FFI] Group {} not found in storage during delete attempt", group_id);
     }
 
     match engine.storage.delete_group(&group_id) {
         Ok(_) => {
-            println!("[FFI] Successfully deleted group {} from local storage", group_id);
+            info!("[FFI] Successfully deleted group {} from local storage", group_id);
             crate::dispatch_global_event(22, group_id.as_bytes());
             FfiResult::success()
         },
         Err(e) => {
-            println!("[FFI] FAILED to delete group {}: {}", group_id, e);
+            error!("[FFI] FAILED to delete group {}: {}", group_id, e);
             FfiResult::error(-1, &format!("Database error: {}", e))
         },
     }
@@ -3128,7 +3142,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
     };
     let solana_address = solana_sdk::pubkey::Pubkey::new_from_array(solana_signing_key.verifying_key().to_bytes()).to_string();
 
-    let (local_name, local_handle, local_avatar, _) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0));
+    let (local_name, local_handle, local_avatar, _, local_tier) = storage.get_profile().unwrap_or(None).unwrap_or((None, None, None, 0, 0));
 
     let my_identity = crate::identity::SovereignIdentity {
         peer_id: identity.peer_id.to_string(),
@@ -3141,6 +3155,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
         is_anchor_capable: true, 
         retention_seconds: 0,
         handle: local_handle,
+        prestige_tier: Some(local_tier as u8),
     };
 
     let tx_lock = engine.network_tx.read();
@@ -3168,6 +3183,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
                     is_anchor_capable: false,
                     retention_seconds: 0,
                     handle: None,
+                    prestige_tier: None,
                 };
                 let _ = storage.upsert_sovereign_contact(&placeholder, false, false);
             }

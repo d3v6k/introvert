@@ -710,6 +710,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isE2eeActive = false;
   double _relayedBytes = 0;
   double _solRewards = 0;
+  int _myTier = 0;
+  int _peerTier = 0;
   bool _isRecording = false;
   bool _showPanel = false;
   bool _isInputEmpty = true;
@@ -725,6 +727,7 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription? _economySubscription;
   StreamSubscription<FileTransferProgress>? _transferSubscription;
   final Map<String, Map<String, List<String>>> _polls = {};
+  final Map<String, List<dynamic>> _reactionsCache = {}; // msgId -> reactions
   final Set<String> _pullRequested = {};
   int _elevatedCount = 0;
 
@@ -747,10 +750,18 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     _loadProfile();
+    _loadPeerTier();
     _loadMessages();
     _markMessagesAsRead();
     _startNetworkDiscovery();
     _startEconomyMonitor();
+
+    // Load more messages when scrolling to top
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels < 200 && _hasMoreMessages && !_isLoading) {
+        _loadMoreMessages();
+      }
+    });
     
     // Graceful background update of peer profile
     _client.pollPeerProfile(widget.peerId);
@@ -783,6 +794,16 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _loadPeerTier() {
+    final contacts = _client.getContacts();
+    final contact = contacts.firstWhere((c) => c['peer_id'] == widget.peerId, orElse: () => null);
+    if (contact != null) {
+      setState(() {
+        _peerTier = contact['prestige_tier'] as int? ?? 0;
+      });
+    }
+  }
+
   void _markMessagesAsRead() {
     // Mark all incoming messages as read locally
     _client.updateMessageStatusForPeer(widget.peerId, 0);
@@ -810,10 +831,18 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  static const int _pageSize = 100;
+  int _loadedOffset = 0;
+  bool _hasMoreMessages = true;
+
   Future<void> _loadMessages() async {
     setState(() => _isLoading = true);
+    _loadedOffset = 0;
+    _hasMoreMessages = true;
     try {
-      final raw = _client.getMessages(widget.peerId);
+      final raw = _client.getMessagesPaginated(widget.peerId, offset: 0, limit: _pageSize);
+      _hasMoreMessages = raw.length >= _pageSize;
+      _loadedOffset = raw.length;
       final List<dynamic> loaded = [];
       for (var m in raw) {
         final content = m['content'] as String? ?? '';
@@ -923,6 +952,17 @@ class _ChatScreenState extends State<ChatScreen> {
           replyTo: replyTo,
         ));
       }
+      // Pre-fetch reactions for all messages (avoids sync FFI in build path)
+      _reactionsCache.clear();
+      for (var m in loaded) {
+        final msgId = m is MessageModel ? m.msgId : (m is FileTransferProgress ? m.transferId : null);
+        if (msgId != null && msgId.isNotEmpty) {
+          try {
+            _reactionsCache[msgId] = _client.getMessageReactions(msgId);
+          } catch (_) {}
+        }
+      }
+
       setState(() {
         _messages.clear();
         _messages.addAll(loaded);
@@ -934,6 +974,49 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e) {
       debugPrint("Error loading messages: $e");
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (!_hasMoreMessages || _isLoading) return;
+    try {
+      final raw = _client.getMessagesPaginated(widget.peerId, offset: _loadedOffset, limit: _pageSize);
+      if (raw.isEmpty) {
+        _hasMoreMessages = false;
+        return;
+      }
+      _hasMoreMessages = raw.length >= _pageSize;
+      _loadedOffset += raw.length;
+
+      final List<dynamic> older = [];
+      for (var m in raw) {
+        final content = m['content'] as String? ?? '';
+        final timestampStr = m['timestamp'] as String? ?? '';
+        final isMe = m['is_me'] == true || m['is_me'] == 1 || m['is_me'] == '1';
+        int status = m['status'] as int? ?? 1;
+        final msgId = m['msg_id'] as String?;
+        final replyTo = m['reply_to'] as String?;
+        DateTime ts = _parseTimestamp(timestampStr);
+        if (content.startsWith("[FILE]:")) {
+          try {
+            final jsonStr = content.substring(7);
+            final meta = json.decode(jsonStr);
+            final progress = FileTransferProgress.fromJson(meta);
+            older.add(progress);
+            continue;
+          } catch (_) {}
+        }
+        older.add(MessageModel(content: content, isMe: isMe, timestamp: ts, status: status, msgId: msgId, replyTo: replyTo));
+      }
+
+      if (mounted) {
+        setState(() {
+          _messages.insertAll(0, older);
+          _messagesVersion++;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading more messages: $e");
     }
   }
 
@@ -1076,14 +1159,24 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _scrollToBottom() {
+  bool _isNearBottom() {
+    if (!_scrollController.hasClients) return true;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    return (maxScroll - currentScroll) < 200;
+  }
+
+  void _scrollToBottom({bool force = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        // Only auto-scroll if user is already near the bottom (or forced)
+        if (force || _isNearBottom()) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
       }
     });
   }
@@ -1173,9 +1266,18 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _solRewards = (stats['intr_balance'] ?? 0) / 1000000000.0;
+          _myTier = _computeTier(_solRewards);
         });
       }
     });
+  }
+
+  static int _computeTier(double balance) {
+    if (balance >= 1000000) return 4;
+    if (balance >= 500000) return 3;
+    if (balance >= 250000) return 2;
+    if (balance >= 100000) return 1;
+    return 0;
   }
 
   void _scrollToMessage(String? msgId) {
@@ -1201,7 +1303,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (msg is MessageModel) {
       msgId = msg.msgId;
       final content = msg.content;
-      final reactions = msgId != null ? _client.getMessageReactions(msgId) : null;
+      final reactions = msgId != null ? (_reactionsCache[msgId] ?? []) : [];
 
       if (content.startsWith("[STICKER]:")) {
         return StickerBubble(
@@ -1327,7 +1429,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } else if (msg is FileTransferProgress) {
       msgId = msg.transferId;
-      final reactions = _client.getMessageReactions(msgId);
+      final reactions = _reactionsCache[msgId] ?? [];
       
       if (msg.filename.startsWith("voice_memo_")) {
         return VoiceMemoBubble(
@@ -1385,7 +1487,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     } else if (msg is ImageGroupProgress) {
       msgId = msg.images.first.transferId;
-      final reactions = _client.getMessageReactions(msgId);
+      final reactions = _reactionsCache[msgId] ?? [];
       return ImageStackBubble(
         group: msg,
         isMe: msg.isOutgoing,
@@ -1467,7 +1569,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 return Material(color: Colors.transparent, child: ListTile(
                   leading: SovereignAvatar(
-                    radius: 24, 
+                    radius: 24,
+                    prestigeTier: isMe ? _myTier : _peerTier,
                     avatar: isMe ? (_myAvatar != null ? MemoryImage(base64Decode(_myAvatar!)) : null) : (widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null),
                     initials: name == "You" ? "ME" : (name.isNotEmpty ? name[0].toUpperCase() : "?"),
                   ),
@@ -1507,19 +1610,24 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       title: Text("1 selected", style: TextStyle(color: AppTheme.current.accent, fontSize: 16, fontWeight: FontWeight.w500)),
       actions: [
-        IconButton(
-          icon: Icon(Icons.copy_rounded, color: AppTheme.current.accent),
-          tooltip: 'Copy',
-          onPressed: () {
-            final content = _getSelectedMsgContent();
-            if (content.isNotEmpty) {
-              Clipboard.setData(ClipboardData(text: content));
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied to clipboard")));
-            }
-            setState(() => _selectedMsg = null);
-          },
-        ),
-        IconButton(
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.copy_rounded, color: AppTheme.current.accent),
+                tooltip: 'Copy',
+                onPressed: () {
+                  final content = _getSelectedMsgContent();
+                  if (content.isNotEmpty) {
+                    Clipboard.setData(ClipboardData(text: content));
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Copied to clipboard")));
+                  }
+                  setState(() => _selectedMsg = null);
+                },
+              ),
+              IconButton(
           icon: Icon(Icons.reply_rounded, color: AppTheme.current.accent),
           tooltip: 'Reply',
           onPressed: () {
@@ -1581,7 +1689,10 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
         ),
-        SizedBox(width: 8),
+            SizedBox(width: 8),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1879,7 +1990,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   if (contacts.isNotEmpty) ...[
                     Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 8), child: Text("CONTACTS", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 10, fontWeight: FontWeight.bold))),
                     ...contacts.map((c) => Material(color: Colors.transparent, child: ListTile(
-                      leading: SovereignAvatar(radius: 27, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null),
+                      leading: SovereignAvatar(radius: 27, prestigeTier: c['prestige_tier'] as int? ?? 0, avatar: c['avatar'] != null ? MemoryImage(base64Decode(c['avatar'])) : null),
                       title: Text(c['alias'] ?? c['peer_id'], style: TextStyle(color: AppTheme.current.text, fontSize: 14)),
                       onTap: () {
                         if (isFileForward && fileForwardPath != null) {
@@ -1985,6 +2096,7 @@ class _ChatScreenState extends State<ChatScreen> {
         } else { content = utf8.decode(data.sublist(8)); }
 
         if (content.startsWith("WEBRTC:")) return;
+        if (!mounted) return;
         final eventTime = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
         setState(() {
           if (event.type == 2) _isE2eeActive = true;
@@ -2015,18 +2127,33 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() {});
       } else if (event.type == 25) {
         if (!mounted || event.data.isEmpty) return;
-        int offset = 0;
-        final pidLen = event.data[offset++];
-        final pId = utf8.decode(event.data.sublist(offset, offset + pidLen));
-        offset += pidLen;
+        try {
+          int offset = 0;
+          final pidLen = event.data[offset++];
+          if (offset + pidLen > event.data.length) return;
+          final pId = utf8.decode(event.data.sublist(offset, offset + pidLen));
+          offset += pidLen;
 
-        if (pId == widget.peerId) {
-            final nameLen = event.data[offset++];
-            final name = utf8.decode(event.data.sublist(offset, offset + nameLen));
-            setState(() {
-              _peerName = name;
-            });
-        }
+          if (pId == widget.peerId) {
+              if (offset >= event.data.length) return;
+              final nameLen = event.data[offset++];
+              if (offset + nameLen > event.data.length) return;
+              final name = utf8.decode(event.data.sublist(offset, offset + nameLen));
+              offset += nameLen;
+              if (offset >= event.data.length) return;
+              final handleLen = event.data[offset++];
+              if (offset + handleLen > event.data.length) return;
+              offset += handleLen;
+              if (offset + 4 > event.data.length) return;
+              final avatarLen = (event.data[offset] << 24) | (event.data[offset + 1] << 16) | (event.data[offset + 2] << 8) | event.data[offset + 3];
+              offset += 4 + avatarLen;
+              final tier = offset < event.data.length ? event.data[offset] : 0;
+              setState(() {
+                _peerName = name;
+                _peerTier = tier;
+              });
+          }
+        } catch (_) {}
       } else if (event.type == 12) {
         if (!mounted) return;
         try {
@@ -2238,7 +2365,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _messagesVersion++;
       });
       _scrollToBottom();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to send sticker: $e")));
+    }
   }
 
   void _sendGif(String url) async {
@@ -2249,7 +2378,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(MessageModel(content: payload, isMe: true, timestamp: DateTime.now(), status: 0, msgId: msgId));
       });
       _scrollToBottom();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to send GIF: $e")));
+    }
   }
 
   void _pickAndSendImage() async {
@@ -2278,7 +2409,9 @@ class _ChatScreenState extends State<ChatScreen> {
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to send image: $e")));
+    }
   }
 
   void _pickAndSendVideo() async {
@@ -2291,7 +2424,9 @@ class _ChatScreenState extends State<ChatScreen> {
           _client.sendMessage(widget.peerId, caption);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to send video: $e")));
+    }
   }
 
   void _sendFile() async {
@@ -2855,14 +2990,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final bool hasSelection = _selectedMsg != null;
     return Scaffold(
       appBar: hasSelection ? _buildSelectionToolbar() : AppBar(
-        leadingWidth: 100,
-        leading: Row(children: [IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)), SovereignAvatar(radius: 24, avatar: widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null)]),
+        leadingWidth: 130,
+        leading: Row(children: [IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)), SovereignAvatar(radius: 20, prestigeTier: _peerTier, avatar: widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null)]),
         title: InkWell(
           onTap: _showInfo,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_peerName ?? "Peer", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(_peerName ?? "Peer", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 1),
               Row(
                 children: [
                   Container(
@@ -2952,7 +3087,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
                     }
 
-                    final avatarWidget = SovereignAvatar(radius: 21, avatar: isMe ? (_myAvatar != null ? MemoryImage(base64Decode(_myAvatar!)) : null) : (widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null));
+                    final avatarWidget = SovereignAvatar(radius: 21, prestigeTier: isMe ? _myTier : _peerTier, avatar: isMe ? (_myAvatar != null ? MemoryImage(base64Decode(_myAvatar!)) : null) : (widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null));
                     
                     final bubble = Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

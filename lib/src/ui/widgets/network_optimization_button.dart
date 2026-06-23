@@ -22,7 +22,7 @@ final double size;
     final client = IntrovertClient();
     
     return IconButton(
-      icon: Icon(Icons.signal_cellular_alt_rounded, color: color ?? AppTheme.current.accent, size: size),
+      icon: Icon(Icons.wifi_tethering_rounded, color: color ?? AppTheme.current.accent, size: size),
       tooltip: peerId != null ? "Recheck Peer Connection" : (groupMemberIds != null ? "Mesh Optimisation" : "Network Optimisation"),
       onPressed: () {
         if (peerId != null) {

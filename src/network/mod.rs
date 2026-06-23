@@ -240,7 +240,7 @@ impl NetworkService {
         let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
         
         // Check Kademlia DHT for restored handle claim: ph_<peer_id>
-        let has_handle = self.storage.get_profile().ok().flatten().and_then(|(_, h, _, _)| h).is_some();
+        let has_handle = self.storage.get_profile().ok().flatten().and_then(|(_, h, _, _, _)| h).is_some();
         if !has_handle {
             let my_pid = local_peer_id.to_string();
             info!("[Mesh] No local handle set. Querying Kademlia DHT for restored handle claim ph_{}...", my_pid);
@@ -532,7 +532,7 @@ impl NetworkService {
                     let _ = self.swarm.behaviour_mut().kademlia.put_record(pubkey_record, kad::Quorum::One);
 
                     // Periodically republish HANDLE if set
-                    if let Ok(Some((_, Some(handle), _, _))) = self.storage.get_profile() {
+                    if let Ok(Some((_, Some(handle), _, _, _))) = self.storage.get_profile() {
                         if handle.starts_with("i@") {
                             let h_key = RecordKey::new(&handle.as_bytes());
                             let mut h_value = local_peer_id.to_string().into_bytes();
@@ -786,7 +786,7 @@ impl NetworkService {
 
                 let progress = FileTransferProgress { 
                     transfer_id: transfer_id.clone(), 
-                    peer_id: peer.to_string(), 
+                    peer_id: transfer.peer_id.to_string(),  // Use original sender, not chunk relay peer
                     filename: transfer.filename.clone(), 
                     mime_type: transfer.mime_type.clone(),
                     file_hash: transfer.file_hash.clone(),
@@ -809,7 +809,7 @@ impl NetworkService {
                         let content = format!("[FILE]:{}", json_str);
                         let storage = Arc::clone(&self.storage);
                         let gid_clone = gid.clone();
-                        let peer_str = peer.to_string();
+                        let peer_str = transfer.peer_id.to_string();  // Use original sender for DB storage
                         let tid_clone = transfer_id.clone();
                         if !self.is_stress_test {
                             tokio::task::spawn_blocking(move || {
@@ -821,7 +821,7 @@ impl NetworkService {
                     if let Ok(json_str) = serde_json::to_string(&progress) {
                         let content = format!("[FILE]:{}", json_str);
                         let storage = Arc::clone(&self.storage);
-                        let peer_str = peer.to_string();
+                        let peer_str = transfer.peer_id.to_string();  // Use original sender for DB storage
                         let tid_clone = transfer_id.clone();
                         if !self.is_stress_test {
                             tokio::task::spawn_blocking(move || {
@@ -1130,9 +1130,9 @@ impl NetworkService {
                                 let tx = self.command_tx.clone();
                                 if let Some(gid) = self.resolved_group_codes.get(&key_str).cloned() {
                                     let local_profile = self.storage.get_profile().ok().flatten();
-                                    let alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-                                    let handle = local_profile.as_ref().and_then(|(_, h, _, _)| h.clone());
-                                    let avatar = local_profile.and_then(|(_, _, a, _)| a);
+                                    let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                                    let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                                    let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
                                     tokio::spawn(async move {
                                         let req = SignalingPayload::GroupManifestRequest { group_id: gid, alias, avatar, handle };
                                         let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload: req }).await;
@@ -1188,11 +1188,11 @@ impl NetworkService {
                             let my_peer_id = self.swarm.local_peer_id().to_string();
                             if target_peer_id == my_peer_id {
                                 let profile = self.storage.get_profile().ok().flatten();
-                                let name = profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-                                let avatar = profile.as_ref().and_then(|(_, _, a, _)| a.clone());
-                                let privacy = profile.as_ref().map(|(_, _, _, p)| *p).unwrap_or(1);
+                                let name = profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                                let avatar = profile.as_ref().and_then(|(_, _, a, _, _)| a.clone());
+                                let privacy = profile.as_ref().map(|(_, _, _, p, _)| *p).unwrap_or(1);
                                 let _ = self.storage.set_profile(name.as_deref(), Some(&handle_resolved), avatar.as_deref(), privacy);
-                                let _ = self.storage.upsert_handle_claim(&handle_resolved, &my_peer_id, chrono::Utc::now().timestamp(), "[]", true);
+                                let _ = self.storage.insert_handle_claim(&handle_resolved, &my_peer_id, chrono::Utc::now().timestamp(), "[]", true);
                                 info!("[Mesh] Restored handle {} for local profile!", handle_resolved);
                             }
                             
@@ -1216,9 +1216,9 @@ impl NetworkService {
                         // If we have providers already discovered for this key, query them immediately
                         if let Some(providers) = self.active_providers.get(&key_str).cloned() {
                             let local_profile = self.storage.get_profile().ok().flatten();
-                            let alias = local_profile.as_ref().and_then(|(n, _, _, _)| n.clone());
-                            let handle = local_profile.as_ref().and_then(|(_, h, _, _)| h.clone());
-                            let avatar = local_profile.and_then(|(_, _, a, _)| a);
+                            let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                            let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                            let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
                             for peer_id in providers {
                                 let tx = self.command_tx.clone();
                                 let gid = value_str.clone();
@@ -1369,23 +1369,29 @@ impl NetworkService {
                     IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Message { propagation_source, message_id, message }) => {
                         info!("[Mesh] Received gossipsub message from {} with id {}", propagation_source, message_id);
                         
-                        // Verify sender is a member of the group (topic = group_id)
+                        // Use message.source (original author) when available, fall back to propagation_source (relay peer).
+                        // In gossipsub, propagation_source is the immediate neighbor that forwarded the message,
+                        // which may be a non-member RBN anchor node. Checking it against the member list
+                        // would silently reject valid messages relayed through non-member nodes.
+                        let author_peer = message.source.unwrap_or(propagation_source);
+                        
+                        // Verify the original author is a member of the group (topic = group_id)
                         let topic_str = message.topic.as_str();
                         let is_member = if let Ok(Some(group)) = self.storage.get_group(topic_str) {
                             let members: Vec<GroupMemberMetadata> = serde_json::from_str(&group.members_json).unwrap_or_default();
-                            members.iter().any(|m| m.peer_id == propagation_source.to_string())
+                            members.iter().any(|m| m.peer_id == author_peer.to_string())
                         } else {
                             false
                         };
                         
                         if !is_member {
-                            warn!("[Mesh] Rejecting gossipsub message from non-member {} for topic {}", propagation_source, topic_str);
+                            warn!("[Mesh] Rejecting gossipsub message from non-member {} for topic {}", author_peer, topic_str);
                             return Ok(());
                         }
                         
                         self.mesh_active_peers.insert(propagation_source);
                         if let Ok(payload) = serde_json::from_slice::<SignalingPayload>(&message.data) {
-                            self.handle_single_payload(propagation_source, payload, false).await;
+                            self.handle_single_payload(author_peer, payload, false).await;
                         }
                     }
                     IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Subscribed { peer_id, topic }) => {
@@ -2696,7 +2702,8 @@ impl NetworkService {
 
                 let offer_sdp = MediaManager::create_offer(Arc::clone(&pc)).await?;
                 self.peer_connections.write().insert(peer_id, pc);
-                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp };
+                let purpose = if media_type == 3 { Some("file_transfer".to_string()) } else { None };
+                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp, purpose };
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
                     if session.is_finished() {
@@ -2732,7 +2739,7 @@ impl NetworkService {
 
                         if let Ok(answer_sdp) = MediaManager::handle_offer(offer_sdp, Arc::clone(&pc)).await {
                             self.peer_connections.write().insert(peer_id, pc);
-                            let response = WebRtcSignal { signal_type: "answer".to_owned(), sdp: answer_sdp };
+                            let response = WebRtcSignal { signal_type: "answer".to_owned(), sdp: answer_sdp, purpose: None };
                             
                             let mut is_secure = false;
                             if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
@@ -2754,7 +2761,7 @@ impl NetworkService {
             }
             NetworkCommand::RejectWebRtc { peer_id } => {
                 self.pending_offers.remove(&peer_id);
-                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned() };
+                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned(), purpose: None };
                 
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
@@ -2772,7 +2779,7 @@ impl NetworkService {
                 }
             }
             NetworkCommand::CloseWebRtc { peer_id } => { 
-                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned() };
+                let response = WebRtcSignal { signal_type: "reject".to_owned(), sdp: "".to_owned(), purpose: None };
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
                     if session.is_finished() {
@@ -2862,7 +2869,7 @@ impl NetworkService {
 
                 let offer_sdp = MediaManager::create_offer(Arc::clone(&pc)).await?;
                 self.peer_connections.write().insert(peer_id, pc);
-                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp };
+                let signal = WebRtcSignal { signal_type: "offer".to_owned(), sdp: offer_sdp, purpose: None };
                 let mut is_secure = false;
                 if let Some(session) = self.noise_sessions.get_mut(&peer_id) {
                     if session.is_finished() {
@@ -3554,16 +3561,31 @@ impl NetworkService {
             SignalingPayload::WebRtc(signal) => {
                 match signal.signal_type.as_str() {
                     "offer" => {
-                        self.data_channels.write().remove(&peer);
-                        let old_pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer) };
-                        if let Some(pc) = old_pc {
-                            let _ = pc.close().await;
+                        // Distinguish file transfer data channel offers from VoIP call offers.
+                        // File transfers use purpose="file_transfer" and should NOT trigger the incoming call UI.
+                        if signal.purpose.as_deref() == Some("file_transfer") {
+                            info!("[Mesh] Received file transfer WebRTC offer from {}", peer);
+                            self.data_channels.write().remove(&peer);
+                            let old_pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer) };
+                            if let Some(pc) = old_pc {
+                                let _ = pc.close().await;
+                            }
+                            self.pending_offers.insert(peer, signal.sdp.clone());
+                            // Event 39 = File transfer WebRTC offer (auto-accept, no call UI)
+                            let data = peer.to_string().into_bytes();
+                            crate::dispatch_global_event(39, &data);
+                        } else {
+                            self.data_channels.write().remove(&peer);
+                            let old_pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer) };
+                            if let Some(pc) = old_pc {
+                                let _ = pc.close().await;
+                            }
+
+                            self.pending_offers.insert(peer, signal.sdp.clone());
+                            // Event 14 = Incoming VoIP call
+                            let data = peer.to_string().into_bytes();
+                            crate::dispatch_global_event(14, &data);
                         }
-
-                        self.pending_offers.insert(peer, signal.sdp.clone());
-
-                        let data = peer.to_string().into_bytes();
-                        crate::dispatch_global_event(14, &data);
                     }
                     "answer" => {
                         let pc_opt = self.peer_connections.read().get(&peer).cloned();
@@ -3836,21 +3858,23 @@ impl NetworkService {
             SignalingPayload::ProfileRequest => {
                 info!("[Mesh] Received ProfileRequest from {}", peer);
                 if let Ok(Some(profile)) = self.storage.get_profile() {
-                    let (name, handle, avatar, _) = profile;
+                    let (name, handle, avatar, _, tier) = profile;
                     let response = SignalingPayload::ProfileResponse {
                         name: name.unwrap_or_else(|| "Unknown".to_string()),
                         handle: handle.unwrap_or_else(|| "".to_string()),
                         avatar_base64: avatar,
+                        prestige_tier: tier as u8,
                     };
                     let _ = self.forward_to_mesh(peer, response, false).await;
                 }
             }
-            SignalingPayload::ProfileResponse { name, handle, avatar_base64 } => {
-                info!("[Mesh] Received ProfileResponse from {}: {} ({})", peer, name, handle);
+            SignalingPayload::ProfileResponse { name, handle, avatar_base64, prestige_tier } => {
+                info!("[Mesh] Received ProfileResponse from {}: {} ({}) tier={}", peer, name, handle, prestige_tier);
                 let peer_id_str = peer.to_string();
                 let storage = Arc::clone(&self.storage);
                 let n = name.clone();
                 let a = avatar_base64.clone();
+                let t = prestige_tier;
                 let peer_id_clone = peer_id_str.clone();
                 
                 tokio::task::spawn_blocking(move || {
@@ -3858,6 +3882,7 @@ impl NetworkService {
                     if let Ok(Some(mut contact)) = storage.get_contact(&peer_id_clone) {
                         contact.global_name = Some(n.clone());
                         contact.avatar_base64 = a.clone();
+                        contact.prestige_tier = Some(t);
                         let alias_is_empty_or_id = contact.local_alias.as_deref().map_or(true, |a| a.is_empty() || a == peer_id_clone);
                         if alias_is_empty_or_id {
                             contact.local_alias = Some(n.clone());
@@ -3882,6 +3907,7 @@ impl NetworkService {
                 let avatar_bytes = avatar_base64.as_deref().unwrap_or("").as_bytes();
                 data.extend(&(avatar_bytes.len() as u32).to_be_bytes());
                 data.extend(avatar_bytes);
+                data.push(prestige_tier);
 
                 crate::dispatch_global_event(25, &data);
             }

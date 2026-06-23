@@ -7,6 +7,7 @@ import '../src/native/introvert_client.dart';
 import '../src/ui/widgets/network_optimization_button.dart';
 import '../src/ui/widgets/rewards_hud.dart';
 import '../blueprint_ui.dart';
+import 'tier_preview_screen.dart';
 import 'theme_mockup_grid.dart';
 import '../theme/app_theme.dart';
 
@@ -157,13 +158,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       SnackBar(content: Text("Claim initiated. Generating Proof-of-Work and gossiping to RBNs...")),
     );
 
-    // Timeout to stop spinning if no verification is received
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted && _isClaiming) {
-        setState(() => _isClaiming = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Handle claim timed out. Please check network and try again.")),
-        );
+    // Poll for verification: check handle status every 5 seconds for up to 60 seconds
+    int attempts = 0;
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      attempts++;
+      if (!mounted || !_isClaiming) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final fullHandle = "i@${_handleController.text.trim()}";
+        final status = IntrovertClient().getHandleStatus(fullHandle);
+        if (status.isNotEmpty && status['verified'] == true) {
+          timer.cancel();
+          if (mounted) {
+            setState(() {
+              _isClaimed = true;
+              _isClaiming = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Handle officially verified by the mesh!")),
+            );
+          }
+        }
+      } catch (_) {}
+
+      if (attempts >= 12) { // 60 seconds total
+        timer.cancel();
+        if (mounted && _isClaiming) {
+          setState(() => _isClaiming = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Handle claim timed out. Please check network and try again.")),
+          );
+        }
       }
     });
   }
@@ -191,6 +218,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  String _tierName(double balance) {
+    if (balance >= 1000000) return 'PLATINUM';
+    if (balance >= 500000) return 'GOLD';
+    if (balance >= 250000) return 'SILVER';
+    if (balance >= 100000) return 'SENTINEL';
+    return 'CITIZEN';
   }
 
   Future<void> _claimRewards() async {
@@ -242,7 +277,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 isSuperActive: (_economyStats['total_relayed'] ?? 0) > 100 * 1024 * 1024,
               ),
             ),
-            SizedBox(height: 24),
+            SizedBox(height: 12),
+            Text(
+              'Current Level: ${_tierName(balance)}',
+              style: TextStyle(color: AppTheme.current.accent, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'monospace', letterSpacing: 1),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'INTR Balance: ${balance.toStringAsFixed(2)}',
+              style: TextStyle(color: AppTheme.current.mutedText, fontSize: 12, fontFamily: 'monospace'),
+            ),
+            SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TierPreviewScreen())),
+              child: Text('VIEW PRESTIGE TIERS', style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontFamily: 'monospace', letterSpacing: 1)),
+            ),
+            SizedBox(height: 16),
             TextField(
               controller: _nameController,
               style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
@@ -257,21 +307,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextField(
               controller: _handleController,
               readOnly: _isClaimed || _hasExistingHandle,
-              style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: (_isClaimed || _hasExistingHandle) ? AppTheme.current.accent : AppTheme.current.text,
+                fontFamily: 'monospace',
+              ),
               decoration: InputDecoration(
                 labelText: 'INTROVERT HANDLE',
                 labelStyle: TextStyle(color: AppTheme.current.accent, fontSize: 12),
-                hintText: 'username',
+                hintText: (_isClaimed || _hasExistingHandle) ? null : 'username',
                 hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
                 prefixText: 'i@',
                 prefixStyle: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold),
                 enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
                 focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
                 suffixIcon: (_isClaimed || _hasExistingHandle)
-                  ? Icon(Icons.verified, color: AppTheme.current.accent, size: 20)
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_outline, color: AppTheme.current.accent, size: 16),
+                        SizedBox(width: 4),
+                        Icon(Icons.verified, color: AppTheme.current.accent, size: 20),
+                      ],
+                    )
                   : (_handleController.text.isNotEmpty ? Icon(Icons.new_releases_outlined, color: Colors.orangeAccent, size: 20) : null),
               ),
             ),
+            if (_isClaimed || _hasExistingHandle) ...[
+              SizedBox(height: 6),
+              Text(
+                'Handle is permanently locked to your identity. Immutable on-chain.',
+                style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.6), fontSize: 10, fontStyle: FontStyle.italic),
+              ),
+            ],
             if (!_isClaimed && !_hasExistingHandle && _handleController.text.isNotEmpty) ...[
               SizedBox(height: 12),
               Align(
@@ -299,10 +366,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: Text(
                     "Allow unknown users to connect",
                     style: TextStyle(color: AppTheme.current.text, fontSize: 14, fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
                     "If disabled, you can only be reached via Magic Links. Highly private.",
                     style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   value: _privacyMode == 1,
                   activeThumbColor: AppTheme.current.accent,

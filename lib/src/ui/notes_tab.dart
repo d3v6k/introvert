@@ -556,18 +556,7 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
       var jsonContent = await file.readAsString();
 
       if (password.isNotEmpty) {
-        try {
-          final encrypted = base64Decode(jsonContent);
-          final key = utf8.encode(password);
-          final decrypted = Uint8List(encrypted.length);
-          for (var i = 0; i < encrypted.length; i++) {
-            decrypted[i] = encrypted[i] ^ key[i % key.length];
-          }
-          jsonContent = utf8.decode(decrypted);
-        } catch (_) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Decryption failed. Wrong password?")));
-          return;
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Password protection removed in this version. Importing as plain text.")));
       }
 
       final data = json.decode(jsonContent) as Map<String, dynamic>;
@@ -658,7 +647,7 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
       final notesData = {
         'version': '1.0',
         'exported_at': DateTime.now().toIso8601String(),
-        'password_protected': password.isNotEmpty,
+        'password_protected': false, // XOR removed — was not real encryption
         'notes': _notes.map((n) => {
           'id': n['id'], 'title': n['title'], 'content': n['content'],
           'tags': n['tags'], 'image_path': n['image_path'],
@@ -666,13 +655,6 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
         }).toList(),
       };
       String jsonContent = json.encode(notesData);
-      if (password.isNotEmpty) {
-        final key = utf8.encode(password);
-        final data = utf8.encode(jsonContent);
-        final encrypted = Uint8List(data.length);
-        for (var i = 0; i < data.length; i++) { encrypted[i] = data[i] ^ key[i % key.length]; }
-        jsonContent = base64Encode(encrypted);
-      }
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/$filename.json');
       await file.writeAsString(jsonContent);

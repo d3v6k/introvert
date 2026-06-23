@@ -37,6 +37,7 @@ async fn webrtc_high_throughput_concurrency_test() -> Result<()> {
     println!("🚀 Starting WebRTC High-Throughput Stress Test...");
 
     let reward_tracker = Arc::new(RewardTracker::new(None));
+    let (dummy_tx, _dummy_rx) = mpsc::channel::<introvert::network::NetworkCommand>(64);
 
     // 1. Setup multiple concurrent peer connections
     let concurrency_count = 5;
@@ -46,8 +47,8 @@ async fn webrtc_high_throughput_concurrency_test() -> Result<()> {
     let dummy_peer_id_b = PeerId::random();
 
     for i in 0..concurrency_count {
-        let pc_a = MediaManager::create_peer_connection(true, Arc::clone(&reward_tracker), dummy_peer_id_b).await?;
-        let pc_b = MediaManager::create_peer_connection(false, Arc::clone(&reward_tracker), dummy_peer_id_a).await?;
+        let (pc_a, _dc_rx_a) = MediaManager::create_peer_connection(true, Arc::clone(&reward_tracker), dummy_peer_id_b, dummy_tx.clone()).await?;
+        let (pc_b, _dc_rx_b) = MediaManager::create_peer_connection(false, Arc::clone(&reward_tracker), dummy_peer_id_a, dummy_tx.clone()).await?;
         pairs.push((pc_a, pc_b, i));
     }
 

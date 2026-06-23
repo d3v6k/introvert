@@ -35,7 +35,7 @@ fn test_unbreakable_foundation_async() {
     let test_msg = CString::new("Hello from the ground up!").unwrap();
     
     CALLBACK_FIRED.store(false, Ordering::SeqCst);
-    let store_res = introvert_store_message_async(test_peer.as_ptr(), test_msg.as_ptr(), test_callback);
+    let store_res = introvert_store_message_async(test_peer.as_ptr(), test_msg.as_ptr(), false, test_callback);
     assert_eq!(store_res.code, 0, "Failed to submit message task");
 
     // Wait for callback (simple spin wait for test)
