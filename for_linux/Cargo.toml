@@ -39,10 +39,8 @@ parking_lot = "0.12"
 
 # Utilities
 libc = "0.2"
-indexmap = "2"
 anyhow = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = { version = "1.0", features = ["derive"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 webpki-roots = "0.25"
@@ -57,13 +55,7 @@ dialoguer = "0.11"
 async-compat = "0.2.5"
 tokio-tungstenite = "0.28.0"
 futures-util = "0.3"
-
-# Local Embeddings
-candle-core = "0.8"
-candle-transformers = "0.8"
-candle-nn = "0.8"
-tokenizers = "0.21"
-hf-hub = "0.4"
+jsonwebtoken = "9"
 
 [dev-dependencies]
 tempfile = "3.10"

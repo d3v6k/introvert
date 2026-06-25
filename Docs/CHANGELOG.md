@@ -2,6 +2,48 @@
 
 All notable changes to Introvert will be documented in this file.
 
+## [0.15.0] - 2026-06-25 — STABLE v39 "Relay Resiliency"
+
+### Added
+- **ListenerClosed Relay Auto-Recovery**: Added `SwarmEvent::ListenerClosed` handler to client networking mod (`src/network/mod.rs`) that automatically removes dropped relay reservation listeners and requests a fresh circuit relay reservation if the connection to the RBN remains active.
+- **RBN Code Sync**: Updated RBN (Relayed Byte Network) daemon source code (`for_linux/src/network/mod.rs`) with v2.0.0 protocol binary codec compatibility.
+- **Makefile All Targets**: Verified full workspace cross-compilation pipeline (`make all`) compiling macOS (`libintrovert.dylib`), iOS (`libs/`), and Android (`jniLibs/`) native outputs.
+
+### Changed
+- **Weak Network Handling UI/UX**: Replaced the blocking interactive dialog on weak connectivity in `lib/views/chat_screen.dart` with a rate-limited background refresh (`forceNetworkRefresh()` capped to once every 2 minutes) and a discreet, non-disruptive `SnackBar` alert: `"Weak network detected... optimizing..."`.
+- **File Transfer Authorization**: Hardened verification constraints on fallback seeder lookups in client and daemon network stacks.
+
+### Fixed
+- **Contact Info Layout Overflow**: Wrapped the contact settings details block in a `SingleChildScrollView` to prevent screen boundary layout errors on mobile screens.
+
+> [!NOTE]
+> Text messaging across networks is fully verified via circuit relays (RelayActive state). However, media sharing across different physical networks (e.g., direct download issues) has been improved but still requires thorough verification on multiple physical device setups.
+
+## [0.14.0] - 2026-06-24 — STABLE v38 "Unified Drive"
+
+### Added
+- **Drive UX Redesign**: Created folder-based storage view, expandable category sections, visual thumbnail grids, and a "Download All" capability in the file explorer.
+- **Hardened Reactions**: Integrated reaction delivery with SQLite `StoreInMailbox` fallback, ensuring reaction indicators persist and propagate reliably when direct transport drops.
+- **Editable Themes**: Added interface configuration tools allowing customization of any system default color theme.
+
+### Changed
+- **Mailbox Delivery Fallback**: Applied mailbox store mechanics for reaction syncing.
+- **File Manifest Sync**: Auto-schedules manifest sync scans on chat message updates.
+
+## [0.13.0] - 2026-06-24 — STABLE v37 "Mesh Resurrection"
+
+### Added
+- **Group Invite Wrappers**: Hardened group invitations by wrapping Manifest keys via ECDH key exchanges.
+
+### Fixed
+- **Group Chat Restoration**: Resolved severe connectivity bugs including Noise IK session deadlocks, `GroupAction` double-encryption, Gossipsub `propagation_source` peer lookup errors, and RBN infinite loop bugs.
+- **Theme Rendering**: Fixed Winter Wonderland styling anomalies.
+
+## [0.12.0] - 2026-06-21 — STABLE v36 "Sovereign Audit (Economy)"
+
+### Added
+- **Economy Integration**: Deployed $INTR token whitepaper, dynamic staking specifications, daily activity incentives, and daily rewards formula logic.
+
 ## [0.12.0] - 2026-06-21 — STABLE v35 "Sovereign Audit"
 
 ### Added

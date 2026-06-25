@@ -1,50 +1,85 @@
-# Introvert Master Plan: Sovereign P2P Architecture
+# INTROVERT: The Sovereign Mesh
+### Master Plan & Technical Specification v3.0
 
-## 1. Vision & Core Philosophy
-Project Introvert is a privacy-first, decentralized communication platform. It eliminates central servers entirely by utilizing true Peer-to-Peer (P2P) networking, end-to-end encryption (E2EE), and a dynamic, sovereign Solana-based token economy. 
+## 1. Vision & Objectives
+Introvert is a privacy-first, decentralized communication platform designed to eliminate reliance on centralized servers. It establishes a sovereign P2P mesh where users own their identity, data, and bandwidth.
 
-Rather than relying on fixed or corporate-hosted bootstrap routing infrastructure, the network operates via a crowdsourced, incentivized, self-healing mesh layer. Entry points are dynamically coordinated on-chain, transforming Introvert from an isolated chat application into a zero-knowledge, autonomous utility network.
-
-## 2. Technical Stack
-- **Core Engine:** Rust (`libintrovert`).
-- **User Interface:** Flutter (Dart).
-- **FFI Bridge:** Asynchronous, non-blocking bridge using Tokio `spawn_blocking` and Dart `NativeCallable.listener`.
-- **Identity:** Deterministic HKDF-SHA256 derivation from a 32-byte master seed (Zero Phone/Email).
-- **Persistence:** SQLCipher (Encrypted SQLite) with thread-safe `Mutex` handles.
-- **Networking:** libp2p (v0.56) with Kademlia DHT, Gossipsub, and WebRTC data channels. Standardized on **Port 443 (HTTPS Bypass)**.
-- **Consensus & Economy:** Solana Mainnet-Beta via a unified Program-Derived Address (PDA) escrow vault, controlled securely by a Squads V4 (3-of-5) Multisig.
+**Core Objectives:**
+*   **Zero-Knowledge Identity:** Single BIP-39 seed derives Libp2p PeerID, SQLCipher encryption key, and Solana Wallet.
+*   **Resilient Networking:** Hybrid routing using mDNS (local), Kademlia DHT (global), and Peer-to-Peer Circuit Relays (asynchronous).
+*   **Sovereign Economy:** Integrated Solana SPL Token (`INTR`) rewards for users who provide relay and storage services to the mesh.
+*   **Hardened Privacy:** Mandatory Noise IK (X25519) E2EE for all signaling and WebRTC streams.
 
 ---
 
-## 3. Execution Roadmap
+## 2. Component Architecture & File Mapping
 
-### Phase 1: Foundational Hardening [COMPLETE]
-Establish an unbreakable, non-blocking core foundation.
-- [x] **Deterministic Identity:** Implement `NodeIdentity` using HKDF-SHA256 for domain-separated keys (P2P vs. Storage vs. Solana Wallet).
-- [x] **Encrypted Persistence:** Initialize `SQLCipher` with high-integrity key management.
-- [x] **Async FFI Bridge:** Transition to a non-blocking architecture using `tokio::task::spawn_blocking` to protect the UI thread.
-- [x] **Callback Synchronization:** Implement `NativeCallable.listener` in Dart to handle Rust background task results via `Completers`.
+### A. Core Engine (Rust - `libintrovert`)
+The high-performance backbone handling networking, crypto, and storage.
+| Component | Strategic Purpose | File Location |
+| :--- | :--- | :--- |
+| **FFI Bridge** | Logic exported to Flutter; handles memory leak-and-reclaim. | `src/lib.rs` |
+| **Network Swarm** | Libp2p engine; handles QUIC, TCP, and Relay V2. | `src/network/mod.rs` |
+| **Introvert Codec**| Custom hybrid JSON-Binary codec for /signaling/2.0.0. | `src/network/codec.rs` |
+| **Kademlia DHT** | Zero-knowledge peer discovery and X25519 key publishing. | `src/network/config.rs` |
+| **Wormhole** | Magic Wormhole PAKE for secure one-time onboarding. | `src/network/wormhole.rs` |
+| **Storage Engine** | SQLCipher integration with 7-day TTL for mailboxes. | `src/storage.rs` |
+| **Economy Layer** | Reward tracking and work-proof generation. | `src/economy/mod.rs` |
+| **Solana Engine** | SPL Token (INTR) balance and gasless claim logic. | `src/economy/solana.rs` |
+| **Media Plane** | WebRTC stack for encrypted Voice/Video. | `src/media/mod.rs` |
+| **Identity** | BIP-39 mnemonic and domain-separated key derivation. | `src/identity.rs` |
 
-### Phase 2: Autonomous Infrastructure Integration [IN PROGRESS]
-Decouple infrastructure from developer dependencies to maximize legal neutrality and global bypass reachability.
-- [ ] **On-Chain Registry:** Deploy the Anchor `introvert-registry` program to manage dynamic Root Bootstrap Node (RBN) addresses.
-- [ ] **Squads V4 Governance:** Permanently sign over the contract's upgrade authority to a 3-of-5 Squads Multisig to strip individual keys of central control.
-- [ ] **Dynamic Discovery Refactor:** Re-engineer `src/network/service.rs` to fetch active bootnodes dynamically from Solana via an internal RPC lookup rather than hardcoding IP profiles.
-- [ ] **Structural Token Gating:** Implement Rust-side balance filters that require peers to hold specific tiers of $INTR (e.g., 500 $INTR minimum) to activate edge-routing tasks (Event Code 22), mitigating Sybil attacks.
-- [ ] **RBN Staking & Cooldown Vault:** Establish a mandatory 50,000 $INTR lockup within the PDA escrow with an automated 7-day unbonding script to guarantee infrastructure stability.
+### B. User Interface (Flutter - `introvert_tests`)
+The WhatsApp-style front-end providing a polished user experience.
+| Component | Strategic Purpose | File Location |
+| :--- | :--- | :--- |
+| **FFI Client** | The Dart-to-Rust bridge; manages unified event streams. | `lib/src/native/introvert_client.dart` |
+| **Main Shell** | Primary UI navigation (Chats, Calls, Settings). | `lib/src/ui/main_shell.dart` |
+| **Chat View** | Real-time messaging with liveness indicators. | `lib/views/chat_screen.dart` |
+| **Identity Hub** | Sovereign Earnings HUD and INTR Wallet management. | `lib/src/ui/widgets/rewards_hud.dart` |
+| **Onboarding** | Mnemonic generation and wallet restoration. | `lib/src/ui/onboarding_screen.dart` |
+| **Video Renderer** | Zero-copy native texture rendering for WebRTC. | `lib/src/ui/video_player.dart` |
+
+### C. System & Build Infrastructure
+Toolchain configurations for cross-platform deployment.
+| Component | Strategic Purpose | File Location |
+| :--- | :--- | :--- |
+| **Android Build** | Standalone APK pipeline with OpenSSL injection. | `build_standalone_apk.sh` |
+| **Linux Runner** | GTK window management and native lib loading. | `linux/runner/my_application.cc` |
+| **Cargo Config** | Linker and target-specific optimizations. | `.cargo/config.toml` |
+| **Manifest** | Android permissions (Internet, Camera, Mic, Storage). | `android/app/src/main/AndroidManifest.xml` |
 
 ---
 
-## 4. Token Economy Overview
+## 3. The Sovereign Token Economy (INTR)
+All incentives are anchored to the official on-chain SPL mint.
+*   **Token:** Introvert Token (`INTR`)
+*   **Mint:** `NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn`
+*   **Decimals:** 9
+*   **Logic:**
+    1.  **Availability Yield:** Users earn INTR for staying online and maintaining DHT records.
+    2.  **Relay Proofs:** Bytes relayed for other peers generate signed work-proofs.
+    3.  **Gasless Claims:** Treasury co-signers (`api.introvert.network`) handle SOL fees for reward payouts.
 
-| Allocation | % | Amount |
-|-----------|---|--------|
-| Ecosystem Rewards Pool | 50% | 50,000,000 $INTR |
-| Community Growth & Grants | 20% | 20,000,000 $INTR |
-| Developer Launch Reimbursement | 10% | 10,000,000 $INTR |
-| Core Team Vesting | 5% | 5,000,000 $INTR |
-| Initial Liquidity | 15% | 15,000,000 $INTR |
+---
 
-**10-year emission:** ~40.17M $INTR via 20% annual decay. Year 1 daily cap: 16,438 $INTR.
+## 4. Networking Protocol Details
+1.  **Discovery:** mDNS scans local LAN; Kademlia DHT scans global Root Bootstrap Nodes (RBNs).
+2.  **Liveness:** Background heartbeats (every 30s) dial verified contacts to maintain active P2P links.
+3.  **Signaling:**
+    *   **Direct:** 1-to-1 QUIC/TCP stream.
+    *   **Relay:** Fallback to circuit-relay via connected RBNs if NAT traversal fails.
+    *   **Mailbox:** Offline messages are stored on 3 nearest DHT neighbors for 7 days (encrypted).
+    *   **Introvert Codec (v2.0.0):** Custom hybrid JSON-Binary codec that bypasses Base64 encoding for `FileChunk` data, providing ~25% wire savings.
 
-**Full specification:** See `Docs/INTROVERT_TOKEN_WHITEPAPER.md` and `Docs/INTROVERT_ECONOMY_BLUEPRINT.md`.
+---
+
+## 5. Deployment Pipeline
+1.  **Rust Build:** `cargo build --release` (targets `x86_64` and `aarch64-android`).
+2.  **Optimization:** `llvm-strip` removes debug symbols to keep the APK under 45MB.
+3.  **FFI Sync:** `libintrovert.so` is manually injected into Flutter's ephemeral and release paths.
+4.  **Flutter Assembly:** `flutter build apk --split-per-abi` for production deployment.
+
+***
+
+This plan is now integrated into the project's memory and is ready for the next phase: **Full Sovereign Network Launch.**
