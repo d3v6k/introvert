@@ -1,0 +1,68 @@
+[Unit]
+Description=Introvert Root Bootstrap Node (RBN) Daemon
+Documentation=https://github.com/introvert/introvert
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Security best practice: Run as a dedicated non-root user
+User=root
+Group=root
+
+# Execution parameters
+WorkingDirectory=/opt/introvert
+ExecStart=/opt/introvert/bin/introvertd --data-dir /opt/introvert/data --relay --port 443
+# Example: Pass any required environment variables (e.g., config paths)
+Environment="RUST_LOG=info"
+Environment="FIREBASE_SERVICE_ACCOUNT_PATH=/opt/introvert/config/firebase-service-account.json"
+Environment="APNS_KEY_PATH=/opt/introvert/config/apns-key.p8"
+Environment="APNS_KEY_ID="
+Environment="APNS_TEAM_ID="
+Environment="APNS_BUNDLE_ID=chat.introvert.app"
+Environment="APNS_USE_PRODUCTION=true"
+
+# High-Availability & Restart Logic
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+
+# --- Security Hardening Rules ---
+# Prevent the process from gaining new privileges via setuid binaries
+NoNewPrivileges=true
+
+# Mount the entire file system hierarchy read-only, except for specific directories
+ProtectSystem=strict
+
+# Deny access to user home directories entirely
+ProtectHome=true
+
+# Prevent modification of kernel tunables (/proc/sys, /sys, etc.)
+ProtectKernelTunables=true
+
+# Prevent loading/unloading kernel modules
+ProtectKernelModules=true
+
+# Prevent access to cgroup filesystem
+ProtectControlGroups=true
+
+# Give the service its own isolated /tmp and /var/tmp
+PrivateTmp=true
+
+# Restrict the types of namespaces the service can create or use
+RestrictNamespaces=true
+
+# Prevent the process from changing its scheduling policy to real-time
+RestrictRealtime=true
+
+# Disallow the creation of executable memory mappings to prevent code injection
+MemoryDenyWriteExecute=true
+
+# Restrict access to raw hardware devices
+PrivateDevices=true
+
+# Allow read/write access ONLY to the designated data directory for SQLite persistence
+ReadWritePaths=/opt/introvert/data /opt/introvert/config
+
+[Install]
+WantedBy=multi-user.target

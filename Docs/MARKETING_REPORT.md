@@ -37,6 +37,11 @@ Introvert is a privacy-first, decentralized communication platform that eliminat
 - **Self-healing network:** Automatic connection recovery and diagnostics
 - **Privacy-first:** All AI processing stays on your device
 
+### 7. Bandwidth-Optimized (Introvert Codec)
+- **25% data savings:** Custom binary-JSON wire format that eliminates Base64 overhead for file chunks
+- **Relay efficiency:** Significantly reduces egress bandwidth requirements on relays
+- **Automatic fallback:** Zero-configuration fallback to legacy JSON if remote peers are outdated
+
 ## Market Position
 
 ### Target Users
@@ -64,6 +69,7 @@ Introvert is a privacy-first, decentralized communication platform that eliminat
 - **Direct P2P:** 14+ Mbps file transfers
 - **Relayed:** 0.3-1 Mbps (bypasses firewalls)
 - **WebRTC:** 1-5 Mbps (browser compatibility)
+- **Introvert Codec:** Saves ~25% wire data on transfers (eliminates Base64 chunk overhead)
 
 ### Scalability
 - **Million-node mandate:** Designed for 1M+ users

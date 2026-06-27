@@ -26,7 +26,9 @@ enum SignalingPayload {
         transfer_id: String, 
         chunk_index: u32 
     },
-    /// Transmits raw binary chunk data encoded in Base64.
+    /// Transmits chunk data. Under `/signaling/1.0.0`, this is a standard JSON payload with Base64 encoding in `data_base64`.
+    /// Under `/signaling/2.0.0` (Introvert Codec), the Base64 field is stripped from JSON and transmitted as raw binary bytes 
+    /// appended to the stream, reducing wire overhead by 25%.
     FileChunk { 
         transfer_id: String, 
         chunk_index: u32, 

@@ -2,6 +2,21 @@
 
 All notable changes to Introvert will be documented in this file.
 
+## [0.16.0] - 2026-06-27 — STABLE v40 "High-Speed Relays"
+
+### Added
+- **Connection Optimizer Action Execution**: Restored and wired the `ClawActions` execution blocks inside `src/network/mod.rs` (both the automatic tick loop and manual tick handler). The network swarm now actively triggers upgrades from relay to direct P2P connections on mDNS discovery.
+- **mDNS Tracker Integration**: Discovered mDNS local peers are now correctly collected and passed to the `IntroClaw` context instead of passing an empty list.
+
+### Changed
+- **Relayed Transfer Chunk Size (4x speedup)**: Upgraded the default chunk size for relayed/pull file transfers from `64KB` to `256KB` in both the client (`src/network/mod.rs`) and RBN daemon (`for_linux/src/network/mod.rs`). This dramatically cuts down stream handshake overhead by 75% over relays.
+- **Expanded Pipeline Window (2x speedup)**: Expanded the receiver's primed pull sequence and pull sliding window limits from `4` to `8` parallel requests to saturate high-latency relayed connections.
+- **Watchdog Recovery Window**: Aligned the watchdog recovery window size to `8` in-flight requests.
+
+### Fixed
+- **Image Transfer Stuck at 51%**: Refactored `select_best_providers_static` to return `Vec::new()` instead of `providers.to_vec()` when no active provider links are open. This allows the pull loop to fall back to retrieve chunks from the active online peer.
+- **Invite Accept Gossipsub Sync**: Added immediate Gossipsub subscription inside `AcceptGroupInvite` to ensure newly accepted members receive signaling without needing a restart.
+
 ## [0.15.0] - 2026-06-25 — STABLE v39 "Relay Resiliency"
 
 ### Added

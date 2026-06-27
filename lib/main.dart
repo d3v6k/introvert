@@ -127,12 +127,19 @@ class _IntrovertAppState extends State<IntrovertApp> {
     }
   }
 
-  void _onOnboardingComplete(Uint8List seed, String avatarName) {
+  void _onOnboardingComplete(Uint8List seed, String avatarName) async {
     final client = Provider.of<IntrovertClient>(context, listen: false);
     
     try {
       if (_dbPath == null) throw Exception("Database path not initialized");
-      client.startEngine(seed, _dbPath!);
+      try {
+        client.startEngine(seed, _dbPath!);
+      } catch (e) {
+        debugPrint("🚨 Onboarding: Engine failed to start on existing DB. Resetting...");
+        final file = File(_dbPath!);
+        if (await file.exists()) await file.delete();
+        client.startEngine(seed, _dbPath!);
+      }
       client.startNetwork();
       
       // Save Avatar Name (privacy_mode=1: allow unknown users to connect by default)
@@ -147,7 +154,11 @@ class _IntrovertAppState extends State<IntrovertApp> {
         }
       }).catchError((_) {});
 
-      setState(() => _showOnboarding = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _showOnboarding = false);
+        }
+      });
     } catch (e) {
       _messengerKey.currentState?.showSnackBar(
         SnackBar(content: Text('Engine failed to start: $e')),

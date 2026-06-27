@@ -5,13 +5,21 @@
 
 set -e
 
-# Configuration
-NDK_PATH="/home/dev/Android/Sdk/ndk/28.2.13676358"
-export ANDROID_HOME="/home/dev/Android/Sdk"
+# Configuration - Auto-detect platform
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}"
+    HOST_TAG="darwin-x86_64"
+else
+    ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
+    HOST_TAG="linux-x86_64"
+fi
+
+NDK_PATH="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+export ANDROID_HOME="$ANDROID_SDK_ROOT"
 export ANDROID_NDK_HOME="$NDK_PATH"
 export MAKE="/usr/bin/make"
 export CMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake"
-export PATH="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+export PATH="$NDK_PATH/toolchains/llvm/prebuilt/$HOST_TAG/bin:$PATH"
 export PATH="$(pwd)/scripts/bin:$PATH"
 
 NDK_VERSION="24"

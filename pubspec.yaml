@@ -1,6 +1,6 @@
 name: introvert_tests
 description: Integration tests for the Introvert engine.
-version: 0.15.0
+version: 0.16.0
 publish_to: none
 environment:
   sdk: '>=3.3.0 <4.0.0'

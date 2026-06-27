@@ -77,11 +77,43 @@
 **Usage:** systemd service configuration
 
 ### `FIREBASE_SERVICE_ACCOUNT_PATH`
-**Purpose:** Path to Firebase service account credentials for Intro-Claw FCM push notifications
+**Purpose:** Path to Firebase service account credentials for FCM push notifications
 **Format:** Absolute file path
 **Example:** `FIREBASE_SERVICE_ACCOUNT_PATH=/opt/introvert/config/firebase-service-account.json`
 **Usage:** `for_linux/src/fcm.rs` — Firebase Admin SDK initialization for FCM v1 API
 **Default:** `/opt/introvert/config/firebase-service-account.json`
+
+### `APNS_KEY_PATH`
+**Purpose:** Path to Apple Push Notification service P8 key file
+**Format:** Absolute file path
+**Example:** `APNS_KEY_PATH=/opt/introvert/config/apns-key.p8`
+**Usage:** `for_linux/src/fcm.rs` — APNs JWT authentication for iOS push notifications
+
+### `APNS_KEY_ID`
+**Purpose:** Apple Push Notification Key ID
+**Format:** 10-character alphanumeric string
+**Example:** `APNS_KEY_ID=ABC1234567`
+**Usage:** `for_linux/src/fcm.rs` — APNs JWT header `kid` claim
+
+### `APNS_TEAM_ID`
+**Purpose:** Apple Developer Team ID
+**Format:** 10-character alphanumeric string
+**Example:** `APNS_TEAM_ID=XYZ9876543`
+**Usage:** `for_linux/src/fcm.rs` — APNs JWT `iss` claim
+
+### `APNS_BUNDLE_ID`
+**Purpose:** iOS app bundle identifier
+**Format:** Reverse-domain string
+**Example:** `APNS_BUNDLE_ID=chat.introvert.app`
+**Usage:** `for_linux/src/fcm.rs` — APNs `apns-topic` header
+**Default:** `chat.introvert.app`
+
+### `APNS_USE_PRODUCTION`
+**Purpose:** Use APNs production or sandbox endpoint
+**Format:** `true` or `false`
+**Example:** `APNS_USE_PRODUCTION=true`
+**Usage:** `for_linux/src/fcm.rs` — Selects `api.push.apple.com` vs `api.development.push.apple.com`
+**Default:** `true`
 
 ## Development
 
@@ -101,9 +133,13 @@ flutter run
 
 ### RBN Deployment
 ```bash
-# In systemd service
+# In systemd service (/etc/systemd/system/introvertd.service)
 Environment="RUST_LOG=info"
-Environment="INTROVERT_SEED=..."
+Environment="FIREBASE_SERVICE_ACCOUNT_PATH=/opt/introvert/config/firebase-service-account.json"
+Environment="APNS_KEY_PATH=/opt/introvert/config/apns-key.p8"
+Environment="APNS_KEY_ID=YOUR_KEY_ID"
+Environment="APNS_TEAM_ID=YOUR_TEAM_ID"
+Environment="APNS_BUNDLE_ID=chat.introvert.app"
 ExecStart=/opt/introvert/bin/introvertd --data-dir /opt/introvert/data --relay --port 443
 ```
 

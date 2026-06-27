@@ -16,16 +16,26 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final IdentityManager _idManager = IdentityManager();
   final IntrovertClient _client = IntrovertClient();
-  final TextEditingController _recoveryController = TextEditingController();
   final TextEditingController _avatarNameController = TextEditingController();
   
   bool _isCreating = false;
   bool _showMnemonic = false;
   String? _mnemonic;
 
+  void _showSnackBar(dynamic snackBarOrText) {
+    final SnackBar snackBar = snackBarOrText is SnackBar 
+        ? snackBarOrText 
+        : SnackBar(content: Text(snackBarOrText.toString()));
+        
+    if (widget.messengerKey != null) {
+      widget.messengerKey!.currentState?.showSnackBar(snackBar);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    }
+  }
+
   @override
   void dispose() {
-    _recoveryController.dispose();
     _avatarNameController.dispose();
     super.dispose();
   }
@@ -76,77 +86,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _startRecover() {
-    _recoveryController.clear();
-    _avatarNameController.clear();
-    showDialog(
+    showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.current.bg,
-        title: Text("Recover Identity", style: TextStyle(color: AppTheme.current.accent)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Enter your 12-word seed phrase and an avatar name below to restore your sovereign ID.", style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12)),
-              SizedBox(height: 16),
-              TextField(
-                controller: _recoveryController,
-                maxLines: 3,
-                style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace', fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "word1 word2 ... word12",
-                  hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1))),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
-                ),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: _avatarNameController,
-                style: TextStyle(color: AppTheme.current.text, fontSize: 14),
-                decoration: InputDecoration(
-                  labelText: "AVATAR NAME",
-                  labelStyle: TextStyle(color: AppTheme.current.accent),
-                  hintText: "Enter display name",
-                  hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1))),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
-                ),
-              ),
-              SizedBox(height: 12),
-              Text(
-                "Your peer ID and i@ handle (if registered) will be shown after recovery.",
-                style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 11),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text("CANCEL")),
-          ElevatedButton(
-            onPressed: () {
-              final mnemonic = _recoveryController.text.trim();
-              final avatar = _avatarNameController.text.trim();
-              if (mnemonic.isEmpty) return;
-              if (avatar.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Avatar Name is required")));
-                return;
-              }
-              Navigator.pop(context);
-              _confirmAndCreate(mnemonic, avatar);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
-            child: Text("RECOVER"),
-          ),
-        ],
-      ),
-    );
+      builder: (dialogContext) => _RecoveryDialog(onSnackBar: _showSnackBar),
+    ).then((result) {
+      if (result != null) {
+        _confirmAndCreate(result['mnemonic']!, result['avatar']!);
+      }
+    });
   }
 
   void _confirmAndCreate(String mnemonic, String avatarName) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (mnemonic.split(' ').length < 12) {
-       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Invalid seed phrase. Must be 12 words.")));
+       _showSnackBar("Invalid seed phrase. Must be 12 words.");
        return;
     }
 
@@ -171,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Show recovered identity info
       if (mounted && peerId != null) {
         final handleInfo = recoveredHandle != null ? '\nHandle: $recoveredHandle' : '';
-        ScaffoldMessenger.of(context).showSnackBar(
+        _showSnackBar(
           SnackBar(
             content: Text("Identity recovered!\nPeer ID: ${peerId.substring(0, 16)}...$handleInfo"),
             duration: const Duration(seconds: 4),
@@ -187,8 +140,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      final snackBar = SnackBar(content: Text('Identity process failed: $e'));
-      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      _showSnackBar('Identity process failed: $e');
       setState(() => _isCreating = false);
     }
   }
@@ -300,9 +252,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPressed: () {
                       final avatar = _avatarNameController.text.trim();
                       if (avatar.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Avatar Name is required")),
-                        );
+                        _showSnackBar("Avatar Name is required");
                         return;
                       }
                       _confirmAndCreate(_mnemonic!, avatar);
@@ -324,6 +274,93 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RecoveryDialog extends StatefulWidget {
+  final void Function(dynamic) onSnackBar;
+  const _RecoveryDialog({required this.onSnackBar});
+
+  @override
+  State<_RecoveryDialog> createState() => _RecoveryDialogState();
+}
+
+class _RecoveryDialogState extends State<_RecoveryDialog> {
+  final TextEditingController _recoveryController = TextEditingController();
+  final TextEditingController _avatarController = TextEditingController();
+
+  @override
+  void dispose() {
+    _recoveryController.dispose();
+    _avatarController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.current.bg,
+      title: Text("Recover Identity", style: TextStyle(color: AppTheme.current.accent)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Enter your 12-word seed phrase and an avatar name below to restore your sovereign ID.", style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12)),
+            SizedBox(height: 16),
+            TextField(
+              controller: _recoveryController,
+              maxLines: 3,
+              style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace', fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "word1 word2 ... word12",
+                hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1))),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _avatarController,
+              style: TextStyle(color: AppTheme.current.text, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: "AVATAR NAME",
+                labelStyle: TextStyle(color: AppTheme.current.accent),
+                hintText: "Enter display name",
+                hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1))),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              "Your peer ID and i@ handle (if registered) will be shown after recovery.",
+              style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text("CANCEL")),
+        ElevatedButton(
+          onPressed: () {
+            final mnemonic = _recoveryController.text.trim();
+            final avatar = _avatarController.text.trim();
+            if (mnemonic.isEmpty) return;
+            if (avatar.isEmpty) {
+              widget.onSnackBar("Avatar Name is required");
+              return;
+            }
+            Navigator.pop(context, {
+              'mnemonic': mnemonic,
+              'avatar': avatar,
+            });
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
+          child: Text("RECOVER"),
+        ),
+      ],
     );
   }
 }

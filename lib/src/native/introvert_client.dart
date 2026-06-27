@@ -245,6 +245,9 @@ typedef IntroClawTriggerTickDart = FfiResult Function();
 typedef IntroClawSetActiveC = FfiResult Function(Bool active);
 typedef IntroClawSetActiveDart = FfiResult Function(bool active);
 
+typedef IntroClawSetNodeModeC = FfiResult Function(Bool enabled);
+typedef IntroClawSetNodeModeDart = FfiResult Function(bool enabled);
+
 typedef IntroClawGetStatusC = FfiResult Function();
 typedef IntroClawGetStatusDart = FfiResult Function();
 
@@ -277,6 +280,9 @@ typedef IntroClawVoipRecordSampleDart = FfiResult Function(int rttMs, double pac
 
 typedef IntroClawVoipGetQualityC = FfiResult Function();
 typedef IntroClawVoipGetQualityDart = FfiResult Function();
+
+typedef IntroClawVoipGetDowngradeRecommendationC = FfiResult Function();
+typedef IntroClawVoipGetDowngradeRecommendationDart = FfiResult Function();
 
 typedef IntrovertGroupCreateC = FfiResult Function(Pointer<Utf8> name, Pointer<Utf8> description, Pointer<Utf8> membersJson);
 typedef IntrovertGroupCreateDart = FfiResult Function(Pointer<Utf8> name, Pointer<Utf8> description, Pointer<Utf8> membersJson);
@@ -653,6 +659,7 @@ class IntrovertClient {
   late IntroClawGetApiKeyDart _getApiKey;
   late IntroClawTriggerTickDart _clawTriggerTick;
   late IntroClawSetActiveDart _clawSetActive;
+  late IntroClawSetNodeModeDart _clawSetNodeMode;
   late IntroClawGetStatusDart _clawGetStatus;
   late IntroClawGetEndpointDart _clawGetEndpoint;
   late IntroClawSetEndpointDart _clawSetEndpoint;
@@ -664,6 +671,7 @@ class IntrovertClient {
   late IntroClawVoipEndCallDart _clawVoipEndCall;
   late IntroClawVoipRecordSampleDart _clawVoipRecordSample;
   late IntroClawVoipGetQualityDart _clawVoipGetQuality;
+  late IntroClawVoipGetDowngradeRecommendationDart _clawVoipGetDowngradeRecommendation;
 
   // Elevated Messages
   late IntrovertElevateMessageDart _elevateMessage;
@@ -1043,6 +1051,7 @@ class IntrovertClient {
       _getApiKey = safeLookup('get_api_key', () => _dylib.lookupFunction<IntroClawGetApiKeyC, IntroClawGetApiKeyDart>('intro_claw_get_api_key'), () => nullptr);
       _clawTriggerTick = safeLookup('claw_trigger_tick', () => _dylib.lookupFunction<IntroClawTriggerTickC, IntroClawTriggerTickDart>('intro_claw_trigger_tick'), () => FfiResult.dummy);
       _clawSetActive = safeLookup('claw_set_active', () => _dylib.lookupFunction<IntroClawSetActiveC, IntroClawSetActiveDart>('intro_claw_set_active'), (a) => FfiResult.dummy);
+      _clawSetNodeMode = safeLookup('claw_set_node_mode', () => _dylib.lookupFunction<IntroClawSetNodeModeC, IntroClawSetNodeModeDart>('intro_claw_set_node_mode'), (e) => FfiResult.dummy);
       _clawGetStatus = safeLookup('claw_get_status', () => _dylib.lookupFunction<IntroClawGetStatusC, IntroClawGetStatusDart>('intro_claw_get_status'), () => FfiResult.dummy);
       _clawGetEndpoint = safeLookup('claw_get_endpoint', () => _dylib.lookupFunction<IntroClawGetEndpointC, IntroClawGetEndpointDart>('intro_claw_get_endpoint'), () => nullptr);
       _clawSetEndpoint = safeLookup('claw_set_endpoint', () => _dylib.lookupFunction<IntroClawSetEndpointC, IntroClawSetEndpointDart>('intro_claw_set_endpoint'), (e) => FfiResult.dummy);
@@ -1054,6 +1063,7 @@ class IntrovertClient {
       _clawVoipEndCall = safeLookup('claw_voip_end_call', () => _dylib.lookupFunction<IntroClawVoipEndCallC, IntroClawVoipEndCallDart>('intro_claw_voip_end_call'), () => FfiResult.dummy);
       _clawVoipRecordSample = safeLookup('claw_voip_record_sample', () => _dylib.lookupFunction<IntroClawVoipRecordSampleC, IntroClawVoipRecordSampleDart>('intro_claw_voip_record_sample'), (r, p, j, b, rel, c) => FfiResult.dummy);
       _clawVoipGetQuality = safeLookup('claw_voip_get_quality', () => _dylib.lookupFunction<IntroClawVoipGetQualityC, IntroClawVoipGetQualityDart>('intro_claw_voip_get_quality'), () => FfiResult.dummy);
+      _clawVoipGetDowngradeRecommendation = safeLookup('claw_voip_get_downgrade_recommendation', () => _dylib.lookupFunction<IntroClawVoipGetDowngradeRecommendationC, IntroClawVoipGetDowngradeRecommendationDart>('intro_claw_voip_get_downgrade_recommendation'), () => FfiResult.dummy);
 
       // Elevated Messages
       _elevateMessage = safeLookup('elevate_message', () => _dylib.lookupFunction<IntrovertElevateMessageC, IntrovertElevateMessageDart>('introvert_elevate_message'), (c, m, co, s, i) => FfiResult.dummy);
@@ -1640,7 +1650,12 @@ class IntrovertClient {
   void fetchMailbox() => _handleFfiResult(_fetchMailbox(), context: "Fetch Mailbox");
   void startMediaStream(String id, int type) => using((Arena arena) => _handleFfiResult(_startMediaStream(id.toNativeUtf8(allocator: arena), type), context: "Media Stream"));
 
-  void setAnchorMode(bool enabled) => _handleFfiResult(_setAnchorMode(enabled), context: "Set Anchor Mode");
+  void setAnchorMode(bool enabled) {
+    _handleFfiResult(_setAnchorMode(enabled), context: "Set Anchor Mode");
+    // When anchor mode is enabled, also enable Intro-Claw node mode
+    // for aggressive optimizations (proactive caching, bandwidth management)
+    setIntroClawNodeMode(enabled);
+  }
   bool isAnchorModeEnabled() => _getAnchorMode() == 1;
 
   // --- Intro-Claw AI Engine Mode ---
@@ -1664,6 +1679,7 @@ class IntrovertClient {
   // --- Intro-Claw Automation Methods ---
   void triggerIntroClawTick() => _handleFfiResult(_clawTriggerTick(), context: "IntroClaw Tick");
   void setIntroClawActive(bool active) => _handleFfiResult(_clawSetActive(active), context: "IntroClaw Active");
+  void setIntroClawNodeMode(bool enabled) => _handleFfiResult(_clawSetNodeMode(enabled), context: "IntroClaw Node Mode");
   String getIntroClawStatus() {
     final result = _clawGetStatus();
     try {
@@ -1745,6 +1761,17 @@ class IntrovertClient {
 
   String voipGetQuality() {
     final result = _clawVoipGetQuality();
+    try {
+      return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
+    } finally {
+      if (result.len > 0) _freeBinary(result.data, result.len);
+    }
+  }
+
+  /// Get VoIP downgrade recommendation
+  /// Returns: "none", "audio_only", "low_bitrate"
+  String voipGetDowngradeRecommendation() {
+    final result = _clawVoipGetDowngradeRecommendation();
     try {
       return String.fromCharCodes(result.data.cast<Uint8>().asTypedList(result.len));
     } finally {

@@ -7,6 +7,24 @@ pub const ANCHOR_PROVIDER_KEY: &[u8] = b"/introvert/anchor_nodes";
 pub const RBN_PEER_ID: &str = "12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a";
 pub const RBN_WS_URL: &str = "wss://47.89.252.80/tunnel";
 
+// --- Message Priority Levels ---
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum MessagePriority {
+    /// Background sync, file transfers, bulk operations
+    Low = 0,
+    /// Normal messages, reactions, edits
+    Normal = 1,
+    /// Calls, typing indicators, time-sensitive data
+    Urgent = 2,
+}
+
+impl Default for MessagePriority {
+    fn default() -> Self {
+        MessagePriority::Normal
+    }
+}
+
 // --- Group Mesh Types ---
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -135,7 +153,7 @@ pub enum SignalingPayload {
     EditMessage { msg_id: String, new_content: String },
     SetRetention { seconds: u32 },
     MessageReaction { msg_id: String, emoji: String },
-    GroupManifestRequest { group_id: String, alias: Option<String>, avatar: Option<String>, #[serde(default)] handle: Option<String> },
+    GroupManifestRequest { group_id: String, alias: Option<String>, avatar: Option<String>, #[serde(default)] handle: Option<String>, #[serde(default)] requester_static_key: Option<Vec<u8>> },
     GroupInvite { group_id: String, name: String, description: String, inviter_peer_id: String, group_secret_wrapped: Vec<u8>, members: Vec<GroupMemberMetadata> },
     GroupAction(SignedGroupAction),
     GroupManifest { group_id: String, name: String, description: String, members: Vec<GroupMemberMetadata> },
@@ -165,6 +183,51 @@ pub enum SignalingPayload {
     },
 }
 
+/// Wrapper for SignalingPayload with priority level
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrioritizedPayload {
+    pub priority: MessagePriority,
+    pub payload: SignalingPayload,
+}
+
+impl PrioritizedPayload {
+    pub fn new(payload: SignalingPayload, priority: MessagePriority) -> Self {
+        Self { priority, payload }
+    }
+
+    pub fn urgent(payload: SignalingPayload) -> Self {
+        Self::new(payload, MessagePriority::Urgent)
+    }
+
+    pub fn normal(payload: SignalingPayload) -> Self {
+        Self::new(payload, MessagePriority::Normal)
+    }
+
+    pub fn low(payload: SignalingPayload) -> Self {
+        Self::new(payload, MessagePriority::Low)
+    }
+
+    /// Get the inherent priority of a payload type
+    pub fn inherent_priority(payload: &SignalingPayload) -> MessagePriority {
+        match payload {
+            // Urgent: calls, typing, time-sensitive
+            SignalingPayload::TypingStart { .. } |
+            SignalingPayload::TypingStop { .. } |
+            SignalingPayload::Heartbeat { .. } => MessagePriority::Urgent,
+
+            // Low: file transfers, sync, bulk operations
+            SignalingPayload::FileChunk { .. } |
+            SignalingPayload::FileChunkRequest { .. } |
+            SignalingPayload::FileTransfer { .. } |
+            SignalingPayload::ChatSyncRequest { .. } |
+            SignalingPayload::ChatSyncResponse { .. } => MessagePriority::Low,
+
+            // Normal: everything else
+            _ => MessagePriority::Normal,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncMessage {
     pub msg_id: String,
@@ -174,9 +237,11 @@ pub struct SyncMessage {
     pub reply_to: Option<String>,
 }
 
+/// JSON-serialized request wrapper used by request_response::json::Behaviour
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignalingRequest(pub SignalingPayload);
 
+/// JSON-serialized response wrapper used by request_response::json::Behaviour
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignalingResponse(pub String);
 
@@ -220,6 +285,7 @@ pub enum NetworkCommand {
     RejectGroupJoin { group_id: String, requester_peer_id: String, reason: String },
     BroadcastGroupMessage { group_id: String, message: String, reply_to: Option<String> },
     PublishGossipsub { topic: String, data: Vec<u8> },
+    SubscribeGossipsub { group_id: String },
     ForceMeshRefresh,
     RegisterSeeder { peer_id: PeerId, transfer_id: String, file_path: String, file_hash: String, chunk_size: u32, total_chunks: u32, group_id: Option<String> },
     UnregisterSeeder { transfer_id: String },
@@ -239,6 +305,7 @@ pub enum NetworkCommand {
         mdns_discovered: Vec<String>,
     },
     IntroClawSetActive { active: bool },
+    IntroClawSetNodeMode { enabled: bool },
     IntroClawNetworkRecon {
         result_tx: tokio::sync::oneshot::Sender<String>,
     },
@@ -263,6 +330,9 @@ pub enum NetworkCommand {
         codec: String,
     },
     IntroClawVoipGetQuality {
+        result_tx: tokio::sync::oneshot::Sender<String>,
+    },
+    IntroClawVoipGetDowngradeRecommendation {
         result_tx: tokio::sync::oneshot::Sender<String>,
     },
 }

@@ -22,6 +22,7 @@ use std::collections::hash_map::DefaultHasher;
 pub struct IntrovertBehaviour {
     pub kademlia: kad::Behaviour<MemoryStore>,
     pub request_response: request_response::json::Behaviour<SignalingRequest, SignalingResponse>,
+    pub request_response_v2: request_response::Behaviour<crate::network::codec::IntrovertCodec>,
     pub mdns: Toggle<mdns::tokio::Behaviour>,
     pub dcutr: dcutr::Behaviour,
     pub relay_client: relay::client::Behaviour,
@@ -57,12 +58,19 @@ impl IntrovertBehaviour {
             .with_request_timeout(std::time::Duration::from_secs(20)); // 20s is enough for relay latency without causing long stalls
         
         let codec = request_response::json::codec::Codec::<SignalingRequest, SignalingResponse>::default()
-            .set_request_size_maximum(2 * 1024 * 1024) // 2MB limit for requests
-            .set_response_size_maximum(2 * 1024 * 1024); // 2MB limit for responses
-
+            .set_request_size_maximum(10 * 1024 * 1024) // 10MB limit for requests
+            .set_response_size_maximum(10 * 1024 * 1024); // 10MB limit for responses
+ 
         let request_response = request_response::json::Behaviour::with_codec(
             codec,
             [(StreamProtocol::new("/introvert/signaling/1.0.0"), request_response::ProtocolSupport::Full)],
+            rr_config.clone(),
+        );
+
+        let binary_codec = crate::network::codec::IntrovertCodec::default();
+        let request_response_v2 = request_response::Behaviour::with_codec(
+            binary_codec,
+            [(StreamProtocol::new("/introvert/signaling/2.0.0"), request_response::ProtocolSupport::Full)],
             rr_config,
         );
 
@@ -91,10 +99,10 @@ impl IntrovertBehaviour {
 
         let relay_server = if enable_relay_server {
             let relay_config = relay::Config {
-                max_circuit_bytes: 100 * 1024 * 1024, // 100MB per circuit (was 1GB)
-                max_circuit_duration: std::time::Duration::from_secs(30 * 60), // 30 min per circuit (was 1 hour)
-                max_reservations: 256, // Was 8192
-                max_circuits: 100, // Was 4096
+                max_circuit_bytes: 1024 * 1024 * 1024, // 1GB for high-volume file relaying
+                max_circuit_duration: std::time::Duration::from_secs(60 * 60), // 1 hour per circuit
+                max_reservations: 8192,
+                max_circuits: 4096,
                 ..Default::default()
             };
             Some(relay::Behaviour::new(peer_id, relay_config))
@@ -117,10 +125,11 @@ impl IntrovertBehaviour {
             gossipsub::MessageId::from(s.finish().to_string())
         };
         let gossipsub_config = gossipsub::ConfigBuilder::default()
-            .heartbeat_interval(std::time::Duration::from_secs(30)) // 30s for battery savings
+            .heartbeat_interval(std::time::Duration::from_secs(10)) // 10s — v34/v37 baseline (DO NOT CHANGE)
             .validation_mode(gossipsub::ValidationMode::Strict)
             .message_id_fn(message_id_fn)
-            .max_transmit_size(1024 * 1024) // 1MB max message size
+            // NOTE: No max_transmit_size — unlimited is the v34/v37 baseline.
+            // A 1MB cap silently drops group messages and large profile avatars.
             .build()
             .expect("Valid gossipsub config");
 
@@ -132,6 +141,7 @@ impl IntrovertBehaviour {
         Self {
             kademlia,
             request_response,
+            request_response_v2,
             mdns: mdns.into(),
             dcutr: dcutr::Behaviour::new(peer_id),
             relay_client,

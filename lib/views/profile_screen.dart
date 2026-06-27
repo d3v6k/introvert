@@ -27,6 +27,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isClaimed = false;
   bool _isClaiming = false;
   bool _hasExistingHandle = false;
+  bool _isDisposing = false;
   StreamSubscription? _networkSubscription;
   StreamSubscription? _economySubscription;
 
@@ -48,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    _isDisposing = true;
     _handleController.removeListener(_onHandleChanged);
     _economySubscription?.cancel();
     _networkSubscription?.cancel();
@@ -76,6 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _startNetworkListener() {
     _networkSubscription = IntrovertClient().networkStream.listen((event) {
+      if (_isDisposing) return;
       if (event.type == 34) {
         // Event 34: Handle Verified [Handle\0PeerID]
         try {

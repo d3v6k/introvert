@@ -26,6 +26,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
   int _seedingCount = 0;
   int _sovereignRemaining = 0;
   bool _isLoading = true;
+  bool _isDisposing = false;
   Timer? _refreshTimer;
   Map<String, FileTransferProgress> _activeTransfers = {};
   Map<String, dynamic>? _swarmStats;
@@ -50,6 +51,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
 
   @override
   void dispose() {
+    _isDisposing = true;
     _refreshTimer?.cancel();
     _networkSubscription?.cancel();
     _swarmSubscription?.cancel();
@@ -65,6 +67,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     });
 
     _networkSubscription = _client.networkStream.listen((event) {
+      if (_isDisposing) return;
       if (event.type == 12) {
         try {
           final progress = FileTransferProgress.fromJson(json.decode(utf8.decode(event.data)));

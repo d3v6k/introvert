@@ -1,16 +1,50 @@
 use rusqlite::{params, Connection};
 use anyhow::Result;
 use std::path::Path;
+use std::collections::HashMap;
+use std::time::{Instant, Duration, SystemTime};
 use parking_lot::Mutex;
 use sha2::{Sha256, Digest};
 use chrono::Utc;
-use tracing::info;
+use tracing::{info, warn};
 use crate::identity::SovereignIdentity;
+
+/// Cached value with expiration
+struct CachedValue<T: Clone> {
+    value: T,
+    inserted_at: Instant,
+    ttl: Duration,
+}
+
+impl<T: Clone> CachedValue<T> {
+    fn new(value: T, ttl: Duration) -> Self {
+        Self { value, inserted_at: Instant::now(), ttl }
+    }
+
+    fn is_valid(&self) -> bool {
+        self.inserted_at.elapsed() < self.ttl
+    }
+
+    fn get(&self) -> Option<&T> {
+        if self.is_valid() { Some(&self.value) } else { None }
+    }
+}
 
 pub struct StorageService {
     conn: Mutex<Connection>,
     _is_ephemeral: bool,
+    // In-memory caches for frequently accessed data
+    profile_cache: Mutex<Option<CachedValue<(Option<String>, Option<String>, Option<String>, i32, i32)>>>,
+    contacts_cache: Mutex<Option<CachedValue<Vec<SovereignIdentity>>>>,
+    storage_usage_cache: Mutex<Option<CachedValue<(u64, u64, u64)>>>,
+    anchor_nodes_cache: Mutex<Option<CachedValue<Vec<SovereignIdentity>>>>,
 }
+
+/// Cache TTL constants
+const PROFILE_CACHE_TTL: Duration = Duration::from_secs(30); // 30 seconds
+const CONTACTS_CACHE_TTL: Duration = Duration::from_secs(60); // 1 minute
+const STORAGE_USAGE_CACHE_TTL: Duration = Duration::from_secs(15); // 15 seconds
+const ANCHOR_NODES_CACHE_TTL: Duration = Duration::from_secs(120); // 2 minutes
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct DriveFileMetadata {
@@ -66,7 +100,14 @@ impl StorageService {
         // WAL mode: crash-safe, better concurrent read performance
         conn.pragma_update(None, "journal_mode", "WAL")?;
 
-        let slf = Self { conn: Mutex::new(conn), _is_ephemeral: false };
+        let slf = Self {
+            conn: Mutex::new(conn),
+            _is_ephemeral: false,
+            profile_cache: Mutex::new(None),
+            contacts_cache: Mutex::new(None),
+            storage_usage_cache: Mutex::new(None),
+            anchor_nodes_cache: Mutex::new(None),
+        };
         slf.bootstrap()?;
         Ok(slf)
     }
@@ -74,7 +115,14 @@ impl StorageService {
     /// Creates a memory-only non-encrypted database for stress testing.
     pub fn new_ephemeral() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
-        let slf = Self { conn: Mutex::new(conn), _is_ephemeral: true };
+        let slf = Self {
+            conn: Mutex::new(conn),
+            _is_ephemeral: true,
+            profile_cache: Mutex::new(None),
+            contacts_cache: Mutex::new(None),
+            storage_usage_cache: Mutex::new(None),
+            anchor_nodes_cache: Mutex::new(None),
+        };
         slf.bootstrap()?;
         Ok(slf)
     }
@@ -217,7 +265,26 @@ impl StorageService {
                 group_id TEXT PRIMARY KEY,
                 deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
-            CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER PRIMARY KEY);"
+            CREATE TABLE IF NOT EXISTS pending_group_invites (
+                group_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                inviter_peer_id TEXT NOT NULL,
+                group_secret_wrapped BLOB NOT NULL,
+                members_json TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS dead_letter_queue (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                peer_id TEXT NOT NULL,
+                payload BLOB NOT NULL,
+                queued_at INTEGER NOT NULL,
+                retry_count INTEGER DEFAULT 0,
+                last_retry_at INTEGER DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_dlq_peer ON dead_letter_queue (peer_id);
+            CREATE INDEX IF NOT EXISTS idx_dlq_queued ON dead_letter_queue (queued_at);"
         )?;
 
         // Notes table
@@ -351,6 +418,18 @@ impl StorageService {
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN last_seen INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE profile ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS pending_group_invites (
+                group_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                inviter_peer_id TEXT NOT NULL,
+                group_secret_wrapped BLOB NOT NULL,
+                members_json TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )",
+            [],
+        );
 
         Ok(())
     }
@@ -433,6 +512,30 @@ impl StorageService {
             "INSERT INTO economy_meta (key, value) VALUES ('intro_claw_active', ?1)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             params![active.to_string()],
+        )?;
+        Ok(())
+    }
+
+    /// Gets the Intro-Claw node mode state
+    pub fn get_intro_claw_node_mode(&self) -> bool {
+        let conn = self.conn.lock();
+        if let Ok(mut stmt) = conn.prepare("SELECT value FROM economy_meta WHERE key = 'intro_claw_node_mode'") {
+            if let Ok(mut rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                if let Some(Ok(val)) = rows.next() {
+                    return val == "true";
+                }
+            }
+        }
+        false
+    }
+
+    /// Sets the Intro-Claw node mode state
+    pub fn set_intro_claw_node_mode(&self, enabled: bool) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO economy_meta (key, value) VALUES ('intro_claw_node_mode', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![enabled.to_string()],
         )?;
         Ok(())
     }
@@ -631,6 +734,11 @@ impl StorageService {
                 identity.prestige_tier.unwrap_or(0) as i32
             ],
         )?;
+        // Invalidate contacts cache
+        let mut cache = self.contacts_cache.lock();
+        *cache = None;
+        let mut anchor_cache = self.anchor_nodes_cache.lock();
+        *anchor_cache = None;
         Ok(())
     }
 
@@ -725,6 +833,16 @@ impl StorageService {
 
     /// Retrieves all verified sovereign contacts.
     pub fn get_all_contacts(&self) -> Result<Vec<crate::identity::SovereignIdentity>> {
+        // Check cache first
+        {
+            let cache = self.contacts_cache.lock();
+            if let Some(cached) = &*cache {
+                if let Some(value) = cached.get() {
+                    return Ok(value.clone());
+                }
+            }
+        }
+
         let conn = self.conn.lock();
         let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1")?;
         let rows = stmt.query_map([], |row| {
@@ -750,11 +868,26 @@ impl StorageService {
         for row in rows {
             contacts.push(row?);
         }
+        
+        // Update cache
+        let mut cache = self.contacts_cache.lock();
+        *cache = Some(CachedValue::new(contacts.clone(), CONTACTS_CACHE_TTL));
+        
         Ok(contacts)
     }
 
     /// Fetches all verified contacts marked as Anchor Capable.
     pub fn fetch_all_anchor_nodes(&self) -> Result<Vec<crate::identity::SovereignIdentity>> {
+        // Check cache first
+        {
+            let cache = self.anchor_nodes_cache.lock();
+            if let Some(cached) = &*cache {
+                if let Some(value) = cached.get() {
+                    return Ok(value.clone());
+                }
+            }
+        }
+
         let conn = self.conn.lock();
         let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1 AND is_anchor_capable = 1")?;
         let rows = stmt.query_map([], |row| {
@@ -780,6 +913,11 @@ impl StorageService {
         for row in rows {
             nodes.push(row?);
         }
+        
+        // Update cache
+        let mut cache = self.anchor_nodes_cache.lock();
+        *cache = Some(CachedValue::new(nodes.clone(), ANCHOR_NODES_CACHE_TTL));
+        
         Ok(nodes)
     }
 
@@ -878,6 +1016,16 @@ impl StorageService {
 
     /// Retrieves the local profile (User's name, handle, avatar, and privacy mode).
     pub fn get_profile(&self) -> Result<Option<(Option<String>, Option<String>, Option<String>, i32, i32)>> {
+        // Check cache first
+        {
+            let cache = self.profile_cache.lock();
+            if let Some(cached) = &*cache {
+                if let Some(value) = cached.get() {
+                    return Ok(Some(value.clone()));
+                }
+            }
+        }
+
         let conn = self.conn.lock();
         let mut stmt = conn.prepare("SELECT name, handle, avatar_base64, privacy_mode, prestige_tier FROM profile WHERE id = 1")?;
         let mut rows = stmt.query_map([], |row| {
@@ -885,7 +1033,11 @@ impl StorageService {
         })?;
 
         if let Some(row) = rows.next() {
-            Ok(Some(row?))
+            let value = row?;
+            // Update cache
+            let mut cache = self.profile_cache.lock();
+            *cache = Some(CachedValue::new(value.clone(), PROFILE_CACHE_TTL));
+            Ok(Some(value))
         } else {
             Ok(None)
         }
@@ -903,6 +1055,9 @@ impl StorageService {
                 privacy_mode = excluded.privacy_mode",
             params![name, handle, avatar, privacy_mode],
         )?;
+        // Invalidate profile cache
+        let mut cache = self.profile_cache.lock();
+        *cache = None;
         Ok(())
     }
 
@@ -1195,29 +1350,41 @@ impl StorageService {
     }
 
     pub fn get_group(&self, group_id: &str) -> Result<Option<GroupMeshInfo>> {
-        let row = {
-            let conn = self.conn.lock();
-            let mut stmt = conn.prepare("SELECT group_id, name, members_json, description FROM groups WHERE group_id = ?1")?;
-            
-            let mut rows = stmt.query_map(params![group_id], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?))
-            })?;
-            
-            rows.next().transpose()?
-        };
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT g.group_id, g.name, g.members_json, g.description, s.secret_blob 
+             FROM groups g 
+             LEFT JOIN group_secrets s ON g.group_id = s.group_id 
+             WHERE g.group_id = ?1"
+        )?;
         
-        if let Some((gid, name, members_json, description)) = row {
-            let secret_vec = self.load_group_secret(&gid)?.unwrap_or_default();
-            let mut secret = [0u8; 32];
-            if secret_vec.len() == 32 { secret.copy_from_slice(&secret_vec); }
+        let mut rows = stmt.query_map(params![group_id], |row| {
+            let gid: String = row.get(0)?;
+            let name: String = row.get(1)?;
+            let members_json: String = row.get(2)?;
+            let description: String = row.get(3)?;
+            let secret_opt: Option<Vec<u8>> = row.get(4)?;
             
-            Ok(Some(GroupMeshInfo {
+            let mut secret = [0u8; 32];
+            if let Some(secret_vec) = secret_opt {
+                if secret_vec.len() == 32 {
+                    secret.copy_from_slice(&secret_vec);
+                } else {
+                    crate::dispatch_debug_log(&format!("get_group: ⚠️ secret_vec length is not 32: {}", secret_vec.len()));
+                }
+            }
+            
+            Ok(GroupMeshInfo {
                 group_id: gid,
                 name,
                 members_json,
                 secret,
                 description,
-            }))
+            })
+        })?;
+        
+        if let Some(row) = rows.next() {
+            Ok(Some(row?))
         } else {
             Ok(None)
         }
@@ -1259,6 +1426,9 @@ impl StorageService {
     }
 
     pub fn save_group_secret(&self, group_id: &str, secret: &[u8]) -> Result<()> {
+        if secret.len() != 32 {
+            return Err(anyhow::anyhow!("Group secret must be exactly 32 bytes"));
+        }
         let conn = self.conn.lock();
         conn.execute(
             "INSERT INTO group_secrets (group_id, secret_blob) VALUES (?1, ?2)
@@ -1321,9 +1491,7 @@ impl StorageService {
         conn.execute(
             "INSERT INTO pending_group_invites (group_id, name, description, inviter_peer_id, group_secret_wrapped, members_json)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-             ON CONFLICT(group_id) DO UPDATE SET name = excluded.name, description = excluded.description,
-                inviter_peer_id = excluded.inviter_peer_id, group_secret_wrapped = excluded.group_secret_wrapped,
-                members_json = excluded.members_json",
+             ON CONFLICT(group_id) DO NOTHING",
             params![invite.group_id, invite.name, invite.description, invite.inviter_peer_id, invite.group_secret_wrapped, invite.members_json],
         )?;
         Ok(())
@@ -1612,12 +1780,96 @@ impl StorageService {
 
     /// Get storage usage: (drive_bytes, mesh_bytes, total_disk_bytes)
     pub fn get_storage_usage(&self) -> (u64, u64, u64) {
+        // Check cache first
+        {
+            let cache = self.storage_usage_cache.lock();
+            if let Some(cached) = &*cache {
+                if let Some(value) = cached.get() {
+                    return *value;
+                }
+            }
+        }
+
         let conn = self.conn.lock();
         let drive_bytes: i64 = conn.query_row("SELECT COALESCE(SUM(total_size), 0) FROM drive_files", [], |row| row.get(0)).unwrap_or(0);
         let mesh_bytes: i64 = conn.query_row("SELECT COALESCE(SUM(LENGTH(data)), 0) FROM mesh_chunks", [], |row| row.get(0)).unwrap_or(0);
         // Use drive + mesh as approximate total (avoids unreliable fs::metadata on mobile)
         let total_disk = (drive_bytes.max(0) as u64) + (mesh_bytes.max(0) as u64);
-        (drive_bytes.max(0) as u64, mesh_bytes.max(0) as u64, total_disk)
+        let result = (drive_bytes.max(0) as u64, mesh_bytes.max(0) as u64, total_disk);
+        
+        // Update cache
+        let mut cache = self.storage_usage_cache.lock();
+        *cache = Some(CachedValue::new(result, STORAGE_USAGE_CACHE_TTL));
+        
+        result
+    }
+
+    // --- Dead Letter Queue (Persistent) ---
+
+    /// Store a message in the dead letter queue for crash recovery
+    pub fn store_dead_letter(&self, peer_id: &str, payload: &[u8]) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        conn.execute(
+            "INSERT INTO dead_letter_queue (peer_id, payload, queued_at) VALUES (?1, ?2, ?3)",
+            params![peer_id, payload, now],
+        )?;
+        Ok(())
+    }
+
+    /// Fetch dead letters for a specific peer
+    pub fn get_dead_letters_for_peer(&self, peer_id: &str) -> Result<Vec<(i64, Vec<u8>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, payload FROM dead_letter_queue WHERE peer_id = ?1 ORDER BY queued_at ASC LIMIT 50"
+        )?;
+        let rows = stmt.query_map(params![peer_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })?;
+        let mut results = Vec::new();
+        for row in rows {
+            if let Ok(r) = row {
+                results.push(r);
+            }
+        }
+        Ok(results)
+    }
+
+    /// Remove dead letters by ID
+    pub fn remove_dead_letters(&self, ids: &[i64]) -> Result<()> {
+        let conn = self.conn.lock();
+        for id in ids {
+            conn.execute("DELETE FROM dead_letter_queue WHERE id = ?1", params![id])?;
+        }
+        Ok(())
+    }
+
+    /// Clean up old dead letters (older than 24 hours)
+    pub fn cleanup_old_dead_letters(&self) -> Result<usize> {
+        let conn = self.conn.lock();
+        let cutoff = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64 - 86400; // 24 hours
+        let deleted = conn.execute(
+            "DELETE FROM dead_letter_queue WHERE queued_at < ?1",
+            params![cutoff],
+        )?;
+        Ok(deleted)
+    }
+
+    /// Get dead letter count for diagnostics
+    pub fn get_dead_letter_count(&self) -> Result<usize> {
+        let conn = self.conn.lock();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM dead_letter_queue",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(count as usize)
     }
 
     // --- Introvert Drive ---

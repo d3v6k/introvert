@@ -1,0 +1,101 @@
+/* Introvert Background System */
+
+.introvert-bg-container {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.bg-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* 1. Base Gradients */
+.light .bg-base {
+    background: linear-gradient(135deg, #FAFAF9 0%, #F5F3F0 50%, #F0EBE6 100%);
+}
+
+.dark .bg-base {
+    background: linear-gradient(135deg, #0F0F0F 0%, #1A1816 50%, #16130E 100%);
+}
+
+/* 2. Textures */
+/* Light Mode: Diagonal lines */
+.light .bg-texture {
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(0, 0, 0, 0.01) 0px,
+        rgba(0, 0, 0, 0.01) 1px,
+        transparent 1px,
+        transparent 10px
+    );
+}
+
+/* Dark Mode: Dot pattern */
+.dark .bg-texture {
+    background-image: radial-gradient(
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px
+    );
+    background-size: 24px 24px;
+}
+
+/* 3. Radial Glow Blobs */
+.glow-blob {
+    position: absolute;
+    width: 60vw;
+    height: 60vw;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.5s ease, filter 0.5s ease;
+}
+
+.dark .glow-blob {
+    opacity: 0.25;
+    filter: blur(120px);
+}
+
+.glow-indigo {
+    top: -10%;
+    left: -10%;
+    background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+}
+
+.glow-green {
+    bottom: -10%;
+    right: -10%;
+    background: radial-gradient(circle, #10b981 0%, transparent 70%);
+}
+
+/* 4. Content Integration */
+.introvert-content {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+}
+
+/* Backdrop Filter Helper Class for child cards */
+.glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+}
+
+.light .glass-card {
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}

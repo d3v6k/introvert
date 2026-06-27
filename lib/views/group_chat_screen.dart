@@ -45,6 +45,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   final IntrovertClient _client = IntrovertClient();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _isDisposing = false;
+  bool _isExiting = false;
   
   final Map<String, FileTransferProgress> _groupTransfers = {};
   StreamSubscription<FileTransferProgress>? _transferSubscription;
@@ -92,6 +94,8 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   String? _docDirPath;
   final Set<String> _polledPeers = {};
   final Set<String> _pullRequested = {};
+  final Map<String, DateTime> _pullRequestedAt = {};
+  static const Duration _pullRetryTimeout = Duration(seconds: 30);
 
   // Active group call state
   String? _activeCallId;
@@ -108,7 +112,19 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     return 0;
   }
 
+  Timer? _loadContactNamesDebounce;
+  Timer? _pullRetryTimer;
+
   void _loadContactNames() {
+    // Debounce to prevent frequent FFI calls from blocking the UI thread
+    _loadContactNamesDebounce?.cancel();
+    _loadContactNamesDebounce = Timer(Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _doLoadContactNames();
+    });
+  }
+
+  void _doLoadContactNames() {
     try {
       final profile = _client.getProfile();
       _myAvatar = profile['avatar'];
@@ -186,6 +202,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
     });
     _loadActiveList();
+    
+    // Periodic retry for stalled file pulls (every 30 seconds)
+    _pullRetryTimer = Timer.periodic(Duration(seconds: 30), (_) {
+      if (mounted) _loadMessages();
+    });
+    
     Future.microtask(() async {
       final dir = await getApplicationDocumentsDirectory();
       if (mounted) {
@@ -196,11 +218,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
 
       // Auto-sync: contacts + last 100 messages from all members (background, discreet)
+      // Intro-Claw: Prioritize members with unread messages
       if (!mounted) return;
       final memberIds = _members.map((m) => m['peer_id']?.toString() ?? '').where((id) => id.isNotEmpty && id != _client.localPeerId).toList();
       if (memberIds.isNotEmpty) {
         setState(() => _isSyncing = true);
-        for (final memberId in memberIds) {
+        
+        // Get unread counts and sort members by unread (highest first)
+        final unreadCounts = _client.getUnreadCounts();
+        final sortedMembers = List<String>.from(memberIds);
+        sortedMembers.sort((a, b) {
+          final aUnread = unreadCounts[a] ?? 0;
+          final bUnread = unreadCounts[b] ?? 0;
+          return bUnread.compareTo(aUnread); // Descending
+        });
+        
+        for (final memberId in sortedMembers) {
           _client.pollPeerProfile(memberId);
           _client.syncChatMessages(memberId, widget.groupId, true);
         }
@@ -241,13 +274,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   @override
   void dispose() {
+    _isDisposing = true;
     _loadMessagesDebounce?.cancel();
+    _loadContactNamesDebounce?.cancel();
     _networkSubscription?.cancel();
     _transferSubscription?.cancel();
     _economySubscription?.cancel();
     _recordingTimer?.cancel();
     _audioRecorder.dispose();
     _callExpiryTimer?.cancel();
+    _pullRetryTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -463,12 +499,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   void _reloadMessages() {
-    if (!mounted) return;
+    if (!mounted || _isExiting) return;
     // Check if group still exists — if deleted by admin, navigate back
     final allGroups = _client.getAllGroups();
     final groupExists = allGroups.any((g) => g is List && g.isNotEmpty && g[0] == widget.groupId);
     if (!groupExists) {
       if (mounted) {
+        _isExiting = true;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Group has been deleted", style: TextStyle(color: AppTheme.current.accent)),
@@ -579,9 +616,16 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             final filename = meta['filename']?.toString() ?? 'unknown';
             final mimeType = meta['mime_type']?.toString() ?? 'application/octet-stream';
 
-            if (!isOutgoing && !exists && !_pullRequested.contains(tid)) {
+            // Allow retry if pull was requested but timed out (sender may have been offline)
+            final shouldPull = !isOutgoing && !exists && (
+              !_pullRequested.contains(tid) ||
+              (_pullRequestedAt[tid]?.isBefore(DateTime.now().subtract(_pullRetryTimeout)) ?? false)
+            );
+
+            if (shouldPull) {
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                 _pullRequested.add(tid);
+                _pullRequestedAt[tid] = DateTime.now();
                 _client.startPull(senderId, tid, filename, mimeType, fileHash, totalSize, true, widget.groupId);
             }
             
@@ -1127,6 +1171,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 ),
               );
               if (confirm == true) {
+                if (!mounted) return;
                 _client.deleteMessage(widget.groupId, msgId!, true, deletedByAdmin: !isOwnMsg && isAdmin);
                 setState(() => _selectedMsg = null);
                 _loadMessages();
@@ -1285,6 +1330,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                   ),
                 );
                   if (confirm == true && msgId != null) {
+                    if (!mounted) return;
                     final isAdminDeletingOther = _isAdmin && !isMe;
                     _client.deleteMessage(widget.groupId, msgId, true, deletedByAdmin: isAdminDeletingOther);
                     setState(() {
@@ -1457,9 +1503,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   void _startListener() {
     _networkSubscription = _client.networkStream.listen((event) {
+      if (_isDisposing || _isExiting) return;
       if (event.type == 21) {
         _debouncedLoadMessages();
       } else if (event.type == 23) {
+        _loadContactNames();
         _debouncedReloadMessages();
       } else if (event.type == 12) {
         if (!mounted) return;
@@ -1858,7 +1906,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         isAdmin: _isAdmin,
       ),
     );
-    if (result == true && mounted) Navigator.pop(context);
+    if (result == true && mounted) {
+      _isExiting = true;
+      Navigator.pop(context);
+    }
   }
 
   void _showAttachmentOptions() {
@@ -1984,6 +2035,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           }
           final file = File(path);
           final size = await file.length();
+          if (!mounted) return;
           final fileHash = _client.computeFileHash(path);
           final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
           _client.registerSeeder(transferId, path, fileHash, size, widget.groupId);
@@ -2026,6 +2078,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       if (pickedFile != null) {
         final file = File(pickedFile.path);
         final size = await file.length();
+        if (!mounted) return;
         final fileHash = _client.computeFileHash(pickedFile.path);
         final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
         _client.registerSeeder(transferId, pickedFile.path, fileHash, size, widget.groupId);
@@ -2052,6 +2105,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         final path = result.files.single.path!;
         final file = File(path);
         final size = await file.length();
+        if (!mounted) return;
         final fileHash = _client.computeFileHash(path);
         final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
         _client.registerSeeder(transferId, path, fileHash, size, widget.groupId);
@@ -2095,6 +2149,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
       // result is the selected LatLng from the picker
       if (result != null) {
+        if (!mounted) return;
         final text = "[LOCATION]:${result.latitude},${result.longitude}";
         _client.sendGroupMessage(widget.groupId, text);
         _loadMessages();
@@ -2479,6 +2534,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
       final file = File(permanentPath);
       final size = await file.length();
+      if (!mounted) return;
       final fileHash = _client.computeFileHash(permanentPath);
       final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
       _client.registerSeeder(transferId, permanentPath, fileHash, size, widget.groupId);
@@ -3242,14 +3298,17 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
   }
 
   Widget _buildRetentionOption(String label, int seconds) {
-    return ListTile(
-      title: Text(label, style: TextStyle(color: AppTheme.current.text)),
-      trailing: _retentionSeconds == seconds ? Icon(Icons.check, color: AppTheme.current.accent) : null,
-      onTap: () {
-        _client.setRetention(widget.groupId, seconds, true);
-        setState(() => _retentionSeconds = seconds);
-        Navigator.pop(context);
-      },
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        title: Text(label, style: TextStyle(color: AppTheme.current.text)),
+        trailing: _retentionSeconds == seconds ? Icon(Icons.check, color: AppTheme.current.accent) : null,
+        onTap: () {
+          _client.setRetention(widget.groupId, seconds, true);
+          setState(() => _retentionSeconds = seconds);
+          Navigator.pop(context);
+        },
+      ),
     );
   }
 

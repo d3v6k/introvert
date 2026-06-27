@@ -20,6 +20,7 @@ The high-performance backbone handling networking, crypto, and storage.
 | :--- | :--- | :--- |
 | **FFI Bridge** | Logic exported to Flutter; handles memory leak-and-reclaim. | `src/lib.rs` |
 | **Network Swarm** | Libp2p engine; handles QUIC, TCP, and Relay V2. | `src/network/mod.rs` |
+| **Introvert Codec**| Custom hybrid JSON-Binary codec for /signaling/2.0.0. | `src/network/codec.rs` |
 | **Kademlia DHT** | Zero-knowledge peer discovery and X25519 key publishing. | `src/network/config.rs` |
 | **Wormhole** | Magic Wormhole PAKE for secure one-time onboarding. | `src/network/wormhole.rs` |
 | **Storage Engine** | SQLCipher integration with 7-day TTL for mailboxes. | `src/storage.rs` |
@@ -69,6 +70,7 @@ All incentives are anchored to the official on-chain SPL mint.
     *   **Direct:** 1-to-1 QUIC/TCP stream.
     *   **Relay:** Fallback to circuit-relay via connected RBNs if NAT traversal fails.
     *   **Mailbox:** Offline messages are stored on 3 nearest DHT neighbors for 7 days (encrypted).
+    *   **Introvert Codec (v2.0.0):** Custom hybrid JSON-Binary codec that bypasses Base64 encoding for `FileChunk` data, providing ~25% wire savings.
 
 ---
 
@@ -77,6 +79,24 @@ All incentives are anchored to the official on-chain SPL mint.
 2.  **Optimization:** `llvm-strip` removes debug symbols to keep the APK under 45MB.
 3.  **FFI Sync:** `libintrovert.so` is manually injected into Flutter's ephemeral and release paths.
 4.  **Flutter Assembly:** `flutter build apk --split-per-abi` for production deployment.
+
+***
+
+## 6. Build & Deployment Matrix (Requirements for Code Changes)
+
+When code changes are made to the codebase, follow this matrix to determine which rebuild, rerun, or upload actions are required:
+
+| Scope of Code Change | Cargo Rebuild (`make mac` / `make android`) | Flutter Run (App Relaunch) | RBN Upload / Redeploy |
+| :--- | :--- | :--- | :--- |
+| **Rust Client Core (`src/`)** | **YES** | **YES** | **NO** |
+| **Dart/Flutter UI (`lib/`)** | **NO** | **YES** (or Hot Reload/Restart) | **NO** |
+| **Assets / Configs (`assets/`)** | **NO** | **YES** | **NO** |
+| **RBN Daemon Core (`for_linux/`)** | **NO** (unless compiling local tests) | **NO** | **YES** (Recompile and redeploy `introvertd` to RBN servers) |
+
+### Protocol Upgrades & Chunk Size Changes
+When changing chunk size or pull pipeline window sizes:
+*   **Active Client Transfers**: Requires a **Cargo Rebuild** (to repackage the native libraries) and **Flutter Run** on the client devices. Redeploying the RBN is **NOT** required because the RBN acts as a transparent circuit relayer and does not inspect or validate chunk sizes.
+*   **Offline Caching / Node Mode**: Requires **RBN Upload & Redeploy** to RBN servers. The daemon itself runs the file prefetcher/seeder engine in Node Mode and must align on chunk sizes to serve offline cache clients.
 
 ***
 

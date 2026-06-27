@@ -3244,11 +3244,12 @@ dependencies = [
 
 [[package]]
 name = "introvert"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
  "async-compat",
+ "async-trait",
  "base64 0.21.7",
  "bincode",
  "bip39",
@@ -3260,6 +3261,7 @@ dependencies = [
  "clap",
  "dialoguer",
  "ed25519-dalek",
+ "futures",
  "futures-util",
  "hex",
  "hf-hub",

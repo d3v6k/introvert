@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -19,14 +20,15 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
   final IntrovertClient _client = IntrovertClient();
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _logScrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
   bool _isLoading = false;
   bool _isReconRunning = false;
   bool _isHealRunning = false;
-  bool _showActivityLog = false;
   List<String> _reconMilestones = [];
   List<Map<String, dynamic>> _activityLog = [];
   OverlayEntry? _terminalOverlay;
+  Timer? _activityLogTimer;
 
   // Live tile data
   String _engineStatus = 'Checking...';
@@ -42,6 +44,20 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
   void initState() {
     super.initState();
     _refreshTileData();
+    _refreshActivityLog();
+    // Refresh activity log every 10 seconds
+    _activityLogTimer = Timer.periodic(Duration(seconds: 10), (_) {
+      if (mounted) _refreshActivityLog();
+    });
+  }
+
+  @override
+  void dispose() {
+    _activityLogTimer?.cancel();
+    _logScrollController.dispose();
+    _inputController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _refreshTileData() {
@@ -78,14 +94,6 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
       _batteryStatus = 'Monitoring';
       _peerHealthStatus = 'Scoring...';
     });
-  }
-
-  @override
-  void dispose() {
-    _inputController.dispose();
-    _scrollController.dispose();
-    _terminalOverlay?.remove();
-    super.dispose();
   }
 
   void _scrollToBottom() {
@@ -344,7 +352,16 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
         children: [
           SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
           _buildClawHeader(),
-          Expanded(child: _showActivityLog ? _buildActivityLogView() : _buildTileGrid()),
+          Expanded(
+            child: Column(
+              children: [
+                // Permanent terminal log (same size as header)
+                _buildActivityLogView(),
+                // Tile buttons below terminal
+                Expanded(child: _buildTileGrid()),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomBar(),
@@ -383,37 +400,6 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
                   color: AppTheme.current.text, letterSpacing: 1.5,
                 )),
                 Spacer(),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showActivityLog = !_showActivityLog;
-                      if (_showActivityLog) _refreshActivityLog();
-                    });
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _showActivityLog
-                          ? Colors.greenAccent.withValues(alpha: 0.15)
-                          : AppTheme.current.mutedText.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.history_rounded, size: 12,
-                            color: _showActivityLog ? Colors.greenAccent : AppTheme.current.mutedText),
-                        SizedBox(width: 3),
-                        Text('LOG', style: TextStyle(
-                          fontSize: 8, fontWeight: FontWeight.bold,
-                          color: _showActivityLog ? Colors.greenAccent : AppTheme.current.mutedText,
-                          letterSpacing: 1,
-                        )),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(width: 6),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -430,10 +416,10 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
             ),
             SizedBox(height: 10),
             Text(
-              'Intro-Claw is an "under the hood engineer and janitor", handling networking, engine optimisation, and mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
+              'Intro-Claw is an AI intelligent agent working under the hood, handling networking, engine optimisation, and mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
               style: TextStyle(
                 fontSize: 11,
-                color: AppTheme.current.mutedText.withValues(alpha: 0.7),
+                color: AppTheme.current.text,
                 height: 1.4,
                 fontStyle: FontStyle.italic,
               ),
@@ -458,32 +444,22 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
       _QueryTile(Icons.sticky_note_2_outlined, 'Notes', 'Show my notes', Colors.amber),
       _QueryTile(Icons.chat_bubble_outline, 'Messages', 'Show recent messages', Colors.cyan),
       _QueryTile(Icons.call_outlined, 'Calls', 'Recent calls', Colors.purple),
-      _QueryTile(Icons.storage_outlined, 'Storage', 'storage_status', Colors.teal, subtitle: _storageStatus),
-      _QueryTile(Icons.build_outlined, 'Engine', 'engine_status', Colors.indigo, subtitle: _engineStatus),
-      // Intro-Claw actions
+      // Intro-Claw actions (not duplicated in terminal)
       _QueryTile(Icons.radar_rounded, 'Network Tune', 'run_network_recon', Colors.orangeAccent),
       _QueryTile(Icons.healing_rounded, 'Heal Mesh', 'run_network_heal', Colors.cyanAccent),
-      _QueryTile(Icons.queue_rounded, 'Offline Queue', 'offline_queue_status', Colors.blueAccent),
-      _QueryTile(Icons.mail_outline_rounded, 'Dead Letters', 'dead_letter_check', Colors.redAccent),
-      _QueryTile(Icons.whatshot_rounded, 'Pre-warm', 'connection_prewarm', Colors.deepOrange),
-      _QueryTile(Icons.favorite_rounded, 'Peer Health', 'peer_health_check', Colors.pinkAccent, subtitle: _peerHealthStatus),
-      _QueryTile(Icons.speed_rounded, 'Bandwidth', 'bandwidth_check', Colors.lightBlue, subtitle: _bandwidthStatus),
-      _QueryTile(Icons.battery_saver_rounded, 'Battery', 'battery_status', Colors.lime, subtitle: _batteryStatus),
-      _QueryTile(Icons.history_rounded, 'Activity Log', 'show_activity_log', Colors.greenAccent),
+      _QueryTile(Icons.build_outlined, 'Run Maintenance', 'run_maintenance', Colors.indigo),
     ];
 
     return Column(
       children: [
-        SizedBox(height: 12),
-        Icon(Icons.psychology_rounded, size: 48, color: AppTheme.current.accent.withValues(alpha: 0.3)),
-        SizedBox(height: 12),
+        SizedBox(height: 8),
         Expanded(
           child: GridView.builder(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
               childAspectRatio: 1.0,
             ),
             itemCount: tiles.length,
@@ -547,11 +523,11 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
       _healDisconnectedPeers();
       return;
     }
-    if (query == 'show_activity_log') {
-      setState(() {
-        _showActivityLog = true;
-        _refreshActivityLog();
-      });
+    if (query == 'run_maintenance') {
+      _client.triggerIntroClawTick();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Maintenance tick triggered')),
+      );
       return;
     }
     if (query == 'storage_status') {
@@ -1159,116 +1135,171 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
 
   Widget _buildActivityLogView() {
     if (_activityLog.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history_rounded, size: 48, color: AppTheme.current.mutedText.withValues(alpha: 0.3)),
-            SizedBox(height: 12),
-            Text('No activity yet', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 14)),
-            SizedBox(height: 4),
-            Text('Intro-Claw operations will appear here', style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.6), fontSize: 12)),
-          ],
+      return Container(
+        height: 150,
+        margin: EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.2)),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.terminal_rounded, size: 24, color: Colors.greenAccent.withValues(alpha: 0.3)),
+              SizedBox(height: 8),
+              Text('Waiting for activity...', style: TextStyle(color: Colors.white38, fontSize: 11, fontFamily: 'monospace')),
+            ],
+          ),
         ),
       );
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Row(
-            children: [
-              Icon(Icons.history_rounded, color: AppTheme.current.accent, size: 16),
-              SizedBox(width: 6),
-              Text('ACTIVITY LOG — LAST HOUR', style: TextStyle(
-                color: AppTheme.current.accent, fontSize: 10,
-                fontWeight: FontWeight.bold, letterSpacing: 1.2,
-              )),
-              Spacer(),
-              GestureDetector(
-                onTap: _refreshActivityLog,
-                child: Icon(Icons.refresh_rounded, color: AppTheme.current.mutedText, size: 16),
+    return Container(
+      height: 150,
+      margin: EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          // Terminal header
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.greenAccent.withValues(alpha: 0.2)),
               ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            itemCount: _activityLog.length,
-            itemBuilder: (context, index) {
-              final entry = _activityLog[index];
-              final timestamp = entry['t'] as int;
-              final category = entry['c'] as String;
-              final message = entry['m'] as String;
-              final severity = entry['s'] as String;
-
-              final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-              final ageSec = now - timestamp;
-              final timeStr = ageSec < 60
-                  ? '${ageSec}s ago'
-                  : ageSec < 3600
-                      ? '${ageSec ~/ 60}m ago'
-                      : '${ageSec ~/ 3600}h ago';
-
-              final severityColor = switch (severity) {
-                'success' => Colors.greenAccent,
-                'warn' => Colors.orangeAccent,
-                'action' => AppTheme.current.accent,
-                _ => AppTheme.current.mutedText,
-              };
-
-              final categoryIcon = switch (category) {
-                'tick' => Icons.timer_rounded,
-                'battery' => Icons.battery_saver_rounded,
-                'recon' => Icons.radar_rounded,
-                'heal' => Icons.healing_rounded,
-                'storage' => Icons.storage_rounded,
-                'offline_queue' => Icons.queue_rounded,
-                'dead_letter' => Icons.mail_outline_rounded,
-                'health' => Icons.favorite_rounded,
-                'prewarm' => Icons.whatshot_rounded,
-                'maintenance' => Icons.build_rounded,
-                'network' => Icons.wifi_rounded,
-                _ => Icons.circle,
-              };
-
-              return Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 24, height: 24,
-                      decoration: BoxDecoration(
-                        color: severityColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(categoryIcon, size: 12, color: severityColor),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(message, style: TextStyle(
-                            fontSize: 11, color: AppTheme.current.text, height: 1.3,
-                          )),
-                          SizedBox(height: 2),
-                          Text('$category · $timeStr', style: TextStyle(
-                            fontSize: 9, color: AppTheme.current.mutedText.withValues(alpha: 0.6),
-                          )),
-                        ],
-                      ),
-                    ),
-                  ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.terminal_rounded, color: Colors.greenAccent, size: 12),
+                SizedBox(width: 6),
+                Text('ACTIVITY LOG', style: TextStyle(
+                  color: Colors.greenAccent, fontSize: 9,
+                  fontFamily: 'monospace', fontWeight: FontWeight.bold, letterSpacing: 1,
+                )),
+                Spacer(),
+                Container(
+                  width: 6, height: 6,
+                  decoration: BoxDecoration(
+                    color: Colors.greenAccent,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              );
-            },
+                SizedBox(width: 4),
+                Text('LIVE', style: TextStyle(
+                  color: Colors.greenAccent, fontSize: 8,
+                  fontFamily: 'monospace', fontWeight: FontWeight.bold,
+                )),
+              ],
+            ),
           ),
-        ),
-      ],
+          // Terminal body
+          Expanded(
+            child: ListView.builder(
+              controller: _logScrollController,
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              itemCount: _activityLog.length,
+              itemBuilder: (context, index) {
+                final entry = _activityLog[index];
+                final timestamp = entry['t'] as int;
+                final category = entry['c'] as String;
+                final message = entry['m'] as String;
+                final severity = entry['s'] as String;
+
+                final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+                final ageSec = now - timestamp;
+                final timeStr = ageSec < 60
+                    ? '${ageSec}s'
+                    : ageSec < 3600
+                        ? '${ageSec ~/ 60}m'
+                        : '${ageSec ~/ 3600}h';
+
+                final severityColor = switch (severity) {
+                  'success' => Colors.greenAccent,
+                  'warn' => Colors.orangeAccent,
+                  'action' => Colors.cyanAccent,
+                  'info' => Colors.white70,
+                  _ => Colors.white54,
+                };
+
+                final categoryIcon = switch (category) {
+                  'tick' => '⏱',
+                  'battery' => '🔋',
+                  'recon' => '📡',
+                  'heal' => '💊',
+                  'storage' => '💾',
+                  'offline_queue' => '📤',
+                  'dead_letter' => '📧',
+                  'health' => '❤️',
+                  'prewarm' => '🔥',
+                  'maintenance' => '🔧',
+                  'network' => '🌐',
+                  'node' => '🖥',
+                  'node_cache' => '📦',
+                  'node_dead_letter' => '📬',
+                  'node_bandwidth' => '📊',
+                  'node_status' => '📈',
+                  'voip' => '📞',
+                  'anchor' => '⚓',
+                  _ => '●',
+                };
+
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 2),
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '[$timeStr] ',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        TextSpan(
+                          text: '$categoryIcon ',
+                          style: TextStyle(fontSize: 10),
+                        ),
+                        TextSpan(
+                          text: message,
+                          style: TextStyle(
+                            color: severityColor,
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Terminal footer
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Colors.greenAccent.withValues(alpha: 0.2)),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text('${_activityLog.length} entries', style: TextStyle(
+                  color: Colors.white38, fontSize: 8, fontFamily: 'monospace',
+                )),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1438,7 +1469,6 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
           children: [
             GestureDetector(
               onTap: () => setState(() {
-                _showActivityLog = false;
                 _messages.clear();
               }),
               child: Container(

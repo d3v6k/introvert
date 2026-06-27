@@ -11,6 +11,9 @@ pub fn get_bootstrap_nodes() -> Vec<(PeerId, Multiaddr)> {
         ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/443".to_string()),
         ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/udp/443/quic-v1".to_string()),
         
+        // Local RBN on thinkpad.local (relay circuit via Alibaba) — v37 baseline
+        ("12D3KooWGzorWx3pLhJCSdSZPApADf7aDM1g71WwvjjzubWSkCkG".to_string(), "/ip4/192.168.1.81/tcp/8443".to_string()),
+        
         // Private Introvert Network - Isolated from Global libp2p DHT
     ];
 

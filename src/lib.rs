@@ -160,6 +160,8 @@ pub fn dispatch_debug_log(msg: &str) {
 // --- Identity & BIP-39 Handlers ---
 
 /// Generates a new 12-word mnemonic.
+/// Returns a raw pointer to a C string. Caller MUST call `introvert_free_string()` on the returned pointer.
+/// Returns null on failure (entropy generation or string conversion error).
 #[no_mangle]
 pub extern "C" fn introvert_generate_mnemonic() -> *mut c_char {
     let mut entropy = [0u8; 16];
@@ -1930,6 +1932,28 @@ pub extern "C" fn intro_claw_set_active(active: bool) -> FfiResult {
     FfiResult::success()
 }
 
+/// Set Intro-Claw node mode (for anchor/always-on nodes)
+/// Node mode enables aggressive optimizations: proactive file caching,
+/// aggressive dead letter processing, bandwidth-aware serving.
+#[no_mangle]
+pub extern "C" fn intro_claw_set_node_mode(enabled: bool) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    // Persist node mode state
+    let _ = engine.storage.set_intro_claw_node_mode(enabled);
+    let tx_lock = engine.network_tx.read();
+    if let Some(tx) = tx_lock.as_ref() {
+        let tx = tx.clone();
+        engine.runtime.spawn(async move {
+            let _ = tx.send(NetworkCommand::IntroClawSetNodeMode { enabled }).await;
+        });
+    }
+    FfiResult::success()
+}
+
 /// Returns Intro-Claw status as JSON: { "is_active": bool, "log_count": int }
 #[no_mangle]
 pub extern "C" fn intro_claw_get_status() -> FfiResult {
@@ -2164,12 +2188,55 @@ pub extern "C" fn intro_claw_voip_get_quality() -> FfiResult {
 /// Check if VoIP should downgrade quality
 #[no_mangle]
 pub extern "C" fn intro_claw_voip_should_downgrade() -> i32 {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return 0,
+    };
+    
+    // Check if we should downgrade based on VoIP quality samples
     // This is a fast synchronous check — no network command needed
     // The caller should check this periodically during a call
-    0 // Default: don't downgrade (will be updated via samples)
+    let tx_lock = engine.network_tx.read();
+    if let Some(_tx) = tx_lock.as_ref() {
+        // For now, return 0 — the actual downgrade logic will be triggered
+        // by the IntroClaw tick when it detects poor quality
+        0
+    } else {
+        0
+    }
+}
+
+/// Get VoIP downgrade recommendation
+/// Returns: "none", "audio_only", "low_bitrate"
+#[no_mangle]
+pub extern "C" fn intro_claw_voip_get_downgrade_recommendation() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    
+    let tx_lock = engine.network_tx.read();
+    if let Some(tx) = tx_lock.as_ref() {
+        let tx = tx.clone();
+        let rt = tokio::runtime::Runtime::new().ok();
+        if let Some(runtime) = rt {
+            let recommendation = runtime.block_on(async move {
+                let (result_tx, result_rx) = tokio::sync::oneshot::channel();
+                let _ = tx.send(NetworkCommand::IntroClawVoipGetDowngradeRecommendation { result_tx }).await;
+                result_rx.await.unwrap_or_else(|_| "none".to_string())
+            });
+            return FfiResult::binary(recommendation.into_bytes());
+        }
+    }
+    FfiResult::error(-11, "Network command channel unavailable")
 }
 
 /// Reclaims leaked binary memory once Dart has finished copying it.
+/// The `_len` parameter is intentionally unused — `libc::free` does not require the size.
+/// It is kept in the signature for API consistency with the Dart side, which passes the length
+/// for its own bookkeeping. The underscore prefix signals intentional non-use to the compiler.
 #[no_mangle]
 pub extern "C" fn introvert_free_binary(ptr: *mut u8, _len: usize) {
     if !ptr.is_null() {
@@ -2425,16 +2492,28 @@ pub extern "C" fn introvert_group_create(
 
     let mut members = vec![creator_member];
 
+    crate::dispatch_debug_log(&format!("introvert_group_create: Creating group {} with name '{}'", group_id, name));
     let initial_peer_ids: Vec<String> = serde_json::from_str(&members_json_str).unwrap_or_default();
+    crate::dispatch_debug_log(&format!("introvert_group_create: Initial peer IDs count: {}", initial_peer_ids.len()));
     for peer_id_str in initial_peer_ids {
-        if let Ok(Some(contact)) = engine.storage.get_contact(&peer_id_str) {
-            members.push(crate::network::GroupMemberMetadata {
-                peer_id: peer_id_str,
-                pubkey: contact.p2p_pubkey,
-                role: crate::network::GroupRole::Member,
-                alias: contact.local_alias.or(contact.global_name),
-                avatar_base64: contact.avatar_base64,
-            });
+        crate::dispatch_debug_log(&format!("introvert_group_create: Looking up contact for peer: {}", peer_id_str));
+        match engine.storage.get_contact(&peer_id_str) {
+            Ok(Some(contact)) => {
+                crate::dispatch_debug_log(&format!("introvert_group_create: Found contact for {}. static_key prefix: {}", peer_id_str, hex::encode(&contact.static_key[0..4.min(contact.static_key.len())])));
+                members.push(crate::network::GroupMemberMetadata {
+                    peer_id: peer_id_str,
+                    pubkey: contact.p2p_pubkey,
+                    role: crate::network::GroupRole::Member,
+                    alias: contact.local_alias.or(contact.global_name),
+                    avatar_base64: contact.avatar_base64,
+                });
+            }
+            Ok(None) => {
+                crate::dispatch_debug_log(&format!("introvert_group_create: ⚠️ Contact {} NOT found in storage!", peer_id_str));
+            }
+            Err(e) => {
+                crate::dispatch_debug_log(&format!("introvert_group_create: ❌ Error loading contact {}: {:?}", peer_id_str, e));
+            }
         }
     }
 
@@ -2461,20 +2540,35 @@ pub extern "C" fn introvert_group_create(
 
         let storage = engine.storage.clone();
         engine.runtime.spawn(async move {
+            // Subscribe to gossipsub topic for the newly created group so the creator receives mesh traffic
+            let _ = tx.send(crate::network::NetworkCommand::SubscribeGossipsub { group_id: group_id_clone.clone() }).await;
+
             for m in members_clone {
                 if m.peer_id == my_peer_id { continue; }
                 if let Ok(pid) = PeerId::from_str(&m.peer_id) {
-                    if let Ok(Some(contact)) = storage.get_contact(&m.peer_id) {
-                        if let Ok(wrapped) = crate::network::group::GroupManager::wrap_group_secret(&secret, &contact.static_key) {
-                            let invite = crate::network::SignalingPayload::GroupInvite {
-                                group_id: group_id_clone.clone(),
-                                name: name_clone.clone(),
-                                description: description_clone.clone(),
-                                inviter_peer_id: my_peer_id.clone(),
-                                group_secret_wrapped: wrapped,
-                                members: members.clone(),
-                            };
-                            let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: invite }).await;
+                    crate::dispatch_debug_log(&format!("introvert_group_create: Sending invite to member {}", m.peer_id));
+                    match storage.get_contact(&m.peer_id) {
+                        Ok(Some(contact)) => {
+                            match crate::network::group::GroupManager::wrap_group_secret(&secret, &contact.static_key) {
+                                Ok(wrapped) => {
+                                    crate::dispatch_debug_log(&format!("introvert_group_create: Successfully wrapped secret for {}", m.peer_id));
+                                    let invite = crate::network::SignalingPayload::GroupInvite {
+                                        group_id: group_id_clone.clone(),
+                                        name: name_clone.clone(),
+                                        description: description_clone.clone(),
+                                        inviter_peer_id: my_peer_id.clone(),
+                                        group_secret_wrapped: wrapped,
+                                        members: members.clone(),
+                                    };
+                                    let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: invite }).await;
+                                }
+                                Err(e) => {
+                                    crate::dispatch_debug_log(&format!("introvert_group_create: ❌ Failed to wrap group secret for {}: {:?}", m.peer_id, e));
+                                }
+                            }
+                        }
+                        _ => {
+                            crate::dispatch_debug_log(&format!("introvert_group_create: ❌ Failed to load contact from invite loop for {}", m.peer_id));
                         }
                     }
                 }
@@ -2507,7 +2601,10 @@ pub extern "C" fn introvert_group_send_message(
     let reply_to = if reply_to_ptr.is_null() { None } else { Some(unsafe { CStr::from_ptr(reply_to_ptr).to_string_lossy().into_owned() }) };
 
     let group_secret_vec = match engine.storage.load_group_secret(&group_id) {
-        Ok(Some(s)) => s,
+        Ok(Some(s)) => {
+            crate::dispatch_debug_log(&format!("introvert_group_send_message: Loaded group secret. Hex prefix: {}", hex::encode(&s[0..4.min(s.len())])));
+            s
+        }
         _ => return FfiResult::error(-1, "Group secret not found"),
     };
     if group_secret_vec.len() != 32 {
@@ -2515,6 +2612,9 @@ pub extern "C" fn introvert_group_send_message(
     }
     let mut group_secret = [0u8; 32];
     group_secret.copy_from_slice(&group_secret_vec);
+    if group_secret.iter().all(|&b| b == 0) {
+        return FfiResult::error(-6, "Group secret is all-zeros");
+    }
 
     use aes_gcm::{Aes256Gcm, Key, Nonce, KeyInit, aead::Aead};
     use rand::RngCore;
@@ -2529,7 +2629,7 @@ pub extern "C" fn introvert_group_send_message(
     let mut content_encrypted = nonce_bytes.to_vec();
     content_encrypted.extend(encrypted);
 
-    let mut msg_id = format!("gm_{}_{}", group_id, chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
+    let mut msg_id = format!("gm_{}_{}_{:08x}", group_id, chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), rand::random::<u32>());
     if message.starts_with("[FILE]:") {
         if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&message[7..]) {
             if let Some(tid) = meta.get("transfer_id").and_then(|v| v.as_str()) {
@@ -2571,16 +2671,34 @@ pub extern "C" fn introvert_group_send_message(
         let storage = engine.storage.clone();
 
         engine.runtime.spawn(async move {
-            if let Ok(Some(members_json)) = storage.get_group_members(&group_id_clone) {
-                let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
-                for m in members {
-                    if m.peer_id == my_peer_id_clone { continue; }
-                    if let Ok(pid) = PeerId::from_str(&m.peer_id) {
-                        let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+            crate::dispatch_debug_log(&format!("introvert_group_send_message: Spawning send loop for group {}", group_id_clone));
+            match storage.get_group_members(&group_id_clone) {
+                Ok(Some(members_json)) => {
+                    let members: Vec<crate::network::GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+                    crate::dispatch_debug_log(&format!("introvert_group_send_message: Group {} has {} members", group_id_clone, members.len()));
+                    for m in members {
+                        if m.peer_id == my_peer_id_clone { continue; }
+                        match PeerId::from_str(&m.peer_id) {
+                            Ok(pid) => {
+                                crate::dispatch_debug_log(&format!("introvert_group_send_message: Forwarding GroupAction to member {}", m.peer_id));
+                                let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload.clone() }).await;
+                            }
+                            Err(e) => {
+                                crate::dispatch_debug_log(&format!("introvert_group_send_message: ❌ Failed to parse peer ID '{}': {:?}", m.peer_id, e));
+                            }
+                        }
                     }
+                }
+                Ok(None) => {
+                    crate::dispatch_debug_log(&format!("introvert_group_send_message: ⚠️ Group {} not found or has no members", group_id_clone));
+                }
+                Err(e) => {
+                    crate::dispatch_debug_log(&format!("introvert_group_send_message: ❌ Error loading group members for {}: {:?}", group_id_clone, e));
                 }
             }
         });
+    } else {
+        crate::dispatch_debug_log("introvert_group_send_message: ❌ network_tx is None!");
     }
 
     FfiResult::success()

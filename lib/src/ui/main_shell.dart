@@ -59,6 +59,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   StreamSubscription<MediaFrameEvent>? _globalMediaSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   ConnectivityResult _lastConnectivity = ConnectivityResult.none;
+  bool _isDisposing = false;
   
   String _localStatus = "OFFLINE";
   Color _localStatusColor = Colors.redAccent;
@@ -69,24 +70,29 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   bool _isInBackground = false;
   DateTime? _lastCallAlertTime;
   DateTime? _lastMsgAlertTime;
+  // Deduplication: track recent notification hashes to prevent gossipsub re-delivery flooding
+  final Set<String> _recentNotificationHashes = {};
+  static const Duration _notificationDedupWindow = Duration(seconds: 30);
+  final Map<String, DateTime> _notificationTimestamps = {};
   final AudioPlayer _notificationPlayer = AudioPlayer();
   bool _isHandleResolvedDialogOpen = false;
   final Set<String> _activeConnectionRequestPeerIds = {};
   final Set<String> _activeGroupJoinRequestIds = {};
 
-  final List<Widget> _tabs = [
-    ChatsTab(key: ChatsTab.chatsKey),
-    const DriveTab(key: ValueKey('drive')),
-    const NotesTab(key: ValueKey('notes')),
-    const AssistantTab(key: ValueKey('assistant')),
-    const SettingsTab(key: ValueKey('settings')),
-  ];
+  final GlobalKey<_ChatsTabState> _chatsKey = GlobalKey<_ChatsTabState>();
+  late final List<Widget> _tabs;
 
   @override
   void initState() {
     super.initState();
+    _tabs = [
+      ChatsTab(key: _chatsKey),
+      const DriveTab(key: ValueKey('drive')),
+      const NotesTab(key: ValueKey('notes')),
+      const AssistantTab(key: ValueKey('assistant')),
+      const SettingsTab(key: ValueKey('settings')),
+    ];
     WidgetsBinding.instance.addObserver(this);
-    AppTheme.current.addListener(_onThemeChanged);
     _startGlobalListener();
 
     // Ensure WebRtcCallService starts listening to event stream early
@@ -129,26 +135,27 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _lastConnectivity = newConnectivity;
       debugPrint("[Intro-Claw] Connectivity changed: $oldConnectivity → $newConnectivity");
 
+      if (!mounted) return;
+
       if (newConnectivity == ConnectivityResult.none) {
         _showClawNetworkAlert("Network Lost", "Intro-Claw: All connections dropped. Messages will be queued.", Colors.redAccent);
       } else if (oldConnectivity == ConnectivityResult.none) {
-        // Network restored — trigger recon
         _triggerClawNetworkRecovery();
       } else {
-        // Network type changed (WiFi ↔ Cellular) — re-optimize
         _triggerClawNetworkRecovery();
       }
     });
   }
 
   void _triggerClawNetworkRecovery() {
-    debugPrint("[Intro-Claw] Network recovery: running recon...");
+    debugPrint("[Intro-Claw] Network recovery: running recon + tick...");
     _showClawNetworkAlert("Network Changed", "Intro-Claw: Re-optimizing connections...", AppTheme.current.accent);
 
-    // Run recon in background
+    // Run recon and trigger tick in background
     Future.delayed(Duration(seconds: 2), () {
       try {
         _client.runNetworkRecon();
+        _client.triggerIntroClawTick(); // Execute intelligence modules
         if (mounted) {
           _showClawNetworkAlert("Intro-Claw", "Connections re-optimized", Colors.greenAccent);
         }
@@ -175,11 +182,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     );
   }
 
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -194,6 +196,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // Return to foreground: exit idle mode
       AlertService.stopBackgroundService();
       BackgroundSyncService.instance.exitIdleMode();
+      
+      // Pre-warm connections: trigger IntroClaw tick to refresh connections
+      Future.delayed(Duration(seconds: 1), () {
+        try {
+          _client.triggerIntroClawTick();
+          _chatsKey.currentState?._loadContacts();
+        } catch (_) {}
+      });
     }
 
     if (state == AppLifecycleState.detached) {
@@ -221,6 +231,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _triggerMessageAlert(String body, {bool isGroup = false}) {
+    // Deduplication: skip if same notification was shown recently
+    final hash = '${isGroup ? "g" : "d"}:$body';
+    final now = DateTime.now();
+    
+    // Clean up old entries
+    _notificationTimestamps.removeWhere((_, time) => now.difference(time) > _notificationDedupWindow);
+    _recentNotificationHashes.removeWhere((h) => !_notificationTimestamps.containsKey(h));
+    
+    if (_recentNotificationHashes.contains(hash)) {
+      return; // Skip duplicate notification
+    }
+    
+    _recentNotificationHashes.add(hash);
+    _notificationTimestamps[hash] = now;
+    
     AlertService.showAlert(
       title: isGroup ? "New Group Message" : "New Message",
       body: body,
@@ -257,6 +282,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
 
     _networkSubscription = client.networkStream.listen((event) {
+      if (_isDisposing) return;
       // Suppress routine high-frequency events (Type 1 and 8) to prevent terminal log flooding
       if (kDebugMode && event.type != 1 && event.type != 8 && event.type != 13 && event.type != 23) {
         debugPrint("🌐 Swarm Event Received: Type=${event.type}, DataLen=${event.data.length}");
@@ -383,7 +409,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         // Event 35: Handle Resolve Failed
         try {
           final handle = utf8.decode(event.data);
-          if (mounted) {
+          if (!_isDisposing && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text("Failed to resolve $handle. It may not exist or the network is unreachable.")),
             );
@@ -411,7 +437,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         if (event.data.isEmpty) return;
         final status = event.data[0];
         debugPrint("📍 Node Status Change: $status (1=Online, 2=RelayActive)");
-        if (mounted) {
+        if (!_isDisposing && mounted) {
           setState(() {
             if (status == 1) {
               _localStatus = "ONLINE";
@@ -442,8 +468,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     // Call startNetwork AFTER listen to capture initial status
     client.startNetwork();
     
-    // Initialize background sync with periodic timer (5 min interval)
-    BackgroundSyncService.instance.initialize();
+    // Initialize background sync — push is the primary wakeup mechanism,
+    // with fallback polling if push delivery fails
+    BackgroundSyncService.instance.initialize(pushAvailable: true);
   }
 
   int _getContactTier(String peerId) {
@@ -475,6 +502,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       }
 
       _activeConnectionRequestPeerIds.add(peerId);
+      if (_isDisposing || !mounted) return;
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -515,7 +543,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 messenger.showSnackBar(
                   SnackBar(content: Text("Connection accepted from $name")),
                 );
-                ChatsTab.chatsKey.currentState?._loadContacts();
+                _chatsKey.currentState?._loadContacts();
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
               child: Text("ACCEPT"),
@@ -535,11 +563,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       final parts = utf8.decode(data).split('\x00');
       if (parts.length < 2) return;
       final String name = parts[1];
-      if (mounted) {
+      if (!_isDisposing && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("$name accepted your connection request!")),
         );
-        ChatsTab.chatsKey.currentState?._loadContacts();
+        _chatsKey.currentState?._loadContacts();
       }
     } catch (_) {}
   }
@@ -562,6 +590,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final String name = contact != null ? (contact['alias'] ?? peerId) : peerId;
     final String? avatarBase64 = contact != null ? contact['avatar'] : null;
 
+    if (_isDisposing || !mounted) return;
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -634,6 +663,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     // Don't show dialog if already in this call
     if (GroupCallService.instance.callId == callId) return;
+    if (_isDisposing || !mounted) return;
 
     showGeneralDialog(
       context: context,
@@ -712,6 +742,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       final joinKey = "$groupId:$requesterPeerId";
       if (_activeGroupJoinRequestIds.contains(joinKey)) return;
       _activeGroupJoinRequestIds.add(joinKey);
+      if (_isDisposing || !mounted) return;
 
       showDialog(
         context: context,
@@ -783,7 +814,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       final String groupName = parts[1];
       final String reason = parts.length > 2 ? parts[2] : "group admin has denied access";
 
-      if (mounted) {
+      if (!_isDisposing && mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -827,7 +858,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       final status = IntrovertClient().getHandleStatus(handle);
       final isVerified = status['verified'] == true;
 
-      if (mounted) {
+      if (!_isDisposing && mounted) {
         _isHandleResolvedDialogOpen = true;
         final parentContext = context;
         showDialog(
@@ -875,11 +906,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     child: Text(
                       "⚠️ UNVERIFIED: This mapping has not been witnessed by RBN nodes yet.",
                       style: TextStyle(color: Colors.orangeAccent, fontSize: 11),
-                    ),
-                  ),
-              ],
+              ),
             ),
-            actions: [
+          ],
+        ),
+        actions: [
               TextButton(onPressed: () => Navigator.pop(context), child: Text("CANCEL")),
               ElevatedButton(
                 onPressed: () {
@@ -903,12 +934,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
-    AppTheme.current.removeListener(_onThemeChanged);
     _globalMediaSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _economySubscription?.cancel();
     _networkSubscription.cancel();
+    _pageController.dispose();
+    _notificationPlayer.dispose();
     try {
       final client = IntrovertClient();
       client.stopEngine();
@@ -916,8 +949,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint("🛑 Error stopping engine on dispose: $e");
     }
-    _pageController.dispose();
-    _notificationPlayer.dispose();
     super.dispose();
   }
 
@@ -1007,21 +1038,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             Spacer(),
             // Network status dot + label
             GestureDetector(
-              onTap: () => _showClawNetworkMenu(context),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _localStatusColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _localStatusColor.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
+                onTap: () => _showClawNetworkMenu(context),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _localStatusColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _localStatusColor.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _localStatusColor,
                         boxShadow: [
@@ -1030,13 +1061,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       ),
                     ),
                     SizedBox(width: 5),
-                    Text(
-                      _localStatus.toLowerCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: _localStatusColor,
-                        letterSpacing: 0.3,
+                    Flexible(
+                      child: Text(
+                        _localStatus.toLowerCase(),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: _localStatusColor,
+                          letterSpacing: 0.3,
+                        ),
                       ),
                     ),
                   ],
@@ -1305,8 +1340,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 }
 
 class ChatsTab extends StatefulWidget {
-  static final GlobalKey<_ChatsTabState> chatsKey = GlobalKey<_ChatsTabState>();
-  ChatsTab({super.key});
+  const ChatsTab({super.key});
 
   @override
   State<ChatsTab> createState() => _ChatsTabState();
@@ -1320,6 +1354,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   Map<String, String> _lastMessages = {}; // peerId/groupId -> last message content
   Map<String, bool> _lastMessageIsMe = {}; // peerId/groupId -> was last message from me?
   bool _isLoading = true;
+  bool _isDisposing = false;
   bool _isRefreshing = false;
   Timer? _refreshDebounce;
   final IntrovertClient _client = IntrovertClient();
@@ -1336,31 +1371,29 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   @override
   void initState() {
     super.initState();
-    AppTheme.current.addListener(_onThemeChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadContacts();
     });
     _networkSubscription = _client.networkStream.listen((event) {
+      if (_isDisposing) return;
       if (event.type == 2 || event.type == 20 || event.type == 21 || event.type == 22 || event.type == 32) {
         _debouncedLoadContacts();
       } else if (event.type == 24) {
         _debouncedLoadContacts();
-        Future.microtask(() => _showInviteDialog(event.data));
+        Future.microtask(() {
+          if (!_isDisposing && mounted) _showInviteDialog(event.data);
+        });
       }
     });
   }
 
   @override
   void dispose() {
+    _isDisposing = true;
     _refreshDebounce?.cancel();
-    AppTheme.current.removeListener(_onThemeChanged);
     _networkSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
   }
 
   void _showInviteDialog(Uint8List data) {
@@ -1417,18 +1450,20 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               _client.declineGroupInvite(groupId);
               Navigator.pop(context);
-              _loadContacts();
+              await Future.delayed(const Duration(milliseconds: 600));
+              if (mounted) _loadContacts();
             },
             child: Text("DECLINE", style: TextStyle(color: Colors.redAccent)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               _client.acceptGroupInvite(groupId);
               Navigator.pop(context);
-              _loadContacts();
+              await Future.delayed(const Duration(milliseconds: 600));
+              if (mounted) _loadContacts();
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
             child: Text("ACCEPT"),
@@ -1473,18 +1508,20 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                               children: [
                                 IconButton(
                                   icon: Icon(Icons.close, color: Colors.redAccent, size: 20),
-                                  onPressed: () {
+                                  onPressed: () async {
                                     _client.declineGroupInvite(groupId);
                                     setDialogState(() {});
-                                    _loadContacts();
+                                    await Future.delayed(const Duration(milliseconds: 600));
+                                    if (mounted) _loadContacts();
                                   },
                                 ),
                                 IconButton(
                                   icon: Icon(Icons.check, color: AppTheme.current.accent, size: 20),
-                                  onPressed: () {
+                                  onPressed: () async {
                                     _client.acceptGroupInvite(groupId);
                                     setDialogState(() {});
-                                    _loadContacts();
+                                    await Future.delayed(const Duration(milliseconds: 600));
+                                    if (mounted) _loadContacts();
                                   },
                                 ),
                               ],
@@ -1561,7 +1598,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   void _debouncedLoadContacts() {
     _refreshDebounce?.cancel();
     _refreshDebounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted) _loadContacts();
+      if (!_isDisposing && mounted) _loadContacts();
     });
   }
 
@@ -1589,7 +1626,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   }
 
   Future<void> _loadContacts() async {
-    if (!mounted || _isRefreshing) return;
+    if (_isDisposing || !mounted || _isRefreshing) return;
     _isRefreshing = true;
     setState(() => _isLoading = true);
     try {
@@ -1714,7 +1751,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
           ),
         ],
       ),
-    );
+    ).whenComplete(() => controller.dispose());
   }
 
   void _showAddOptions() {
@@ -2024,6 +2061,8 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                     borderAlpha: 0.12,
                     padding: EdgeInsets.zero,
                     margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Material(
+                    color: Colors.transparent,
                     child: ListTile(
                     leading: SovereignAvatar(
                       radius: 30,
@@ -2130,6 +2169,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                       ).then((_) => _loadContacts());
                     },
                   ),
+                  ),
                   );
                 }
               },
@@ -2200,34 +2240,38 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
       }
     } else if (action == 'rename') {
       final controller = TextEditingController(text: currentAlias ?? "");
-      final newAlias = await showDialog<String>(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: AppTheme.current.surface,
-          title: Text("Rename Contact"),
-          content: TextField(
-            controller: controller,
-            style: TextStyle(color: AppTheme.current.text),
-            decoration: InputDecoration(
-              labelText: "Alias",
-              labelStyle: TextStyle(color: AppTheme.current.accent),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+      try {
+        final newAlias = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: AppTheme.current.surface,
+            title: Text("Rename Contact"),
+            content: TextField(
+              controller: controller,
+              style: TextStyle(color: AppTheme.current.text),
+              decoration: InputDecoration(
+                labelText: "Alias",
+                labelStyle: TextStyle(color: AppTheme.current.accent),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
+                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+              ),
             ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, null), child: Text("CANCEL")),
+              TextButton(
+                onPressed: () => Navigator.pop(context, controller.text.trim()),
+                child: Text("SAVE", style: TextStyle(color: AppTheme.current.accent)),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, null), child: Text("CANCEL")),
-            TextButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: Text("SAVE", style: TextStyle(color: AppTheme.current.accent)),
-            ),
-          ],
-        ),
-      );
+        );
 
-      if (newAlias != null) {
-        _client.updateContactAlias(peerId, newAlias);
-        _loadContacts();
+        if (newAlias != null) {
+          _client.updateContactAlias(peerId, newAlias);
+          _loadContacts();
+        }
+      } finally {
+        controller.dispose();
       }
     }
   }
@@ -2573,7 +2617,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   bool _isAnchorMode = false;
   bool _isTunnelMode = false;
   String _klipyApiKey = '';
-  bool _clawEngineActive = false;
   String _clawStatusJson = '{}';
   int _clawDriveBytes = 0;
   int _clawMeshBytes = 0;
@@ -2606,6 +2649,9 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     _isAnchorMode = IntrovertClient().isAnchorModeEnabled();
     _isTunnelMode = IntrovertClient().isTunnelModeEnabled();
     _loadKlipyApiKey();
+    
+    // Intro-Claw is always active — no toggle needed
+    IntrovertClient().setIntroClawActive(true);
     _refreshClawStatus();
     
     _swarmStatsSubscription = IntrovertClient().swarmStatsStream.listen((stats) {
@@ -3001,6 +3047,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
 
   void _loadKlipyApiKey() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _klipyApiKey = prefs.getString('klipy_api_key') ?? '';
     });
@@ -3337,22 +3384,25 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                       ],
                     ),
                     Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1), height: 24),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('Wallet ID', style: TextStyle(fontSize: 13, color: AppTheme.current.text.withValues(alpha: 0.7))),
-                      subtitle: Text(_economyStats['sol_address'] ?? 'Connecting...', 
-                        style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppTheme.current.text.withValues(alpha: 0.5))),
-                      trailing: IconButton(
-                        icon: Icon(Icons.copy, size: 18),
-                        onPressed: () {
-                          final addr = _economyStats['sol_address'];
-                          if (addr != null && addr != 'Connecting...') {
-                            Clipboard.setData(ClipboardData(text: addr));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Wallet ID copied to clipboard')),
-                            );
-                          }
-                        },
+                    Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('Wallet ID', style: TextStyle(fontSize: 13, color: AppTheme.current.text.withValues(alpha: 0.7))),
+                        subtitle: Text(_economyStats['sol_address'] ?? 'Connecting...', 
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppTheme.current.text.withValues(alpha: 0.5))),
+                        trailing: IconButton(
+                          icon: Icon(Icons.copy, size: 18),
+                          onPressed: () {
+                            final addr = _economyStats['sol_address'];
+                            if (addr != null && addr != 'Connecting...') {
+                              Clipboard.setData(ClipboardData(text: addr));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Wallet ID copied to clipboard')),
+                              );
+                            }
+                          },
+                        ),
                       ),
                     ),
                     Text(
@@ -3674,7 +3724,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 await UpdateService.setUpdateUrl(controller.text);
                 if (context.mounted) {
                   Navigator.pop(context);
-                  setState(() {});
+                  if (mounted) setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Update server configuration saved.')),
                   );
@@ -3685,7 +3735,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
           ],
         );
       },
-    );
+    ).whenComplete(() => controller.dispose());
   }
 
   void _showAboutDialog() {
@@ -3950,28 +4000,31 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                         ),
                         ...AppTheme.themes.map((theme) {
                           final isSelected = theme.name == AppTheme.current.theme.name;
-                          return ListTile(
-                            leading: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(colors: [theme.bg, theme.surface]),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: theme.accent.withValues(alpha: 0.5), width: 1.5),
+                          return Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              leading: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(colors: [theme.bg, theme.surface]),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: theme.accent.withValues(alpha: 0.5), width: 1.5),
+                                ),
+                                child: Container(
+                                  margin: EdgeInsets.all(4),
+                                  decoration: BoxDecoration(color: theme.accent, shape: BoxShape.circle),
+                                ),
                               ),
-                              child: Container(
-                                margin: EdgeInsets.all(4),
-                                decoration: BoxDecoration(color: theme.accent, shape: BoxShape.circle),
-                              ),
+                              title: Text(theme.name, style: TextStyle(color: isSelected ? AppTheme.current.accent : AppTheme.current.text, fontSize: 14)),
+                              subtitle: Text(theme.isDark ? "Dark" : "Light", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                              trailing: isSelected ? Icon(Icons.check, color: AppTheme.current.accent) : null,
+                              onTap: () {
+                                AppTheme.current.setTheme(theme);
+                                Navigator.pop(context);
+                                setState((){});
+                              },
                             ),
-                            title: Text(theme.name, style: TextStyle(color: isSelected ? AppTheme.current.accent : AppTheme.current.text, fontSize: 14)),
-                            subtitle: Text(theme.isDark ? "Dark" : "Light", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
-                            trailing: isSelected ? Icon(Icons.check, color: AppTheme.current.accent) : null,
-                            onTap: () {
-                              AppTheme.current.setTheme(theme);
-                              Navigator.pop(context);
-                              setState((){});
-                            },
                           );
                         }),
 
@@ -3991,7 +4044,9 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                     borderAlpha: 0.12,
                     padding: EdgeInsets.zero,
                     margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: ListTile(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: ListTile(
                               leading: Container(
                                 width: 32,
                                 height: 32,
@@ -4057,37 +4112,41 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                                 setState((){});
                               },
                             ),
+                          ),
                           );
                         }),
                         ],
 
                         // Create custom theme button
                         Divider(height: 1, indent: 16, endIndent: 16, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                        ListTile(
-                          leading: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: AppTheme.current.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3), width: 1),
+                        Material(
+                          color: Colors.transparent,
+                          child: ListTile(
+                            leading: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: AppTheme.current.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3), width: 1),
+                              ),
+                              child: Icon(Icons.add, color: AppTheme.current.accent, size: 18),
                             ),
-                            child: Icon(Icons.add, color: AppTheme.current.accent, size: 18),
+                            title: Text("Create Custom Theme", style: TextStyle(color: AppTheme.current.accent, fontSize: 14, fontWeight: FontWeight.w500)),
+                            subtitle: Text("Design your own colour palette", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                            onTap: () async {
+                              final result = await showDialog<ThemeConfig>(
+                                context: context,
+                                builder: (_) => CustomThemeCreator(),
+                              );
+                              if (result != null) {
+                                await AppTheme.current.saveCustomTheme(result);
+                                await AppTheme.current.setTheme(result);
+                                setSheetState(() {});
+                                setState(() {});
+                              }
+                            },
                           ),
-                          title: Text("Create Custom Theme", style: TextStyle(color: AppTheme.current.accent, fontSize: 14, fontWeight: FontWeight.w500)),
-                          subtitle: Text("Design your own colour palette", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
-                          onTap: () async {
-                            final result = await showDialog<ThemeConfig>(
-                              context: context,
-                              builder: (_) => CustomThemeCreator(),
-                            );
-                            if (result != null) {
-                              await AppTheme.current.saveCustomTheme(result);
-                              await AppTheme.current.setTheme(result);
-                              setSheetState(() {});
-                              setState(() {});
-                            }
-                          },
                         ),
                         SizedBox(height: 16),
                       ],
@@ -4104,70 +4163,73 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
 
   void _showKlipyApiKeyDialog() async {
     final controller = TextEditingController(text: _klipyApiKey);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.current.surface,
-        title: Text("Configure KLIPY API Key", style: TextStyle(color: AppTheme.current.accent)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Get a free KLIPY API key by registering a partner app at:",
-              style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12),
-            ),
-            SizedBox(height: 4),
-            InkWell(
-              onTap: () {
-                Clipboard.setData(const ClipboardData(text: "https://partner.klipy.com/"));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Link copied to clipboard")),
-                );
-              },
-              child: Text(
-                "partner.klipy.com (Tap to copy link)",
-                style: TextStyle(color: AppTheme.current.accent, decoration: TextDecoration.underline, fontSize: 12),
+    try {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppTheme.current.surface,
+          title: Text("Configure KLIPY API Key", style: TextStyle(color: AppTheme.current.accent)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Get a free KLIPY API key by registering a partner app at:",
+                style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12),
               ),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                labelText: "KLIPY API Key",
-                labelStyle: TextStyle(color: Colors.grey),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+              SizedBox(height: 4),
+              InkWell(
+                onTap: () {
+                  Clipboard.setData(const ClipboardData(text: "https://partner.klipy.com/"));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Link copied to clipboard")),
+                  );
+                },
+                child: Text(
+                  "partner.klipy.com (Tap to copy link)",
+                  style: TextStyle(color: AppTheme.current.accent, decoration: TextDecoration.underline, fontSize: 12),
+                ),
               ),
-              style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
+              SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: "KLIPY API Key",
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+                ),
+                style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text("CANCEL", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text("SAVE", style: TextStyle(color: AppTheme.current.accent)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text("CANCEL", style: TextStyle(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text("SAVE", style: TextStyle(color: AppTheme.current.accent)),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (confirm == true) {
-      final value = controller.text.trim();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('klipy_api_key', value);
-      setState(() {
-        _klipyApiKey = value;
-      });
-      if (mounted) {
+      if (confirm == true) {
+        final value = controller.text.trim();
+        final prefs = await SharedPreferences.getInstance();
+        if (!mounted) return;
+        await prefs.setString('klipy_api_key', value);
+        setState(() {
+          _klipyApiKey = value;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(value.isEmpty ? "KLIPY API Key removed" : "KLIPY API Key updated")),
         );
       }
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -4269,12 +4331,12 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                         ],
                       ),
                       SizedBox(height: 8),
-                      // Engine Status Row
+                      // Engine Status (always active)
                       Row(
                         children: [
                           Icon(
-                            _clawEngineActive ? Icons.check_circle : Icons.cancel,
-                            color: _clawEngineActive ? Colors.green : Colors.red,
+                            Icons.check_circle,
+                            color: Colors.green,
                             size: 18,
                           ),
                           SizedBox(width: 8),
@@ -4283,7 +4345,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _clawEngineActive ? 'Engine Active' : 'Engine Inactive',
+                                  'Engine Active',
                                   style: TextStyle(
                                     color: AppTheme.current.text,
                                     fontSize: 12,
@@ -4291,7 +4353,41 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                                   ),
                                 ),
                                 Text(
-                                  'Runs 17 modules every 5 minutes',
+                                  'Runs 20+ modules every 5 minutes',
+                                  style: TextStyle(
+                                    color: AppTheme.current.mutedText,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      // Node Mode Toggle (for anchor/always-on nodes)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.dns_rounded,
+                            color: _isAnchorMode ? AppTheme.current.accent : AppTheme.current.mutedText,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Node Mode',
+                                  style: TextStyle(
+                                    color: AppTheme.current.text,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Aggressive optimizations for always-on nodes',
                                   style: TextStyle(
                                     color: AppTheme.current.mutedText,
                                     fontSize: 10,
@@ -4301,10 +4397,10 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                             ),
                           ),
                           Switch(
-                            value: _clawEngineActive,
+                            value: _isAnchorMode,
                             onChanged: (value) {
-                              IntrovertClient().setIntroClawActive(value);
-                              _refreshClawStatus();
+                              _toggleAnchorMode(value);
+                              IntrovertClient().setIntroClawNodeMode(value);
                             },
                             activeColor: AppTheme.current.accent,
                           ),
@@ -4470,7 +4566,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       final status = jsonDecode(statusJson) as Map<String, dynamic>;
       setState(() {
         _clawStatusJson = statusJson;
-        _clawEngineActive = status['is_active'] == true;
       });
     } catch (e) {
       debugPrint('Error loading intro-claw status: $e');
@@ -4549,17 +4644,20 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
       iconColor = AppTheme.current.accent;
     }
 
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: iconColor, size: 20),
-      title: Text('$token Balance', style: TextStyle(fontSize: 13)),
-      trailing: Text(
-        '$formattedBalance $token',
-        style: TextStyle(
-          fontFamily: 'monospace',
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          color: AppTheme.current.text,
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(icon, color: iconColor, size: 20),
+        title: Text('$token Balance', style: TextStyle(fontSize: 13)),
+        trailing: Text(
+          '$formattedBalance $token',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: AppTheme.current.text,
+          ),
         ),
       ),
     );
@@ -4588,7 +4686,7 @@ class _CreateGroupDialogState extends State<_CreateGroupDialog> {
     super.dispose();
   }
 
-  void _createGroup() {
+  void _createGroup() async {
     final name = _nameController.text.trim();
     final desc = _descController.text.trim();
     if (name.isEmpty) {
@@ -4600,6 +4698,7 @@ class _CreateGroupDialogState extends State<_CreateGroupDialog> {
     final messenger = ScaffoldMessenger.of(context);
     _client.createGroup(name, desc, _selectedPeerIds);
     Navigator.pop(context);
+    await Future.delayed(const Duration(milliseconds: 600));
     widget.onComplete();
     messenger.showSnackBar(
       SnackBar(content: Text("Group '$name' created successfully!")),

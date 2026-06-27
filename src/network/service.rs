@@ -35,8 +35,10 @@ pub struct NetworkService {
     pub(crate) direct_conn_count: HashMap<PeerId, usize>,
     pub(crate) relay_reservations: HashSet<PeerId>,
     pub(crate) relay_listeners: HashMap<ListenerId, PeerId>,
-    pub(crate) relay_dial_limiter: HashMap<PeerId, Instant>,
+    pub(crate) relay_dial_limiter: HashMap<PeerId, (Instant, u32)>, // (last_attempt, failure_count)
     pub(crate) outbound_tracker: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
+    pub(crate) peer_supports_v2: HashSet<PeerId>,
+    pub(crate) outbound_tracker_v2: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
     pub(crate) inflight_requests: HashMap<PeerId, u32>,
     pub(crate) liveness_interval_secs: u64,
     pub(crate) downloads_dir: String,
@@ -54,6 +56,17 @@ pub struct NetworkService {
     pub(crate) pending_offers: HashMap<PeerId, String>,
     pub(crate) early_chunks: indexmap::IndexMap<String, Vec<(u32, u32, String)>>,
     pub(crate) intro_claw: crate::intro_claw::IntroClawService,
+    pub(crate) heal_rate_limiter: HashMap<PeerId, Instant>,
+    pub(crate) pending_requester_static_keys: HashMap<String, Vec<u8>>,
+    pub(crate) introclaw_command_log: Vec<(Instant, String)>,
+    /// Pending ACKs to be batched: peer_id -> Vec<(msg_id, status)>
+    pub(crate) pending_acks: HashMap<PeerId, Vec<(String, u8)>>,
+    /// Peers discovered via mDNS (local network)
+    pub(crate) mdns_peers: HashSet<PeerId>,
+    /// Deduplication: recently seen group message IDs to prevent duplicate event dispatch
+    pub(crate) seen_group_messages: HashSet<String>,
+    /// Last time ACKs were flushed
+    pub(crate) last_ack_flush: Instant,
 }
 
 #[derive(Debug, Clone)]

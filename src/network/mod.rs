@@ -29,6 +29,7 @@ pub mod config;
 pub mod group;
 pub mod registry;
 pub mod tunnel;
+pub mod codec;
 pub mod types;
 pub mod service;
 pub mod e2ee;
@@ -200,6 +201,15 @@ impl NetworkService {
                 Arc::clone(&storage),
                 shared_is_relayed_map,
             ),
+            peer_supports_v2: HashSet::new(),
+            outbound_tracker_v2: HashMap::new(),
+            heal_rate_limiter: HashMap::new(),
+            pending_requester_static_keys: HashMap::new(),
+            introclaw_command_log: Vec::new(),
+            pending_acks: HashMap::new(),
+            mdns_peers: HashSet::new(),
+            seen_group_messages: HashSet::new(),
+            last_ack_flush: Instant::now(),
         })
     }
 
@@ -293,6 +303,13 @@ impl NetworkService {
                         let payload = crate::network::SignalingPayload::Heartbeat { timestamp };
                         let _ = self.forward_to_mesh(peer_id, payload, false).await;
                     }
+                    
+                    // Periodic cache maintenance
+                    let now = Instant::now();
+                    self.heal_rate_limiter.retain(|_, t| now.duration_since(*t) < Duration::from_secs(60));
+                    if self.seen_group_messages.len() > 1000 {
+                        self.seen_group_messages.clear();
+                    }
                 }
                 _ = fast_poll_interval.tick() => {
                     let has_active_incoming = self.incoming_transfers.values().any(|t| t.is_relayed);
@@ -378,7 +395,7 @@ impl NetworkService {
                                 // Find the first missing chunk index
                                 let mut next = 0u32;
                                 while t.received_chunks.contains_key(&next) { next += 1; }
-                                let window = if is_direct_p2p { 8 } else { 4 };
+                                let window = if is_direct_p2p { 12 } else { 8 };
                                 let limit = if t.total_chunks > 0 {
                                     std::cmp::min(next + window, t.total_chunks)
                                 } else {
@@ -508,14 +525,18 @@ impl NetworkService {
                             .map(|pid| pid.to_string())
                             .collect();
                         let active_hashes = self.storage.get_active_drive_hashes();
+                        let mdns_peers: Vec<String> = self.mdns_peers.iter()
+                            .map(|p| p.to_string())
+                            .collect();
                         let ctx = crate::intro_claw::ClawTickContext {
                             battery_pct: 100, // Platform-specific in future
                             is_background: false,
                             connected_peers,
-                            mdns_discovered: Vec::new(),
+                            mdns_discovered: mdns_peers,
                             active_transfer_hashes: active_hashes,
                         };
-                        self.intro_claw.tick(&ctx);
+                        let actions = self.intro_claw.tick(&ctx);
+                        self.execute_claw_actions(actions).await;
                     }
                 }
                 _ = republication_interval.tick() => {
@@ -876,6 +897,9 @@ impl NetworkService {
                         for (peer_id, addrs) in grouped {
                             info!("mDNS discovered peer: {} with {} addresses", peer_id, addrs.len());
                             
+                            // Track mDNS peers for Intro-Claw context
+                            self.mdns_peers.insert(peer_id);
+                            
                             // Check if this peer is a static bootstrap node to prevent clearing its bootstrap configuration
                             let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id);
                             if !is_bootstrap {
@@ -1133,8 +1157,15 @@ impl NetworkService {
                                     let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
                                     let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
                                     let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
+                                    let local_static_key = self.local_static_public.to_bytes().to_vec();
                                     tokio::spawn(async move {
-                                        let req = SignalingPayload::GroupManifestRequest { group_id: gid, alias, avatar, handle };
+                                        let req = SignalingPayload::GroupManifestRequest {
+                                            group_id: gid,
+                                            alias,
+                                            avatar,
+                                            handle,
+                                            requester_static_key: Some(local_static_key),
+                                        };
                                         let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload: req }).await;
                                     });
                                 }
@@ -1219,14 +1250,22 @@ impl NetworkService {
                             let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
                             let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
                             let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
+                            let local_static_key = self.local_static_public.to_bytes().to_vec();
                             for peer_id in providers {
                                 let tx = self.command_tx.clone();
                                 let gid = value_str.clone();
                                 let alias_clone = alias.clone();
                                 let handle_clone = handle.clone();
                                 let avatar_clone = avatar.clone();
+                                let static_key_clone = local_static_key.clone();
                                 tokio::spawn(async move {
-                                    let req = SignalingPayload::GroupManifestRequest { group_id: gid, alias: alias_clone, avatar: avatar_clone, handle: handle_clone };
+                                    let req = SignalingPayload::GroupManifestRequest {
+                                        group_id: gid,
+                                        alias: alias_clone,
+                                        avatar: avatar_clone,
+                                        handle: handle_clone,
+                                        requester_static_key: Some(static_key_clone),
+                                    };
                                     let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload: req }).await;
                                 });
                             }
@@ -1542,11 +1581,12 @@ impl NetworkService {
                 }
             }
             SwarmEvent::ConnectionClosed { peer_id, endpoint, .. } => {
-               // Clean up WebRTC resources immediately on connection loss to prevent stale ghost channels
-               self.data_channels.write().remove(&peer_id);
-               self.anchor_mappings.remove(&peer_id);
-               self.relay_reservations.remove(&peer_id);
-               self.inflight_requests.remove(&peer_id);
+                // Clean up WebRTC resources immediately on connection loss to prevent stale ghost channels
+                self.data_channels.write().remove(&peer_id);
+                self.anchor_mappings.remove(&peer_id);
+                self.relay_reservations.remove(&peer_id);
+                self.inflight_requests.remove(&peer_id);
+                self.pending_requester_static_keys.remove(&peer_id.to_string());
 
                let pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer_id) };
                if let Some(pc) = pc {
@@ -1641,24 +1681,37 @@ impl NetworkService {
     fn dial_relay_path(&mut self, recipient_id: PeerId) {
         let recipient_str = recipient_id.to_string();
 
-        // Rate-limit dials to 5s per peer to avoid ResourceLimitExceeded
-        if let Some(last) = self.relay_dial_limiter.get(&recipient_id) {
-            if last.elapsed() < Duration::from_secs(5) { return; }
+        // Exponential backoff: base 5s, max 300s (5 minutes)
+        const BASE_BACKOFF_SECS: u64 = 5;
+        const MAX_BACKOFF_SECS: u64 = 300;
+        
+        if let Some((last, failure_count)) = self.relay_dial_limiter.get(&recipient_id) {
+            let backoff = std::cmp::min(
+                BASE_BACKOFF_SECS * 2u64.pow(*failure_count),
+                MAX_BACKOFF_SECS
+            );
+            if last.elapsed() < Duration::from_secs(backoff) {
+                debug!("[Mesh] Rate-limited dial to {} (backoff: {}s, failures: {})", 
+                    &recipient_str[..16.min(recipient_str.len())], backoff, failure_count);
+                return;
+            }
         }
-        self.relay_dial_limiter.insert(recipient_id, Instant::now());
 
         info!("[Mesh] Peer {} not connected. Constructing relay paths...", recipient_str);
 
         // 1. Dial ONE random RBN node from the bootstrap list (Scalability fix for Million-Node Mandate)
         // Dilation all RBNs simultaneously causes ResourceLimitExceeded on the relays.
+        // SELF-RELAY GUARD: skip any bootstrap node matching our own PeerId (defensive coding).
+        let local_id = *self.swarm.local_peer_id();
         let mut rbn_list: Vec<_> = self.bootstrap_nodes.iter()
-            .filter(|(_, addr)| addr.to_string().contains("443"))
+            .filter(|(id, addr)| *id != local_id && addr.to_string().contains("443"))
             .collect();
         
         use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
         rbn_list.shuffle(&mut rng);
 
+        let mut dial_success = false;
         if let Some((rbn_id, rbn_addr)) = rbn_list.first() {
             let relay_addr = rbn_addr.clone()
                 .with(libp2p::multiaddr::Protocol::P2p(*rbn_id))
@@ -1666,11 +1719,24 @@ impl NetworkService {
                 .with(libp2p::multiaddr::Protocol::P2p(recipient_id));
 
             info!("[Mesh] Attempting relay path dial via RBN: {}", rbn_id);
-            let _ = self.swarm.dial(relay_addr);
+            if self.swarm.dial(relay_addr).is_ok() {
+                dial_success = true;
+            }
         }
 
         // 2. Also attempt direct dial as primary fallback
-        let _ = self.swarm.dial(recipient_id);
+        if self.swarm.dial(recipient_id).is_ok() {
+            dial_success = true;
+        }
+
+        // Update limiter with backoff
+        let entry = self.relay_dial_limiter.entry(recipient_id).or_insert((Instant::now(), 0));
+        entry.0 = Instant::now();
+        if !dial_success {
+            entry.1 = entry.1.saturating_add(1);
+        } else {
+            entry.1 = 0; // Reset on success
+        }
     }
 
     async fn forward_to_mesh(&mut self, recipient_id: PeerId, payload: SignalingPayload, force_mailbox: bool) -> anyhow::Result<()> {
@@ -1749,7 +1815,6 @@ impl NetworkService {
                     SignalingPayload::Standard(_) | 
                     SignalingPayload::ChatMessage { .. } | 
                     SignalingPayload::Acknowledgement { .. } |
-                    SignalingPayload::GroupAction(_) |
                     SignalingPayload::GroupManifest { .. } |
                     SignalingPayload::GroupInvite { .. } |
                     SignalingPayload::MessageReaction { .. } |
@@ -2127,13 +2192,48 @@ impl NetworkService {
                     }
 
                     if let Ok(peer) = requester_peer_id.parse::<PeerId>() {
-                        let manifest_payload = SignalingPayload::GroupManifest {
-                            group_id: group_id.clone(),
-                            name: group_info.name.clone(),
-                            description: group_info.description.clone(),
-                            members: members.clone(),
-                        };
-                        let _ = self.forward_to_mesh(peer, manifest_payload, false).await;
+                        // Check if we have the requester's static public key to wrap the secret
+                        let mut static_key = None;
+                        
+                        // First, try contact storage
+                        if let Ok(Some(contact)) = self.storage.get_contact(&requester_peer_id) {
+                            static_key = Some(contact.static_key);
+                        } else if let Some(sk_bytes) = self.pending_requester_static_keys.remove(&requester_peer_id) {
+                            // Try the pending requests cache
+                            if sk_bytes.len() == 32 {
+                                let mut sk = [0u8; 32];
+                                sk.copy_from_slice(&sk_bytes);
+                                static_key = Some(sk);
+                            }
+                        }
+
+                        let mut sent_invite = false;
+                        if let Some(sk) = static_key {
+                            if let Ok(wrapped) = group::GroupManager::wrap_group_secret(&group_info.secret, &sk) {
+                                let invite_payload = SignalingPayload::GroupInvite {
+                                    group_id: group_id.clone(),
+                                    name: group_info.name.clone(),
+                                    description: group_info.description.clone(),
+                                    inviter_peer_id: my_peer_id.clone(),
+                                    group_secret_wrapped: wrapped,
+                                    members: members.clone(),
+                                };
+                                info!("[Mesh] Sending GroupInvite to approved requester {}", requester_peer_id);
+                                let _ = self.forward_to_mesh(peer, invite_payload, false).await;
+                                sent_invite = true;
+                            }
+                        }
+
+                        if !sent_invite {
+                            info!("[Mesh] No contact or pending static key found for approved requester {}, sending GroupManifest fallback", requester_peer_id);
+                            let manifest_payload = SignalingPayload::GroupManifest {
+                                group_id: group_id.clone(),
+                                name: group_info.name.clone(),
+                                description: group_info.description.clone(),
+                                members: members.clone(),
+                            };
+                            let _ = self.forward_to_mesh(peer, manifest_payload, false).await;
+                        }
                     }
 
                     crate::dispatch_global_event(23, group_id.as_bytes());
@@ -2141,6 +2241,7 @@ impl NetworkService {
             }
             NetworkCommand::RejectGroupJoin { group_id, requester_peer_id, reason } => {
                 info!("[Mesh] Admin rejecting group join request for {} to group {}", requester_peer_id, group_id);
+                self.pending_requester_static_keys.remove(&requester_peer_id);
                 if let Ok(Some(group_info)) = self.storage.get_group(&group_id) {
                     if let Ok(peer) = requester_peer_id.parse::<PeerId>() {
                         let reject_payload = SignalingPayload::GroupJoinRejected {
@@ -2335,6 +2436,13 @@ impl NetworkService {
                         let _ = self.storage.upsert_group(&group_id, &invite.name, &invite.description, &invite.members_json);
                         let _ = self.storage.delete_pending_invite(&group_id);
                         let _ = self.storage.untombstone_group(&group_id);
+
+                        // Subscribe to Gossipsub topic for this group immediately
+                        let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
+                        if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
+                            error!("[Mesh] Failed to subscribe to gossipsub topic for accepted group {}: {:?}", group_id, e);
+                        }
+
                         crate::dispatch_global_event(23, group_id.as_bytes());
                         info!("[Mesh] ✅ Group invite accepted: {}", invite.name);
 
@@ -2365,6 +2473,21 @@ impl NetworkService {
                 let ident_topic = libp2p::gossipsub::IdentTopic::new(topic.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.publish(ident_topic, data) {
                     error!("[Mesh] ❌ Failed to publish gossipsub message to topic {}: {:?}", topic, e);
+                }
+            }
+            NetworkCommand::SubscribeGossipsub { group_id } => {
+                let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
+                match self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
+                    Ok(subbed) => {
+                        if subbed {
+                            info!("[Mesh] Subscribed to gossipsub topic for group: {}", group_id);
+                        } else {
+                            debug!("[Mesh] Already subscribed to gossipsub topic for group: {}", group_id);
+                        }
+                    }
+                    Err(e) => {
+                        error!("[Mesh] ❌ Failed to subscribe to gossipsub topic for group {}: {:?}", group_id, e);
+                    }
                 }
             }
             NetworkCommand::BroadcastGroupMessage { group_id, message, reply_to } => {
@@ -3145,7 +3268,8 @@ impl NetworkService {
                     mdns_discovered,
                     active_transfer_hashes: active_hashes,
                 };
-                self.intro_claw.tick(&ctx);
+                let actions = self.intro_claw.tick(&ctx);
+                self.execute_claw_actions(actions).await;
             }
             NetworkCommand::IntroClawSetActive { active } => {
                 self.intro_claw.set_active(active);
@@ -3308,6 +3432,13 @@ impl NetworkService {
             NetworkCommand::IntroClawVoipGetQuality { result_tx } => {
                 let quality = self.intro_claw.voip_get_quality_summary();
                 let _ = result_tx.send(quality);
+            }
+            NetworkCommand::IntroClawSetNodeMode { enabled } => {
+                self.intro_claw.set_node_mode(enabled);
+            }
+            NetworkCommand::IntroClawVoipGetDowngradeRecommendation { result_tx } => {
+                let recommendation = self.intro_claw.voip_get_downgrade_recommendation();
+                let _ = result_tx.send(recommendation);
             }
         }
         Ok(())
@@ -3681,7 +3812,8 @@ impl NetworkService {
                 let (path, csize, tchunks, f_hash, grp_id) = if let Some(info) = seeder_info {
                     // SECURITY: Verify requesting peer is authorized for this transfer
                     let peer_str = peer.to_string();
-                    let authorized = if let Some(ref gid) = info.4 {
+                    let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer);
+                    let authorized = is_bootstrap || if let Some(ref gid) = info.4 {
                         // Group transfer: verify peer is a group member
                         self.storage.get_group(gid)
                             .ok()
@@ -3710,8 +3842,9 @@ impl NetworkService {
                     let tchunks = (size as f32 / requested_csize as f32).ceil() as u32;
                     (info.0, requested_csize, tchunks, info.3, info.4)
                 } else {
-                    // SECURITY: Only serve Sovereign Drive files to known contacts
-                    let is_contact = self.storage.get_contact(&peer.to_string())
+                    // SECURITY: Only serve Sovereign Drive files to known contacts or bootstrap nodes
+                    let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer);
+                    let is_contact = is_bootstrap || self.storage.get_contact(&peer.to_string())
                         .ok()
                         .flatten()
                         .is_some();
@@ -4115,7 +4248,7 @@ impl NetworkService {
                 let is_direct_p2p = is_connected_now && !relayed_map_snapshot.unwrap_or(false);
                 let final_is_relayed = if is_direct_p2p { false } else { is_relayed };
 
-                let chunk_size = if final_is_relayed { 64 * 1024 } else { 256 * 1024 };
+                let chunk_size = 256 * 1024;
                 let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
 
                 // DEDUPLICATION: If we already have an active transfer for this file_hash (regardless
@@ -4155,9 +4288,9 @@ impl NetworkService {
                         let mut next = 0u32;
                         while existing.received_chunks.contains_key(&next) { next += 1; }
                         let limit = if existing.total_chunks > 0 {
-                            std::cmp::min(next + 4, existing.total_chunks)
+                            std::cmp::min(next + 8, existing.total_chunks)
                         } else {
-                            next + 4
+                            next + 8
                         };
                         existing.next_pull_idx = limit;
                         
@@ -4198,7 +4331,7 @@ impl NetworkService {
                         last_update: Instant::now(),
                         is_relayed: final_is_relayed,
                         group_id: group_id.clone(),
-                        next_pull_idx: 4,
+                        next_pull_idx: 8,
                         chunk_size,
                         stall_chunk_count: 0,
                     });
@@ -4250,7 +4383,7 @@ impl NetworkService {
                     if final_is_relayed {
                         let is_direct = self.swarm.is_connected(&actual_seeder_peer)
                             && self.is_relayed_map.read().get(&actual_seeder_peer).cloned() == Some(false);
-                        let initial_pipeline = if is_direct { 8 } else { 4 };
+                        let initial_pipeline = if is_direct { 12 } else { 8 };
                         let pacing_delay = if is_direct { 10 } else { 50 };
 
                         info!("[Mesh] Relay/Pull transfer detected. Initiating primed pull sequence ({} deep) for {}", initial_pipeline, transfer_id);
@@ -4280,13 +4413,49 @@ impl NetworkService {
                 info!("[Mesh] Received chunk {}/{} for {}", chunk_index, total_chunks, transfer_id);
                 self.handle_file_chunk(peer, transfer_id, chunk_index, total_chunks, data_base64).await;
             }
-            SignalingPayload::GroupManifestRequest { group_id, alias, avatar, handle } => {
+            SignalingPayload::GroupManifestRequest { group_id, alias, avatar, handle, requester_static_key } => {
                 if let Ok(Some(group)) = self.storage.get_group(&group_id) {
                     let members: Vec<GroupMemberMetadata> = serde_json::from_str(&group.members_json).unwrap_or_default();
                     let requester_peer_id = peer.to_string();
 
+                    // Cache the requester's static key if provided
+                    if let Some(ref sk) = requester_static_key {
+                        self.pending_requester_static_keys.insert(requester_peer_id.clone(), sk.clone());
+                    }
+
+                    let my_peer_id = self.swarm.local_peer_id().to_string();
+
                     if members.iter().any(|m| m.peer_id == requester_peer_id) {
-                        // Already a member: return manifest immediately
+                        // Already a member: return manifest immediately, and try to also return the invite to recover secret if needed.
+                        let secret_is_valid = !group.secret.iter().all(|&b| b == 0);
+                        if secret_is_valid {
+                            let mut static_key = None;
+                            if let Ok(Some(contact)) = self.storage.get_contact(&requester_peer_id) {
+                                static_key = Some(contact.static_key);
+                            } else if let Some(ref sk_bytes) = requester_static_key {
+                                if sk_bytes.len() == 32 {
+                                    let mut sk = [0u8; 32];
+                                    sk.copy_from_slice(sk_bytes);
+                                    static_key = Some(sk);
+                                }
+                            }
+
+                            if let Some(sk) = static_key {
+                                if let Ok(wrapped) = group::GroupManager::wrap_group_secret(&group.secret, &sk) {
+                                    let invite_payload = SignalingPayload::GroupInvite {
+                                        group_id: group_id.clone(),
+                                        name: group.name.clone(),
+                                        description: group.description.clone(),
+                                        inviter_peer_id: my_peer_id.clone(),
+                                        group_secret_wrapped: wrapped,
+                                        members: members.clone(),
+                                    };
+                                    info!("[Mesh] Sending GroupInvite to existing member {} to sync/recover secret", requester_peer_id);
+                                    let _ = self.forward_to_mesh(peer, invite_payload, false).await;
+                                }
+                            }
+                        }
+
                         let payload = SignalingPayload::GroupManifest {
                             group_id,
                             name: group.name,
@@ -4296,7 +4465,6 @@ impl NetworkService {
                         let _ = self.forward_to_mesh(peer, payload, false).await;
                     } else {
                         // Not a member: trigger admin approval notification (Event 26)
-                        let my_peer_id = self.swarm.local_peer_id().to_string();
                         let is_admin = members.iter().any(|m| m.peer_id == my_peer_id && (m.role == GroupRole::Creator || m.role == GroupRole::Admin));
                         if is_admin {
                             info!("[Mesh] Group join request from {} for group {}", requester_peer_id, group_id);
@@ -4325,6 +4493,34 @@ impl NetworkService {
             }
             SignalingPayload::GroupInvite { group_id, name, description, inviter_peer_id, group_secret_wrapped, members } => {
                 info!("[Mesh] Received GroupInvite for group: {} from {}", name, inviter_peer_id);
+                
+                // SELF-HEALING: If we already have the group in our DB, but the secret is all-zeros (or we are missing the secret),
+                // we can auto-unwrap and save it without prompting the user!
+                let auto_accept = if let Ok(Some(existing_group)) = self.storage.get_group(&group_id) {
+                    !self.storage.is_group_deleted(&group_id) && existing_group.secret.iter().all(|&b| b == 0)
+                } else {
+                    false
+                };
+
+                if auto_accept {
+                    if let Ok(group_secret) = group::GroupManager::unwrap_group_secret(&group_secret_wrapped, &self.local_static_secret) {
+                        info!("[Mesh] Auto-accepting GroupInvite to recover/save secret for group {}", group_id);
+                        let _ = self.storage.save_group_secret(&group_id, &group_secret);
+                        let members_json = serde_json::to_string(&members).unwrap_or_default();
+                        let _ = self.storage.upsert_group(&group_id, &name, &description, &members_json);
+                        let _ = self.storage.untombstone_group(&group_id);
+                        
+                        // Subscribe to Gossipsub topic for this group immediately to start receiving mesh traffic
+                        let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
+                        if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
+                            error!("[Mesh] Failed to subscribe to gossipsub topic for auto-accepted group {}: {:?}", group_id, e);
+                        }
+                        
+                        crate::dispatch_global_event(23, group_id.as_bytes());
+                        return; // Done! No need to show prompt
+                    }
+                }
+
                 // Subscribe to Gossipsub topic for this group immediately to start receiving mesh traffic
                 let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossipsub.subscribe(&topic) {
@@ -4352,105 +4548,195 @@ impl NetworkService {
                 crate::dispatch_global_event(24, &data);
             }
             SignalingPayload::GroupAction(signed_action) => {
+                crate::dispatch_debug_log(&format!("handle_single_payload: Received GroupAction for group {} from {}", signed_action.group_id, signed_action.signer_peer_id));
                 let members_json_res = self.storage.get_group_members(&signed_action.group_id);
                 if let Ok(Some(members_json)) = members_json_res {
                     let members: Vec<GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
                     match group::GroupManager::verify_action(&signed_action, &members) {
                         Ok(true) => {
+                            crate::dispatch_debug_log("handle_single_payload: GroupAction signature verified successfully");
+                            crate::dispatch_debug_log(&format!("handle_single_payload: Processing GroupAction action variant"));
                             match signed_action.action {
                                 GroupAction::Message { ref content_encrypted, ref msg_id, ref reply_to } => {
-                                    if let Ok(Some(group_info)) = self.storage.get_group(&signed_action.group_id) {
-                                        use aes_gcm::{Aes256Gcm, Key, Nonce, KeyInit, aead::Aead};
-                                        if content_encrypted.len() >= 12 {
-                                            let nonce = Nonce::from_slice(&content_encrypted[0..12]);
-                                            let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&group_info.secret));
-                                            if let Ok(decrypted) = cipher.decrypt(nonce, &content_encrypted[12..]) {
-                                                let content = String::from_utf8_lossy(&decrypted).into_owned();
-                                                let is_me = signed_action.signer_peer_id == self.swarm.local_peer_id().to_string();
-                                                let rt = reply_to.clone();
-                                                if !self.is_stress_test {
-                                                    let _ = self.storage.store_group_message(&signed_action.group_id, &signed_action.signer_peer_id, &msg_id, &content, is_me, rt.as_deref());
-                                                }
-                                                
-                                                let mut event_data = vec![signed_action.group_id.len() as u8];
-                                                event_data.extend(signed_action.group_id.as_bytes());
-                                                event_data.push(signed_action.signer_peer_id.len() as u8);
-                                                event_data.extend(signed_action.signer_peer_id.as_bytes());
-                                                
-                                                let rt_bytes = reply_to.as_ref().map(|s| s.as_bytes()).unwrap_or(&[]);
-                                                event_data.push(rt_bytes.len() as u8);
-                                                event_data.extend(rt_bytes);
+                                    crate::dispatch_debug_log(&format!("handle_single_payload: GroupAction::Message: msg_id={}, content_encrypted_len={}, reply_to={:?}", msg_id, content_encrypted.len(), reply_to));
+                                    
+                                    if self.seen_group_messages.contains(msg_id) {
+                                        crate::dispatch_debug_log(&format!("handle_single_payload: Duplicate group message {} ignored", msg_id));
+                                        return;
+                                    }
+                                    self.seen_group_messages.insert(msg_id.clone());
 
-                                                event_data.extend(content.as_bytes());
-                                                
-                                                // SOVEREIGN HYBRID RELIABILITY: 
-                                                // If we are an anchor node, store this gossip message in the mailbox for all other group members.
-                                                // This ensures that members who are currently offline will receive the message when they reconnect.
-                                                if self.storage.is_anchor_mode_enabled() {
-                                                    let storage_m = self.storage.clone();
-                                                    let gid_m = signed_action.group_id.clone();
-                                                    let payload_m = SignalingPayload::GroupAction(signed_action.clone());
-                                                    let my_id_str = self.swarm.local_peer_id().to_string();
-                                                    let tx_m = self.command_tx.clone();
-                                                    
-                                                    tokio::spawn(async move {
-                                                        if let Ok(Some(members_json)) = storage_m.get_group_members(&gid_m) {
-                                                            let members: Vec<GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
-                                                            for m in members {
-                                                                if m.peer_id != my_id_str {
-                                                                    if let Ok(m_pid) = m.peer_id.parse::<PeerId>() {
-                                                                        // Push to RBN Mailbox for offline members
-                                                                        let _ = tx_m.send(NetworkCommand::StoreInMailbox { 
-                                                                            peer_id: m_pid, 
-                                                                            payload: payload_m.clone() 
-                                                                        }).await;
+                                    match self.storage.get_group(&signed_action.group_id) {
+                                        Ok(Some(group_info)) => {
+                                            let is_all_zeros = group_info.secret.iter().all(|&b| b == 0);
+                                            crate::dispatch_debug_log(&format!("handle_single_payload: Found group info for {}. secret is all zeros: {}. Hex prefix: {}", signed_action.group_id, is_all_zeros, hex::encode(&group_info.secret[0..4.min(group_info.secret.len())])));
+                                            
+                                            if is_all_zeros {
+                                                if let Ok(signer_pid) = signed_action.signer_peer_id.parse::<PeerId>() {
+                                                    let now = std::time::Instant::now();
+                                                    let should_req = if let Some(last) = self.heal_rate_limiter.get(&signer_pid) {
+                                                        now.duration_since(*last) > std::time::Duration::from_secs(10)
+                                                    } else {
+                                                        true
+                                                    };
+                                                    if should_req {
+                                                        self.heal_rate_limiter.insert(signer_pid, now);
+                                                        let local_profile = self.storage.get_profile().ok().flatten();
+                                                        let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                                                        let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                                                        let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
+                                                        let local_static_key = self.local_static_public.to_bytes().to_vec();
+                                                        
+                                                        info!("[Mesh] Group secret is all-zeros for group {}! Proactively requesting manifest from signer {}", signed_action.group_id, signed_action.signer_peer_id);
+                                                        let req = SignalingPayload::GroupManifestRequest {
+                                                            group_id: signed_action.group_id.clone(),
+                                                            alias,
+                                                            avatar,
+                                                            handle,
+                                                            requester_static_key: Some(local_static_key),
+                                                        };
+                                                        let _ = self.forward_to_mesh(signer_pid, req, false).await;
+                                                    }
+                                                }
+                                            }
+                                            
+                                            use aes_gcm::{Aes256Gcm, Key, Nonce, KeyInit, aead::Aead};
+                                            if content_encrypted.len() >= 12 {
+                                                let nonce = Nonce::from_slice(&content_encrypted[0..12]);
+                                                let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&group_info.secret));
+                                                match cipher.decrypt(nonce, &content_encrypted[12..]) {
+                                                    Ok(decrypted) => {
+                                                        let content = String::from_utf8_lossy(&decrypted).into_owned();
+                                                        crate::dispatch_debug_log(&format!("handle_single_payload: Decrypted group message content: {}", content));
+                                                        let is_me = signed_action.signer_peer_id == self.swarm.local_peer_id().to_string();
+                                                        let rt = reply_to.clone();
+                                                        if !self.is_stress_test {
+                                                            if let Err(e) = self.storage.store_group_message(&signed_action.group_id, &signed_action.signer_peer_id, &msg_id, &content, is_me, rt.as_deref()) {
+                                                                crate::dispatch_debug_log(&format!("handle_single_payload: ❌ Failed to store group message: {:?}", e));
+                                                            } else {
+                                                                crate::dispatch_debug_log("handle_single_payload: Successfully stored group message");
+                                                            }
+                                                        }
+                                                        
+                                                        let mut event_data = vec![signed_action.group_id.len() as u8];
+                                                        event_data.extend(signed_action.group_id.as_bytes());
+                                                        event_data.push(signed_action.signer_peer_id.len() as u8);
+                                                        event_data.extend(signed_action.signer_peer_id.as_bytes());
+                                                        
+                                                        let rt_bytes = reply_to.as_ref().map(|s| s.as_bytes()).unwrap_or(&[]);
+                                                        event_data.push(rt_bytes.len() as u8);
+                                                        event_data.extend(rt_bytes);
+
+                                                        event_data.extend(content.as_bytes());
+                                                        
+                                                        // SOVEREIGN HYBRID RELIABILITY: 
+                                                        // If we are an anchor node, store this gossip message in the mailbox for all other group members.
+                                                        // This ensures that members who are currently offline will receive the message when they reconnect.
+                                                        if self.storage.is_anchor_mode_enabled() {
+                                                            let storage_m = self.storage.clone();
+                                                            let gid_m = signed_action.group_id.clone();
+                                                            let payload_m = SignalingPayload::GroupAction(signed_action.clone());
+                                                            let my_id_str = self.swarm.local_peer_id().to_string();
+                                                            let tx_m = self.command_tx.clone();
+                                                            
+                                                            tokio::spawn(async move {
+                                                                if let Ok(Some(members_json)) = storage_m.get_group_members(&gid_m) {
+                                                                    let members: Vec<GroupMemberMetadata> = serde_json::from_str(&members_json).unwrap_or_default();
+                                                                    for m in members {
+                                                                        if m.peer_id != my_id_str {
+                                                                            if let Ok(m_pid) = m.peer_id.parse::<PeerId>() {
+                                                                                // Push to RBN Mailbox for offline members
+                                                                                let _ = tx_m.send(NetworkCommand::StoreInMailbox { 
+                                                                                    peer_id: m_pid, 
+                                                                                    payload: payload_m.clone() 
+                                                                                }).await;
+                                                                            }
+                                                                        }
                                                                     }
+                                                                }
+                                                            });
+                                                        }
+
+                                                        // Anchor Auto-Pull: If we are an anchor node, automatically pull group media
+                                                        // to ensure it's available even if the seeder goes offline.
+                                                        if self.storage.is_anchor_mode_enabled() && content.starts_with("[FILE]:") {
+                                                            if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content[7..]) {
+                                                                let tid = meta.get("transfer_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                                                let filename = meta.get("filename").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
+                                                                let mime_type = meta.get("mime_type").and_then(|v| v.as_str()).unwrap_or("application/octet-stream").to_string();
+                                                                let file_hash = meta.get("file_hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                                                let total_size = meta.get("total_size").and_then(|v| v.as_u64()).unwrap_or(0);
+                                                                
+                                                                if !tid.is_empty() && !file_hash.is_empty() {
+                                                                    let tx = self.command_tx.clone();
+                                                                    let sid = signed_action.signer_peer_id.clone();
+                                                                    let gid = signed_action.group_id.clone();
+                                                                    let tid_clone = tid.clone();
+                                                                    
+                                                                    tokio::spawn(async move {
+                                                                        info!("[Registry] Anchor Auto-Pull: Initiating mesh cache for {} from {}", tid_clone, sid);
+                                                                        let payload = SignalingPayload::FileTransfer {
+                                                                            transfer_id: tid_clone,
+                                                                            filename,
+                                                                            mime_type,
+                                                                            file_hash,
+                                                                            total_size: total_size as usize,
+                                                                            is_relayed: true,
+                                                                            sender_peer_id: Some(sid),
+                                                                            group_id: Some(gid),
+                                                                        };
+                                                                        // Forward to ourselves to trigger the pull logic in handle_single_payload
+                                                                        let _ = tx.send(NetworkCommand::HandleIncomingPayload { 
+                                                                            peer_id: PeerId::random(), // Dummy peer for local trigger
+                                                                            payload 
+                                                                        }).await;
+                                                                    });
                                                                 }
                                                             }
                                                         }
-                                                    });
-                                                }
 
-                                                // Anchor Auto-Pull: If we are an anchor node, automatically pull group media
-                                                // to ensure it's available even if the seeder goes offline.
-                                                if self.storage.is_anchor_mode_enabled() && content.starts_with("[FILE]:") {
-                                                    if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&content[7..]) {
-                                                        let tid = meta.get("transfer_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                                        let filename = meta.get("filename").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                                                        let mime_type = meta.get("mime_type").and_then(|v| v.as_str()).unwrap_or("application/octet-stream").to_string();
-                                                        let file_hash = meta.get("file_hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                                        let total_size = meta.get("total_size").and_then(|v| v.as_u64()).unwrap_or(0);
-                                                        
-                                                        if !tid.is_empty() && !file_hash.is_empty() {
-                                                            let tx = self.command_tx.clone();
-                                                            let sid = signed_action.signer_peer_id.clone();
-                                                            let gid = signed_action.group_id.clone();
-                                                            let tid_clone = tid.clone();
-                                                            
-                                                            tokio::spawn(async move {
-                                                                info!("[Registry] Anchor Auto-Pull: Initiating mesh cache for {} from {}", tid_clone, sid);
-                                                                let payload = SignalingPayload::FileTransfer {
-                                                                    transfer_id: tid_clone,
-                                                                    filename,
-                                                                    mime_type,
-                                                                    file_hash,
-                                                                    total_size: total_size as usize,
-                                                                    is_relayed: true,
-                                                                    sender_peer_id: Some(sid),
-                                                                    group_id: Some(gid),
-                                                                };
-                                                                // Forward to ourselves to trigger the pull logic in handle_single_payload
-                                                                let _ = tx.send(NetworkCommand::HandleIncomingPayload { 
-                                                                    peer_id: PeerId::random(), // Dummy peer for local trigger
-                                                                    payload 
-                                                                }).await;
-                                                            });
-                                                        }
+                                                        crate::dispatch_global_event(21, &event_data);
+                                                    }
+                                                    Err(e) => {
+                                                        crate::dispatch_debug_log(&format!("handle_single_payload: ❌ Decryption failed: {:?}", e));
                                                     }
                                                 }
-
-                                                crate::dispatch_global_event(21, &event_data);
+                                            } else {
+                                                crate::dispatch_debug_log(&format!("handle_single_payload: ❌ content_encrypted is too short: {}", content_encrypted.len()));
                                             }
+                                        }
+                                        Ok(None) => {
+                                            crate::dispatch_debug_log(&format!("handle_single_payload: ❌ Group {} not found in local storage!", signed_action.group_id));
+                                            
+                                            if let Ok(signer_pid) = signed_action.signer_peer_id.parse::<PeerId>() {
+                                                let now = std::time::Instant::now();
+                                                let should_req = if let Some(last) = self.heal_rate_limiter.get(&signer_pid) {
+                                                    now.duration_since(*last) > std::time::Duration::from_secs(10)
+                                                } else {
+                                                    true
+                                                };
+                                                if should_req {
+                                                    self.heal_rate_limiter.insert(signer_pid, now);
+                                                    let local_profile = self.storage.get_profile().ok().flatten();
+                                                    let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                                                    let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                                                    let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
+                                                    let local_static_key = self.local_static_public.to_bytes().to_vec();
+                                                    
+                                                    info!("[Mesh] Group {} not found in local storage! Proactively requesting manifest from signer {}", signed_action.group_id, signed_action.signer_peer_id);
+                                                    let req = SignalingPayload::GroupManifestRequest {
+                                                        group_id: signed_action.group_id.clone(),
+                                                        alias,
+                                                        avatar,
+                                                        handle,
+                                                        requester_static_key: Some(local_static_key),
+                                                    };
+                                                    let _ = self.forward_to_mesh(signer_pid, req, false).await;
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            crate::dispatch_debug_log(&format!("handle_single_payload: ❌ Error querying group {}: {:?}", signed_action.group_id, e));
                                         }
                                     }
                                 },
@@ -4579,12 +4865,43 @@ impl NetworkService {
 
                     }
                     Ok(false) => {
+                        crate::dispatch_debug_log(&format!("handle_single_payload: ❌ GroupAction signature verification failed for signer {}", signed_action.signer_peer_id));
                         error!("[Mesh] ❌ GroupAction signature verification failed for signer {}", signed_action.signer_peer_id);
                     }
                     Err(e) => {
+                        crate::dispatch_debug_log(&format!("handle_single_payload: ❌ GroupAction verification error for signer {}: {:?}", signed_action.signer_peer_id, e));
                         error!("[Mesh] ❌ GroupAction verification error for signer {}: {:?}", signed_action.signer_peer_id, e);
                     }
                 }
+                } else {
+                    crate::dispatch_debug_log(&format!("handle_single_payload: ⚠️ No group members or group info found in DB for group_id: {}", signed_action.group_id));
+                    
+                    if let Ok(signer_pid) = signed_action.signer_peer_id.parse::<PeerId>() {
+                        let now = std::time::Instant::now();
+                        let should_req = if let Some(last) = self.heal_rate_limiter.get(&signer_pid) {
+                            now.duration_since(*last) > std::time::Duration::from_secs(10)
+                        } else {
+                            true
+                        };
+                        if should_req {
+                            self.heal_rate_limiter.insert(signer_pid, now);
+                            let local_profile = self.storage.get_profile().ok().flatten();
+                            let alias = local_profile.as_ref().and_then(|(n, _, _, _, _)| n.clone());
+                            let handle = local_profile.as_ref().and_then(|(_, h, _, _, _)| h.clone());
+                            let avatar = local_profile.and_then(|(_, _, a, _, _)| a);
+                            let local_static_key = self.local_static_public.to_bytes().to_vec();
+                            
+                            info!("[Mesh] Group members not found for group {}! Proactively requesting manifest from signer {}", signed_action.group_id, signed_action.signer_peer_id);
+                            let req = SignalingPayload::GroupManifestRequest {
+                                group_id: signed_action.group_id.clone(),
+                                alias,
+                                avatar,
+                                handle,
+                                requester_static_key: Some(local_static_key),
+                            };
+                            let _ = self.forward_to_mesh(signer_pid, req, false).await;
+                        }
+                    }
                 }
             }
             SignalingPayload::GroupManifest { group_id, name, description, members } => {
@@ -5076,8 +5393,8 @@ impl NetworkService {
             format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
         });
         
-        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 64KB (Sovereign Swarm Pull)
-        let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 }; 
+        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 256KB (Sovereign Swarm Pull)
+        let chunk_size = 256 * 1024;
         let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
         
         let transfer_payload = SignalingPayload::FileTransfer { 
@@ -5255,7 +5572,129 @@ impl NetworkService {
         } else if !relayed.is_empty() {
             relayed
         } else {
-            providers.to_vec()
+            // No providers connected — return empty to trigger FindProviders discovery
+            // instead of trying offline seeders repeatedly
+            Vec::new()
+        }
+    }
+
+    async fn execute_claw_actions(&mut self, actions: crate::intro_claw::ClawActions) {
+        if actions.is_empty() { return; }
+        
+        info!("[IntroClaw] Executing {} actions", 
+            actions.heal_peers.len() + actions.prefetch_files.len() + 
+            actions.retry_dead_letters.len() + actions.upgrade_connections.len() + 
+            actions.pre_establish_relays.len());
+
+        // 1. Heal unreachable peers
+        for peer_id_str in &actions.heal_peers {
+            if let Ok(peer_id) = peer_id_str.parse::<PeerId>() {
+                if !self.swarm.is_connected(&peer_id) {
+                    info!("[IntroClaw] Auto-healing peer: {}", peer_id_str);
+                    self.dial_relay_path(peer_id);
+                }
+            }
+        }
+
+        // 2. Upgrade relay connections to direct P2P
+        for peer_id_str in &actions.upgrade_connections {
+            if let Ok(peer_id) = peer_id_str.parse::<PeerId>() {
+                info!("[IntroClaw] Upgrading connection to direct P2P: {}", peer_id_str);
+                let _ = self.swarm.dial(peer_id);
+            }
+        }
+
+        // 3. Pre-establish relays for unstable peers
+        for peer_id_str in &actions.pre_establish_relays {
+            if let Ok(peer_id) = peer_id_str.parse::<PeerId>() {
+                if !self.swarm.is_connected(&peer_id) {
+                    info!("[IntroClaw] Pre-establishing relay for unstable peer: {}", peer_id_str);
+                    self.dial_relay_path(peer_id);
+                }
+            }
+        }
+
+        // 4. Prefetch missing files
+        for file_hash in &actions.prefetch_files {
+            info!("[IntroClaw] Auto-prefetching file: {}", file_hash);
+            if let Ok(messages) = self.storage.search_all_messages(&format!("[FILE]:{}", file_hash), 1) {
+                for (content, _, _, _, _, _, _) in messages {
+                    if let Some(start) = content.find("[FILE]:") {
+                        let json_part = &content[start + 7..];
+                        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(json_part) {
+                            let transfer_id = meta["transfer_id"].as_str().unwrap_or("");
+                            let peer_id = meta["peer_id"].as_str().unwrap_or("");
+                            let filename = meta["filename"].as_str().unwrap_or("unknown");
+                            let mime_type = meta["mime_type"].as_str().unwrap_or("application/octet-stream");
+                            let total_size = meta["total_size"].as_i64().unwrap_or(0);
+                            let group_id = meta["group_id"].as_str().map(|s| s.to_string());
+
+                            if let (Some(tid), Some(pid)) = (meta["transfer_id"].as_str(), meta["peer_id"].as_str()) {
+                                if let Ok(peer) = pid.parse::<PeerId>() {
+                                    let payload = crate::network::types::SignalingPayload::FileTransfer {
+                                        transfer_id: tid.to_string(),
+                                        filename: filename.to_string(),
+                                        mime_type: mime_type.to_string(),
+                                        file_hash: file_hash.clone(),
+                                        total_size: total_size as usize,
+                                        is_relayed: true,
+                                        sender_peer_id: Some(pid.to_string()),
+                                        group_id,
+                                    };
+                                    let _ = self.command_tx.send(NetworkCommand::HandleIncomingPayload { 
+                                        peer_id: peer, 
+                                        payload 
+                                    }).await;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Retry dead letters
+        if !actions.retry_dead_letters.is_empty() {
+            let connected: Vec<String> = self.swarm.connected_peers()
+                .map(|p| p.to_string())
+                .collect();
+            let flushed = self.intro_claw.flush_offline_queue(&connected);
+            for (peer_id, payload) in flushed {
+                if let Ok(pid) = peer_id.parse::<PeerId>() {
+                    info!("[IntroClaw] Retrying dead letter to: {}", peer_id);
+                    let _ = self.command_tx.send(NetworkCommand::ForwardMeshSignaling {
+                        peer_id: pid,
+                        payload: bincode::deserialize(&payload).unwrap_or(
+                            crate::network::types::SignalingPayload::Standard(String::from_utf8_lossy(&payload).to_string())
+                        ),
+                    }).await;
+                }
+            }
+        }
+
+        // 6. Node mode cache
+        for (file_hash, peer_id) in &actions.cache_files_for_offline {
+            info!("[IntroClaw Node] Proactive caching file {} for offline peer {}", file_hash, &peer_id[..8.min(peer_id.len())]);
+            if let Ok(Some(file)) = self.storage.get_drive_file_by_hash(file_hash) {
+                if !file.local_path.is_empty() {
+                    let path = std::path::Path::new(&file.local_path);
+                    if path.exists() {
+                        let transfer_id = format!("node_cache_{}_{}", file_hash, std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs());
+                        let _ = self.command_tx.send(NetworkCommand::RegisterSeeder {
+                            peer_id: *self.swarm.local_peer_id(),
+                            transfer_id,
+                            file_path: file.local_path.clone(),
+                            file_hash: file_hash.clone(),
+                            chunk_size: 256 * 1024,
+                            total_chunks: ((file.total_size as f64) / (256.0 * 1024.0)).ceil() as u32,
+                            group_id: None,
+                        }).await;
+                    }
+                }
+            }
         }
     }
 }

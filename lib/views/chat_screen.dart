@@ -382,22 +382,25 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
             color: AppTheme.current.text.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: ListTile(
-            dense: true,
-            leading: Icon(
-              type == 'media' ? Icons.image_outlined : type == 'links' ? Icons.link : Icons.description_outlined,
-              color: type == 'media' ? Colors.blueAccent : type == 'links' ? Colors.cyanAccent : Colors.orangeAccent,
-              size: 20,
-            ),
-            title: Text(
-              item['filename'] ?? item['url'] ?? '',
-              style: TextStyle(color: AppTheme.current.text, fontSize: 13),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              (item['timestamp']?.toString().length ?? 0) > 16 ? item['timestamp'].toString().substring(0, 16) : (item['timestamp'] ?? ''),
-              style: TextStyle(color: AppTheme.current.mutedText, fontSize: 10),
+          child: Material(
+            color: Colors.transparent,
+            child: ListTile(
+              dense: true,
+              leading: Icon(
+                type == 'media' ? Icons.image_outlined : type == 'links' ? Icons.link : Icons.description_outlined,
+                color: type == 'media' ? Colors.blueAccent : type == 'links' ? Colors.cyanAccent : Colors.orangeAccent,
+                size: 20,
+              ),
+              title: Text(
+                item['filename'] ?? item['url'] ?? '',
+                style: TextStyle(color: AppTheme.current.text, fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                (item['timestamp']?.toString().length ?? 0) > 16 ? item['timestamp'].toString().substring(0, 16) : (item['timestamp'] ?? ''),
+                style: TextStyle(color: AppTheme.current.mutedText, fontSize: 10),
+              ),
             ),
           ),
         );
@@ -541,9 +544,10 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
     final displayName = _globalName?.isNotEmpty == true ? _globalName! : widget.peerName;
     return AlertDialog(
       backgroundColor: AppTheme.current.surface,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           SovereignAvatar(radius: 60, avatar: widget.avatarBase64 != null ? MemoryImage(base64Decode(widget.avatarBase64!)) : null),
           SizedBox(height: 16),
           // Name
@@ -673,6 +677,7 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
           ),
         ],
       ),
+      ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text("CLOSE", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7)))),
       ],
@@ -703,6 +708,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<dynamic>? _cachedDisplayMessages;
   bool _isLoading = false;
   bool _isSyncing = false;
+  bool _isDisposing = false;
   String? _myAvatar;
   dynamic _replyingTo;
   String? _editingMsgId;
@@ -729,7 +735,11 @@ class _ChatScreenState extends State<ChatScreen> {
   final Map<String, Map<String, List<String>>> _polls = {};
   final Map<String, List<dynamic>> _reactionsCache = {}; // msgId -> reactions
   final Set<String> _pullRequested = {};
+  final Map<String, DateTime> _pullRequestedAt = {};
+  static const Duration _pullRetryTimeout = Duration(seconds: 30);
   int _elevatedCount = 0;
+  Timer? _pullRetryTimer;
+  DateTime? _lastNetworkOptimizeTime;
 
   @override
   void initState() {
@@ -756,6 +766,11 @@ class _ChatScreenState extends State<ChatScreen> {
     _startNetworkDiscovery();
     _startEconomyMonitor();
 
+    // Periodic retry for stalled file pulls (every 30 seconds)
+    _pullRetryTimer = Timer.periodic(Duration(seconds: 30), (_) {
+      if (mounted) _loadMessages();
+    });
+
     // Load more messages when scrolling to top
     _scrollController.addListener(() {
       if (_scrollController.position.pixels < 200 && _hasMoreMessages && !_isLoading) {
@@ -776,10 +791,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _isDisposing = true;
     _networkSubscription?.cancel();
     _economySubscription?.cancel();
     _transferSubscription?.cancel();
     _recordingTimer?.cancel();
+    _pullRetryTimer?.cancel();
     _loadMessagesDebounce?.cancel();
     _audioRecorder.dispose();
     _messageController.dispose();
@@ -927,13 +944,18 @@ class _ChatScreenState extends State<ChatScreen> {
               thumbnail: progress.thumbnail,
             );
 
-            if (!isMe && !exists && existingIdx == -1 && !_pullRequested.contains(progress.transferId)) {
-              try {
-                final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
-                final isRelayed = _status != "Direct P2P";
-                _pullRequested.add(progress.transferId);
-                _client.startPull(progress.peerId, progress.transferId, progress.filename, progress.mimeType, fileHash, totalSize, isRelayed, null);
-              } catch (_) {}
+            if (!isMe && !exists && existingIdx == -1) {
+              final shouldPull = !_pullRequested.contains(progress.transferId) ||
+                (_pullRequestedAt[progress.transferId]?.isBefore(DateTime.now().subtract(_pullRetryTimeout)) ?? false);
+              if (shouldPull) {
+                try {
+                  final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
+                  final isRelayed = _status != "Direct P2P";
+                  _pullRequested.add(progress.transferId);
+                  _pullRequestedAt[progress.transferId] = DateTime.now();
+                  _client.startPull(progress.peerId, progress.transferId, progress.filename, progress.mimeType, fileHash, totalSize, isRelayed, null);
+                } catch (_) {}
+              }
             }
 
             loaded.add(updatedProgress);
@@ -2045,6 +2067,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _runIntroClawRecon();
 
     _networkSubscription = _client.networkStream.listen((event) {
+      if (_isDisposing) return;
       if (event.type == 8) {
         if (event.data.isEmpty) return;
         int colonIndex = event.data.lastIndexOf(58);
@@ -2068,11 +2091,16 @@ class _ChatScreenState extends State<ChatScreen> {
           _showIntroClawSnack("Intro-Claw: Connected via relay — seeking direct path", Colors.orangeAccent);
         }
       } else if (event.type == 10) {
-        // Network status event — check for weak/slow connection
+        // Network status event — check for weak/slow connection (RelayActive)
         if (event.data.isNotEmpty) {
           final statusCode = event.data[0];
           if (statusCode == 2 && mounted) {
-            _showNetworkWeakAlert();
+            final now = DateTime.now();
+            if (_lastNetworkOptimizeTime == null || now.difference(_lastNetworkOptimizeTime!) > const Duration(minutes: 2)) {
+              _lastNetworkOptimizeTime = now;
+              _client.forceNetworkRefresh();
+              _showIntroClawSnack("Weak network detected... optimizing...", Colors.orangeAccent);
+            }
           }
         }
       } else if (event.type == 2 || event.type == 4) {
@@ -2274,42 +2302,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _showNetworkWeakAlert() {
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.current.surface,
-        title: Row(
-          children: [
-            Icon(Icons.signal_wifi_off_rounded, color: Colors.orangeAccent, size: 20),
-            SizedBox(width: 8),
-            Text("Weak Network", style: TextStyle(color: AppTheme.current.text, fontSize: 15)),
-          ],
-        ),
-        content: Text(
-          "Intro-Claw detected a slow or unstable connection. Messages may be delayed.\n\n"
-          "The mesh will automatically retry via relay paths when available.",
-          style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("OK", style: TextStyle(color: AppTheme.current.accent)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _client.forceNetworkRefresh();
-              _showIntroClawSnack("Intro-Claw: Refreshing network connections...", AppTheme.current.accent);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
-            child: Text("OPTIMIZE"),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _sendMessage() async {
     final text = _messageController.text.trim();

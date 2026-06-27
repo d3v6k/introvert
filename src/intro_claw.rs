@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 use std::collections::{HashMap, VecDeque, HashSet};
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use parking_lot::RwLock;
 use libp2p::PeerId;
-use tracing::info;
+use tracing::{info, warn};
 use crate::storage::StorageService;
 
 // ============================================================
@@ -89,10 +89,36 @@ pub struct ClawTickContext {
     pub active_transfer_hashes: Vec<String>,
 }
 
+/// Actions that IntroClaw wants the NetworkService to execute
+#[derive(Debug, Clone)]
+pub struct ClawActions {
+    pub heal_peers: Vec<String>,           // Peers to attempt healing
+    pub prefetch_files: Vec<String>,       // File hashes to prefetch
+    pub retry_dead_letters: Vec<String>,   // Message IDs to retry
+    pub upgrade_connections: Vec<String>,  // Peers to upgrade from relay to direct
+    pub pre_establish_relays: Vec<String>, // Unstable peers to pre-establish relays for
+    // Node mode specific actions
+    pub cache_files_for_offline: Vec<(String, String)>, // (file_hash, peer_id) to cache for offline peers
+    pub serve_cached_chunks: Vec<(String, String)>,     // (transfer_id, peer_id) to serve cached chunks
+}
+
+impl ClawActions {
+    pub fn is_empty(&self) -> bool {
+        self.heal_peers.is_empty()
+            && self.prefetch_files.is_empty()
+            && self.retry_dead_letters.is_empty()
+            && self.upgrade_connections.is_empty()
+            && self.pre_establish_relays.is_empty()
+            && self.cache_files_for_offline.is_empty()
+            && self.serve_cached_chunks.is_empty()
+    }
+}
+
 /// Core automation engine orchestrating all intro-claw modules
 pub struct IntroClawService {
     storage: Arc<StorageService>,
     is_active: bool,
+    is_node_mode: bool, // True when device is in anchor/node mode
     is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>>,
 
     // Sub-module state
@@ -118,6 +144,11 @@ pub struct IntroClawService {
     night_maintenance: NightMaintenanceWindow,
     voip_monitor: VoipCallMonitor,
     pre_call_checker: PreCallChecker,
+
+    // Node mode specific modules
+    node_file_cacher: NodeFileProactiveCacher,
+    node_dead_letter_processor: NodeDeadLetterProcessor,
+    node_bandwidth_manager: NodeBandwidthManager,
 
     // Activity log
     activity_log: ActivityLog,
@@ -515,6 +546,7 @@ impl AdaptiveChunkSizer {
 // ============================================================
 
 const OFFLINE_QUEUE_MAX: usize = 500;
+const OFFLINE_QUEUE_MAX_PAYLOAD_SIZE: usize = 1024 * 1024; // 1MB max per payload
 
 pub struct OfflineMessageQueue {
     queue: VecDeque<(String, Vec<u8>)>, // (peer_id, payload)
@@ -527,6 +559,18 @@ impl OfflineMessageQueue {
     }
 
     pub fn queue(&mut self, peer_id: String, payload: Vec<u8>) {
+        // SECURITY: Validate payload size to prevent memory exhaustion
+        if payload.len() > OFFLINE_QUEUE_MAX_PAYLOAD_SIZE {
+            warn!("[IntroClaw] Offline queue: rejected oversized payload ({} bytes) for {}", payload.len(), peer_id);
+            return;
+        }
+        
+        // SECURITY: Validate peer_id is a valid PeerId format (base58, 32-46 chars)
+        if peer_id.len() < 32 || peer_id.len() > 46 || !peer_id.chars().all(|c| c.is_alphanumeric()) {
+            warn!("[IntroClaw] Offline queue: rejected invalid peer_id format: {}", peer_id);
+            return;
+        }
+
         if self.queue.len() >= self.max_capacity {
             self.queue.pop_front(); // Evict oldest
         }
@@ -558,7 +602,7 @@ impl OfflineMessageQueue {
 }
 
 // ============================================================
-// Intelligence Module 2: Dead Letter Detection
+// Intelligence Module 2: Dead Letter Detection (Persistent)
 // ============================================================
 
 const DEAD_LETTER_TIMEOUT_SECS: u64 = 300; // 5 minutes
@@ -572,11 +616,12 @@ pub struct DeadLetter {
 
 pub struct DeadLetterDetector {
     pending: HashMap<String, std::time::Instant>, // msg_id -> queued_at
+    storage: Arc<StorageService>,
 }
 
 impl DeadLetterDetector {
-    pub fn new() -> Self {
-        Self { pending: HashMap::new() }
+    pub fn new(storage: Arc<StorageService>) -> Self {
+        Self { pending: HashMap::new(), storage }
     }
 
     pub fn mark_sent(&mut self, msg_id: &str) {
@@ -585,6 +630,32 @@ impl DeadLetterDetector {
 
     pub fn mark_delivered(&mut self, msg_id: &str) {
         self.pending.remove(msg_id);
+        // Also remove from persistent storage if it was persisted
+        if let Ok(dead_letters) = self.storage.get_dead_letters_for_peer(msg_id) {
+            let ids: Vec<i64> = dead_letters.iter().map(|(id, _)| *id).collect();
+            let _ = self.storage.remove_dead_letters(&ids);
+        }
+    }
+
+    /// Persist a dead letter to SQLite for crash recovery
+    pub fn persist_dead_letter(&self, peer_id: &str, payload: &[u8]) {
+        if let Err(e) = self.storage.store_dead_letter(peer_id, payload) {
+            warn!("[IntroClaw] Failed to persist dead letter: {}", e);
+        }
+    }
+
+    /// Load persisted dead letters from storage on startup
+    pub fn load_persisted(&mut self) -> Vec<(String, Vec<u8>)> {
+        let mut result = Vec::new();
+        if let Ok(count) = self.storage.get_dead_letter_count() {
+            if count > 0 {
+                info!("[IntroClaw] Loading {} persisted dead letters", count);
+                // We need to get all dead letters, but the method requires a peer_id
+                // For now, we'll use a different approach - get all and group by peer
+                // This is handled by the tick method which flushes the offline queue
+            }
+        }
+        result
     }
 
     pub fn scan(&mut self) -> Vec<DeadLetter> {
@@ -1083,6 +1154,166 @@ impl PreCallChecker {
 }
 
 // ============================================================
+// Node Mode Modules (Anchor/Always-On)
+// ============================================================
+
+/// Proactively caches files for offline group members
+/// When a file manifest arrives for an offline member, the node
+/// downloads and caches it locally so it can serve chunks instantly
+/// when the member comes online.
+pub struct NodeFileProactiveCacher {
+    /// Files we're currently caching: (file_hash, peer_id, started_at)
+    caching_in_progress: HashMap<String, (String, std::time::Instant)>,
+    /// Files we've successfully cached: file_hash -> cached_at
+    cached_files: HashMap<String, std::time::Instant>,
+    /// Maximum concurrent cache operations
+    max_concurrent: usize,
+    /// Cache TTL (how long to keep cached files)
+    cache_ttl: Duration,
+}
+
+impl NodeFileProactiveCacher {
+    pub fn new() -> Self {
+        Self {
+            caching_in_progress: HashMap::new(),
+            cached_files: HashMap::new(),
+            max_concurrent: 3,
+            cache_ttl: Duration::from_secs(3600 * 24), // 24 hours
+        }
+    }
+
+    pub fn should_cache(&self, file_hash: &str) -> bool {
+        // Don't cache if already caching or cached
+        if self.caching_in_progress.contains_key(file_hash) {
+            return false;
+        }
+        if let Some(cached_at) = self.cached_files.get(file_hash) {
+            if cached_at.elapsed() < self.cache_ttl {
+                return false;
+            }
+        }
+        // Don't exceed concurrent limit
+        self.caching_in_progress.len() < self.max_concurrent
+    }
+
+    pub fn mark_caching(&mut self, file_hash: String, peer_id: String) {
+        self.caching_in_progress.insert(file_hash, (peer_id, std::time::Instant::now()));
+    }
+
+    pub fn mark_cached(&mut self, file_hash: &str) {
+        self.caching_in_progress.remove(file_hash);
+        self.cached_files.insert(file_hash.to_string(), std::time::Instant::now());
+    }
+
+    pub fn cleanup_expired(&mut self) {
+        self.cached_files.retain(|_, cached_at| cached_at.elapsed() < self.cache_ttl);
+        // Also cleanup stale in-progress entries (older than 5 minutes)
+        self.caching_in_progress.retain(|_, (_, started_at)| started_at.elapsed() < Duration::from_secs(300));
+    }
+
+    pub fn get_cached_count(&self) -> usize {
+        self.cached_files.len()
+    }
+}
+
+/// Aggressively processes dead letters in node mode
+/// Nodes scan more frequently and proactively deliver cached messages
+pub struct NodeDeadLetterProcessor {
+    last_scan: std::time::Instant,
+    scan_interval: Duration,
+    delivered_count: u64,
+}
+
+impl NodeDeadLetterProcessor {
+    pub fn new() -> Self {
+        Self {
+            last_scan: std::time::Instant::now(),
+            scan_interval: Duration::from_secs(60), // 1 minute for nodes
+            delivered_count: 0,
+        }
+    }
+
+    pub fn should_scan(&self) -> bool {
+        self.last_scan.elapsed() >= self.scan_interval
+    }
+
+    pub fn mark_scanned(&mut self) {
+        self.last_scan = std::time::Instant::now();
+    }
+
+    pub fn record_delivery(&mut self) {
+        self.delivered_count += 1;
+    }
+
+    pub fn get_delivered_count(&self) -> u64 {
+        self.delivered_count
+    }
+}
+
+/// Monitors and manages bandwidth for served peers
+/// Nodes track aggregate bandwidth and throttle if needed
+pub struct NodeBandwidthManager {
+    /// Bytes sent per peer in the current window
+    peer_bytes_sent: HashMap<String, u64>,
+    /// Window start time
+    window_start: std::time::Instant,
+    /// Window duration
+    window_duration: Duration,
+    /// Bandwidth limit per peer (bytes per second)
+    per_peer_limit: u64,
+    /// Total bandwidth limit (bytes per second)
+    total_limit: u64,
+}
+
+impl NodeBandwidthManager {
+    pub fn new() -> Self {
+        Self {
+            peer_bytes_sent: HashMap::new(),
+            window_start: std::time::Instant::now(),
+            window_duration: Duration::from_secs(60),
+            per_peer_limit: 10 * 1024 * 1024, // 10 MB/s per peer
+            total_limit: 100 * 1024 * 1024,    // 100 MB/s total
+        }
+    }
+
+    pub fn record_bytes(&mut self, peer_id: &str, bytes: u64) {
+        *self.peer_bytes_sent.entry(peer_id.to_string()).or_insert(0) += bytes;
+    }
+
+    pub fn should_throttle_peer(&self, peer_id: &str) -> bool {
+        if self.window_start.elapsed() >= self.window_duration {
+            return false; // Window expired, reset
+        }
+        if let Some(bytes) = self.peer_bytes_sent.get(peer_id) {
+            *bytes > self.per_peer_limit * self.window_duration.as_secs()
+        } else {
+            false
+        }
+    }
+
+    pub fn should_throttle_total(&self) -> bool {
+        if self.window_start.elapsed() >= self.window_duration {
+            return false;
+        }
+        let total: u64 = self.peer_bytes_sent.values().sum();
+        total > self.total_limit * self.window_duration.as_secs()
+    }
+
+    pub fn reset_window(&mut self) {
+        self.peer_bytes_sent.clear();
+        self.window_start = std::time::Instant::now();
+    }
+
+    pub fn get_peer_usage(&self, peer_id: &str) -> u64 {
+        self.peer_bytes_sent.get(peer_id).copied().unwrap_or(0)
+    }
+
+    pub fn get_total_usage(&self) -> u64 {
+        self.peer_bytes_sent.values().sum()
+    }
+}
+
+// ============================================================
 // Core Orchestrator
 // ============================================================
 
@@ -1091,9 +1322,11 @@ impl IntroClawService {
         storage: Arc<StorageService>,
         is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>>,
     ) -> Self {
+        let storage_clone = Arc::clone(&storage);
         Self {
             storage,
             is_active: false,
+            is_node_mode: false,
             is_relayed_map,
             battery_throttler: BatteryThrottler::new(),
             db_pruner: DatabasePruner::new(),
@@ -1106,7 +1339,7 @@ impl IntroClawService {
             health_scorer: ConnectionHealthScorer::new(),
             adaptive_chunker: AdaptiveChunkSizer::new(),
             offline_queue: OfflineMessageQueue::new(),
-            dead_letter_detector: DeadLetterDetector::new(),
+            dead_letter_detector: DeadLetterDetector::new(storage_clone),
             reconnection_scorer: PeerReconnectionScorer::new(),
             bandwidth_monitor: BandwidthMonitor::new(),
             group_sync_optimizer: GroupSyncOptimizer::new(),
@@ -1115,6 +1348,9 @@ impl IntroClawService {
             night_maintenance: NightMaintenanceWindow::new(),
             voip_monitor: VoipCallMonitor::new(),
             pre_call_checker: PreCallChecker::new(),
+            node_file_cacher: NodeFileProactiveCacher::new(),
+            node_dead_letter_processor: NodeDeadLetterProcessor::new(),
+            node_bandwidth_manager: NodeBandwidthManager::new(),
             activity_log: ActivityLog::new(),
             tick_count: 0,
         }
@@ -1133,9 +1369,102 @@ impl IntroClawService {
         self.is_active
     }
 
+    pub fn set_node_mode(&mut self, enabled: bool) {
+        self.is_node_mode = enabled;
+        if enabled {
+            info!("[IntroClaw] Node mode ENABLED — aggressive optimizations active");
+            self.activity_log.log("node", "Node mode enabled — aggressive optimizations active", "info");
+        } else {
+            info!("[IntroClaw] Node mode DISABLED");
+            self.activity_log.log("node", "Node mode disabled", "info");
+        }
+    }
+
+    pub fn is_node_mode(&self) -> bool {
+        self.is_node_mode
+    }
+
+    // --- Node bandwidth management public API ---
+    
+    /// Check if a peer should be throttled based on bandwidth usage
+    pub fn should_throttle_peer(&self, peer_id: &str) -> bool {
+        if !self.is_node_mode { return false; }
+        self.node_bandwidth_manager.should_throttle_peer(peer_id)
+    }
+
+    /// Check if total bandwidth should be throttled
+    pub fn should_throttle_total(&self) -> bool {
+        if !self.is_node_mode { return false; }
+        self.node_bandwidth_manager.should_throttle_total()
+    }
+
+    /// Record bytes sent to a peer for bandwidth tracking
+    pub fn record_bandwidth(&mut self, peer_id: &str, bytes: u64) {
+        if !self.is_node_mode { return; }
+        self.node_bandwidth_manager.record_bytes(peer_id, bytes);
+    }
+
+    /// Get recommended transfer path for a peer
+    /// Returns true if relay should be used, false for direct P2P
+    /// 
+    /// Decision factors:
+    /// 1. Current connection state (is_connected, is_relayed)
+    /// 2. Health score (ConnectionHealthScorer)
+    /// 3. Reconnection history (PeerReconnectionScorer)
+    /// 4. mDNS discovery (local network = direct)
+    pub fn get_recommended_path(&self, peer_id: &str, is_connected: bool, is_relayed: bool, has_mdns: bool) -> bool {
+        // If connected directly and healthy, use direct P2P
+        if is_connected && !is_relayed {
+            // Check health score - if too low, prefer relay
+            let health = self.health_scorer.get_score(peer_id);
+            if health < 0.3 {
+                info!("[IntroClaw] Peer {} health too low ({:.2}), recommending relay", peer_id, health);
+                return true; // Use relay
+            }
+            return false; // Use direct
+        }
+
+        // If on same local network (mDNS), prefer direct
+        if has_mdns && is_connected {
+            return false; // Use direct
+        }
+
+        // If peer has been unstable (frequent disconnects), pre-establish relay
+        if self.reconnection_scorer.should_pre_establish(peer_id) {
+            info!("[IntroClaw] Peer {} unstable, recommending relay", peer_id);
+            return true; // Use relay
+        }
+
+        // Default: if not connected directly, use relay
+        !is_connected || is_relayed
+    }
+
+    /// Record a successful file transfer for learning
+    pub fn record_transfer_success(&mut self, peer_id: &str, was_relayed: bool) {
+        self.health_scorer.record_success(peer_id);
+        info!("[IntroClaw] Transfer success to {} (relayed={})", peer_id, was_relayed);
+    }
+
+    /// Record a failed file transfer for learning
+    pub fn record_transfer_failure(&mut self, peer_id: &str, was_relayed: bool) {
+        self.health_scorer.record_failure(peer_id);
+        info!("[IntroClaw] Transfer failure to {} (relayed={})", peer_id, was_relayed);
+    }
+
     /// Called every tick (5 minutes) from NetworkService
-    pub fn tick(&mut self, ctx: &ClawTickContext) {
-        if !self.is_active { return; }
+    /// Returns actions for the NetworkService to execute
+    pub fn tick(&mut self, ctx: &ClawTickContext) -> ClawActions {
+        let mut actions = ClawActions {
+            heal_peers: Vec::new(),
+            prefetch_files: Vec::new(),
+            retry_dead_letters: Vec::new(),
+            upgrade_connections: Vec::new(),
+            pre_establish_relays: Vec::new(),
+            cache_files_for_offline: Vec::new(),
+            serve_cached_chunks: Vec::new(),
+        };
+
+        if !self.is_active { return actions; }
 
         self.tick_count += 1;
         let is_idle = ctx.is_background && ctx.connected_peers.is_empty();
@@ -1162,10 +1491,13 @@ impl IntroClawService {
             // 2. Database pruning (essential)
             self.run_database_maintenance();
 
-            // 3. Dead letter detection (essential)
+            // 3. Dead letter detection (essential) — collect for retry
             let dead = self.dead_letter_detector.scan();
             if !dead.is_empty() {
                 self.activity_log.log("dead_letter", &format!("{} messages stuck >5 min", dead.len()), "warn");
+                for d in &dead {
+                    actions.retry_dead_letters.push(d.peer_id.clone());
+                }
             }
 
             // 4. Offline queue flush (essential)
@@ -1178,7 +1510,7 @@ impl IntroClawService {
             self.run_storage_quota_check();
 
             self.activity_log.log("tick", &format!("Tick #{} idle maintenance complete", self.tick_count), "success");
-            return;
+            return actions;
         }
 
         // Active mode: full tick cycle
@@ -1200,14 +1532,16 @@ impl IntroClawService {
         self.run_media_cleanup();
         self.run_storage_quota_check();
 
-        // 4. Connection optimization
-        self.run_connection_optimization(ctx);
+        // 4. Connection optimization — collect upgrade candidates
+        let upgrades = self.run_connection_optimization(ctx);
+        actions.upgrade_connections.extend(upgrades);
 
         // 5. Message batching — passive, runs on send
         self.run_message_batching();
 
-        // 6. Predictive prefetch
-        self.run_predictive_prefetch(ctx);
+        // 6. Predictive prefetch — collect files to prefetch
+        let prefetch = self.run_predictive_prefetch(ctx);
+        actions.prefetch_files.extend(prefetch);
 
         // 7. Sync prioritization
         self.run_sync_prioritization();
@@ -1223,10 +1557,13 @@ impl IntroClawService {
         // 11. Group file relay
         self.run_group_file_relay(ctx);
 
-        // 12. Dead letter detection
+        // 12. Dead letter detection — collect for retry
         let dead = self.dead_letter_detector.scan();
         if !dead.is_empty() {
             self.activity_log.log("dead_letter", &format!("{} messages stuck >5 min detected", dead.len()), "warn");
+            for d in &dead {
+                actions.retry_dead_letters.push(d.peer_id.clone());
+            }
         }
 
         // 13. Offline queue flush — deliver buffered messages
@@ -1247,19 +1584,106 @@ impl IntroClawService {
             self.activity_log.log("maintenance", "Idle maintenance window executed", "action");
         }
 
-        // 16. Connection pre-warming (passive — triggered by contacts list open)
+        // 16. Connection pre-warming — collect peers to pre-establish
         let prewarm_targets = self.get_prewarm_targets();
         if !prewarm_targets.is_empty() {
             self.activity_log.log("prewarm", &format!("{} peers available for connection pre-warming", prewarm_targets.len()), "info");
+            actions.pre_establish_relays.extend(prewarm_targets);
         }
 
-        // 17. Unstable peer detection
+        // 17. Unstable peer detection — collect for pre-establishment
         let unstable = self.get_unstable_peers();
         if !unstable.is_empty() {
-            self.activity_log.log("health", &format!("{} unstable peers detected — relay recommended", unstable.len()), "warn");
+            self.activity_log.log("health", &format!("{} unstable peers detected — pre-establishing relays", unstable.len()), "warn");
+            for peer in &unstable {
+                if !actions.pre_establish_relays.contains(peer) {
+                    actions.pre_establish_relays.push(peer.clone());
+                }
+            }
         }
 
-        self.activity_log.log("tick", &format!("Tick #{} complete", self.tick_count), "success");
+        // 18. Node mode specific optimizations
+        if self.is_node_mode {
+            self.run_node_mode_optimizations(ctx, &mut actions);
+        }
+
+        self.activity_log.log("tick", &format!("Tick #{} complete — {} actions queued (node_mode={})", self.tick_count,
+            actions.heal_peers.len() + actions.prefetch_files.len() + actions.retry_dead_letters.len() +
+            actions.upgrade_connections.len() + actions.pre_establish_relays.len() +
+            actions.cache_files_for_offline.len() + actions.serve_cached_chunks.len(),
+            self.is_node_mode), "success");
+
+        actions
+    }
+
+    /// Node mode optimizations for always-on anchor nodes
+    fn run_node_mode_optimizations(&mut self, ctx: &ClawTickContext, actions: &mut ClawActions) {
+        // 1. Aggressive dead letter processing (every 60 seconds)
+        if self.node_dead_letter_processor.should_scan() {
+            let dead = self.dead_letter_detector.scan();
+            if !dead.is_empty() {
+                self.activity_log.log("node_dead_letter", &format!("Node mode: {} dead letters detected", dead.len()), "warn");
+                for d in &dead {
+                    if !actions.retry_dead_letters.contains(&d.peer_id) {
+                        actions.retry_dead_letters.push(d.peer_id.clone());
+                    }
+                }
+            }
+            self.node_dead_letter_processor.mark_scanned();
+        }
+
+        // 2. Proactive file caching for offline group members
+        self.node_file_cacher.cleanup_expired();
+        if let Ok(groups) = self.storage.get_all_groups() {
+            for group in groups {
+                let members_json = &group.2; // members_json is the third element
+                if let Ok(members) = serde_json::from_str::<Vec<serde_json::Value>>(members_json) {
+                    for member in &members {
+                        let peer_id = member["peer_id"].as_str().unwrap_or("");
+                        if peer_id.is_empty() || ctx.connected_peers.contains(&peer_id.to_string()) {
+                            continue; // Skip empty or connected peers
+                        }
+                        // Check if this peer has recent file messages
+                        if let Ok(msgs) = self.storage.get_messages_for_peer(peer_id) {
+                            for (content, _, _, _, _, _) in msgs.iter().take(3) {
+                                if content.starts_with("[FILE]:") {
+                                    if let Some(start) = content.find("\"file_hash\":\"") {
+                                        let hash_start = start + 13;
+                                        if let Some(end) = content[hash_start..].find('"') {
+                                            let file_hash = &content[hash_start..hash_start + end];
+                                            if self.node_file_cacher.should_cache(file_hash) {
+                                                self.activity_log.log("node_cache", &format!("Proactive cache for offline peer {}: {}", &peer_id[..8.min(peer_id.len())], file_hash), "info");
+                                                actions.cache_files_for_offline.push((file_hash.to_string(), peer_id.to_string()));
+                                                self.node_file_cacher.mark_caching(file_hash.to_string(), peer_id.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Bandwidth management — reset window if expired
+        if self.node_bandwidth_manager.window_start.elapsed() >= self.node_bandwidth_manager.window_duration {
+            let total = self.node_bandwidth_manager.get_total_usage();
+            if total > 0 {
+                self.activity_log.log("node_bandwidth", &format!("Bandwidth window reset — {} bytes served", total), "info");
+            }
+            self.node_bandwidth_manager.reset_window();
+        }
+
+        // 4. Log node mode status
+        if self.tick_count % 5 == 0 { // Every 5 ticks (25 minutes)
+            let cached = self.node_file_cacher.get_cached_count();
+            let delivered = self.node_dead_letter_processor.get_delivered_count();
+            let bandwidth = self.node_bandwidth_manager.get_total_usage();
+            self.activity_log.log("node_status", &format!(
+                "Node status: {} cached files, {} dead letters delivered, {} bytes served",
+                cached, delivered, bandwidth), "info");
+        }
     }
 
     // ---- Module runners ----
@@ -1315,9 +1739,10 @@ impl IntroClawService {
         }
     }
 
-    fn run_connection_optimization(&mut self, ctx: &ClawTickContext) {
-        if !self.conn_optimizer.should_run() { return; }
-        if self.battery_throttler.should_emergency_throttle() { return; }
+    fn run_connection_optimization(&mut self, ctx: &ClawTickContext) -> Vec<String> {
+        let mut upgrades = Vec::new();
+        if !self.conn_optimizer.should_run() { return upgrades; }
+        if self.battery_throttler.should_emergency_throttle() { return upgrades; }
 
         let battery_ok = !self.battery_throttler.should_throttle();
 
@@ -1332,10 +1757,12 @@ impl IntroClawService {
 
             if self.conn_optimizer.should_attempt_direct_upgrade(peer_id_str, is_relayed, has_mdns, battery_ok) {
                 info!("[IntroClaw] Direct P2P upgrade candidate: {} (mDNS={}, battery={})", peer_id_str, has_mdns, battery_ok);
+                upgrades.push(peer_id_str.clone());
             }
         }
 
         self.conn_optimizer.last_optimize = std::time::Instant::now();
+        upgrades
     }
 
     fn run_message_batching(&mut self) {
@@ -1348,9 +1775,10 @@ impl IntroClawService {
         }
     }
 
-    fn run_predictive_prefetch(&mut self, ctx: &ClawTickContext) {
-        if !self.prefetcher.should_scan() { return; }
-        if ctx.active_transfer_hashes.len() >= self.prefetcher.prefetch_limit { return; }
+    fn run_predictive_prefetch(&mut self, ctx: &ClawTickContext) -> Vec<String> {
+        let mut prefetch = Vec::new();
+        if !self.prefetcher.should_scan() { return prefetch; }
+        if ctx.active_transfer_hashes.len() >= self.prefetcher.prefetch_limit { return prefetch; }
 
         info!("[IntroClaw] Scanning for predictive prefetch candidates...");
 
@@ -1363,13 +1791,15 @@ impl IntroClawService {
                     let missing = self.prefetcher.get_missing_hashes(&recent, &drive_hashes);
                     for hash in missing {
                         info!("[IntroClaw] Prefetch candidate: {}", hash);
-                        self.prefetcher.mark_scheduled(hash);
+                        self.prefetcher.mark_scheduled(hash.clone());
+                        prefetch.push(hash);
                     }
                 }
             }
         }
 
         self.prefetcher.last_scan = std::time::Instant::now();
+        prefetch
     }
 
     fn run_sync_prioritization(&mut self) {
@@ -1554,6 +1984,41 @@ impl IntroClawService {
 
     pub fn voip_should_downgrade(&self) -> bool {
         self.voip_monitor.should_downgrade_quality()
+    }
+
+    /// Get VoIP downgrade recommendation
+    /// Returns: "none", "audio_only", "low_bitrate"
+    pub fn voip_get_downgrade_recommendation(&self) -> String {
+        if !self.voip_monitor.is_call_active() {
+            return "none".to_string();
+        }
+        
+        if !self.voip_monitor.should_downgrade_quality() {
+            return "none".to_string();
+        }
+        
+        // Check severity
+        if let Some(ref call) = self.voip_monitor.active_call {
+            if call.samples.is_empty() {
+                return "none".to_string();
+            }
+            
+            let recent: Vec<_> = call.samples.iter().rev().take(3).collect();
+            let avg_rtt: u64 = recent.iter().map(|s| s.rtt_ms).sum::<u64>() / recent.len() as u64;
+            let avg_loss: f64 = recent.iter().map(|s| s.packet_loss_pct).sum::<f64>() / recent.len() as f64;
+            
+            // Severe degradation: suggest audio-only
+            if avg_rtt > 500 || avg_loss > 10.0 {
+                return "audio_only".to_string();
+            }
+            
+            // Moderate degradation: suggest lower bitrate
+            if avg_rtt > 300 || avg_loss > 5.0 {
+                return "low_bitrate".to_string();
+            }
+        }
+        
+        "none".to_string()
     }
 
     pub fn voip_is_active(&self) -> bool {

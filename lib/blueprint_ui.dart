@@ -232,21 +232,6 @@ class SovereignWallpaper extends StatefulWidget {
 }
 
 class _SovereignWallpaperState extends State<SovereignWallpaper> {
-  @override
-  void initState() {
-    super.initState();
-    AppTheme.current.addListener(_onThemeChanged);
-  }
-
-  @override
-  void dispose() {
-    AppTheme.current.removeListener(_onThemeChanged);
-    super.dispose();
-  }
-
-  void _onThemeChanged() {
-    if (mounted) setState(() {});
-  }
 
   String? _lastWallpaperPath;
   bool? _lastWallpaperExists;

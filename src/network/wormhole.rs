@@ -69,6 +69,17 @@ pub async fn create_invite(my_identity: SovereignIdentity) -> Result<(String, im
             let peer_identity: SovereignIdentity = serde_json::from_slice(&msg).context("Invalid identity format from peer")?;
             
             info!("Wormhole: Identity exchange complete with {}", peer_identity.peer_id);
+            
+            // Generate verification fingerprint for out-of-band confirmation
+            // Both parties see the same fingerprint (derived from both PeerIds)
+            use sha2::{Sha256, Digest};
+            let mut fp_input = my_identity.peer_id.as_bytes().to_vec();
+            fp_input.extend_from_slice(peer_identity.peer_id.as_bytes());
+            let fp_hash = Sha256::digest(&fp_input);
+            let fingerprint = hex::encode(&fp_hash[..6]); // 12 hex chars
+            info!("Wormhole: Verification fingerprint: {}", fingerprint);
+            crate::dispatch_debug_log(&format!("Wormhole: Fingerprint: {} — verify with peer to confirm identity", fingerprint));
+            
             crate::dispatch_debug_log("Wormhole: Handover verified. Secure link established.");
             
             // Don't let close hang the whole process

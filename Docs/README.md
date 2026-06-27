@@ -14,6 +14,7 @@ Introvert is a privacy-first, decentralized communication ecosystem. It eliminat
 - **Real-time Delivery/Read Receipts:** Functional 'Acknowledgement' protocol for WhatsApp-style UI ticks (Sent, Delivered, Read).
 - **Real-time P2P Push:** RBN-driven push logic that eliminates polling delays for connected peers.
 - **Relay-Aware Connectivity:** Automatic construction of relay paths via RBN nodes, ensuring Mac-to-Android and multi-network reliability.
+- **Introvert Codec:** A custom hybrid JSON-binary codec (`/introvert/signaling/2.0.0`) that eliminates Base64 overhead for `FileChunk` data, providing ~25% wire data savings.
 - **Direct Dial Auto-Upgrades:** Connections automatically upgrade from relayed to direct P2P when direct addresses are discovered.
 - **Persistent History:** Encrypted local storage using SQLCipher (AES-256-CBC) with CRDT-based synchronization.
 - **Economic Incentives:** Built-in Solana-based $INTR token economy (100M fixed supply, Mint: `NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn`). 50% allocation (50M) for ecosystem rewards over 10 years. Dynamic pool-clearing daily rewards. Gasless transactions via Treasury Fee Payer. See `Docs/INTROVERT_TOKEN_WHITEPAPER.md`.
@@ -29,7 +30,7 @@ Introvert is a privacy-first, decentralized communication ecosystem. It eliminat
 ## Technical Stack
 - **Backend:** Rust (libp2p v0.56, SQLite/SQLCipher, Noise IK, WebRTC, Solana SDK 4.0)
 - **Frontend:** Flutter (Dart) with dart:ffi bridge
-- **Networking:** Port 443 TCP/UDP (QUIC), WebSocket tunnel fallback, dynamic Solana-based bootstrapping
+- **Networking:** Port 443 TCP/UDP (QUIC), WebSocket tunnel fallback, dynamic Solana-based bootstrapping, and custom **Introvert Codec** (v2.0.0 protocol)
 - **Storage:** SQLCipher encrypted database (18 tables)
 - **Identity:** HKDF-SHA256 deterministic derivation from master seed (Zero Phone/Email)
 - **Consensus & Economy:** Solana Mainnet-Beta via unified PDA escrow vault, Squads V4 (3-of-5) Multisig governance

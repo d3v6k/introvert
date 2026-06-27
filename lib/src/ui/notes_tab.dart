@@ -526,7 +526,7 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
           ),
         ],
       ),
-    );
+    ).whenComplete(() => passwordController.dispose());
   }
 
   void _showImportConfirmReplace(String password) {
@@ -639,7 +639,10 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      filenameController.dispose();
+      passwordController.dispose();
+    });
   }
 
   Future<void> _exportNotes(String filename, String password) async {
@@ -756,10 +759,13 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         final dir = await getApplicationDocumentsDirectory();
         final fileName = 'note_img_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedFile = await File(picked.path).copy('${dir.path}/$fileName');
+        if (!mounted) return;
         setState(() => _imagePath = savedFile.path);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+      }
     }
   }
 
@@ -992,10 +998,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         final dir = await getApplicationDocumentsDirectory();
         final fileName = 'note_img_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final savedFile = await File(picked.path).copy('${dir.path}/$fileName');
+        if (!mounted) return;
         setState(() => _imagePath = savedFile.path);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+      }
     }
   }
 

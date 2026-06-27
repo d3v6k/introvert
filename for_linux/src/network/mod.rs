@@ -32,10 +32,12 @@ pub mod config;
 pub mod group;
 pub mod registry;
 pub mod tunnel;
+pub mod codec; // Binary codec for /introvert/signaling/2.0.0 (inactive on client until Phase 2)
 
 use crate::media::{MediaManager, WebRtcSignal};
 use crate::identity::SovereignIdentity;
 use noise_session::NoiseSession;
+use codec::{IntrovertCodec, BinarySignalingRequest, BinarySignalingResponse};
 pub use behaviour::{IntrovertBehaviour, IntrovertBehaviourEvent};
 
 pub const ANCHOR_PROVIDER_KEY: &[u8] = b"/introvert/anchor_nodes";
@@ -356,6 +358,10 @@ pub struct NetworkService {
     relay_listeners: HashMap<ListenerId, PeerId>,
     relay_dial_limiter: HashMap<PeerId, Instant>,
     outbound_tracker: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
+    /// Outbound tracker for v2.0.0 binary codec sends
+    outbound_tracker_v2: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
+    /// Peers that have advertised /introvert/signaling/2.0.0 via Identify
+    peer_supports_v2: HashSet<PeerId>,
     /// Per-peer count of in-flight request_response sends (to prevent relay flooding)
     inflight_requests: HashMap<PeerId, u32>,
     liveness_interval_secs: u64,
@@ -520,6 +526,8 @@ impl NetworkService {
             relay_listeners: HashMap::new(),
             relay_dial_limiter: HashMap::new(),
             outbound_tracker: HashMap::new(),
+            outbound_tracker_v2: HashMap::new(),
+            peer_supports_v2: HashSet::new(),
             inflight_requests: HashMap::new(),
             liveness_interval_secs,
             downloads_dir,
@@ -1199,6 +1207,15 @@ impl NetworkService {
                         // Discovery: If peer supports our protocol AND HOP relay protocol, they can be an anchor/relay
                         let supports_signaling = info.protocols.iter().any(|p| p.to_string().contains("/introvert/signaling/1.0.0"));
                         let supports_hop = info.protocols.iter().any(|p| p.to_string().contains("/libp2p/circuit/relay/0.2.0/hop"));
+
+                        // Track v2.0.0 binary codec capability per peer
+                        if info.protocols.iter().any(|p| p.to_string().contains("/introvert/signaling/2.0.0")) {
+                            info!("[Codec] Peer {} supports v2.0.0 binary codec — FileChunk sends will use binary protocol.", peer_id);
+                            self.peer_supports_v2.insert(peer_id);
+                        } else {
+                            self.peer_supports_v2.remove(&peer_id);
+                        }
+
                         if supports_signaling && supports_hop {
                             info!("✨ Peer {} supports Introvert Signaling and HOP. Discovered as Anchor.", peer_id);
                             if !self.discovered_anchors.contains(&peer_id) {
@@ -1570,6 +1587,56 @@ impl NetworkService {
                         }
                     }
                     IntrovertBehaviourEvent::RequestResponse(request_response::Event::ResponseSent { .. }) => {}
+
+                    // ── v2.0.0 Binary Codec Event Handler ──────────────────────────────────────────
+                    // Mirrors the v1.0.0 handler but unwraps BinarySignalingRequest.
+                    // Payload routing is protocol-agnostic — handle_single_payload() is unchanged.
+                    IntrovertBehaviourEvent::RequestResponseV2(request_response::Event::Message {
+                        peer,
+                        message: request_response::Message::Request { request: BinarySignalingRequest(payload), channel, .. },
+                        ..
+                    }) => {
+                        let _ = self.swarm.behaviour_mut().request_response_v2
+                            .send_response(channel, BinarySignalingResponse("ACK".to_string()));
+                        let tx = self.command_tx.clone();
+                        tokio::spawn(async move {
+                            let _ = tx.send(NetworkCommand::HandleIncomingPayload { peer_id: peer, payload }).await;
+                        });
+                    }
+                    IntrovertBehaviourEvent::RequestResponseV2(request_response::Event::Message {
+                        peer,
+                        message: request_response::Message::Response { request_id, .. },
+                        ..
+                    }) => {
+                        self.outbound_tracker_v2.remove(&request_id);
+                        if let Some(count) = self.inflight_requests.get_mut(&peer) {
+                            *count = count.saturating_sub(1);
+                            if *count == 0 { self.inflight_requests.remove(&peer); }
+                        }
+                    }
+                    IntrovertBehaviourEvent::RequestResponseV2(request_response::Event::OutboundFailure {
+                        request_id, peer, error, ..
+                    }) => {
+                        info!("[Mesh] v2.0.0 outbound failure to {}: {:?}. Falling back to v1.0.0.", peer, error);
+                        if let Some(count) = self.inflight_requests.get_mut(&peer) {
+                            *count = count.saturating_sub(1);
+                            if *count == 0 { self.inflight_requests.remove(&peer); }
+                        }
+                        // Fallback: re-send over v1.0.0 JSON codec
+                        if let Some((target_peer, payload)) = self.outbound_tracker_v2.remove(&request_id) {
+                            let is_file_chunk = matches!(payload, SignalingPayload::FileChunk { .. });
+                            if !is_file_chunk {
+                                let req_id = self.swarm.behaviour_mut().request_response
+                                    .send_request(&target_peer, SignalingRequest(payload.clone()));
+                                self.outbound_tracker.insert(req_id, (target_peer, payload));
+                            }
+                            // FileChunk: pull model handles retries — don't re-queue
+                        }
+                    }
+                    IntrovertBehaviourEvent::RequestResponseV2(request_response::Event::ResponseSent { .. }) => {}
+                    IntrovertBehaviourEvent::RequestResponseV2(request_response::Event::InboundFailure { .. }) => {}
+                    // ── End v2.0.0 Handler ─────────────────────────────────────────────────────────
+
                     IntrovertBehaviourEvent::Ping(ping_event) => {
                         // Check for pending diagnostic RTT measurement
                         if let Ok(rtt) = ping_event.result {
@@ -3917,7 +3984,7 @@ impl NetworkService {
                     return;
                 }
 
-                let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 };
+                let chunk_size = 256 * 1024;
                 let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
 
                 let mut is_update = false;
@@ -4792,8 +4859,8 @@ impl NetworkService {
             format!("gft_{}_{}", file_hash, ts)
         });
         
-        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 64KB (Sovereign Swarm Pull)
-        let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 }; 
+        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 256KB (Sovereign Swarm Pull)
+        let chunk_size = 256 * 1024;
         let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
         
         let transfer_payload = SignalingPayload::FileTransfer { 
@@ -4962,7 +5029,9 @@ impl NetworkService {
         } else if !relayed.is_empty() {
             relayed
         } else {
-            providers.to_vec()
+            // No providers connected — return empty to trigger FindProviders discovery
+            // instead of trying offline seeders repeatedly
+            Vec::new()
         }
     }
 }

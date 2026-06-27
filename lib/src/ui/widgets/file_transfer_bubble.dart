@@ -587,7 +587,7 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
                           padding: const EdgeInsets.all(12),
                           child: _buildAudioPlayerWidget(stateColor),
                         ),
-                      ] else if (isMedia && _thumbnailPath != null && File(_thumbnailPath!).existsSync() && isVerified) ...[
+                      ] else if (isMedia && ((_thumbnailPath != null && File(_thumbnailPath!).existsSync()) || (progress.thumbnail != null && progress.thumbnail!.isNotEmpty)) && (isVerified || isMe)) ...[
                         // Clean media display: image with rounded corners, no frame
                         ClipRRect(
                           borderRadius: BorderRadius.circular(15),
