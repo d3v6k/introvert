@@ -129,7 +129,7 @@ impl Default for ActivityWeights {
             rapid_fire_max_per_window: 10,
             daily_point_cap: 5000.0,
             intr_per_point: 0.001,
-            edge_infra_multiplier: 38.0,
+            edge_infra_multiplier: 3.0,
         }
     }
 }
@@ -244,6 +244,7 @@ struct DailyRewardState {
     global_points_estimate: f64,
     is_rbn: bool,
     is_edge_node: bool,
+    prestige_tier: u8,
 }
 
 impl DailyRewardState {
@@ -259,6 +260,7 @@ impl DailyRewardState {
             global_points_estimate: DEFAULT_GLOBAL_POINTS_ESTIMATE,
             is_rbn: false,
             is_edge_node: false,
+            prestige_tier: 0,
         }
     }
 }
@@ -340,7 +342,17 @@ impl DailyRewardEngine {
             let effective_pool = if is_rbn { self.get_rbn_daily_pool_cap() } else { self.get_daily_pool_cap() };
             let global_estimate = state.global_points_estimate.max(1.0);
             let user_share = prev.total_points / global_estimate;
-            prev.intr_reward = user_share * effective_pool;
+            let prestige_mult = match state.prestige_tier {
+                0 => 1.0,
+                1 => 1.05,
+                2 => 1.10,
+                3 => 1.20,
+                4 => 1.50,
+                5 => 1.15,
+                6 => 1.15,
+                _ => 1.0,
+            };
+            prev.intr_reward = user_share * effective_pool * prestige_mult;
 
             prev.unique_peers = state.unique_peers.len() as u32;
             prev.is_eligible = prev.unique_peers >= anti.min_unique_peers && prev.capped_points > 0.0;
@@ -528,6 +540,12 @@ impl DailyRewardEngine {
         state.is_edge_node = is_edge;
     }
 
+    /// Sets the prestige tier status for this node.
+    pub fn set_prestige_tier(&self, tier: u8) {
+        let mut state = self.state.write();
+        state.prestige_tier = tier;
+    }
+
     /// Returns the emission year (1-based) since TGE.
     pub fn get_emission_year(&self) -> u32 {
         let tge = NaiveDate::parse_from_str(TGE_DATE, "%Y-%m-%d").unwrap_or(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
@@ -598,9 +616,20 @@ impl DailyRewardEngine {
             0.0
         };
 
+        let prestige_mult = match state.prestige_tier {
+            0 => 1.0,
+            1 => 1.05,
+            2 => 1.10,
+            3 => 1.20,
+            4 => 1.50,
+            5 => 1.15,
+            6 => 1.15,
+            _ => 1.0,
+        };
+
         // CRITICAL: Output as nano-INTR integer (1 INTR = 1,000,000,000 nano-INTR)
         // No floating-point serialization — matches Solana SPL 9-decimal precision
-        let intr_earned_f64 = user_share * effective_pool;
+        let intr_earned_f64 = user_share * effective_pool * prestige_mult;
         let intr_earned_nano: u64 = (intr_earned_f64 * 1_000_000_000.0) as u64;
 
         let unique_peers = state.unique_peers.len() as u32;

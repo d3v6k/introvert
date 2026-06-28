@@ -42,7 +42,7 @@ To insulate developers from hosting liability, the platform uses an automated, o
 |                                              |      (PDA Escrow Vault)      |   |
 |                                              +------------------------------+   |
 |                                                /                          \     |
-|                   (Stakes 50k $INTR to Vault) /                            \    |
+|                   (Stakes 2M $INTR to Vault) /                            \    |
 |                                              /                              \   |
 |                                             v                                v  |
 |                                    +-----------------+              +-----------------+
@@ -56,6 +56,6 @@ To insulate developers from hosting liability, the platform uses an automated, o
 All network stakes and emission balances are consolidated into a single **Program-Derived Address (PDA)** on Solana. This account has no cryptographic private key; it is governed purely by the execution parameters of the immutable `introvert-registry` program.
 
 #### The Token Sink Mechanics
-1. **RBN Bonding Sinks:** Operators must transfer and bond exactly 50,000 $INTR into the PDA Escrow to declare their multiaddress on the active network directory.
+1. **RBN Bonding Sinks:** Operators must transfer and bond exactly 2,000,000 $INTR into the PDA Escrow to declare their multiaddress on the active network directory.
 2. **Unbonding Cooldown:** If an RBN withdraws from the network, their stake enters an unalterable 7-day on-chain cooldown state. This prevents exit-scams if the node drops offline or serves faulty data blocks.
 3. **Edge Node Tiers:** Standard client apps query the blockchain to check token balances. Mobile devices must maintain a fixed amount of $INTR to qualify for active P2P background relay features.

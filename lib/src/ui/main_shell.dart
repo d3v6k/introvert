@@ -67,6 +67,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   double _dailyIntrEarned = 0.0;
   StreamSubscription<Map<String, dynamic>>? _economySubscription;
 
+  void Function(String ip, String peerId, String rtt)? rbnConfirmedCallback;
+  void Function(String ip, String reason)? rbnFailedCallback;
+
+  void _onRbnConfirmed(String ip, String peerId, String rtt) {
+    if (rbnConfirmedCallback != null) {
+      rbnConfirmedCallback!(ip, peerId, rtt);
+    }
+  }
+
+  void _onRbnFailed(String ip, String reason) {
+    if (rbnFailedCallback != null) {
+      rbnFailedCallback!(ip, reason);
+    }
+  }
+
   bool _isInBackground = false;
   DateTime? _lastCallAlertTime;
   DateTime? _lastMsgAlertTime;
@@ -190,7 +205,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       // App is losing focus/backgrounding: enter idle mode
-      AlertService.startBackgroundService();
+      final bool needsStayAwake = _client.isAnchorModeEnabled() || !BackgroundSyncService.instance.pushAvailable;
+      AlertService.startBackgroundService(awake: needsStayAwake);
       BackgroundSyncService.instance.enterIdleMode();
     } else if (state == AppLifecycleState.resumed) {
       // Return to foreground: exit idle mode
@@ -415,6 +431,33 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             );
           }
         } catch (_) {}
+      } else if (event.type == 45) {
+        // Event 45: RbnConnectionConfirmed [original_ip|peer_id|rtt]
+        try {
+          final payload = utf8.decode(event.data);
+          final parts = payload.split('|');
+          if (parts.length >= 3) {
+            final ip = parts[0];
+            final peerId = parts[1];
+            final rtt = parts[2];
+            _onRbnConfirmed(ip, peerId, rtt);
+          }
+        } catch (e) {
+          debugPrint("Error handling Event 45: $e");
+        }
+      } else if (event.type == 46) {
+        // Event 46: RbnConnectionFailed [original_ip|reason]
+        try {
+          final payload = utf8.decode(event.data);
+          final parts = payload.split('|');
+          if (parts.length >= 2) {
+            final ip = parts[0];
+            final reason = parts[1];
+            _onRbnFailed(ip, reason);
+          }
+        } catch (e) {
+          debugPrint("Error handling Event 46: $e");
+        }
       } else if (event.type == 14) {
         // Event Code 14: Incoming Call Offer
         try {
@@ -468,9 +511,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     // Call startNetwork AFTER listen to capture initial status
     client.startNetwork();
     
+    // Register any pending push token and fetch mailbox now that the engine is active
+    AlertService.tryRegisterPendingToken();
+    try {
+      client.fetchMailbox();
+    } catch (_) {}
+    
     // Initialize background sync — push is the primary wakeup mechanism,
     // with fallback polling if push delivery fails
-    BackgroundSyncService.instance.initialize(pushAvailable: true);
+    final bool hasPush = AlertService.hasRegisteredToken || (AlertService.apnsToken != null && AlertService.apnsToken!.isNotEmpty);
+    BackgroundSyncService.instance.initialize(pushAvailable: hasPush);
   }
 
   int _getContactTier(String peerId) {
@@ -2674,6 +2724,18 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     super.dispose();
   }
 
+  void _showRbnManagerDialog() {
+    final mainShellState = context.findAncestorStateOfType<_MainShellState>();
+    if (mainShellState == null) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => _RbnManagerDialog(
+        client: IntrovertClient(),
+        parentState: mainShellState,
+      ),
+    );
+  }
+
   void _showSwarmStatus() {
     IntrovertClient().requestSwarmStats();
     showDialog(
@@ -3060,6 +3122,33 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
         setState(() {
           _economyStats = stats;
         });
+
+        // Dynamically compute and update prestige tier based on INTR balance
+        final rawBalance = stats['intr_balance'];
+        double balance = 0.0;
+        if (rawBalance != null) {
+          if (rawBalance is num) {
+            balance = rawBalance.toDouble();
+          } else {
+            balance = double.tryParse(rawBalance.toString()) ?? 0.0;
+          }
+          balance /= 1000000000.0; // 9 decimals
+        }
+
+        int tier = 0;
+        if (balance >= 1000000.0) {
+          tier = 4; // Platinum
+        } else if (balance >= 500000.0) {
+          tier = 3; // Gold
+        } else if (balance >= 250000.0) {
+          tier = 2; // Silver
+        } else if (balance >= 100000.0) {
+          tier = 1; // Sentinel
+        } else {
+          tier = 0; // Citizen
+        }
+
+        IntrovertClient().setProfileTier(tier);
       }
     });
   }
@@ -3429,6 +3518,39 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
             ),
             SizedBox(height: 24),
             _buildSettingSection(
+              'Edge Node Status',
+              [
+                SwitchListTile(
+                  title: Row(
+                    children: [
+                      Flexible(
+                        child: Text('Node Mode', style: TextStyle(fontSize: 13, color: AppTheme.current.text.withValues(alpha: 0.5)), overflow: TextOverflow.ellipsis),
+                      ),
+                      SizedBox(width: 6),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.current.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text('EARN 3X', style: TextStyle(
+                          fontSize: 8, fontWeight: FontWeight.bold,
+                          color: AppTheme.current.accent, letterSpacing: 1,
+                        )),
+                      ),
+                    ],
+                  ),
+                  subtitle: Text('Devices operating in Edge node earn 3x to 4x when compared to regular users. Holding requirement of 50,000 INTR to be eligible to become node.', style: TextStyle(fontSize: 12, color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
+                  value: false,
+                  onChanged: null,
+                  activeTrackColor: AppTheme.current.accent.withValues(alpha: 0.5),
+                  activeThumbColor: AppTheme.current.accent,
+                  dense: true,
+                ),
+              ],
+            ),
+            SizedBox(height: 24),
+            _buildSettingSection(
               'Appearance',
               [
                 ListTile(
@@ -3472,38 +3594,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                   dense: true,
                 ),
                 Divider(height: 1, indent: 16, endIndent: 16, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                // ── Contribution ──
-                SwitchListTile(
-                  title: Row(
-                    children: [
-                      Flexible(
-                        child: Text('Participate as Anchor Node', style: TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
-                      ),
-                      SizedBox(width: 6),
-                      GestureDetector(
-                        onTap: _showAnchorModeInfo,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppTheme.current.accent.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text('INFO', style: TextStyle(
-                            fontSize: 8, fontWeight: FontWeight.bold,
-                            color: AppTheme.current.accent, letterSpacing: 1,
-                          )),
-                        ),
-                      ),
-                    ],
-                  ),
-                  subtitle: Text('Help relay messages and store mailbox payloads for others. Earn extra rewards.', style: TextStyle(fontSize: 12)),
-                  value: _isAnchorMode,
-                  onChanged: _toggleAnchorMode,
-                  activeTrackColor: AppTheme.current.accent.withValues(alpha: 0.5),
-                  activeThumbColor: AppTheme.current.accent,
-                  dense: true,
-                ),
-                Divider(height: 1, indent: 16, endIndent: 16, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
                 // ── Connectivity ──
                 SwitchListTile(
                   secondary: Icon(Icons.vpn_lock_rounded, color: Colors.deepPurpleAccent, size: 20),
@@ -3520,6 +3610,15 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                   title: Text('Optimise Network Connection', style: TextStyle(fontSize: 13)),
                   subtitle: Text('Refresh all P2P connections to improve mesh performance.', style: TextStyle(fontSize: 12)),
                   trailing: NetworkOptimizationButton(color: AppTheme.current.accent),
+                  dense: true,
+                ),
+                Divider(height: 1, indent: 16, endIndent: 16, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                ListTile(
+                  leading: Icon(Icons.router_rounded, color: AppTheme.current.accent, size: 20),
+                  title: Text('Intro Claw RBN Selection', style: TextStyle(fontSize: 13)),
+                  subtitle: Text('Manage and test Bootstrap Relays (RBNs) and manually configure relay endpoints.', style: TextStyle(fontSize: 12)),
+                  trailing: Icon(Icons.chevron_right, size: 20),
+                  onTap: _showRbnManagerDialog,
                   dense: true,
                 ),
                 Divider(height: 1, indent: 16, endIndent: 16, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
@@ -4361,48 +4460,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      // Node Mode Toggle (for anchor/always-on nodes)
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.dns_rounded,
-                            color: _isAnchorMode ? AppTheme.current.accent : AppTheme.current.mutedText,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Node Mode',
-                                  style: TextStyle(
-                                    color: AppTheme.current.text,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  'Aggressive optimizations for always-on nodes',
-                                  style: TextStyle(
-                                    color: AppTheme.current.mutedText,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: _isAnchorMode,
-                            onChanged: (value) {
-                              _toggleAnchorMode(value);
-                              IntrovertClient().setIntroClawNodeMode(value);
-                            },
-                            activeColor: AppTheme.current.accent,
                           ),
                         ],
                       ),
@@ -5301,6 +5358,406 @@ class _IncomingGroupCallOverlayState extends State<_IncomingGroupCallOverlay> wi
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RbnManagerDialog extends StatefulWidget {
+  final IntrovertClient client;
+  final _MainShellState parentState;
+
+  const _RbnManagerDialog({required this.client, required this.parentState});
+
+  @override
+  State<_RbnManagerDialog> createState() => _RbnManagerDialogState();
+}
+
+class _RbnManagerDialogState extends State<_RbnManagerDialog> {
+  List<dynamic> _rbns = [];
+  final TextEditingController _ipController = TextEditingController();
+  bool _isTesting = false;
+  String _testStatus = "";
+  Color _statusColor = Colors.transparent;
+
+  bool _isRefreshing = false;
+  String _refreshMessage = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshRbns();
+    
+    // Subscribe to RBN connection test events
+    widget.parentState.rbnConfirmedCallback = (ip, peerId, rtt) {
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+          _testStatus = "SUCCESS: Set to RBN (${_obfuscateAddress(ip)})";
+          _statusColor = Colors.greenAccent;
+          _refreshRbns();
+        });
+      }
+    };
+
+    widget.parentState.rbnFailedCallback = (ip, reason) {
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+          _testStatus = "FAILED to connect to ${_obfuscateAddress(ip)}: $reason";
+          _statusColor = Colors.redAccent;
+        });
+      }
+    };
+  }
+
+  @override
+  void dispose() {
+    // Unsubscribe
+    widget.parentState.rbnConfirmedCallback = null;
+    widget.parentState.rbnFailedCallback = null;
+    _ipController.dispose();
+    super.dispose();
+  }
+
+  String _obfuscateAddress(String address) {
+    if (address.isEmpty) return address;
+    
+    // Match /ip4/192.168.1.81/tcp/443 style
+    final ip4RegExp = RegExp(r'/ip4/(\d+)\.(\d+)\.(\d+)\.(\d+)');
+    if (ip4RegExp.hasMatch(address)) {
+      return address.replaceAllMapped(ip4RegExp, (m) => '/ip4/${m[1]}.${m[2]}.xxx.xxx');
+    }
+    
+    // Match standard IPv4
+    final plainIpRegExp = RegExp(r'^(\d+)\.(\d+)\.(\d+)\.(\d+)$');
+    if (plainIpRegExp.hasMatch(address)) {
+      return address.replaceAllMapped(plainIpRegExp, (m) => '${m[1]}.${m[2]}.xxx.xxx');
+    }
+    
+    return address;
+  }
+
+  void _refreshRbns() {
+    setState(() {
+      _rbns = widget.client.getRbns();
+    });
+  }
+
+  void _onRefreshPressed() async {
+    if (_isRefreshing) return;
+    setState(() {
+      _isRefreshing = true;
+      _refreshMessage = "Fetching latest RBN latency metrics...";
+    });
+
+    // Request updated swarm stats/latencies
+    widget.client.requestSwarmStats();
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    _refreshRbns();
+
+    // Find RBN with lowest latency
+    dynamic bestRbn;
+    int minLatency = 999999;
+    for (var rbn in _rbns) {
+      final lat = rbn['latency_ms'];
+      if (lat != null && lat < minLatency) {
+        minLatency = lat;
+        bestRbn = rbn;
+      }
+    }
+
+    if (bestRbn != null) {
+      setState(() {
+        _refreshMessage = "Optimizing path: Switching RBNs for better speeds & reliability...";
+      });
+      await Future.delayed(const Duration(seconds: 2));
+      setState(() {
+        _isRefreshing = false;
+        _refreshMessage = "";
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Connected to optimal RBN: ${_obfuscateAddress(bestRbn['address'])} (${bestRbn['latency_ms']}ms)"),
+            backgroundColor: AppTheme.current.accent,
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _isRefreshing = false;
+        _refreshMessage = "";
+      });
+    }
+  }
+
+  void _startConnectionTest() {
+    var ipInput = _ipController.text.trim();
+    if (ipInput.isEmpty) return;
+
+    // If user enters a plain IP (e.g. 192.168.1.81), append /ip4/ prefix
+    final ipv4Regex = RegExp(r'^\d+\.\d+\.\d+\.\d+$');
+    if (ipv4Regex.hasMatch(ipInput)) {
+      ipInput = '/ip4/$ipInput/tcp/443';
+    }
+
+    setState(() {
+      _isTesting = true;
+      _testStatus = "Testing connection to ${_obfuscateAddress(ipInput)}...";
+      _statusColor = AppTheme.current.accent;
+    });
+
+    widget.client.testRbn(ipInput);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppTheme.current.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        width: MediaQuery.of(context).size.width * 0.9,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'ROUTING RELAYS (RBN)',
+                  style: TextStyle(
+                    color: AppTheme.current.accent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(Icons.close, size: 20, color: AppTheme.current.mutedText),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Intro Claw automatically selects the best RBN relay based on speed (lowest ping latency) to ensure optimal delivery. To preserve your device battery life, auto-optimization checks run only when the application is active and in the foreground.',
+              style: TextStyle(color: AppTheme.current.mutedText, fontSize: 12, height: 1.3),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'ACTIVE RELAY LIST',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.current.text.withValues(alpha: 0.7),
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                _isRefreshing
+                    ? SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent),
+                      )
+                    : InkWell(
+                        onTap: _onRefreshPressed,
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4.0),
+                          child: Icon(Icons.refresh, size: 16, color: AppTheme.current.accent),
+                        ),
+                      ),
+              ],
+            ),
+            if (_refreshMessage.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.current.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.current.accent),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _refreshMessage,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.current.accent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 180),
+              child: _rbns.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No relays connected yet.',
+                        style: TextStyle(color: AppTheme.current.mutedText, fontSize: 12),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _rbns.length,
+                      itemBuilder: (context, idx) {
+                        final rbn = _rbns[idx];
+                        final peerId = rbn['peer_id'] ?? '';
+                        final truncatedPeerId = peerId.length > 20
+                            ? '${peerId.substring(0, 8)}...${peerId.substring(peerId.length - 8)}'
+                            : peerId;
+                        final address = rbn['address'] ?? '';
+                        final latency = rbn['latency_ms'];
+                        
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.current.bg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.dns, size: 18, color: AppTheme.current.accent),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        truncatedPeerId,
+                                        style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _obfuscateAddress(address),
+                                        style: TextStyle(fontSize: 10, color: AppTheme.current.mutedText),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: latency != null
+                                        ? Colors.green.withValues(alpha: 0.1)
+                                        : Colors.amber.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    latency != null ? '${latency}ms' : 'Pending',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: latency != null ? Colors.greenAccent : Colors.amberAccent,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'MANUALLY SET INTROVERT RBN ADDRESS',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.current.text.withValues(alpha: 0.7),
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppTheme.current.bg,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppTheme.current.mutedText.withValues(alpha: 0.2)),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                    child: TextField(
+                      controller: _ipController,
+                      enabled: !_isTesting,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter RBN IP address',
+                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 38,
+                  child: ElevatedButton(
+                    onPressed: _isTesting ? null : _startConnectionTest,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.current.accent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    child: _isTesting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Test', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            if (_testStatus.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _statusColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _statusColor.withValues(alpha: 0.2)),
+                ),
+                child: Text(
+                  _testStatus,
+                  style: TextStyle(fontSize: 11, color: _statusColor, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

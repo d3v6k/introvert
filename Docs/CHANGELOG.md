@@ -134,7 +134,7 @@ All notable changes to Introvert will be documented in this file.
 - **Protocol Specification:** Replaced messaging/file/mailbox/group/media lifecycles with Decentralized RBN Infrastructure Lifecycle (on-chain init, dynamic directory, work verification, governance-gated upgrades)
 - **Security & Encryption:** Replaced E2EE/storage/mailbox/FFI sections with Autonomous Infrastructure Safeguards (PDA isolation, Squads V4 governance, time-locked unstaking)
 - **README.md:** Updated intro, core features, and tech stack to reflect sovereign P2P architecture with Solana-based dynamic bootstrapping, PDA vault, and token gating
-- **Deployment Architecture:** RBN deployment now requires 50,000 $INTR stake in PDA escrow. Added on-chain registration and governance sections
+- **Deployment Architecture:** RBN deployment now requires 2,000,000 $INTR stake in PDA escrow. Added on-chain registration and governance sections
 - **Rebuild Guide:** RBN setup now requires $INTR tokens and on-chain registration instead of hardcoded IP lists
 - **Configuration Reference:** Bootstrap nodes section updated to reflect dynamic Solana-based discovery with legacy fallback
 - **Module Reference:** `network/config.rs` noted as legacy fallback; dynamic discovery is primary
@@ -143,8 +143,8 @@ All notable changes to Introvert will be documented in this file.
 ### Architecture Decisions
 - Bootstrap nodes are discovered dynamically from Solana on-chain registry at app startup
 - Hardcoded IP arrays in `network/config.rs` serve as fallback only when Solana RPC is unreachable
-- RBN operators must bond 50,000 $INTR into PDA escrow with 7-day unbonding cooldown
-- Edge nodes require 500 $INTR minimum for active relay routing (Event Code 22)
+- RBN operators must bond 2,000,000 $INTR into PDA escrow with 7-day unbonding cooldown
+- Edge nodes require 100,000 $INTR minimum for active relay routing (Event Code 22)
 - Contract upgrades controlled by Squads V4 3-of-5 Multisig — no single developer override
 
 ## [0.11.0] - 2026-06-20 — STABLE v34 "Iron Claw"

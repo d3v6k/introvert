@@ -21,7 +21,7 @@ The `is_lease_valid()` function always returns `true`. The `INTROVERT_TRUST_ALL_
 
 **Phase 2 transforms RBNs from "trust me" to "verify me" through:**
 
-1. On-chain Solana registry with mandatory 50,000 $INTR stake
+1. On-chain Solana registry with mandatory 2,000,000 $INTR stake
 2. Cryptographic message signatures preventing mailbox tampering
 3. Envelope encryption so RBNs cannot read relayed content
 4. Hardened reward claims with signed proofs and on-chain verification
@@ -135,7 +135,7 @@ A peer is classified as an anchor if it advertises both `/introvert/signaling/1.
 │                             │  }                               ││
 │  ┌─────────────────────┐    └──────────────────────────────────┘│
 │  │ PDA Escrow Vault    │<── Program-Derived Address             │
-│  │ (50k $INTR per RBN) │    No private key, immutable rules    │
+│  │ (2M $INTR per RBN) │    No private key, immutable rules    │
 │  └─────────────────────┘                                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -146,8 +146,8 @@ A peer is classified as an anchor if it advertises both `/introvert/signaling/1.
 
 #### `register_rbn(peer_id, multiaddr)`
 
-1. Operator must hold >= 50,000 $INTR in their ATA
-2. Transfer 50,000 $INTR from operator ATA to PDA escrow vault
+1. Operator must hold >= 2,000,000 $INTR in their ATA
+2. Transfer 2,000,000 $INTR from operator ATA to PDA escrow vault
 3. Create `RbnNode` account with `is_active = true`
 4. Record `multiaddr`, `peer_id`, `operator_wallet`
 5. Set `last_heartbeat = now`
@@ -298,7 +298,7 @@ The wallet is **deterministically linked** to the node identity — same seed, s
 ### 5.2 RBN Operator Onboarding
 
 ```
-Step 1: Obtain 50,000 $INTR
+Step 1: Obtain 2,000,000 $INTR
     └── Via DEX (Raydium/Orca), OTC, or ecosystem grant
 
 Step 2: Transfer $INTR to derived wallet
@@ -313,7 +313,7 @@ Step 4: Daemon automatically:
     b. Checks $INTR balance >= 50,000
     c. Detects public IP
     d. Calls register_rbn() on introvert-registry
-    e. Transfers 50,000 $INTR to PDA escrow
+    e. Transfers 2,000,000 $INTR to PDA escrow
     f. Starts heartbeat loop (every 6 hours)
     g. Starts IP change detection (every 5 minutes)
 
@@ -344,7 +344,7 @@ Add `--status` flag to `introvertd`:
  PeerId:        12D3KooW...
  Wallet:        9jauyK...
  Multiaddr:     /ip4/203.0.113.5/tcp/443
- Stake:         50,000 $INTR (locked)
+ Stake:         2,000,000 $INTR (locked)
  Status:        ACTIVE
  Uptime:        14d 6h 32m
  Connected:     847 peers
@@ -587,7 +587,7 @@ for anchor_id in connected_anchors.iter().take(2) {
 
 | Task | File | Change |
 |------|------|--------|
-| Fix `is_lease_valid()` | `for_linux/src/economy/mod.rs:170` | Check operator balance >= 50,000 INTR |
+| Fix `is_lease_valid()` | `for_linux/src/economy/mod.rs:170` | Check operator balance >= 2,000,000 INTR |
 | Fix lease check pubkey | `for_linux/src/network/mod.rs:793` | Use operator wallet, not treasury |
 | Gate `INTROVERT_TRUST_ALL_WITNESSES` | `for_linux/src/network/mod.rs:4658` | `#[cfg(debug_assertions)]` |
 
@@ -692,8 +692,8 @@ cargo test --test economy_audit -- --nocapture
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| RBN Stake | 50,000 INTR | Economic gate |
-| Edge Relay Threshold | 500 INTR | Active relay eligibility |
+| RBN Stake | 2,000,000 INTR | Economic gate |
+| Edge Relay Threshold | 100,000 INTR | Active relay eligibility |
 | Heartbeat Interval | 6 hours | Liveness proof |
 | Heartbeat Expiry | 24 hours | Stale node pruning |
 | Unbonding Period | 7 days | Exit scam prevention |

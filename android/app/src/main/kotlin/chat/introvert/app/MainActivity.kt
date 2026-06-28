@@ -24,6 +24,7 @@ import chat.introvert.app.R
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "introvert/alerts"
@@ -40,6 +41,23 @@ class MainActivity : FlutterActivity() {
         createNotificationChannels()
         requestNotificationPermission()
         handlePushIntent(intent)
+        
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful && task.result != null) {
+                    val token = task.result
+                    Log.d("IntrovertFCM", "Launch FCM token: ${token.take(20)}...")
+                    val prefs = getSharedPreferences("introvert_fcm", Context.MODE_PRIVATE)
+                    prefs.edit().putString("pending_fcm_token", token).apply()
+                    forwardPendingFcmToken()
+                } else {
+                    Log.w("IntrovertFCM", "Failed to retrieve FCM token: ${task.exception?.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("IntrovertFCM", "Error fetching FCM token: ${e.message}", e)
+        }
+
         forwardPendingFcmToken()
     }
 
@@ -119,7 +137,8 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "startBackgroundService" -> {
-                        startIntrovertService()
+                        val awake = call.argument<Boolean>("awake") ?: false
+                        startIntrovertService(awake)
                         result.success(null)
                     }
                     "stopBackgroundService" -> {
@@ -147,8 +166,10 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun startIntrovertService() {
-        val intent = Intent(this, IntrovertService::class.java)
+    private fun startIntrovertService(awake: Boolean) {
+        val intent = Intent(this, IntrovertService::class.java).apply {
+            putExtra("awake", awake)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {

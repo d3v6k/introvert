@@ -61,6 +61,19 @@ fn test_ffi_lifecycle() {
     println!("My Peer ID: {}", peer_id);
     introvert_free_string(peer_id_ptr);
 
+    // Test RBN FFI functions
+    let rbn_res = introvert_network_get_rbns();
+    assert_eq!(rbn_res.code, 0);
+    assert!(!rbn_res.data.is_null());
+    let rbn_json = unsafe { std::slice::from_raw_parts(rbn_res.data, rbn_res.len) };
+    let rbn_str = std::str::from_utf8(rbn_json).unwrap();
+    println!("RBN List from FFI: {}", rbn_str);
+    introvert_free_binary(rbn_res.data, rbn_res.len);
+
+    let test_ip_c = CString::new("127.0.0.1").unwrap();
+    let test_rbn_res = introvert_network_test_rbn(test_ip_c.as_ptr());
+    assert_eq!(test_rbn_res.code, 0);
+
     // 6. Stop Engine
     let res = introvert_engine_stop();
     assert_eq!(res.code, 0);

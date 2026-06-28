@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'introvert_client.dart';
+import '../services/background_sync_service.dart';
 
 /// Thin Dart wrapper around the native `introvert/alerts` MethodChannel.
 ///
@@ -18,6 +19,10 @@ class AlertService {
   static bool _permissionsRequested = false;
 
   static String? _apnsToken;
+  static String? _pendingFcmToken;
+  static bool _hasRegisteredToken = false;
+
+  static bool get hasRegisteredToken => _hasRegisteredToken;
 
   /// Initializes the alert service and sets up listeners for native events.
   static void initialize() {
@@ -27,7 +32,7 @@ class AlertService {
           _apnsToken = call.arguments as String;
           final masked = _apnsToken!.length > 8 ? '...${_apnsToken!.substring(_apnsToken!.length - 8)}' : _apnsToken;
           debugPrint("🔔 AlertService: Received APNs Token: $masked");
-          IntrovertClient().registerPushToken(Platform.isIOS ? "ios" : "android", _apnsToken!);
+          tryRegisterPendingToken();
           break;
         case 'onWakeup':
           debugPrint("🔔 AlertService: Background Wakeup! Triggering P2P Fetch...");
@@ -43,8 +48,9 @@ class AlertService {
           
           // Register FCM token with RBN if provided
           if (fcmToken != null && fcmToken.isNotEmpty) {
-            debugPrint("🔔 AlertService: FCM token received, registering with RBN...");
-            IntrovertClient().registerPushToken("android", fcmToken);
+            debugPrint("🔔 AlertService: FCM token received, caching for registration...");
+            _pendingFcmToken = fcmToken;
+            tryRegisterPendingToken();
           }
           
           debugPrint("🔔 AlertService: Push notification received: chat=$openChat, group=$openGroup, call=$incomingCall");
@@ -56,6 +62,24 @@ class AlertService {
   }
 
   static String? get apnsToken => _apnsToken;
+
+  /// Attempts to register the pending FCM or APNs token with the active RBN.
+  /// Safely retries once the native engine is fully running.
+  static void tryRegisterPendingToken() {
+    final token = _apnsToken ?? _pendingFcmToken;
+    if (token == null || token.isEmpty) return;
+    
+    final client = IntrovertClient();
+    try {
+      client.registerPushToken(Platform.isIOS ? "ios" : "android", token);
+      debugPrint("🔔 AlertService: Push token successfully registered with RBN.");
+      _hasRegisteredToken = true;
+      _pendingFcmToken = null; // Clear pending on success
+      BackgroundSyncService.instance.updatePushAvailability(true);
+    } catch (e) {
+      debugPrint("🔔 AlertService: Engine not ready yet to register push token: $e");
+    }
+  }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -109,10 +133,10 @@ class AlertService {
   }
 
   /// Starts the native background foreground service (Android only).
-  static Future<void> startBackgroundService() async {
+  static Future<void> startBackgroundService({bool awake = false}) async {
     if (!Platform.isAndroid) return;
     try {
-      await _channel.invokeMethod('startBackgroundService');
+      await _channel.invokeMethod('startBackgroundService', {'awake': awake});
     } catch (e) {
       debugPrint("🔔 AlertService: Failed to start background service: $e");
     }

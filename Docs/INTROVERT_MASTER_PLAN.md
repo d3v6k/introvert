@@ -10,6 +10,15 @@ Introvert is a privacy-first, decentralized communication platform designed to e
 *   **Sovereign Economy:** Integrated Solana SPL Token (`INTR`) rewards for users who provide relay and storage services to the mesh.
 *   **Hardened Privacy:** Mandatory Noise IK (X25519) E2EE for all signaling and WebRTC streams.
 
+**Core Philosophy & Value Pillars:**
+*   **Open-Source & Peer-to-Peer:** A fully transparent codebase audited by the community. Serverless, direct edge-to-edge routing over standard libp2p.
+*   **End-to-End Encryption:** Locally encrypted messaging, groups, and drive data using the Noise Protocol frame (`Noise_IK_25519_ChaChaPoly_BLAKE2s`) and AES-256-GCM.
+*   **Eco-Friendly / Green Credentials:** Zero carbon-heavy datacenters. Utilizes existing idle consumer hardware coupled with Solana's green Proof-of-History consensus.
+*   **Zero Spam:** Sybil-resistant, balance-gated rate-limiting filters that increase the economic cost of abuse.
+*   **Bleeding-Edge Tech:** Powered by the self-healing **Intro-Claw Maintenance Engine** and the bandwidth-saving binary **Intro Codec** (saving 25% overhead).
+*   **User Rewards:** Earn $INTR tokens daily based on contribution weight via dynamic pool-clearing rewards.
+*   **Community-Powered RBNs:** Root Bootstrap Nodes are operated by community hosts to maintain a decentralized network directory.
+
 ---
 
 ## 2. Component Architecture & File Mapping
@@ -79,6 +88,24 @@ All incentives are anchored to the official on-chain SPL mint.
 2.  **Optimization:** `llvm-strip` removes debug symbols to keep the APK under 45MB.
 3.  **FFI Sync:** `libintrovert.so` is manually injected into Flutter's ephemeral and release paths.
 4.  **Flutter Assembly:** `flutter build apk --split-per-abi` for production deployment.
+
+***
+
+## 6. Build & Deployment Matrix (Requirements for Code Changes)
+
+When code changes are made to the codebase, follow this matrix to determine which rebuild, rerun, or upload actions are required:
+
+| Scope of Code Change | Cargo Rebuild (`make mac` / `make android`) | Flutter Run (App Relaunch) | RBN Upload / Redeploy |
+| :--- | :--- | :--- | :--- |
+| **Rust Client Core (`src/`)** | **YES** | **YES** | **NO** |
+| **Dart/Flutter UI (`lib/`)** | **NO** | **YES** (or Hot Reload/Restart) | **NO** |
+| **Assets / Configs (`assets/`)** | **NO** | **YES** | **NO** |
+| **RBN Daemon Core (`for_linux/`)** | **NO** (unless compiling local tests) | **NO** | **YES** (Recompile and redeploy `introvertd` to RBN servers) |
+
+### Protocol Upgrades & Chunk Size Changes
+When changing chunk size or pull pipeline window sizes:
+*   **Active Client Transfers**: Requires a **Cargo Rebuild** (to repackage the native libraries) and **Flutter Run** on the client devices. Redeploying the RBN is **NOT** required because the RBN acts as a transparent circuit relayer and does not inspect or validate chunk sizes.
+*   **Offline Caching / Node Mode**: Requires **RBN Upload & Redeploy** to RBN servers. The daemon itself runs the file prefetcher/seeder engine in Node Mode and must align on chunk sizes to serve offline cache clients.
 
 ***
 

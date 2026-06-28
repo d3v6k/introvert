@@ -21,7 +21,7 @@ class BackgroundSyncService {
 
   /// Initialize background sync.
   /// [pushAvailable] should be true if FCM/APNs is configured and working.
-  Future<void> initialize({bool pushAvailable = true}) async {
+  Future<void> initialize({bool pushAvailable = false}) async {
     if (_initialized) return;
     _initialized = true;
     _pushAvailable = pushAvailable;
@@ -30,6 +30,18 @@ class BackgroundSyncService {
       debugPrint("✅ Background sync initialized — push active, polling disabled");
     } else {
       debugPrint("⚠️ Background sync initialized — push unavailable, starting fallback poll");
+      _startFallbackPoll();
+    }
+  }
+
+  /// Dynamically update push availability when tokens arrive or change.
+  void updatePushAvailability(bool available) {
+    if (_pushAvailable == available) return;
+    _pushAvailable = available;
+    debugPrint("🔄 BackgroundSyncService: Push availability updated to $available");
+    if (available) {
+      _fallbackTimer?.cancel();
+    } else if (!_isIdle) {
       _startFallbackPoll();
     }
   }
@@ -67,6 +79,7 @@ class BackgroundSyncService {
   }
 
   bool get isIdle => _isIdle;
+  bool get pushAvailable => _pushAvailable;
 
   /// Cancel all background tasks.
   void cancel() {

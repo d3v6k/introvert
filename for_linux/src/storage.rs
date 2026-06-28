@@ -456,7 +456,7 @@ impl StorageService {
                 static_key = excluded.static_key, 
                 solana_address = excluded.solana_address, 
                 global_name = excluded.global_name,
-                local_alias = excluded.local_alias,
+                local_alias = COALESCE(contacts.local_alias, excluded.local_alias),
                 avatar_base64 = excluded.avatar_base64,
                 is_verified = excluded.is_verified,
                 is_incoming = excluded.is_incoming,

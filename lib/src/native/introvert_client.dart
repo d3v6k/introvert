@@ -588,6 +588,8 @@ class IntrovertClient {
   late IntrovertGetAnchorModeDart _getAnchorMode;
   late IntrovertNetworkSetTunnelModeDart _setTunnelMode;
   late IntrovertNetworkGetTunnelModeDart _getTunnelMode;
+  late IntrovertNetworkGetRbnsDart _getRbns;
+  late IntrovertNetworkTestRbnDart _testRbn;
   late IntrovertNetworkRecheckConnectionDart _recheckConnection;
   late IntrovertNetworkResolveHandleDart _resolveHandle;
   late IntrovertNetworkSendDirectInviteDart _sendDirectInvite;
@@ -974,6 +976,8 @@ class IntrovertClient {
       _getAnchorMode = safeLookup('get_anchor_mode', () => _dylib.lookupFunction<IntrovertGetAnchorModeC, IntrovertGetAnchorModeDart>('introvert_network_get_anchor_mode'), () => 0);
       _setTunnelMode = safeLookup('set_tunnel', () => _dylib.lookupFunction<IntrovertNetworkSetTunnelModeC, IntrovertNetworkSetTunnelModeDart>('introvert_network_set_tunnel_mode'), (e) => FfiResult.dummy);
       _getTunnelMode = safeLookup('get_tunnel_mode', () => _dylib.lookupFunction<IntrovertNetworkGetTunnelModeC, IntrovertNetworkGetTunnelModeDart>('introvert_network_get_tunnel_mode'), () => 0);
+      _getRbns = safeLookup('get_rbns', () => _dylib.lookupFunction<IntrovertNetworkGetRbnsC, IntrovertNetworkGetRbnsDart>('introvert_network_get_rbns'), () => FfiResult.dummy);
+      _testRbn = safeLookup('test_rbn', () => _dylib.lookupFunction<IntrovertNetworkTestRbnC, IntrovertNetworkTestRbnDart>('introvert_network_test_rbn'), (addr) => FfiResult.dummy);
       _recheckConnection = safeLookup('recheck_connection', () => _dylib.lookupFunction<IntrovertNetworkRecheckConnectionC, IntrovertNetworkRecheckConnectionDart>('introvert_network_recheck_connection'), (p) => FfiResult.dummy);
       _resolveHandle = safeLookup('resolve_handle', () => _dylib.lookupFunction<IntrovertNetworkResolveHandleC, IntrovertNetworkResolveHandleDart>('introvert_network_resolve_handle'), (h) => FfiResult.dummy);
       _sendDirectInvite = safeLookup('send_direct_invite', () => _dylib.lookupFunction<IntrovertNetworkSendDirectInviteC, IntrovertNetworkSendDirectInviteDart>('introvert_network_send_direct_invite'), (p) => FfiResult.dummy);
@@ -2351,6 +2355,20 @@ class IntrovertClient {
       if (res.len > 0) _freeBinary(res.data, res.len);
     }
   }
+
+  List<dynamic> getRbns() {
+    final res = _getRbns();
+    try {
+      if (res.code != 0) return [];
+      return json.decode(utf8.decode(res.data.asTypedList(res.len))) as List<dynamic>;
+    } finally {
+      if (res.len > 0) _freeBinary(res.data, res.len);
+    }
+  }
+
+  void testRbn(String address) {
+    using((Arena arena) => _handleFfiResult(_testRbn(address.toNativeUtf8(allocator: arena)), context: "Test RBN Connection"));
+  }
 }
 
 // ==================== CALL HISTORY TYPEDEFS ====================
@@ -2373,3 +2391,8 @@ typedef IntrovertSendTypingStopC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertSendTypingStopDart = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertGetLastSeenC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertGetLastSeenDart = FfiResult Function(Pointer<Utf8> peerId);
+
+typedef IntrovertNetworkGetRbnsC = FfiResult Function();
+typedef IntrovertNetworkGetRbnsDart = FfiResult Function();
+typedef IntrovertNetworkTestRbnC = FfiResult Function(Pointer<Utf8> address);
+typedef IntrovertNetworkTestRbnDart = FfiResult Function(Pointer<Utf8> address);

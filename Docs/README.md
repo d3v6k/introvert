@@ -2,11 +2,20 @@
 
 Introvert is a privacy-first, decentralized communication ecosystem. It eliminates central servers entirely by utilizing true Peer-to-Peer (P2P) networking, end-to-end encryption (E2EE), and a dynamic, sovereign Solana-based token economy. The network operates via a crowdsourced, incentivized, self-healing mesh layer, with entry points dynamically coordinated on-chain — transforming Introvert from an isolated chat application into a zero-knowledge, autonomous utility network.
 
+## 🌟 Core Value Pillars
+*   **Open-Source & P2P:** A fully transparent codebase audited by the community. Serverless, direct edge-to-edge routing over standard libp2p.
+*   **End-to-End Encryption:** Locally encrypted messaging, groups, and drive data using the Noise Protocol frame (`Noise_IK_25519_ChaChaPoly_BLAKE2s`) and AES-256-GCM.
+*   **Eco-Friendly / Green Credentials:** Zero carbon-heavy datacenters. Utilizes existing idle consumer hardware coupled with Solana's green Proof-of-History consensus.
+*   **Zero Spam:** Sybil-resistant, balance-gated rate-limiting filters that increase the economic cost of abuse.
+*   **Bleeding-Edge Tech:** Powered by the self-healing **Intro-Claw Maintenance Engine** and the bandwidth-saving binary **Intro Codec** (saving 25% overhead).
+*   **User Rewards:** Earn $INTR tokens daily based on contribution weight via dynamic pool-clearing rewards.
+*   **Community-Powered RBNs:** Root Bootstrap Nodes are operated by community hosts to maintain a decentralized network directory.
+
 ## Core Features
 - **Zero-Knowledge Privacy:** End-to-end encryption (E2EE) using the Noise Protocol (Noise_IK_25519_ChaChaPoly_BLAKE2s).
 - **Sovereign Identity:** Deterministic identity derived from a 32-byte master seed via HKDF-SHA256. No phone number, email, or central authority required.
 - **Dynamic Blockchain Bootstrapping:** Eliminates hardcoded bootstrap IPs. Clients discover RBN nodes dynamically via Solana on-chain registry queries, making the network resistant to DNS/IP blacklisting.
-- **Token Gating Engine:** Structural Sybil resistance requiring 500 $INTR minimum for edge routing (Event Code 22) and 50,000 $INTR for RBN operators.
+- **Token Gating Engine:** Structural Sybil resistance requiring 100,000 $INTR minimum for edge routing (Event Code 22) and 2,000,000 $INTR for RBN operators.
 - **Autonomous Escrow Vault:** Unified Program-Derived Address (PDA) on Solana holding all network stakes and emissions — no single key controls the vault.
 - **Squads V4 Governance:** 3-of-5 multisig controls contract upgrades, ensuring full legal separation for the software publisher.
 - **Messenger-Grade Hardening:** libp2p v0.56 mesh standardized on **Port 443 (HTTPS Bypass)** for global reachability through carrier firewalls.

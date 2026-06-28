@@ -85,6 +85,8 @@ pub struct Engine {
 
 pub static ENGINE: Lazy<RwLock<Option<Engine>>> = Lazy::new(|| RwLock::new(None));
 
+pub static ACTIVE_PEER_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 pub static TEST_CALLBACK: Lazy<RwLock<Option<FfiNetworkCallback>>> = Lazy::new(|| RwLock::new(None));
 
 pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>> = Lazy::new(|| parking_lot::Mutex::new(None));
@@ -1586,6 +1588,12 @@ pub extern "C" fn introvert_network_get_tunnel_mode() -> i32 {
     } else {
         0
     }
+}
+
+/// Returns the number of currently active peer connections in the swarm.
+#[no_mangle]
+pub extern "C" fn introvert_network_get_active_peer_count() -> i32 {
+    ACTIVE_PEER_COUNT.load(std::sync::atomic::Ordering::Relaxed) as i32
 }
 
 #[no_mangle]

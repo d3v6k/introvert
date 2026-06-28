@@ -104,6 +104,11 @@ pub struct Engine {
 
 pub static ENGINE: Lazy<RwLock<Option<Engine>>> = Lazy::new(|| RwLock::new(None));
 
+pub static RBN_LATENCIES: Lazy<RwLock<std::collections::HashMap<String, u128>>> = Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+pub static BOOTSTRAP_NODES: Lazy<RwLock<Vec<(String, String)>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+pub static ACTIVE_PEER_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 pub static TEST_CALLBACK: Lazy<RwLock<Option<FfiNetworkCallback>>> = Lazy::new(|| RwLock::new(None));
 
 pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>> = Lazy::new(|| parking_lot::Mutex::new(None));
@@ -309,13 +314,18 @@ pub extern "C" fn introvert_engine_start(
     let is_anchor_mode = storage.is_anchor_mode_enabled();
     let is_tunnel_mode = storage.is_tunnel_mode_enabled();
 
+    let daily_engine = Arc::new(crate::economy::daily_rewards::DailyRewardEngine::new(storage.clone()));
+    if let Ok(Some((_, _, _, _, tier))) = storage.get_profile() {
+        daily_engine.set_prestige_tier(tier as u8);
+    }
+
     *engine_lock = Some(Engine {
         runtime,
         identity,
         storage: storage.clone(),
         reward_tracker,
         solana_client,
-        daily_reward_engine: Some(Arc::new(crate::economy::daily_rewards::DailyRewardEngine::new(storage))),
+        daily_reward_engine: Some(daily_engine),
         session_encryption_key,
         network_tx: RwLock::new(None),
         network_callback: RwLock::new(None),
@@ -1089,7 +1099,12 @@ pub extern "C" fn introvert_storage_set_profile_tier(tier: i32) -> FfiResult {
     }
 
     match engine.storage.set_profile_tier(tier as u8) {
-        Ok(_) => FfiResult::success(),
+        Ok(_) => {
+            if let Some(ref daily) = engine.daily_reward_engine {
+                daily.set_prestige_tier(tier as u8);
+            }
+            FfiResult::success()
+        }
         Err(e) => FfiResult::error(-1, &format!("Set tier error: {}", e)),
     }
 }
@@ -1832,6 +1847,12 @@ pub extern "C" fn introvert_network_get_tunnel_mode() -> i32 {
     } else {
         0
     }
+}
+
+/// Returns the number of currently active peer connections in the swarm.
+#[no_mangle]
+pub extern "C" fn introvert_network_get_active_peer_count() -> i32 {
+    ACTIVE_PEER_COUNT.load(std::sync::atomic::Ordering::Relaxed) as i32
 }
 
 // --- Intro-Claw AI Engine Mode ---
@@ -3761,6 +3782,16 @@ pub extern "C" fn introvert_network_register_push_token(
         None => return FfiResult::error(-13, "Network not started"),
     };
 
+    // Save token to local DB so we can auto-register on reconnect
+    let db_token = push_token.clone();
+    let db_device = device_type.clone();
+    let local_peer = engine.identity.peer_id.to_string();
+    let storage = Arc::clone(&engine.storage);
+    match storage.save_push_token(&local_peer, &db_device, &db_token) {
+        Ok(_) => dispatch_debug_log(&format!("FFI: Push token saved successfully to local DB under key: {}", local_peer)),
+        Err(e) => dispatch_debug_log(&format!("FFI: ❌ Failed to save push token to local DB: {:?}", e)),
+    }
+
     engine.runtime.spawn(async move {
         let payload = crate::network::SignalingPayload::IdentifySleepState { device_type, push_token };
         // Broadcast to all RBNs/Bootstrap nodes
@@ -4687,5 +4718,54 @@ pub extern "C" fn introvert_daily_reward_get_realtime_earnings() -> FfiResult {
             FfiResult::binary(json_str.into_bytes())
         }
         None => FfiResult::binary(b"{}".to_vec()),
+    }
+}
+
+/// Returns a JSON list of all registered RBN bootstrap nodes, including address and ping latency.
+#[no_mangle]
+pub extern "C" fn introvert_network_get_rbns() -> FfiResult {
+    let bootstrap = crate::BOOTSTRAP_NODES.read();
+    let latencies = crate::RBN_LATENCIES.read();
+
+    let mut list = Vec::new();
+    for (pid, addr) in bootstrap.iter() {
+        let latency = latencies.get(pid).cloned();
+        list.push(json!({
+            "peer_id": pid,
+            "address": addr,
+            "latency_ms": latency,
+        }));
+    }
+
+    match serde_json::to_string(&list) {
+        Ok(s) => FfiResult::binary(s.into_bytes()),
+        Err(_) => FfiResult::error(-1, "JSON serialization failed"),
+    }
+}
+
+/// Triggers a connection test to a manual RBN IP/Multiaddress.
+/// When finished, confirms via Event 45 (RbnConnectionConfirmed) or Event 46 (RbnConnectionFailed).
+#[no_mangle]
+pub extern "C" fn introvert_network_test_rbn(
+    address_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if address_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let address = unsafe { CStr::from_ptr(address_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    if let Some(ref tx) = *tx_lock {
+        let tx_clone = tx.clone();
+        engine.runtime.spawn(async move {
+            let _ = tx_clone.send(NetworkCommand::TestManualRbn { address }).await;
+        });
+        FfiResult::success()
+    } else {
+        FfiResult::error(-12, "Network not started")
     }
 }

@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Introvert RBN Node Operator Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0B0F17;
+            --tile-bg: rgba(17, 24, 39, 0.7);
+            --tile-border: rgba(255, 255, 255, 0.08);
+            --cyber-cyan: #00F2FE;
+            --cyber-purple: #7F00FF;
+            --text-main: #E5E7EB;
+            --text-muted: #9CA3AF;
+            --success-glow: #10B981;
+            --error-glow: #EF4444;
+            --warning-glow: #F59E0B;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Glow in Background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle, rgba(127, 0, 255, 0.15) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: '';
+            position: absolute;
+            bottom: -10%;
+            right: -10%;
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle, rgba(0, 242, 254, 0.12) 0%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Header Styling */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--tile-border);
+            backdrop-filter: blur(10px);
+            background-color: rgba(11, 15, 23, 0.8);
+            z-index: 10;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            fill: url(#cyber-grad);
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, var(--cyber-cyan) 0%, var(--cyber-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success-glow);
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success-glow);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        /* Dashboard Grid Layout */
+        main {
+            flex-grow: 1;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .tile {
+            background-color: var(--tile-bg);
+            border: 1px solid var(--tile-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .tile:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .tile-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Specific Tile Sizing */
+        .tile-staking { grid-column: span 5; }
+        .tile-swarm { grid-column: span 7; }
+        .tile-bandwidth { grid-column: span 8; }
+        .tile-hardware { grid-column: span 4; }
+        .tile-console { grid-column: span 12; }
+
+        /* Wallet & Staking Content */
+        .address-box {
+            background-color: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .copy-btn {
+            background: none;
+            border: none;
+            color: var(--cyber-cyan);
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .metrics-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .metric-accent {
+            color: var(--cyber-cyan);
+        }
+
+        /* Swarm Metrics Layout */
+        .swarm-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.25rem;
+            height: calc(100% - 2rem);
+        }
+
+        .swarm-subtile {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .swarm-val {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            background: linear-gradient(135deg, #FFF 0%, var(--cyber-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Bandwidth Chart */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 160px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* System TelemetrysetContent */
+        .sys-meter {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .meter-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+
+        .meter-bar {
+            height: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--cyber-purple) 0%, var(--cyber-cyan) 100%);
+            width: 0%;
+            transition: width 0.5s ease-out;
+        }
+
+        /* Console & Logging Output */
+        .console-output {
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            height: 180px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            padding: 1rem;
+            overflow-y: auto;
+            color: #34D399; /* Green text for terminal feel */
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .log-entry {
+            line-height: 1.4;
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            margin-right: 0.5rem;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1024px) {
+            .tile-staking, .tile-swarm, .tile-bandwidth, .tile-hardware {
+                grid-column: span 6;
+            }
+        }
+
+        @media (max-width: 640px) {
+            main {
+                padding: 1rem;
+            }
+            .tile {
+                grid-column: span 12 !important;
+            }
+            header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* Animation */
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 0.5;
+            }
+        }
+
+        /* Diagnostic Badges */
+        .diagnostic-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+        }
+        .badge-green {
+            color: var(--success-glow);
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .badge-red {
+            color: var(--error-glow);
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .badge-orange {
+            color: #F59E0B;
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SVG Definitions for Icon Gradients -->
+    <svg style="display: none;">
+        <defs>
+            <linearGradient id="cyber-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00F2FE" />
+                <stop offset="100%" stop-color="#7F00FF" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <header>
+        <div class="logo-container" style="display: flex; align-items: center; gap: 0.5rem;">
+            <img src="data:image/png;base64,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" class="logo-icon" style="width: 36px; height: 36px; object-fit: contain;" />
+            <img src="data:image/png;base64,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" class="logo-text-img" style="height: 24px; object-fit: contain; margin-left: 0.5rem;" />
+            <span class="logo-text" id="node-name-header" style="font-size: 0.9rem; font-weight: 600; color: var(--text-muted); margin-left: 0.5rem; border-left: 1px solid var(--tile-border); padding-left: 0.5rem; letter-spacing: 0.05em; font-family: 'Inter', sans-serif;">RBN OPERATOR</span>
+        </div>
+        <div class="status-badge">
+            <span class="status-dot"></span>
+            <span id="node-status-text">ONLINE</span>
+        </div>
+    </header>
+
+    <main>
+        <!-- Staking Panel -->
+        <div class="tile tile-staking">
+            <div class="tile-title">
+                <span>Wallet & On-Chain Staking</span>
+                <span style="color: var(--cyber-cyan)">SOLANA</span>
+            </div>
+            <div class="metrics-list">
+                <div class="metric-row">
+                    <span class="metric-label">Operator Address</span>
+                </div>
+                <div class="address-box">
+                    <span id="operator-wallet">Loading...</span>
+                    <button class="copy-btn" onclick="copyWallet()">Copy</button>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">SOL Balance</span>
+                    <span class="metric-value" id="sol-balance">-- SOL</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Registry Staking</span>
+                    <span class="metric-value metric-accent" id="staking-status">ACTIVE</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Lease Status</span>
+                    <span class="metric-value" id="lease-status">VALID</span>
+                </div>
+                <div class="metric-row" style="margin-top: 1rem; justify-content: center;">
+                    <button class="copy-btn" id="reveal-wallet-btn" onclick="openRevealModal()" style="width: 100%; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(127, 0, 255, 0.15) 100%); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.5rem; font-weight: 600; cursor: pointer; border-radius: 6px; color: #FFF; transition: all 0.2s ease;">Reveal Operator Keypair</button>
+                </div>
+                <div class="metric-row" style="margin-top: 0.5rem; justify-content: center;">
+                    <button class="copy-btn" id="change-pwd-btn" onclick="openChangePasswordModal()" style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; font-weight: 600; cursor: pointer; border-radius: 6px; color: #FFF; transition: all 0.2s ease;">Change GUI Password</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Swarm Routing Panel -->
+        <div class="tile tile-swarm">
+            <div class="tile-title">
+                <span>libp2p Swarm Routing Telemetry</span>
+                <span style="color: var(--cyber-purple)">DHT</span>
+            </div>
+            <div class="swarm-grid">
+                <div class="swarm-subtile">
+                    <span class="swarm-val" id="connected-peers">--</span>
+                    <span class="metric-label">Connected Swarm Peers</span>
+                </div>
+                <div class="swarm-subtile">
+                    <span class="swarm-val" id="dht-records">--</span>
+                    <span class="metric-label">Kademlia DHT Records</span>
+                </div>
+                <div class="swarm-subtile">
+                    <span class="swarm-val" id="direct-links">--</span>
+                    <span class="metric-label">Direct (LAN) Dials</span>
+                </div>
+                <div class="swarm-subtile">
+                    <span class="swarm-val" id="relayed-links">--</span>
+                    <span class="metric-label">Active Relay Paths</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bandwidth Throughput Panel -->
+        <div class="tile tile-bandwidth">
+            <div class="tile-title">
+                <span>Bandwidth Metrics & Throughput Pacing</span>
+                <span id="bandwidth-raw">IN: 0 KB/s | OUT: 0 KB/s</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="bandwidthChart"></canvas>
+            </div>
+        </div>
+
+        <!-- System & SQLite Telemetry Panel -->
+        <div class="tile tile-hardware">
+            <div class="tile-title">
+                <span>Hardware & Engine Stats</span>
+            </div>
+            <div class="sys-meter">
+                <div class="meter-info">
+                    <span>CPU Core Load</span>
+                    <span id="cpu-val">0%</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="cpu-fill"></div>
+                </div>
+            </div>
+            <div class="sys-meter">
+                <div class="meter-info">
+                    <span>Physical RAM</span>
+                    <span id="ram-val">0 / 0 MB</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-fill" id="ram-fill"></div>
+                </div>
+            </div>
+            <div class="metrics-list" style="margin-top: 1rem;">
+                <div class="metric-row">
+                    <span class="metric-label">SQLite Pages</span>
+                    <span class="metric-value" id="sqlite-pages">--</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">RBN Uptime</span>
+                    <span class="metric-value" id="uptime">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Critical Node Diagnostics Panel -->
+        <div class="tile tile-diagnostics" style="grid-column: span 6;">
+            <div class="tile-title">
+                <span>Critical Functions Diagnostics</span>
+                <span style="color: var(--cyber-cyan)">STATUS Cockpit</span>
+            </div>
+            <div class="metrics-list" style="margin-top: 1rem;">
+                <div class="metric-row">
+                    <span class="metric-label">Daemon Service Status</span>
+                    <span class="diagnostic-badge badge-green" id="diag-daemon">ACTIVE</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Solana Registry State</span>
+                    <span class="diagnostic-badge" id="diag-solana">CHECKING...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Port 443 Inbound Link</span>
+                    <span class="diagnostic-badge" id="diag-inbound">CHECKING...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Outbound Network Link</span>
+                    <span class="diagnostic-badge" id="diag-outbound">CHECKING...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Storage Engine Integrity</span>
+                    <span class="diagnostic-badge" id="diag-storage">CHECKING...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Node Core Version</span>
+                    <span class="diagnostic-badge" id="diag-version">CHECKING...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-Time Diagnostic Logger -->
+        <div class="tile tile-console">
+            <div class="tile-title">
+                <span>Real-Time Diagnostic Console Logs</span>
+            </div>
+            <div class="console-output" id="console-logs">
+                <div class="log-entry"><span class="log-time">[00:00:00]</span> Console logger initialized. Listening for swarm notifications...</div>
+            </div>
+        </div>
+
+        <!-- Global RBN Registry Panel -->
+        <div class="tile tile-console" style="grid-column: span 12;">
+            <div class="tile-title">
+                <span>Solana Registry: Global RBN Network Map</span>
+                <span style="color: var(--cyber-cyan)" id="rbn-count">0 Nodes Registered</span>
+            </div>
+            <div class="registry-container" style="overflow-x: auto; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; margin-top: 0.5rem;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-family: 'Inter', sans-serif; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-muted);">
+                            <th style="padding: 0.75rem 0.5rem;">Node Name</th>
+                            <th style="padding: 0.75rem 0.5rem;">Public Multiaddress</th>
+                            <th style="padding: 0.75rem 0.5rem;">Libp2p Peer ID</th>
+                            <th style="padding: 0.75rem 0.5rem;">Operator Wallet</th>
+                            <th style="padding: 0.75rem 0.5rem; text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rbn-registry-rows">
+                        <tr>
+                            <td colspan="5" style="padding: 1rem; text-align: center; color: var(--text-muted);">Syncing with Solana Devnet...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Web Dashboard Scripting
+        const pollInterval = 2000;
+        let lastInBytes = 0;
+        let lastOutBytes = 0;
+        let chartDataIn = Array(30).fill(0);
+        let chartDataOut = Array(30).fill(0);
+
+        function copyWallet() {
+            const el = document.getElementById("operator-wallet");
+            navigator.clipboard.writeText(el.innerText);
+            alert("Operator wallet address copied to clipboard!");
+        }
+
+        // Simple Canvas chart renderer for bandwidth pacing
+        const canvas = document.getElementById('bandwidthChart');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i < canvas.height; i += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            const step = canvas.width / (chartDataIn.length - 1);
+            const maxVal = Math.max(...chartDataIn, ...chartDataOut, 100);
+
+            // Draw IN flow (Cyan line)
+            ctx.beginPath();
+            ctx.strokeStyle = '#00F2FE';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < chartDataIn.length; i++) {
+                const x = i * step;
+                const y = canvas.height - (chartDataIn[i] / maxVal) * (canvas.height - 20) - 10;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Draw OUT flow (Purple line)
+            ctx.beginPath();
+            ctx.strokeStyle = '#7F00FF';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < chartDataOut.length; i++) {
+                const x = i * step;
+                const y = canvas.height - (chartDataOut[i] / maxVal) * (canvas.height - 20) - 10;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        async function fetchStats() {
+            try {
+                const token = localStorage.getItem("rbn_session_token");
+                if (!token) {
+                    showLoginOverlay();
+                    return;
+                }
+                const response = await fetch(`/api/stats?token=${token}`);
+                if (response.status === 401) {
+                    localStorage.removeItem("rbn_session_token");
+                    showLoginOverlay();
+                    return;
+                }
+                const data = await response.json();
+
+                // Reset status to ONLINE on successful fetch
+                document.getElementById("node-status-text").innerText = "ONLINE";
+                document.querySelector(".status-badge").style.borderColor = "rgba(16, 185, 129, 0.3)";
+                document.querySelector(".status-badge").style.color = "var(--success-glow)";
+                document.querySelector(".status-dot").style.backgroundColor = "var(--success-glow)";
+
+                // 1. Update text metrics
+                document.getElementById("operator-wallet").innerText = data.operator_wallet || 'N/A';
+                document.getElementById("sol-balance").innerText = `${(data.sol_balance_lamports / 1000000000).toFixed(4)} SOL`;
+                document.getElementById("staking-status").innerText = data.is_staked ? 'ACTIVE' : 'ACTIVE (Free Tier)';
+                document.getElementById("lease-status").innerText = data.is_lease_valid ? 'VALID' : 'EXPIRED';
+
+                document.getElementById("connected-peers").innerText = data.connected_peers;
+                document.getElementById("dht-records").innerText = data.dht_records;
+                document.getElementById("direct-links").innerText = data.direct_connections;
+                document.getElementById("relayed-links").innerText = data.relayed_connections;
+
+                document.getElementById("cpu-val").innerText = `${data.cpu_load_pct}%`;
+                document.getElementById("cpu-fill").style.width = `${data.cpu_load_pct}%`;
+                document.getElementById("ram-val").innerText = `${data.ram_used_mb} / ${data.ram_total_mb} MB`;
+                document.getElementById("ram-fill").style.width = `${(data.ram_used_mb / data.ram_total_mb * 100).toFixed(0)}%`;
+
+                document.getElementById("sqlite-pages").innerText = data.sqlite_page_count;
+                document.getElementById("uptime").innerText = formatUptime(data.uptime_seconds);
+
+                // Update node name in header
+                if (data.node_name) {
+                    document.getElementById("node-name-header").innerText = `RBN OPERATOR (${data.node_name})`;
+                }
+
+                // 3. Update Diagnostics Badges
+                const solanaBadge = document.getElementById("diag-solana");
+                solanaBadge.innerText = data.solana_registry_status || 'UNKNOWN';
+                solanaBadge.className = 'diagnostic-badge';
+                if (solanaBadge.innerText.includes("ACTIVE")) {
+                    solanaBadge.classList.add("badge-green");
+                } else if (solanaBadge.innerText.includes("Low Funds") || solanaBadge.innerText.includes("UNREGISTERED")) {
+                    solanaBadge.classList.add("badge-orange");
+                } else {
+                    solanaBadge.classList.add("badge-red");
+                }
+
+                const inboundBadge = document.getElementById("diag-inbound");
+                inboundBadge.innerText = data.port_443_status || 'UNKNOWN';
+                inboundBadge.className = 'diagnostic-badge';
+                if (inboundBadge.innerText.includes("Traffic Detected") || inboundBadge.innerText.includes("ACTIVE")) {
+                    inboundBadge.classList.add("badge-green");
+                } else if (inboundBadge.innerText.includes("LISTENING")) {
+                    inboundBadge.classList.add("badge-orange");
+                } else {
+                    inboundBadge.classList.add("badge-red");
+                }
+
+                const outboundBadge = document.getElementById("diag-outbound");
+                outboundBadge.innerText = data.outbound_status || 'UNKNOWN';
+                outboundBadge.className = 'diagnostic-badge';
+                if (outboundBadge.innerText === "CONNECTED") {
+                    outboundBadge.classList.add("badge-green");
+                } else {
+                    outboundBadge.classList.add("badge-red");
+                }
+
+                const storageBadge = document.getElementById("diag-storage");
+                storageBadge.innerText = data.db_integrity || 'UNKNOWN';
+                storageBadge.className = 'diagnostic-badge';
+                if (storageBadge.innerText === "HEALTHY" || storageBadge.innerText === "OK") {
+                    storageBadge.classList.add("badge-green");
+                } else {
+                    storageBadge.classList.add("badge-red");
+                }
+
+                const versionBadge = document.getElementById("diag-version");
+                versionBadge.className = 'diagnostic-badge';
+                if (data.version === data.latest_version) {
+                    versionBadge.innerText = `v${data.version} (LATEST)`;
+                    versionBadge.classList.add("badge-green");
+                } else {
+                    versionBadge.innerText = `v${data.version} (UPDATE NEEDED)`;
+                    versionBadge.classList.add("badge-orange");
+                }
+
+                // Update registry list
+                if (data.rbn_registry) {
+                    document.getElementById("rbn-count").innerText = `${data.rbn_registry.length} Nodes Registered`;
+                    const rowsContainer = document.getElementById("rbn-registry-rows");
+                    if (data.rbn_registry.length === 0) {
+                        rowsContainer.innerHTML = `<tr><td colspan="5" style="padding: 1rem; text-align: center; color: var(--text-muted);">No other RBNs registered on-chain yet.</td></tr>`;
+                    } else {
+                        rowsContainer.innerHTML = data.rbn_registry.map(rbn => {
+                            const statusColor = rbn.is_active ? 'var(--success-glow)' : 'var(--error-glow)';
+                            const statusText = rbn.is_active ? 'ACTIVE' : 'INACTIVE';
+                            return `
+                                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.03); color: var(--text-main);">
+                                    <td style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--cyber-cyan); font-family: 'Inter', sans-serif;">${rbn.node_name}</td>
+                                    <td style="padding: 0.75rem 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">${rbn.multiaddress}</td>
+                                    <td style="padding: 0.75rem 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;" title="Click to Copy" onclick="navigator.clipboard.writeText('${rbn.peer_id}'); alert('Peer ID copied!');">${rbn.peer_id.substring(0, 16)}...</td>
+                                    <td style="padding: 0.75rem 0.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);">${rbn.operator.substring(0, 8)}...</td>
+                                    <td style="padding: 0.75rem 0.5rem; text-align: center;">
+                                        <span style="color: ${statusColor}; background-color: rgba(${rbn.is_active ? '16, 185, 129' : '239, 68, 68'}, 0.1); border: 1px solid rgba(${rbn.is_active ? '16, 185, 129' : '239, 68, 68'}, 0.3); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">${statusText}</span>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+
+                // 2. Bandwidth Rate calculations
+                const rateIn = data.bandwidth_rate_in_kb;
+                const rateOut = data.bandwidth_rate_out_kb;
+                document.getElementById("bandwidth-raw").innerText = `IN: ${rateIn.toFixed(1)} KB/s | OUT: ${rateOut.toFixed(1)} KB/s`;
+
+                // Add to chart queues
+                chartDataIn.shift();
+                chartDataIn.push(rateIn);
+                chartDataOut.shift();
+                chartDataOut.push(rateOut);
+                drawChart();
+
+                // Append logs if new logs arrived
+                if (data.new_logs && data.new_logs.length > 0) {
+                    const logsContainer = document.getElementById("console-logs");
+                    data.new_logs.forEach(log => {
+                        const div = document.createElement("div");
+                        div.className = "log-entry";
+                        div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${log}`;
+                        logsContainer.appendChild(div);
+                    });
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                }
+
+            } catch (e) {
+                console.error("Failed to connect to RBN statistics API:", e);
+                document.getElementById("node-status-text").innerText = "OFFLINE";
+                document.querySelector(".status-badge").style.borderColor = "rgba(239, 68, 68, 0.3)";
+                document.querySelector(".status-badge").style.color = "var(--error-glow)";
+                document.querySelector(".status-dot").style.backgroundColor = "var(--error-glow)";
+            }
+        }
+
+        function formatUptime(seconds) {
+            const d = Math.floor(seconds / (3600*24));
+            const h = Math.floor((seconds % (3600*24)) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            return `${d}d ${h}h ${m}m`;
+        }
+
+        setInterval(fetchStats, pollInterval);
+        fetchStats();
+    </script>
+    <!-- Login Overlay -->
+    <div id="login-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #090B10 0%, #151922 100%); z-index: 10000; justify-content: center; align-items: center; font-family: 'Inter', sans-serif;">
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 2.5rem; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.6); backdrop-filter: blur(20px);">
+            <!-- Icon/Logo -->
+            <img src="data:image/png;base64,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" style="width: 64px; height: 64px; object-fit: contain; margin-bottom: 1rem; filter: drop-shadow(0 0 10px var(--cyber-cyan));" />
+            <h2 style="color: #FFF; margin: 0 0 0.5rem 0; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">RBN Cockpit Access</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 2rem;">Authorized Node Operators Only</p>
+            
+            <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <div style="text-align: left; display: flex; flex-direction: column; gap: 0.35rem;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Operator Password</label>
+                    <input type="password" id="login-password" required placeholder="Enter password" style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; border-radius: 8px; color: #FFF; font-size: 0.95rem; font-family: inherit; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--cyber-cyan)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'"/>
+                </div>
+                <button type="submit" style="background: linear-gradient(135deg, var(--cyber-cyan) 0%, var(--cyber-purple) 100%); border: none; padding: 0.85rem; border-radius: 8px; color: #FFF; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s; letter-spacing: 0.05em; text-transform: uppercase;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Access Dashboard</button>
+            </form>
+            <div style="margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-muted);">
+                Default Password: <code style="color: var(--cyber-cyan); background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px;">introvert_rbn</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal Overlay -->
+    <div id="change-pwd-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(11, 15, 23, 0.95); z-index: 9999; justify-content: center; align-items: center; font-family: 'Inter', sans-serif;">
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 2rem; width: 90%; max-width: 450px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(20px);">
+            <h3 style="color: #FFF; margin-top: 0; font-size: 1.2rem; letter-spacing: 0.05em; text-transform: uppercase;">Change GUI Password</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">Update the password used to access this dashboard.</p>
+            
+            <form onsubmit="handleChangePassword(event)" style="display: flex; flex-direction: column; gap: 1rem; text-align: left;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Current Password</label>
+                    <input type="password" id="pwd-current" required style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 0.6rem; border-radius: 6px; color: #FFF; width: 100%; box-sizing: border-box;" />
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">New Password</label>
+                    <input type="password" id="pwd-new" required style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 0.6rem; border-radius: 6px; color: #FFF; width: 100%; box-sizing: border-box;" />
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Confirm New Password</label>
+                    <input type="password" id="pwd-confirm" required style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 0.6rem; border-radius: 6px; color: #FFF; width: 100%; box-sizing: border-box;" />
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="submit" style="flex-grow: 1; background: var(--cyber-cyan); border: none; padding: 0.75rem; border-radius: 6px; color: #000; font-weight: 700; cursor: pointer; font-size: 0.9rem;">Update Password</button>
+                    <button type="button" onclick="closeChangePasswordModal()" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); padding: 0.75rem 1rem; color: var(--text-muted); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reveal Keypair Modal Overlay -->
+    <div id="reveal-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(11, 15, 23, 0.95); z-index: 9999; justify-content: center; align-items: center; font-family: 'Inter', sans-serif;">
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 2rem; width: 90%; max-width: 550px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(20px);">
+            <h3 style="color: var(--error-glow); margin-top: 0; font-size: 1.3rem; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                ⚠️ CRITICAL SECURITY WARNING
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin: 1rem 0;">
+                You are about to export the private key material of your RBN Operator wallet. Anyone who obtains this key will have complete ownership of your on-chain funds.
+            </p>
+            <div style="background-color: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.75rem; color: #FFF; font-size: 0.85rem; font-weight: 600; text-align: left; margin-bottom: 1.5rem;">
+                Make sure no one is looking at your screen, and never share this private key with anyone, including the Introvert core team.
+            </div>
+            
+            <div id="modal-initial-actions">
+                <button onclick="revealOperatorKeys()" style="background-color: var(--error-glow); border: none; padding: 0.75rem 1.5rem; font-weight: 700; color: #FFF; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 0.5rem; transition: background-color 0.2s;">I Understand, Reveal Keys</button>
+                <button onclick="closeRevealModal()" style="background-color: transparent; border: 1px solid rgba(255,255,255,0.2); padding: 0.75rem 1.5rem; font-weight: 600; color: var(--text-muted); border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;">Cancel</button>
+            </div>
+
+            <div id="modal-key-display" style="display: none; text-align: left; margin-top: 1.5rem; gap: 1rem; flex-direction: column;">
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Base58 Private Key (Phantom / Solflare)</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="password" id="modal-priv-b58" readonly style="flex-grow: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 4px; color: var(--cyber-cyan); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;" />
+                        <button onclick="toggleVisibility('modal-priv-b58')" class="copy-btn">Show</button>
+                        <button onclick="copyElementText('modal-priv-b58', 'Private Key')" class="copy-btn">Copy</button>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.25rem; margin-top: 1rem;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Solana CLI JSON Keypair Array</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="password" id="modal-priv-json" readonly style="flex-grow: 1; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 4px; color: var(--cyber-purple); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;" />
+                        <button onclick="toggleVisibility('modal-priv-json')" class="copy-btn">Show</button>
+                        <button onclick="copyElementText('modal-priv-json', 'JSON Keypair')" class="copy-btn">Copy</button>
+                    </div>
+                </div>
+                <button onclick="closeRevealModal()" style="margin-top: 1.5rem; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; border-radius: 6px; color: #FFF; font-weight: 600; cursor: pointer; transition: background 0.2s;">Done & Lock Wallet</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showLoginOverlay() {
+            document.getElementById("login-overlay").style.display = "flex";
+        }
+
+        function hideLoginOverlay() {
+            document.getElementById("login-overlay").style.display = "none";
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const password = document.getElementById("login-password").value;
+            try {
+                const response = await fetch(`/api/login?password=${encodeURIComponent(password)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem("rbn_session_token", data.token);
+                    hideLoginOverlay();
+                    fetchStats();
+                } else {
+                    alert("Invalid password. Please try again.");
+                }
+            } catch (e) {
+                alert("Failed to connect to RBN daemon.");
+            }
+        }
+
+        function openChangePasswordModal() {
+            document.getElementById("change-pwd-modal").style.display = "flex";
+            document.getElementById("pwd-current").value = "";
+            document.getElementById("pwd-new").value = "";
+            document.getElementById("pwd-confirm").value = "";
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById("change-pwd-modal").style.display = "none";
+        }
+
+        async function handleChangePassword(event) {
+            event.preventDefault();
+            const current = document.getElementById("pwd-current").value;
+            const newPwd = document.getElementById("pwd-new").value;
+            const confirmPwd = document.getElementById("pwd-confirm").value;
+
+            if (newPwd !== confirmPwd) {
+                alert("New passwords do not match!");
+                return;
+            }
+
+            const token = localStorage.getItem("rbn_session_token");
+            try {
+                const response = await fetch(`/api/change-password?old=${encodeURIComponent(current)}&new=${encodeURIComponent(newPwd)}&token=${token}`);
+                if (response.ok) {
+                    alert("Password updated successfully! Please log in again.");
+                    localStorage.removeItem("rbn_session_token");
+                    closeChangePasswordModal();
+                    showLoginOverlay();
+                } else {
+                    const data = await response.json();
+                    alert(data.message || "Failed to update password.");
+                }
+            } catch (e) {
+                alert("Failed to reach RBN server.");
+            }
+        }
+
+        function openRevealModal() {
+            document.getElementById("reveal-modal").style.display = "flex";
+            document.getElementById("modal-initial-actions").style.display = "block";
+            document.getElementById("modal-key-display").style.display = "none";
+            document.getElementById("modal-priv-b58").value = "";
+            document.getElementById("modal-priv-json").value = "";
+            document.getElementById("modal-priv-b58").type = "password";
+            document.getElementById("modal-priv-json").type = "password";
+        }
+
+        function closeRevealModal() {
+            document.getElementById("reveal-modal").style.display = "none";
+            document.getElementById("modal-priv-b58").value = "";
+            document.getElementById("modal-priv-json").value = "";
+        }
+
+        async function revealOperatorKeys() {
+            try {
+                const token = localStorage.getItem("rbn_session_token");
+                const response = await fetch(`/api/export-wallet?token=${token}`);
+                if (response.status === 401) {
+                    alert("Unauthorized. Please re-login.");
+                    closeRevealModal();
+                    showLoginOverlay();
+                    return;
+                }
+                const data = await response.json();
+                document.getElementById("modal-priv-b58").value = data.private_key_base58;
+                document.getElementById("modal-priv-json").value = data.private_key_json;
+                document.getElementById("modal-initial-actions").style.display = "none";
+                document.getElementById("modal-key-display").style.display = "flex";
+            } catch (e) {
+                alert("Failed to export key material. Ensure daemon is running.");
+            }
+        }
+
+        function toggleVisibility(id) {
+            const input = document.getElementById(id);
+            if (input.type === "password") {
+                input.type = "text";
+            } else {
+                input.type = "password";
+            }
+        }
+
+        function copyElementText(id, label) {
+            const input = document.getElementById(id);
+            navigator.clipboard.writeText(input.value);
+            alert(`${label} copied to clipboard!`);
+        }
+    </script>
+</body>
+</html>

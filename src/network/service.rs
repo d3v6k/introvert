@@ -67,6 +67,8 @@ pub struct NetworkService {
     pub(crate) seen_group_messages: HashSet<String>,
     /// Last time ACKs were flushed
     pub(crate) last_ack_flush: Instant,
+    pub(crate) rbn_latencies: Arc<RwLock<HashMap<PeerId, u128>>>,
+    pub(crate) pending_manual_rbns: Arc<RwLock<HashMap<Multiaddr, String>>>,
 }
 
 #[derive(Debug, Clone)]

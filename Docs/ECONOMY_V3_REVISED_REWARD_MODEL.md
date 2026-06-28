@@ -26,7 +26,7 @@ The proposed model is sustainable for the full 10-year emission schedule and pre
 |---|-----------|-----------|
 | 1 | RBNs earn by staying alive, not by relaying data | RBNs are last-resort relay; data volume is not their primary value |
 | 2 | Edge nodes earn ≥ 3× regular users | Fair compensation for infrastructure contribution |
-| 3 | RBNs earn significantly more than edge nodes | RBNs bond 50,000 INTR and are critical infrastructure |
+| 3 | RBNs earn significantly more than edge nodes | RBNs bond 2,000,000 INTR and are critical infrastructure |
 | 4 | Pool isolation is sacred | RBN and user pools never interfere |
 | 5 | 10-year sustainability | All rewards fit within the emission envelope |
 | 6 | Anti-gaming by design | Every metric must be costly to fake |
@@ -91,7 +91,7 @@ The proposed model is sustainable for the full 10-year emission schedule and pre
 
 | Parameter | Previous | Current (v3.0.1) | Change |
 |-----------|----------|------------------|--------|
-| `edge_infra_multiplier` | 30.0 | **38.0** | +27% |
+| `edge_infra_multiplier` | 30.0 | **3.0** | +27% |
 | `UptimeSeconds` weight | 0.001 | **0.005** | +400% |
 | `UptimeSeconds` availability yield | 1.2× at ≥23h | **1.5× at ≥22h** | Stronger incentive |
 | `RelayBytes` cap (RBN) | Uncapped | **51,200 KB (50 MB)** | New cap |
@@ -136,7 +136,7 @@ This is independent of RBN point weight — all RBNs earn equally regardless of 
 Currently `ActivityEvent.is_rbn` is client-reported (`daily_rewards.rs:195`). Any node can set `is_rbn: true` to bypass RelayBytes caps and draw from the RBN pool.
 
 **Proposed fix:**
-1. Rust engine checks on-chain: does this node's Solana address have ≥ 50,000 INTR bonded in the PDA escrow?
+1. Rust engine checks on-chain: does this node's Solana address have ≥ 2,000,000 INTR bonded in the PDA escrow?
 2. Cache result for 1 hour to avoid repeated RPC calls
 3. `ActivityEvent.is_rbn` field is ignored — Rust determines RBN status internally
 4. This is implemented as a separate task from the weight changes
@@ -155,7 +155,7 @@ UptimeSeconds:  86,400 × 0.005 = 432.0 pts
 Total:          5,534.4 pts
 ```
 
-**Edge node** (same social, 38× multiplier on infra):
+**Edge node** (same social, 3× multiplier on infra):
 ```
 Social:         5,000 pts
 RelayBytes:     10,240 × 0.01 × 38 = 3,891.2 pts
@@ -200,7 +200,7 @@ rbn_reward = (2,060 / total_rbn_points) × rbn_pool = rbn_pool / num_rbns
 edge_reward / regular_reward = 25,307.2 / 5,534.4 = 4.572×
 ```
 
-This ratio is **constant** across all scenarios — it depends only on the point weights, not on pool size or participant count. The 38× multiplier guarantees ≥ 3× (actual: 4.57×). ✓
+This ratio is **constant** across all scenarios — it depends only on the point weights, not on pool size or participant count. The 3× multiplier guarantees ≥ 3× (actual: 4.57×). ✓
 
 ### 5.4 RBN/Regular Ratio — Driven by Pool Scarcity
 
@@ -215,7 +215,7 @@ This ratio is dominated by the RBN pool having far fewer participants than the u
 Currently `ActivityEvent.is_rbn` is client-reported (`daily_rewards.rs:195`). Any node can set `is_rbn: true` to bypass RelayBytes caps and draw from the RBN pool.
 
 **Proposed fix:**
-1. Rust engine checks on-chain: does this node's Solana address have ≥ 50,000 INTR bonded in the PDA escrow?
+1. Rust engine checks on-chain: does this node's Solana address have ≥ 2,000,000 INTR bonded in the PDA escrow?
 2. Cache result for 1 hour to avoid repeated RPC calls
 3. `ActivityEvent.is_rbn` field is ignored — Rust determines RBN status internally
 4. This is implemented as a separate task from the weight changes
@@ -299,7 +299,7 @@ Using the pool-isolated clearing formula `reward = (points / total_pool_points) 
 
 **6. The 50× floor mechanism is unnecessary.** Under all projected scenarios, RBN base rewards (from clearing) already exceed 50× regular user rewards. The floor is dead code and has been removed from this proposal.
 
-### 6.6 RBN Payback Period (50,000 INTR Bond)
+### 6.6 RBN Payback Period (2,000,000 INTR Bond)
 
 | Year | Users | RBN Daily Earning | Days to Payback | Months |
 |------|-------|------------------|-----------------|--------|
@@ -366,7 +366,7 @@ The system is fully sustainable. ✓
 | Defense | Mechanism | Impact |
 |---------|-----------|--------|
 | RBN RelayBytes cap (50 MB) | Prevents relay-volume gaming | Limits relay points to 512/day |
-| RBN bond verification | On-chain check of 50,000 INTR stake | Prevents `is_rbn` spoofing |
+| RBN bond verification | On-chain check of 2,000,000 INTR stake | Prevents `is_rbn` spoofing |
 | UptimeSeconds as primary metric | Cannot be faked — requires actual uptime | Core RBN value is being online |
 
 ### 8.3 Remaining Vulnerabilities
@@ -409,7 +409,7 @@ fn blended_weight(old: f64, new: f64, days_since_change: u32) -> f64 {
 
 | Change | Location | Detail |
 |--------|----------|--------|
-| `edge_infra_multiplier` default | Line 130 | 30.0 → 38.0 |
+| `edge_infra_multiplier` default | Line 130 | 30.0 → 3.0 |
 | `uptime_seconds` default weight | Line 113 | 0.001 → 0.005 |
 | `cap_relay_bytes` for RBN | Line 122 | Add RBN-specific cap (51,200) |
 | Availability yield | Line 656 | 1.2× → 1.5×, threshold 82800 → 79200 |
@@ -453,7 +453,7 @@ Pools correctly isolated — social and infra tracked separately.
 
 ## 11. Open Questions for Expert Review
 
-1. **Is the Edge/Regular ratio (4.57×) acceptable?** The requirement was ≥ 3×. The 38× multiplier delivers 4.57×. Should we reduce to exactly 3× (multiplier ≈ 25.6)?
+1. **Is the Edge/Regular ratio (4.57×) acceptable?** The requirement was ≥ 3×. The 3× multiplier delivers 4.57×. Should we reduce to exactly 3× (multiplier ≈ 25.6)?
 
 2. **Should the RBN pool allocation change?** Currently 33% of emission. RBNs earn enormously more than regular users. Should we reallocate some to the user pool?
 
@@ -486,8 +486,8 @@ Pools correctly isolated — social and infra tracked separately.
 | Term | Definition |
 |------|-----------|
 | **INTR** | Introvert Token (SPL, 9 decimals) |
-| **RBN** | Root Bootstrap Node (50,000 INTR bond) |
-| **Edge node** | Relay-capable node (≥500 INTR stake) |
+| **RBN** | Root Bootstrap Node (2,000,000 INTR bond) |
+| **Edge node** | Relay-capable node (≥100,000 INTR stake) |
 | **Pool-isolated clearing** | RBN and user rewards drawn from separate pools |
 | **Availability yield** | Uptime multiplier for near-24h availability |
 | **Social points** | Messaging, calls, files (capped at 5,000/day) |

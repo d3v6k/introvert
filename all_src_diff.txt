@@ -20,7 +20,7 @@ diff -urN /Volumes/512-SSD-External/introvert back up/stable_v34/src/economy/dai
 +// 10-year emission schedule: daily user pool caps ($INTR/day)
 +// From the whitepaper: Year 1 = 16,438/day, 20% annual decay
 +// Year N daily cap = 16438 * (0.8 ^ (N-1))
-+const YEAR_1_DAILY_POOL: f64 = 16_438.0;
++const YEAR_1_DAILY_POOL: f64 = 16_43.0;
 +const YEAR_1_RBN_DAILY_POOL: f64 = 8_219.0;  // RBN pool: 3,000,000 / 365
 +const ANNUAL_DECAY: f64 = 0.8;
 +
@@ -133,7 +133,7 @@ diff -urN /Volumes/512-SSD-External/introvert back up/stable_v34/src/economy/dai
 +            rapid_fire_max_per_window: 10,
 +            daily_point_cap: 5000.0,
 +            intr_per_point: 0.001,
-+            edge_infra_multiplier: 38.0,
++            edge_infra_multiplier: 3.0,
 +        }
 +    }
 +}

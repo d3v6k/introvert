@@ -278,7 +278,7 @@ As of Phase 2, Introvert no longer uses hardcoded bootstrap node arrays. On star
 1. Connect to a high-uptime Solana RPC cluster
 2. Query all program accounts owned by the `introvert-registry` address
 3. Parse `Multiaddr` strings and validation metrics
-4. Filter entries: must have active status AND >= 50,000 $INTR stake
+4. Filter entries: must have active status AND >= 2,000,000 $INTR stake
 5. Inject verified multiaddresses into Kademlia DHT swarm
 
 ### Legacy Bootstrap (Fallback)
@@ -301,8 +301,8 @@ export INTROVERT_EXTRA_BOOTSTRAP="/ip4/x.x.x.x/tcp/443/p2p/PeerId"
 ### Token Gating Thresholds
 | Tier | $INTR Minimum | Capability |
 |------|---------------|------------|
-| Edge Relay | 500 $INTR | Active P2P background relay (Event Code 22) |
-| RBN Operator | 50,000 $INTR | Register as Root Bootstrap Node |
+| Edge Relay | 100,000 $INTR | Active P2P background relay (Event Code 22) |
+| RBN Operator | 2,000,000 $INTR | Register as Root Bootstrap Node |
 
 ### Kademlia DHT Config
 ```rust

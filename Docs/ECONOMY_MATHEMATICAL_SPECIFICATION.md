@@ -95,7 +95,7 @@ Reserve for years 11+ = 50,000,000 - 40,168,162 = 9,831,838 $INTR
 
 **File:** `src/economy/daily_rewards.rs`
 ```rust
-const YEAR_1_DAILY_POOL: f64 = 16_438.0;
+const YEAR_1_DAILY_POOL: f64 = 16_43.0;
 const YEAR_1_RBN_DAILY_POOL: f64 = 8_219.0;
 const ANNUAL_DECAY: f64 = 0.8;
 
@@ -141,7 +141,7 @@ Each user action is assigned a point value. Points represent the relative import
 
 > **Key distinction:** Social activities (messaging, calls, files) are capped at 5,000 points/day. Infrastructure activities (relay, uptime) have their own separate pool and are **not** subject to the 5,000 social cap.
 
-> **Edge Multiplier:** Edge relay nodes (500 $INTR stake) receive a 30× multiplier on infrastructure weights. This ensures nodes earn at least 2× more than regular users, incentivizing network infrastructure contribution. The multiplier is configurable via `edge_infra_multiplier` in `ActivityWeights` (default: 30.0).
+> **Edge Multiplier:** Edge relay nodes (100,000 $INTR stake) receive a 30× multiplier on infrastructure weights. This ensures nodes earn at least 2× more than regular users, incentivizing network infrastructure contribution. The multiplier is configurable via `edge_infra_multiplier` in `ActivityWeights` (default: 30.0).
 
 ### 3.2 Point Calculation Formula
 
@@ -450,7 +450,7 @@ Purpose: Detect mid-cycle balance manipulation
 ### 6.1 Staking Requirement
 
 ```
-RBN Bond = 50,000 $INTR locked in PDA Escrow
+RBN Bond = 2,000,000 $INTR locked in PDA Escrow
 Unbonding Period = 7 days = 604,800 seconds
 ```
 
@@ -508,7 +508,7 @@ RBN Daily Pool = 3,000,000 / 365 = 8,219 $INTR/day
 
 | Tier | Balance Required | Privilege |
 |------|-----------------|-----------|
-| Regular | 500 $INTR | Edge Relay status |
+| Regular | 100,000 $INTR | Edge Relay status |
 | Silver | 10,000 $INTR | Bypass rate limits |
 | Gold | 25,000 $INTR | Beta access |
 | Platinum | 100,000 $INTR | Governance proposals |
@@ -516,10 +516,10 @@ RBN Daily Pool = 3,000,000 / 365 = 8,219 $INTR/day
 ### 7.2 Sybil Resistance
 
 ```
-Edge Relay Threshold = 500 $INTR
+Edge Relay Threshold = 100,000 $INTR
 
 For Event Code 22 (Node Eligible):
-  if wallet_balance < 500:
+  if wallet_balance < 100000:
     eligible = false (client-only mode)
   else:
     eligible = true (active relay)
@@ -668,7 +668,7 @@ P_total = 3705.0
 R = floor(3705.0 / 100000.0 × 16,438,000,000,000) = 609,027,900,000 nano-INTR ≈ 609.03 $INTR
 ```
 
-### Test Vector 1: Edge Node (500 $INTR Stake, 30× Multiplier)
+### Test Vector 1: Edge Node (100,000 $INTR Stake, 30× Multiplier)
 
 **System State:** $Y = 1$, $G_{\text{estimate}} = 100,000.0$, $\text{is\_rbn} = \text{false}$, $\text{is\_edge} = \text{true}$
 
@@ -735,7 +735,7 @@ R = floor(105861.28 / 100000.0 × 8,219,000,000,000)
 
 | Constant | Value | Location | Purpose |
 |----------|-------|----------|---------|
-| `YEAR_1_DAILY_POOL` | 16,438.0 | daily_rewards.rs | Year 1 daily user pool cap |
+| `YEAR_1_DAILY_POOL` | 16,43.0 | daily_rewards.rs | Year 1 daily user pool cap |
 | `YEAR_1_RBN_DAILY_POOL` | 8,219.0 | daily_rewards.rs | Year 1 daily RBN pool cap |
 | `ANNUAL_DECAY` | 0.8 | daily_rewards.rs | 20% annual emission reduction |
 | `TGE_DATE` | "2026-01-01" | daily_rewards.rs | Token Generation Event date |
@@ -753,8 +753,8 @@ R = floor(105861.28 / 100000.0 × 8,219,000,000,000)
 | Availability yield threshold | 82,800 sec (23h) | mod.rs | Near-continuous uptime bonus |
 | Availability yield multiplier | 1.2× | mod.rs | 20% uptime bonus |
 | Claim cooldown | 300 seconds | mod.rs | Minimum time between claims |
-| RBN bond | 50,000 $INTR | whitepaper | RBN staking requirement |
-| Edge relay threshold | 500 $INTR | whitepaper | Minimum for active relay |
+| RBN bond | 2,000,000 $INTR | whitepaper | RBN staking requirement |
+| Edge relay threshold | 100,000 $INTR | whitepaper | Minimum for active relay |
 | Unbonding period | 604,800 seconds | whitepaper | 7-day cooldown |
 
 ---
@@ -802,7 +802,7 @@ R = floor(105861.28 / 100000.0 × 8,219,000,000,000)
 **Code:** `src/economy/mod.rs` — `prepare_reward_proof()`
 
 ### 11.9 Edge Node Infrastructure Multiplier
-**Issue:** Edge nodes (500 $INTR stake) earned the same as regular users (no stake), providing no incentive to run infrastructure.
+**Issue:** Edge nodes (100,000 $INTR stake) earned the same as regular users (no stake), providing no incentive to run infrastructure.
 **Fix:** Added `edge_infra_multiplier: 30.0` to `ActivityWeights`. Edge nodes receive 30× boost on RelayBytes and UptimeSeconds weights, ensuring they earn at least 2× more than regular users.
 **Code:** `src/economy/daily_rewards.rs` — `ActivityWeights`, `score_activities_static()`
 

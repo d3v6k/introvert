@@ -112,25 +112,25 @@ Social activities are capped at 5,000 points/day. Infrastructure activities draw
 
 ### 7. Node Economics
 
-#### 7.1 Edge Nodes (≥500 $INTR)
+#### 7.1 Edge Nodes (≥100,000 $INTR)
 
-Edge nodes receive a **38× infrastructure multiplier** on RelayBytes and UptimeSeconds weights. This guarantees edge nodes earn **≥4.57× of regular users** — a mathematical constant derived from the point ratio (25,307.2 ÷ 5,534.4).
+Edge nodes receive a **3× infrastructure multiplier** on RelayBytes and UptimeSeconds weights. This guarantees edge nodes earn **≥4.57× of regular users** — a mathematical constant derived from the point ratio (25,307.2 ÷ 5,534.4).
 
 | Metric | Value |
 |--------|-------|
-| Minimum Stake | 500 $INTR |
-| Infra Multiplier | 38× |
+| Minimum Stake | 100,000 $INTR |
+| Infra Multiplier | 3× |
 | Edge/Regular Ratio | 4.57× (constant) |
 | RelayBytes Cap | 10,240 KB/day |
 | UptimeSeconds Cap | 86,400s/day |
 
-#### 7.2 Root Bootstrap Nodes (RBNs) (≥50,000 $INTR)
+#### 7.2 Root Bootstrap Nodes (RBNs) (≥2,000,000 $INTR)
 
 RBNs are the backbone of the mesh network. They are evaluated primarily by **uptime**, not data volume — because RBNs are last-resort relay and their value is keeping the mesh alive.
 
 | Metric | Value |
 |--------|-------|
-| Baseline Bond | 50,000 $INTR locked in PDA Escrow |
+| Baseline Bond | 2,000,000 $INTR locked in PDA Escrow |
 | Unbonding Cooldown | 7 days (604,800 seconds) |
 | UptimeSeconds Weight | 0.005/sec (primary metric) |
 | Availability Yield | 1.5× at ≥22 hours uptime |
@@ -149,7 +149,7 @@ The prestige tier system rewards long-term $INTR holders with visual upgrades an
 |------|-----------------|-------------|------------|------------------|
 | Citizen | < 100,000 $INTR | 1.0× | None | 1.0× |
 | Sentinel | ≥ 100,000 $INTR | 1.15× | Cyan metallic | 1.05× |
-| Silver | ≥ 250,000 $INTR | 1.30× | Gunmetal grey | 1.10× |
+| Silver | ≥ 22,000,000 $INTR | 1.30× | Gunmetal grey | 1.10× |
 | Gold | ≥ 500,000 $INTR | 1.50× | Amber/gold | 1.20× |
 | Platinum | ≥ 1,000,000 $INTR | 1.75× | Icy white-blue | 1.50× |
 
@@ -172,7 +172,7 @@ Bonus programs are deployed via the RewardConfig and funded from a separate bonu
 
 | Program | Amount | Per-User Cap | Window | Budget |
 |---------|--------|-------------|--------|--------|
-| Referral Bonus | 500 INTR/referral | 10 referrals | 90 days | 500,000 INTR |
+| Referral Bonus | 100,000 INTR/referral | 10 referrals | 90 days | 500,000 INTR |
 | Early Adopter | 1,000 INTR | 1 claim | 30 days | 1,000,000 INTR |
 | Daily Streak | +1%/day | 30% max | Permanent | Unlimited |
 | Prestige Bonus | 5-50% base | Tier-based | Permanent | Unlimited |
@@ -200,6 +200,6 @@ Bonus programs are signed by the RBN multisig. Devices verify the signature befo
 - **Squads V4 Multisig:** 3-of-5 threshold controls registry program upgrades
 - **PDA Escrow Vault:** Keyless, governed purely by immutable program logic
 - **7-Day Unbonding:** Prevents exit-scams and infrastructure churn
-- **RBN Bond Verification:** On-chain check of 50,000 INTR stake prevents RBN status spoofing
+- **RBN Bond Verification:** On-chain check of 2,000,000 INTR stake prevents RBN status spoofing
 - **Signed RewardConfig:** RBN multisig signs daily reward configuration to prevent tampering
 - **Contract Upgrades:** No single developer override path

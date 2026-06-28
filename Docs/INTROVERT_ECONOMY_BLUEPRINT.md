@@ -70,7 +70,7 @@ User Daily Reward = (User Points / Global Points) * Daily Pool Cap
 
 | Parameter | Value |
 |-----------|-------|
-| Baseline Bond | 50,000 $INTR in PDA Escrow |
+| Baseline Bond | 2,000,000 $INTR in PDA Escrow |
 | Year 1 RBN Allocation | 3,000,000 $INTR |
 | Relay Points | 0.01 per KB |
 | Uptime Points | 0.001 per second |
@@ -80,7 +80,7 @@ User Daily Reward = (User Points / Global Points) * Daily Pool Cap
 
 | Tier | Balance | Privilege |
 |------|---------|-----------|
-| Regular | 500 $INTR | Edge Relay status; standard rewards |
+| Regular | 100,000 $INTR | Edge Relay status; standard rewards |
 | Silver | 10,000 $INTR | Bypass rate limits; priority routing |
 | Gold | 25,000 $INTR | Beta access; premium transfers |
 | Platinum | 100,000 $INTR | Governance proposals; infinite ZK storage |

@@ -10,14 +10,14 @@ The Rust core dispatches events to the UI using a `u8` type code followed by a b
 | **7** | E2EE Active | `PeerId_String` + `\0` (Separator) + `0` (Success byte). |
 | **8** | Peer Status | `PeerId_String` + `\0` (Separator) + `[0=Direct, 1=Relay, 2=Offline]`. |
 | **11** | Anchor Mode | `[0=Disabled, 1=Enabled]`. |
-| **22** | Node Eligible | `[0=Ineligible, 1=Eligible]` (Enforced based on the 500 $INTR balance tier verification step). |
+| **22** | Node Eligible | `[0=Ineligible, 1=Eligible]` (Enforced based on the 100,000 $INTR balance tier verification step). |
 
 ---
 
 ## 2. Decentralized RBN Infrastructure Lifecycle
 
 ### Step 1: On-Chain Initialization
-The operator launches the headless Linux server daemon binary (`src/main.rs`). The daemon interacts with the Anchor token module to lock up **50,000 $INTR** from their private key into the program's secure PDA Escrow, uploading their listener path configuration (`/ip4/x.x.x.x/tcp/443/p2p/PeerId`).
+The operator launches the headless Linux server daemon binary (`src/main.rs`). The daemon interacts with the Anchor token module to lock up **2,000,000 $INTR** from their private key into the program's secure PDA Escrow, uploading their listener path configuration (`/ip4/x.x.x.x/tcp/443/p2p/PeerId`).
 
 ### Step 2: Dynamic Directory Retrieval
 A sovereign user mobile app runs initialization. It fires a block query to parse the `introvert-registry` account table, matches active nodes with non-zero escrow balances, and maps the target bootstrap paths.

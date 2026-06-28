@@ -33,7 +33,7 @@ This guide provides a linear, step-by-step process to rebuild the entire Introve
     ```
 
 ## Step 4: RBN Infrastructure (Optional but Recommended)
-1.  **$INTR Requirement:** You need 50,000 $INTR tokens to register as an RBN operator. These are bonded into the PDA escrow vault via the `introvert-registry` Anchor program.
+1.  **$INTR Requirement:** You need 2,000,000 $INTR tokens to register as an RBN operator. These are bonded into the PDA escrow vault via the `introvert-registry` Anchor program.
 2.  **Server:** Provision a Linux VPS (Port 443 TCP/UDP must be open).
 3.  **Compile RBN:**
     ```bash
@@ -41,7 +41,7 @@ This guide provides a linear, step-by-step process to rebuild the entire Introve
     ./build_linux.sh
     ```
 4.  **Deploy:** Follow the `BUILD_&_DEPLOYMENT_GUIDE.md` to start the `introvertd` service.
-5.  **On-Chain Registration:** The daemon interacts with the Anchor registry program to lock your 50,000 $INTR and declare your multiaddress. Clients will discover your RBN automatically via Solana RPC queries — no hardcoded IP lists needed.
+5.  **On-Chain Registration:** The daemon interacts with the Anchor registry program to lock your 2,000,000 $INTR and declare your multiaddress. Clients will discover your RBN automatically via Solana RPC queries — no hardcoded IP lists needed.
 6.  **Governance:** The registry contract is controlled by a Squads V4 (3-of-5) Multisig. No single developer can alter structural rules or reward issuance rates.
 
 ## Step 5: Launch & Onboarding

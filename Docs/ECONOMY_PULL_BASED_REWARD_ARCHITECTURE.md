@@ -233,7 +233,7 @@ BonusProgram {
     id: "referral_launch_2026",
     name: "Launch Referral Bonus",
     bonus_type: BonusType::FixedIntr,
-    amount: 500.0,  // 500 INTR per referral
+    amount: 500.0,  // 100,000 INTR per referral
     max_claims: 10,  // max 10 referrals per user
     total_budget: 500_000.0,  // 500K INTR total budget
     budget_consumed: 0.0,
@@ -520,7 +520,7 @@ If a device cannot reach any RBN:
   "cycle_date": "2026-07-01",
   "emission_year": 1,
   "base_pools": {
-    "user_edge_pool": 16438.0,
+    "user_edge_pool": 1643.0,
     "rbn_pool": 8219.0,
     "bonus_pool": 5000.0
   },

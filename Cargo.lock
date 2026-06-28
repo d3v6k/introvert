@@ -3244,7 +3244,7 @@ dependencies = [
 
 [[package]]
 name = "introvert"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3253,6 +3253,7 @@ dependencies = [
  "base64 0.21.7",
  "bincode",
  "bip39",
+ "bs58",
  "bytes",
  "candle-core",
  "candle-nn",

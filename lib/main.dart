@@ -96,6 +96,13 @@ class _IntrovertAppState extends State<IntrovertApp> {
         }
         debugPrint("📡 Starting networking plane...");
         client.startNetwork();
+        
+        // Register any pending push token and fetch mailbox on boot
+        AlertService.tryRegisterPendingToken();
+        try {
+          client.fetchMailbox();
+        } catch (_) {}
+        
         debugPrint("🚀 Introvert Engine Started Successfully!");
         
         // Restore saved Anchor Mode settings
@@ -141,6 +148,10 @@ class _IntrovertAppState extends State<IntrovertApp> {
         client.startEngine(seed, _dbPath!);
       }
       client.startNetwork();
+      AlertService.tryRegisterPendingToken();
+      try {
+        client.fetchMailbox();
+      } catch (_) {}
       
       // Save Avatar Name (privacy_mode=1: allow unknown users to connect by default)
       client.setProfile(avatarName, null, null, 1);

@@ -70,6 +70,28 @@ impl NetworkService {
         let mut tunnel_handle = None;
         let mut bootstrap_nodes = config::get_bootstrap_nodes();
 
+        if !is_tunnel_enabled {
+            let solana_client_c = Arc::clone(&solana_client);
+            let program_id_str = "RBNRegXy4vQszN2Cg8gqf91mYyL24p8cT32d1mY1111";
+            info!("[SolanaRegistry] Querying devnet RBN registry at program: {}...", program_id_str);
+            match solana_client_c.fetch_registered_rbns(program_id_str).await {
+                Ok(registered_nodes) => {
+                    info!("[SolanaRegistry] Found {} active RBNs registered on-chain.", registered_nodes.len());
+                    for (peer_id_str, multiaddress_str) in registered_nodes {
+                        if let (Ok(peer_id), Ok(addr)) = (peer_id_str.parse::<PeerId>(), multiaddress_str.parse::<Multiaddr>()) {
+                            if !bootstrap_nodes.iter().any(|(pid, _)| pid == &peer_id) {
+                                info!("[SolanaRegistry] Adding dynamic RBN to bootstrap: {} ({})", peer_id, addr);
+                                bootstrap_nodes.push((peer_id, addr));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("[SolanaRegistry] Failed to query Solana RBN registry: {}. Falling back to hardcoded bootstrap nodes.", e);
+                }
+            }
+        }
+
         if is_tunnel_enabled {
             info!("[Tunnel] Secure Tunnel Mode is active. Launching loopback client...");
             // Start local tunnel listener on a dynamic port (0 means dynamic)
@@ -156,7 +178,10 @@ impl NetworkService {
         // Create shared Arc for is_relayed_map so both NetworkService and IntroClaw can use it
         let shared_is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>> = Arc::new(RwLock::new(HashMap::new()));
 
-        Ok(Self {
+        let rbn_latencies = Arc::new(RwLock::new(HashMap::new()));
+        let pending_manual_rbns = Arc::new(RwLock::new(HashMap::new()));
+
+        let res = Self {
             swarm, 
             command_rx,
             command_tx,
@@ -188,7 +213,7 @@ impl NetworkService {
             local_keypair: keypair,
             resolved_group_codes: indexmap::IndexMap::new(),
             anchor_mappings: HashMap::new(),
-            bootstrap_nodes,
+            bootstrap_nodes: bootstrap_nodes.clone(),
             _tunnel_handle: tunnel_handle,
             pending_diagnostics: HashMap::new(),
             registry: registry::RegistryManager::new(storage.clone()),
@@ -210,7 +235,17 @@ impl NetworkService {
             mdns_peers: HashSet::new(),
             seen_group_messages: HashSet::new(),
             last_ack_flush: Instant::now(),
-        })
+            rbn_latencies: rbn_latencies.clone(),
+            pending_manual_rbns: pending_manual_rbns.clone(),
+        };
+
+        // Sync to global RBN bootstrap list
+        {
+            let mut global_bn = crate::BOOTSTRAP_NODES.write();
+            *global_bn = bootstrap_nodes.iter().map(|(pid, addr)| (pid.to_string(), addr.to_string())).collect();
+        }
+
+        Ok(res)
     }
 
     pub async fn run(mut self) {
@@ -945,7 +980,34 @@ impl NetworkService {
                     }
                     IntrovertBehaviourEvent::Identify(identify::Event::Received { peer_id, info, .. }) => {
                         debug!("Identify received from {}: Protocols={:?}", peer_id, info.protocols);
-                        self.mesh_active_peers.insert(peer_id);
+
+                        // Auto-register push token on Identify with RBN bootstrap nodes
+                        let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id);
+                        if is_bootstrap {
+                            let storage = Arc::clone(&self.storage);
+                            let my_peer_id = self.swarm.local_peer_id().to_string();
+                            let tx = self.command_tx.clone();
+                            tokio::spawn(async move {
+                                crate::dispatch_debug_log(&format!("[Mesh] Checking local push token for auto-registration on Identify (my_peer_id: {})", my_peer_id));
+                                match storage.get_push_token(&my_peer_id) {
+                                    Ok(Some((device_type, push_token))) => {
+                                        crate::dispatch_debug_log(&format!("[Mesh] 🔔 Found local token. Auto-registering with RBN {} on Identify...", peer_id));
+                                        let payload = SignalingPayload::IdentifySleepState { device_type, push_token };
+                                        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+                                    }
+                                    Ok(None) => {
+                                        crate::dispatch_debug_log("[Mesh] No local push token found in DB to auto-register.");
+                                    }
+                                    Err(e) => {
+                                        crate::dispatch_debug_log(&format!("[Mesh] ❌ Error fetching local push token: {:?}", e));
+                                    }
+                                }
+                            });
+                        }
+
+                        if self.mesh_active_peers.insert(peer_id) {
+                            crate::ACTIVE_PEER_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
                         
                         // Add addresses to both Kademlia AND the swarm's direct address book
                         // This is critical for the Relay Client to find the relay server.
@@ -1377,6 +1439,12 @@ impl NetworkService {
                     IntrovertBehaviourEvent::Ping(ping_event) => {
                         // Check for pending diagnostic RTT measurement
                         if let Ok(rtt) = ping_event.result {
+                            let is_rbn = self.bootstrap_nodes.iter().any(|(id, _)| id == &ping_event.peer);
+                            if is_rbn {
+                                self.rbn_latencies.write().insert(ping_event.peer, rtt.as_millis());
+                                crate::RBN_LATENCIES.write().insert(ping_event.peer.to_string(), rtt.as_millis());
+                            }
+
                             if let Some(diag) = self.pending_diagnostics.remove(&ping_event.peer) {
                                 let transport = diag.transport.unwrap_or_else(|| "Unknown".to_string());
                                 let payload = format!(
@@ -1428,14 +1496,18 @@ impl NetworkService {
                             return Ok(());
                         }
                         
-                        self.mesh_active_peers.insert(propagation_source);
+                        if self.mesh_active_peers.insert(propagation_source) {
+                            crate::ACTIVE_PEER_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
                         if let Ok(payload) = serde_json::from_slice::<SignalingPayload>(&message.data) {
                             self.handle_single_payload(author_peer, payload, false).await;
                         }
                     }
                     IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Subscribed { peer_id, topic }) => {
                         info!("[Mesh] Peer {} subscribed to topic {}", peer_id, topic);
-                        self.mesh_active_peers.insert(peer_id);
+                        if self.mesh_active_peers.insert(peer_id) {
+                            crate::ACTIVE_PEER_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
                     }
                     IntrovertBehaviourEvent::Gossipsub(_) => {}
                     IntrovertBehaviourEvent::Dcutr(_) => {}
@@ -1483,9 +1555,29 @@ impl NetworkService {
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 info!("[Swarm] Connection established with {}", peer_id);
 
+                let endpoint_addr = endpoint.get_remote_address();
+                let is_manual = {
+                    let mut pending = self.pending_manual_rbns.write();
+                    pending.remove(endpoint_addr)
+                };
+
+                if let Some(original_ip) = is_manual {
+                    info!("[Registry] Manual RBN connection confirmed to {} (PeerId: {})", original_ip, peer_id);
+                    if !self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id) {
+                        self.bootstrap_nodes.push((peer_id, endpoint_addr.clone()));
+                        // Sync to global RBN bootstrap list
+                        {
+                            let mut global_bn = crate::BOOTSTRAP_NODES.write();
+                            *global_bn = self.bootstrap_nodes.iter().map(|(pid, addr)| (pid.to_string(), addr.to_string())).collect();
+                        }
+                    }
+                    let payload = format!("{}|{}|0", original_ip, peer_id);
+                    crate::dispatch_global_event(45, payload.as_bytes()); // Event 45: RbnConnectionConfirmed
+                }
+
                 // If this is a direct (non-relayed) connection, save the address as a potential relay mapping
                 if !endpoint.is_relayed() {
-                    self.anchor_mappings.insert(peer_id, endpoint.get_remote_address().clone());
+                    self.anchor_mappings.insert(peer_id, endpoint_addr.clone());
                 }
 
                 // Immediately transition out of 'Syncing' status
@@ -1615,6 +1707,9 @@ impl NetworkService {
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
                    self.is_relayed_map.write().remove(&peer_id);
                    self.direct_conn_count.remove(&peer_id);
+                   if self.mesh_active_peers.remove(&peer_id) {
+                       crate::ACTIVE_PEER_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                   }
                    info!("[Swarm] Connection lost with {}. Peer is now truly offline.", peer_id);
 
                     let mut data = peer_id.to_string().into_bytes();
@@ -1711,6 +1806,14 @@ impl NetworkService {
         let mut rng = rand::thread_rng();
         rbn_list.shuffle(&mut rng);
 
+        // Sort by ping latency (Intro-Claw best RBN selection)
+        {
+            let latencies = self.rbn_latencies.read();
+            rbn_list.sort_by_key(|(id, _)| {
+                latencies.get(id).cloned().unwrap_or(u128::MAX)
+            });
+        }
+
         let mut dial_success = false;
         if let Some((rbn_id, rbn_addr)) = rbn_list.first() {
             let relay_addr = rbn_addr.clone()
@@ -1796,6 +1899,30 @@ impl NetworkService {
                 // to prevent socket/substream multiplexer saturation.
                 let is_chunk_data = matches!(payload, SignalingPayload::FileChunk { .. });
                 if is_chunk_data {
+                    let is_relayed_conn = self.is_relayed_map.read().get(&recipient_id).cloned().unwrap_or(false);
+                    if is_relayed_conn {
+                        // Randomize file chunk routing between available RBNs
+                        let local_id = *self.swarm.local_peer_id();
+                        let rbn_list: Vec<_> = self.bootstrap_nodes.iter()
+                            .filter(|(id, addr)| *id != local_id && addr.to_string().contains("443"))
+                            .collect();
+                        
+                        if rbn_list.len() > 1 {
+                            use rand::seq::SliceRandom;
+                            let mut rng = rand::thread_rng();
+                            if let Some((rbn_id, _)) = rbn_list.choose(&mut rng) {
+                                let transit_payload = SignalingPayload::TransitFileChunk {
+                                    target_peer: recipient_id.to_string(),
+                                    chunk: Box::new(payload.clone()),
+                                };
+                                info!("[Mesh] Randomizing chunk routing: sending transit hop to RBN {}", rbn_id);
+                                let req_id = self.swarm.behaviour_mut().request_response.send_request(rbn_id, SignalingRequest(transit_payload));
+                                self.outbound_tracker.insert(req_id, (*rbn_id, payload.clone()));
+                                return Ok(());
+                            }
+                        }
+                    }
+
                     let inflight = self.inflight_requests.get(&recipient_id).cloned().unwrap_or(0);
                     let limit = if is_relayed_conn { 4 } else { 8 };
                     if inflight >= limit {
@@ -2535,7 +2662,23 @@ impl NetworkService {
                                 if let Ok(signed) = group::GroupManager::sign_action(gid.clone(), action, &keypair) {
                                     let payload = SignalingPayload::GroupAction(signed);
                                     if let Ok(data) = serde_json::to_vec(&payload) {
-                                        let _ = tx.send(NetworkCommand::PublishGossipsub { topic: gid, data }).await;
+                                        let _ = tx.send(NetworkCommand::PublishGossipsub { topic: gid.clone(), data }).await;
+                                        
+                                        // Mailbox/direct fallback delivery to other group members for offline notification routing
+                                        if let Ok(Some(group)) = storage.get_group(&gid) {
+                                            let members: Vec<GroupMemberMetadata> = serde_json::from_str(&group.members_json).unwrap_or_default();
+                                            for m in members {
+                                                if m.peer_id != my_peer_id {
+                                                    if let Ok(pid) = m.peer_id.parse::<libp2p::PeerId>() {
+                                                        let tx_clone = tx.clone();
+                                                        let payload_clone = payload.clone();
+                                                        tokio::spawn(async move {
+                                                            let _ = tx_clone.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload_clone }).await;
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -2780,6 +2923,56 @@ impl NetworkService {
             }
             NetworkCommand::HandleIncomingWebRtcPayload { peer_id, payload } => {
                 self.handle_signaling_payload(peer_id, payload, true).await;
+            }
+            NetworkCommand::TestManualRbn { address } => {
+                info!("[Registry] Testing manual RBN connection to {}", address);
+                let multiaddr_str = if address.contains("/ip4/") || address.contains("/ip6/") || address.contains("/dns/") {
+                    address.clone()
+                } else {
+                    format!("/ip4/{}/tcp/443", address)
+                };
+
+                let multiaddr = match multiaddr_str.parse::<libp2p::Multiaddr>() {
+                    Ok(addr) => addr,
+                    Err(e) => {
+                        let payload = format!("{}|Invalid address format: {}", address, e);
+                        crate::dispatch_global_event(46, payload.as_bytes()); // Event 46: RbnConnectionFailed
+                        return Ok(());
+                    }
+                };
+
+                // Add to pending manual RBN connections
+                self.pending_manual_rbns.write().insert(multiaddr.clone(), address.clone());
+
+                let dial_res = self.swarm.dial(multiaddr.clone());
+                if dial_res.is_err() {
+                    self.pending_manual_rbns.write().remove(&multiaddr);
+                    let payload = format!("{}|Dial failed: {:?}", address, dial_res.err());
+                    crate::dispatch_global_event(46, payload.as_bytes()); // Event 46: RbnConnectionFailed
+                    return Ok(());
+                }
+
+                // Spawn a watchdog task that waits 5 seconds. If the peer is not connected, dispatch failed event.
+                let command_tx = self.command_tx.clone();
+                let addr_str = address.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    let _ = command_tx.send(NetworkCommand::VerifyManualRbnConnection { address: addr_str, multiaddr }).await;
+                });
+            }
+            NetworkCommand::VerifyManualRbnConnection { address, multiaddr } => {
+                // If it is still present in pending_manual_rbns, it means ConnectionEstablished did NOT fire!
+                // So the connection failed or timed out.
+                let was_pending = {
+                    let mut pending = self.pending_manual_rbns.write();
+                    pending.remove(&multiaddr).is_some()
+                };
+
+                if was_pending {
+                    warn!("[Registry] Connection test failed or timed out for manual RBN: {}", address);
+                    let payload = format!("{}|Connection timeout (5000ms reached)", address);
+                    crate::dispatch_global_event(46, payload.as_bytes()); // Event 46: RbnConnectionFailed
+                }
             }
             NetworkCommand::ForceMeshRefresh => {
                 info!("[Network] Force Mesh Refresh triggered. Performing HARD RESET of networking stack.");
@@ -4093,7 +4286,7 @@ impl NetworkService {
 
                 // Send messages that peer is missing — only text messages, skip [FILE]: (handled by pull)
                 let to_send: Vec<SyncMessage> = our_messages.into_iter()
-                    .filter(|m| missing_on_peer.contains(&m.msg_id) && !m.content.starts_with("[FILE]:"))
+                    .filter(|m| missing_on_peer.contains(&m.msg_id))
                     .take(50)
                     .collect();
 
@@ -4412,6 +4605,12 @@ impl NetworkService {
             SignalingPayload::FileChunk { transfer_id, chunk_index, total_chunks, data_base64 } => {
                 info!("[Mesh] Received chunk {}/{} for {}", chunk_index, total_chunks, transfer_id);
                 self.handle_file_chunk(peer, transfer_id, chunk_index, total_chunks, data_base64).await;
+            }
+            SignalingPayload::TransitFileChunk { target_peer, chunk } => {
+                info!("[Mesh] Received TransitFileChunk for target {} from sender {}", target_peer, peer);
+                if let Ok(target_peer_id) = target_peer.parse::<libp2p::PeerId>() {
+                    let _ = self.forward_to_mesh(target_peer_id, *chunk, false).await;
+                }
             }
             SignalingPayload::GroupManifestRequest { group_id, alias, avatar, handle, requester_static_key } => {
                 if let Ok(Some(group)) = self.storage.get_group(&group_id) {

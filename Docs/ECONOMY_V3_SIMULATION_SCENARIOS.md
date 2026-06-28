@@ -42,10 +42,10 @@ Social Point Cap:       5,000 pts/day
 
 ### 1.4 Node Parameters
 ```
-Edge Infra Multiplier:  38× (applied to RelayBytes + UptimeSeconds)
+Edge Infra Multiplier:  3× (applied to RelayBytes + UptimeSeconds)
 RBN Availability Yield: 1.5× (applied to UptimeSeconds when uptime ≥ 22 hours)
-RBN Bond:               50,000 INTR (locked in PDA escrow)
-Edge Minimum Stake:     500 INTR
+RBN Bond:               2,000,000 INTR (locked in PDA escrow)
+Edge Minimum Stake:     100,000 INTR
 ```
 
 ### 1.5 Point Calculations Per Node Type
@@ -59,7 +59,7 @@ UptimeSeconds:  86,400 × 0.005 = 432.0 pts
 Total:          5,534.4 pts
 ```
 
-**Edge Node** (maxed social, full uptime, 38× infra multiplier):
+**Edge Node** (maxed social, full uptime, 3× infra multiplier):
 ```
 Social:         5,000.0 pts (cap)
 RelayBytes:     10,240 × 0.01 × 38 = 3,891.2 pts
@@ -501,7 +501,7 @@ RBN Operator:  (1,103 / 35) = 31.51 INTR/day
 
 ## 6. RBN Payback Analysis
 
-| # | Scenario | Users | RBN Daily | Bond (50,000 INTR) | Days to Payback | Months |
+| # | Scenario | Users | RBN Daily | Bond (2,000,000 INTR) | Days to Payback | Months |
 |---|----------|-------|-----------|--------------------|--------------------|--------|
 | 1 | Genesis | 200 | 8,219.00 | 50,000 | 6 | 0.2 |
 | 2 | Seed | 500 | 4,109.50 | 50,000 | 12 | 0.4 |
@@ -563,11 +563,11 @@ Since `rbn_reward = rbn_pool / num_rbns`, the entire pool is distributed every d
 | Term | Definition |
 |------|-----------|
 | **INTR** | Introvert Token (SPL, 9 decimals, 1 INTR = 10⁹ nano-INTR) |
-| **RBN** | Root Bootstrap Node (50,000 INTR bond, dedicated server) |
-| **Edge node** | Relay-capable node (≥500 INTR stake) |
+| **RBN** | Root Bootstrap Node (2,000,000 INTR bond, dedicated server) |
+| **Edge node** | Relay-capable node (≥100,000 INTR stake) |
 | **Pool-isolated clearing** | RBN and user rewards drawn from separate pools |
 | **Availability yield** | 1.5× uptime multiplier for RBNs with ≥22h daily uptime |
 | **Social points** | Messaging, calls, files (capped at 5,000/day) |
-| **Infra points** | Relay + uptime (multiplied by 38× for edge nodes) |
+| **Infra points** | Relay + uptime (multiplied by 3× for edge nodes) |
 | **Emission year** | Year since TGE (1-based), drives pool size via 20% decay |
 | **Pool scarcity** | RBN pool has few participants (1-35), yielding high per-RBN rewards |
