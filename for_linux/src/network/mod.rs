@@ -2208,9 +2208,9 @@ impl NetworkService {
         if matches!(payload, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
             info!("[Mesh] Path not ready. Buffering file chunk/request for {} in RAM...", recipient_str);
             // REDUNDANCY FILTER: If adding a Request, remove older Requests for the same transfer to prevent buffer bloat
-            if let SignalingPayload::FileChunkRequest { ref transfer_id, .. } = payload {
+            if let SignalingPayload::FileChunkRequest { ref transfer_id, chunk_index, .. } = payload {
                 if let Some(pending) = self.pending_messages.get_mut(&recipient_id) {
-                    pending.retain(|p| !matches!(p, SignalingPayload::FileChunkRequest { transfer_id: ref tid, .. } if tid == transfer_id));
+                    pending.retain(|p| !matches!(p, SignalingPayload::FileChunkRequest { transfer_id: ref tid, chunk_index: ref idx, .. } if tid == transfer_id && idx == &chunk_index));
                 }
             }
             self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
