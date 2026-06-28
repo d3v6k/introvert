@@ -10,7 +10,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import '../src/native/introvert_client.dart';
-import '../src/ui/widgets/rewards_hud.dart';
 import '../src/ui/widgets/file_transfer_bubble.dart';
 import '../src/ui/widgets/image_stack_bubble.dart';
 import '../src/ui/widgets/note_bubble.dart';
@@ -3172,7 +3171,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
         ],
       ),
-      Positioned(top: 20, left: 0, right: 0, child: Center(child: RewardsHUD(relayedBytes: _relayedBytes.toInt(), solRewards: _solRewards))),
       // Elevated Messages mini tab
       Positioned(
         top: 60,
