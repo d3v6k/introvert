@@ -1,116 +1,81 @@
-# Introvert: Sovereign P2P Mesh
+# Introvert Documentation Index
 
-Introvert is a privacy-first, decentralized communication ecosystem. It eliminates central servers entirely by utilizing true Peer-to-Peer (P2P) networking, end-to-end encryption (E2EE), and a dynamic, sovereign Solana-based token economy. The network operates via a crowdsourced, incentivized, self-healing mesh layer, with entry points dynamically coordinated on-chain — transforming Introvert from an isolated chat application into a zero-knowledge, autonomous utility network.
+This directory contains the technical blueprints, specifications, audits, guides, and plans for the Introvert P2P network. 
 
-## 🌟 Core Value Pillars
-*   **Open-Source & P2P:** A fully transparent codebase audited by the community. Serverless, direct edge-to-edge routing over standard libp2p.
-*   **End-to-End Encryption:** Locally encrypted messaging, groups, and drive data using the Noise Protocol frame (`Noise_IK_25519_ChaChaPoly_BLAKE2s`) and AES-256-GCM.
-*   **Eco-Friendly / Green Credentials:** Zero carbon-heavy datacenters. Utilizes existing idle consumer hardware coupled with Solana's green Proof-of-History consensus.
-*   **Zero Spam:** Sybil-resistant, balance-gated rate-limiting filters that increase the economic cost of abuse.
-*   **Bleeding-Edge Tech:** Powered by the self-healing **Intro-Claw Maintenance Engine** and the bandwidth-saving binary **Intro Codec** (saving 25% overhead).
-*   **User Rewards:** Earn $INTR tokens daily based on contribution weight via dynamic pool-clearing rewards.
-*   **Community-Powered RBNs:** Root Bootstrap Nodes are operated by community hosts to maintain a decentralized network directory.
-
-## Core Features
-- **Zero-Knowledge Privacy:** End-to-end encryption (E2EE) using the Noise Protocol (Noise_IK_25519_ChaChaPoly_BLAKE2s).
-- **Sovereign Identity:** Deterministic identity derived from a 32-byte master seed via HKDF-SHA256. No phone number, email, or central authority required.
-- **Dynamic Blockchain Bootstrapping:** Eliminates hardcoded bootstrap IPs. Clients discover RBN nodes dynamically via Solana on-chain registry queries, making the network resistant to DNS/IP blacklisting.
-- **Token Gating Engine:** Structural Sybil resistance requiring 100,000 $INTR minimum for edge routing (Event Code 22) and 2,000,000 $INTR for RBN operators.
-- **Autonomous Escrow Vault:** Unified Program-Derived Address (PDA) on Solana holding all network stakes and emissions — no single key controls the vault.
-- **Squads V4 Governance:** 3-of-5 multisig controls contract upgrades, ensuring full legal separation for the software publisher.
-- **Messenger-Grade Hardening:** libp2p v0.56 mesh standardized on **Port 443 (HTTPS Bypass)** for global reachability through carrier firewalls.
-- **Dark Mesh Isolation:** Completely shielded from global DHT noise via custom `/introvert/kad/1.0.0` protocols and client-only mode for edge devices.
-- **Real-time Delivery/Read Receipts:** Functional 'Acknowledgement' protocol for WhatsApp-style UI ticks (Sent, Delivered, Read).
-- **Real-time P2P Push:** RBN-driven push logic that eliminates polling delays for connected peers.
-- **Relay-Aware Connectivity:** Automatic construction of relay paths via RBN nodes, ensuring Mac-to-Android and multi-network reliability.
-- **Introvert Codec:** A custom hybrid JSON-binary codec (`/introvert/signaling/2.0.0`) that eliminates Base64 overhead for `FileChunk` data, providing ~25% wire data savings.
-- **Direct Dial Auto-Upgrades:** Connections automatically upgrade from relayed to direct P2P when direct addresses are discovered.
-- **Persistent History:** Encrypted local storage using SQLCipher (AES-256-CBC) with CRDT-based synchronization.
-- **Economic Incentives:** Built-in Solana-based $INTR token economy (100M fixed supply, Mint: `NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn`). 50% allocation (50M) for ecosystem rewards over 10 years. Dynamic pool-clearing daily rewards. Gasless transactions via Treasury Fee Payer. See `Docs/INTROVERT_TOKEN_WHITEPAPER.md`.
-- **Sovereign Drive:** Encrypted file storage with automatic organization into context-aware subfolders.
-- **Encrypted Groups:** Gossipsub-based mesh group rooms with signed actions, role management, and shared secrets.
-- **Mesh Reactions:** Decentralized emoji reaction propagation across the mesh network.
-- **Magic Wormhole Onboarding:** Zero-config device pairing via 2-word codes.
-- **WebSocket Tunnel:** Loopback tunnel client for NAT traversal via RBN WebSocket proxies.
-- **Handle Registry:** PoW-based INR handle claims with RBN witness consensus.
-- **Intro-Claw AI Engine:** Local automation engine with 12 maintenance modules, BERT-based semantic intent matching (all-MiniLM-L6-v2), natural language assistant, network recon & healing, and optional Hybrid AI mode.
-- **Green Energy & Sustainability:** A "Zero-Data-Center" architecture utilizing existing consumer hardware.
-
-## Technical Stack
-- **Backend:** Rust (libp2p v0.56, SQLite/SQLCipher, Noise IK, WebRTC, Solana SDK 4.0)
-- **Frontend:** Flutter (Dart) with dart:ffi bridge
-- **Networking:** Port 443 TCP/UDP (QUIC), WebSocket tunnel fallback, dynamic Solana-based bootstrapping, and custom **Introvert Codec** (v2.0.0 protocol)
-- **Storage:** SQLCipher encrypted database (18 tables)
-- **Identity:** HKDF-SHA256 deterministic derivation from master seed (Zero Phone/Email)
-- **Consensus & Economy:** Solana Mainnet-Beta via unified PDA escrow vault, Squads V4 (3-of-5) Multisig governance
-
-## Getting Started
-
-### Prerequisites
-- **Rust:** `rustup` stable (1.75+)
-- **Flutter:** 3.22+ (stable channel)
-- **Android NDK:** v28.2.13676358
-- **CMake & LLVM:** For native cryptography bindings
-- **CocoaPods:** For iOS/macOS plugin management
-
-### Build Native Core
-```bash
-make mac      # For macOS (produces libintrovert.dylib)
-make android  # For Android (arm64 + x86_64 .so files)
-make ios      # For iOS (device + simulator .a static libraries)
-```
-
-### Launch Application
-```bash
-flutter pub get
-flutter run
-```
-
-### RBN Deployment
-```bash
-# Option 1: Local cross-compile and deploy (recommended)
-brew install zig && cargo install cargo-zigbuild
-./deploy_local_rbn.sh
-
-# Option 2: Remote compilation on build machine
-./deploy_rbn.sh
-```
-
-## Project Structure
-```
-/introvert
-├── Docs/                    # Technical blueprints & rebuild guides
-├── android/                 # Android build config (com.example.introvert_tests)
-├── ios/                     # iOS build config (CocoaPods, P2P entitlements)
-├── macos/                   # macOS build config (CocoaPods, ephemeral libs)
-├── lib/                     # Flutter UI (Dart)
-│   ├── main.dart            # App entry point, initialization
-│   ├── blueprint_ui.dart    # Reusable UI components (SovereignAvatar, etc.)
-│   ├── src/
-│   │   ├── native/          # FFI Bridge (introvert_client.dart, identity_manager.dart)
-│   │   ├── ui/              # Main shell, drive tab, update service, video player
-│   │   ├── services/        # WebRTC call service
-│   │   └── repository/      # Sync repository
-│   ├── views/               # Chat, group chat, profile, call, media gallery, wallet
-│   └── theme/               # App styling (5 themes: Introvert Dark, Nordic Fog, etc.)
-├── src/                     # Rust Core Engine
-│   ├── lib.rs               # FFI C-bindings (3414 lines, 50+ exported functions)
-│   ├── main.rs              # Headless daemon entry point (introvertd)
-│   ├── identity.rs          # Deterministic HKDF identity derivation
-│   ├── storage.rs           # SQLCipher persistence (18 tables, 1338 lines)
-│   ├── network/             # libp2p swarm, signaling, groups, registry, tunnel
-│   ├── media/               # WebRTC implementation
-│   └── economy/             # Reward tracker + Solana incentive engine
-├── scripts/                 # Automation (Android build, cmake wrapper)
-├── for_linux/               # RBN Daemon source tree (Linux Native)
-├── plugins/                 # Local plugins (pdf_render_maintained)
-├── assets/                  # Images, audio (introvert_ping.m4a)
-├── Makefile                 # Master build orchestration
-├── Cargo.toml               # Rust dependency management
-├── Cargo.lock               # Rust lockfile
-├── pubspec.yaml             # Flutter dependency management
-└── pubspec.lock             # Flutter lockfile
-```
+To keep the repository clean, the documentation has been organized into logical subfolders. Below is the master sitemap.
 
 ---
-**Own your words. Own your network. Own your future.**
+
+## 📂 Documentation Sitemap
+
+### 1. ⚙️ Root Documents (Core Reference)
+*   **[INTROVERT_MASTER_PLAN.md](./INTROVERT_MASTER_PLAN.md):** The core execution strategy, technical phases, and vision.
+*   **[ARCHITECTURE_BLUEPRINT.md](./ARCHITECTURE_BLUEPRINT.md):** System component layers, token-gating engine, and design principles.
+*   **[CONFIGURATION_REFERENCE.md](./CONFIGURATION_REFERENCE.md):** Environment variables, client settings, and engine configurations.
+*   **[CHANGELOG.md](./CHANGELOG.md):** Complete development history and version changes.
+*   **[DEBUG_SESSION_STATUS.md](./DEBUG_SESSION_STATUS.md):** The active debugging log (large file transfer stall & handover solutions).
+
+### 2. 🔌 Protocols & Signaling (`Protocol/`)
+Technical specifications of the networking and data serialization formats:
+*   **[FILE_TRANSFER_PROTOCOL.md](./Protocol/FILE_TRANSFER_PROTOCOL.md):** Adaptive chunking (64KB/256KB), pacing, and pull-based pipeline recovery.
+*   **[FFI_API_REFERENCE.md](./Protocol/FFI_API_REFERENCE.md):** API specification for the Rust-to-Dart FFI C-bindings.
+*   **[BINARY_CODEC_UPGRADE_PLAN.md](./Protocol/BINARY_CODEC_UPGRADE_PLAN.md):** The v2.0.0 binary codec specifications and fallback logic.
+*   **[NETWORK_&_SIGNALING.md](./Protocol/NETWORK_&_SIGNALING.md):** Basic libp2p swarm and signaling configurations.
+*   **[PROTOCOL_SPECIFICATION.md](./Protocol/PROTOCOL_SPECIFICATION.md):** Message exchange sequence rules.
+*   **[introvert_codec.md](./Protocol/introvert_codec.md):** The binary/JSON hybrid serialization specification.
+*   **[introvert_system.md](./Protocol/introvert_system.md):** High-level system interaction protocol flow.
+
+### 3. 🪙 Tokenomics & Economy (`Economy/`)
+The mathematical specs and staking architecture of the $INTR economy:
+*   **[INTROVERT_TOKEN_WHITEPAPER.md](./Economy/INTROVERT_TOKEN_WHITEPAPER.md):** Staking tiers, allocations, and consensus model.
+*   **[DAILY_REWARDS_SYSTEM.md](./Economy/DAILY_REWARDS_SYSTEM.md):** Contribution-weight algorithm for daily emissions.
+*   **[ECONOMY_MATHEMATICAL_SPECIFICATION.md](./Economy/ECONOMY_MATHEMATICAL_SPECIFICATION.md):** Proof of Staking (PoS) and emissions curves.
+*   **[ECONOMY_PULL_BASED_REWARD_ARCHITECTURE.md](./Economy/ECONOMY_PULL_BASED_REWARD_ARCHITECTURE.md):** Decentralized claiming and proof mechanics.
+*   **[ECONOMY_V3_REVISED_REWARD_MODEL.md](./Economy/ECONOMY_V3_REVISED_REWARD_MODEL.md):** Revised anti-inflationary yield allocations.
+*   **[ECONOMY_V3_SIMULATION_SCENARIOS.md](./Economy/ECONOMY_V3_SIMULATION_SCENARIOS.md):** Stress simulations for reward sustainability.
+*   **[INTROVERT_ECONOMY_BLUEPRINT.md](./Economy/INTROVERT_ECONOMY_BLUEPRINT.md):** Escrow and program governance models.
+*   **[RBN_HOLDING_REQUIREMENTS.md](./Economy/RBN_HOLDING_REQUIREMENTS.md):** Staking threshold rules (100k for edge, 2M for RBN).
+
+### 4. 🔗 Solana Integration (`Solana/`)
+Anchor programs, PDA registries, and Mainnet-Beta execution:
+*   **[SOLANA_RBN_REGISTRY_PLAN.md](./Solana/SOLANA_RBN_REGISTRY_PLAN.md):** Architecture of the Anchor registration contract.
+*   **[SOLANA_MAINNET_EXECUTION_ADDENDUM.md](./Solana/SOLANA_MAINNET_EXECUTION_ADDENDUM.md):** Security mitigations for mainnet release.
+
+### 5. 🛠️ Operations & Guides (`Operations/`)
+Setup references, build steps, and deployment procedures:
+*   **[BUILD_&_DEPLOYMENT_GUIDE.md](./Operations/BUILD_&_DEPLOYMENT_GUIDE.md):** Prerequisites and native compilation guides.
+*   **[RBN_COMMUNITY_HOSTING_PLAN.md](./Operations/RBN_COMMUNITY_HOSTING_PLAN.md):** Staking and server provisioning for community operators.
+*   **[RBN_DASHBOARD_ACCESS_GUIDE.md](./Operations/RBN_DASHBOARD_ACCESS_GUIDE.md):** Port-tunneling and dashboard authentication.
+*   **[RBN_OPERATOR_GUIDE.md](./Operations/RBN_OPERATOR_GUIDE.md):** Installation, telemetry, and log monitoring scripts.
+*   **[RBN_PHASE_2_DEPLOYMENT_PLAN.md](./Operations/RBN_PHASE_2_DEPLOYMENT_PLAN.md):** Scaling and automation milestones.
+*   **[ENVIRONMENT_VARIABLES.md](./Operations/ENVIRONMENT_VARIABLES.md):** All configurations supported by the Rust core.
+*   **[FIREBASE_FCM_SETUP.md](./Operations/FIREBASE_FCM_SETUP.md):** Setup guidelines for Android push notifications.
+*   **[IOS_PUSH_SETUP.md](./Operations/IOS_PUSH_SETUP.md):** Setup guidelines for Apple APNs.
+*   **[PUSH_NOTIFICATION_ARCHITECTURE.md](./Operations/PUSH_NOTIFICATION_ARCHITECTURE.md):** Sleep state handling and RBN relaying.
+*   **[REBUILD_GUIDE.md](./Operations/REBUILD_GUIDE.md):** How to force clean re-builds.
+*   **[RELEASE_PROCESS.md](./Operations/RELEASE_PROCESS.md):** Semantic versioning and production releases.
+*   **[STABLE_VERSION_PROCESS.md](./Operations/STABLE_VERSION_PROCESS.md):** Creation and recovery of stable builds.
+*   **[TESTING_GUIDE.md](./Operations/TESTING_GUIDE.md):** Unit and integration testing protocols.
+*   **[TROUBLESHOOTING.md](./Operations/TROUBLESHOOTING.md):** Diagnostic playbooks.
+
+### 6. 🛡️ Audits & stress Tests (`Audits/`)
+Security, cryptographic, network, and database audit reports:
+*   **[INTROVERT_FILE_TRANSFER_STALL_AUDIT.md](./Audits/INTROVERT_FILE_TRANSFER_STALL_AUDIT.md):** Audit of Yamux stream buffer congestion.
+*   **[DEEP_AUDIT_v31_REGRESSION_REPORT.md](./Audits/DEEP_AUDIT_v31_REGRESSION_REPORT.md):** Code regression report for core version v3.1.
+*   **[MESH_STRESS_TEST_REPORT_2026_06_07.md](./Audits/MESH_STRESS_TEST_REPORT_2026_06_07.md):** Stress test results for multi-peer networks.
+*   **[network_performance.md](./Audits/network_performance.md):** Peer-to-peer transport latency benchmarks.
+
+### 7. 📈 Marketing & Vision (`Marketing/`)
+Introvert competitive analysis, sustainability plans, and the network manifesto:
+*   **[MARKETING_REPORT.md](./Marketing/MARKETING_REPORT.md):** Differentiators, token utilities, and competitive positioning.
+*   **[INTROVERT_MANIFESTO.md](./Marketing/INTROVERT_MANIFESTO.md):** Principles of decentralized ownership.
+*   **[GREEN_ENERGY_&_SUSTAINABILITY.md](./Marketing/GREEN_ENERGY_&_SUSTAINABILITY.md):** Sustainability credentials of a zero-datacenter mesh.
+
+### 8. 📦 Database & Components (`Components/`)
+Database schemas, component registries, and layout manifests:
+*   **[DATABASE_SCHEMA.md](./Components/DATABASE_SCHEMA.md):** Detailed table layout (18 tables) of the SQLCipher database.
+*   **[UI_COMPONENT_MANIFEST.md](./Components/UI_COMPONENT_MANIFEST.md):** Registry of reusable Flutter elements.
+*   **[encrypted_drive.md](./Components/encrypted_drive.md):** Sovereign Drive directory trees and storage layers.
+*   **[MODULE_REFERENCE.md](./Components/MODULE_REFERENCE.md):** Architecture of the 12 Intro-Claw maintenance modules.
+*   **[DEPLOYMENT_ARCHITECTURE.md](./Components/DEPLOYMENT_ARCHITECTURE.md):** Swarm network deployment architectures.
+*   **[SECURITY_&_ENCRYPTION.md](./Components/SECURITY_&_ENCRYPTION.md):** Wire and persistence encryption details.
