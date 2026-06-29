@@ -4203,7 +4203,7 @@ impl NetworkService {
                         filename: filename.clone(),
                         mime_type: mime_type.clone(),
                         file_hash: file_hash.clone(),
-                        total_size,
+                        total_size: total_size as usize,
                         total_chunks,
                         received_chunks: HashMap::new(),
                         peer_id: actual_seeder_peer,

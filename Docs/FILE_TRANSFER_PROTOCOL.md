@@ -65,7 +65,7 @@ sequenceDiagram
     
     loop Sequential Push (256KB Chunks)
         Sender->>Receiver: 2. FileChunk (Chunk 0, Data)
-        Note over Sender, Receiver: Pacing: 20ms
+        Note over Sender, Receiver: Pacing: 10ms
         Sender->>Receiver: 3. FileChunk (Chunk 1, Data)
     end
     
@@ -77,8 +77,11 @@ sequenceDiagram
 1. **Initiation:** The sender evaluates connection status. If a direct path exists (connected directly and `is_relayed` is false), the sender transmits the `FileTransfer` manifest with `is_relayed = false`.
 2. **Chunk Size:** Configured to **256KB** to maximize throughput on high-bandwidth, low-latency links.
 3. **Transmission Mode (Push):** The sender sequentially pushes chunks to the receiver over the connection without waiting for intermediate acknowledgements.
-4. **Pacing:** A **20ms** pacing interval is introduced between chunks to prevent SCTP socket buffer saturation on WebRTC data channels or TCP window bottlenecks.
-5. **Integrity Check:** Upon receiving the final chunk, the receiver reconstructs the file, computes its SHA-256 hash, verifies it against the manifest, and replies with `FileTransferComplete`.
+4. **Pacing:** A **10ms** pacing interval is introduced between chunks to prevent SCTP socket buffer saturation on WebRTC data channels or TCP window bottlenecks.
+5. **Flow Control & Pull Recovery Fallback:**
+   - While direct transfers default to the push model for zero-overhead, the receiver runs a 10-second watchdog.
+   - If direct chunk arrivals stall (e.g. socket congestion or packet drops), the receiver automatically transitions the transfer to the **pull recovery model** (`is_relayed = true`), initializing a **12-chunk parallel pipeline** to aggressively request the missing chunks over the direct connection.
+6. **Integrity Check:** Upon receiving the final chunk, the receiver reconstructs the file, computes its SHA-256 hash, verifies it against the manifest, and replies with `FileTransferComplete`.
 
 ---
 
@@ -167,6 +170,9 @@ sequenceDiagram
 6. **Footprint & Quota Cleanup:** 
    - Group files are stored in a dedicated local mesh directory.
    - Once all members acknowledge receipt (via group `Acknowledgement` signals) or when the node's local mesh capacity exceeds the **1GB quota**, temporary mesh files are purged using a Least-Recently-Used (LRU) algorithm.
+7. **Privacy Kill-Switch (Revocation):**
+   - Senders can broadcast a signed `FileTransferRevoke` payload containing the file hash and original signature.
+   - Upon receipt, group members must immediately unregister from the DHT provider registry (`stop_providing`) and wipe the cached file chunks from their local mesh directories to ensure the file does not continue seeding.
 
 ---
 

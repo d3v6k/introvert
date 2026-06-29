@@ -41,7 +41,7 @@ Wire format (per request):
 **For FileChunk payloads specifically:**
 - The base64 string is stripped from the JSON
 - Raw binary data is appended after the JSON section
-- The receiver decodes it back to base64 (for in-memory compatibility) transparently
+- **Optimization:** To maximize CPU and RAM performance, we avoid converting the binary data back into a base64 String in memory. Instead, we refactor `SignalingPayload::FileChunk` to hold an enum type `FileData::Raw(Vec<u8>)` (v2.0.0) alongside `FileData::Base64(String)` (v1.0.0). The receiver passes the raw `Vec<u8>` directly to the cryptographic and local storage layers, preventing redundant string allocations.
 
 **Measured savings (from `codec_tests.rs`):**
 
@@ -218,10 +218,23 @@ IntrovertBehaviourEvent::RequestResponseV2(event) => {
         request_response::Event::OutboundFailure { peer, request_id, error } => {
             warn!("[Mesh] v2.0.0 outbound failure to {}: {:?}", peer, error);
             if let Some((peer_id, payload)) = self.outbound_tracker_v2.remove(&request_id) {
-                // Fallback to v1.0.0
-                let req_id = self.swarm.behaviour_mut().request_response
-                    .send_request(&peer_id, SignalingRequest(payload.clone()));
-                self.outbound_tracker.insert(req_id, (peer_id, payload));
+                // Safeguard: Check if this was a network routing failure/timeout (implies peer is offline).
+                // If the peer is offline, fallback to v1.0.0 is guaranteed to fail anyway; we should just mailbox/queue it.
+                let is_network_error = matches!(
+                    error,
+                    libp2p::request_response::OutboundFailure::ConnectionClosed
+                        | libp2p::request_response::OutboundFailure::Timeout
+                );
+                
+                if is_network_error {
+                    info!("[Mesh] Network failure to {} during v2.0.0 request. Bypassing v1.0.0 fallback and re-queuing for mailbox/recon.", peer);
+                    self.pending_messages.entry(peer_id).or_default().push(payload);
+                } else {
+                    info!("[Mesh] Falling back to v1.0.0 for payload to {}", peer_id);
+                    let req_id = self.swarm.behaviour_mut().request_response
+                        .send_request(&peer_id, SignalingRequest(payload.clone()));
+                    self.outbound_tracker.insert(req_id, (peer_id, payload));
+                }
             }
         }
         _ => {}
@@ -324,7 +337,7 @@ outbound_tracker_v2: HashMap::new(),
 
 Add the `IntrovertBehaviourEvent::RequestResponseV2(...)` arm. Identical to the v1.0.0 arm but unwraps `BinarySignalingRequest` and uses `outbound_tracker_v2`.
 
-Include automatic fallback: if v2.0.0 `OutboundFailure` fires, retry the payload over v1.0.0.
+Include automatic fallback: if v2.0.0 `OutboundFailure` fires, fallback to v1.0.0 *only* if the error is not a network routing/timeout error (which implies the peer is offline), and track the state to prevent infinite retry loops. Deduplicate inbound requests using the unique `msg_id` inside signaling payloads.
 
 #### Step 2.4 — Selective v2.0.0 Sending for FileChunk
 

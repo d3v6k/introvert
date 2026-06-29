@@ -3160,7 +3160,7 @@ impl NetworkService {
                         filename: "".to_string(), // receiver already has this
                         mime_type: "".to_string(),
                         file_hash,
-                        total_size,
+                        total_size: total_size as u64,
                         is_relayed: true,  // Switch receiver to pull mode
                         sender_peer_id: Some(local_peer_id.to_string()),
                         group_id: None,
@@ -4006,7 +4006,10 @@ impl NetworkService {
                     // SECURITY: Verify requesting peer is authorized for this transfer
                     let peer_str = peer.to_string();
                     let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer);
-                    let authorized = is_bootstrap || if let Some(ref gid) = info.4 {
+                    let authorized = if is_bootstrap {
+                        // RBN is only authorized for group transfers (offline caching), never 1:1 transfers
+                        info.4.is_some()
+                    } else if let Some(ref gid) = info.4 {
                         // Group transfer: verify peer is a group member
                         self.storage.get_group(gid)
                             .ok()
@@ -4035,9 +4038,8 @@ impl NetworkService {
                     let tchunks = (size as f32 / requested_csize as f32).ceil() as u32;
                     (info.0, requested_csize, tchunks, info.3, info.4)
                 } else {
-                    // SECURITY: Only serve Sovereign Drive files to known contacts or bootstrap nodes
-                    let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer);
-                    let is_contact = is_bootstrap || self.storage.get_contact(&peer.to_string())
+                    // SECURITY: Only serve Sovereign Drive files to known contacts (never to RBN nodes)
+                    let is_contact = self.storage.get_contact(&peer.to_string())
                         .ok()
                         .flatten()
                         .is_some();
@@ -4520,7 +4522,7 @@ impl NetworkService {
                         filename: filename.clone(),
                         mime_type: mime_type.clone(),
                         file_hash: file_hash.clone(),
-                        total_size,
+                        total_size: total_size as usize,
                         total_chunks,
                         received_chunks: HashMap::new(),
                         peer_id: actual_seeder_peer,
@@ -4879,7 +4881,7 @@ impl NetworkService {
                                                                             filename,
                                                                             mime_type,
                                                                             file_hash,
-                                                                            total_size: total_size as usize,
+                                                                            total_size: total_size as u64,
                                                                             is_relayed: true,
                                                                             sender_peer_id: Some(sid),
                                                                             group_id: Some(gid),
@@ -5601,7 +5603,7 @@ impl NetworkService {
             filename: filename.clone(),
             mime_type: mime_type.clone(), 
             file_hash: file_hash.clone(),
-            total_size,
+            total_size: total_size as u64,
             is_relayed,
             sender_peer_id: Some(local_peer_id.to_string()),
             group_id: group_id.clone(),
@@ -5835,7 +5837,7 @@ impl NetworkService {
                                         filename: filename.to_string(),
                                         mime_type: mime_type.to_string(),
                                         file_hash: file_hash.clone(),
-                                        total_size: total_size as usize,
+                                        total_size: total_size as u64,
                                         is_relayed: true,
                                         sender_peer_id: Some(pid.to_string()),
                                         group_id,

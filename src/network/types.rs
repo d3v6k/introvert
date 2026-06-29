@@ -137,7 +137,7 @@ pub enum SignalingPayload {
         filename: String, 
         mime_type: String, 
         file_hash: String, 
-        total_size: usize, 
+        total_size: u64, 
         #[serde(default)]
         is_relayed: bool,
         #[serde(default)]

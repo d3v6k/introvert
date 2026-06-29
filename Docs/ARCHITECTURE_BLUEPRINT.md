@@ -3,7 +3,7 @@
 ## 1. System Overview
 **Million-Node Mandate:** Introvert MUST scale flawlessly for **over 1,000,000 active users**. All features, routing protocols (e.g., Gossipsub), and database interactions are designed against this extreme scale to prevent loop starvation or O(N) degradation.
 
-Introvert avoids central servers entirely, relying on a distributed mesh of user nodes and dynamic, community-operated Root Bootstrap Nodes (RBNs). The infrastructure layer is entirely automated; regular user app clients discover the network geometry by fetching signed, active multiaddresses directly from an immutable Solana registry contract, eliminating static points of failure.
+Introvert avoids central application-layer servers entirely, relying on a distributed mesh of user nodes and dynamic, community-operated Root Bootstrap Nodes (RBNs). The discovery layer is decentralized; regular user app clients discover the network geometry by fetching signed, active multiaddresses directly from an immutable Solana registry contract, eliminating central application servers. To prevent Solana RPC clusters from becoming a single point of failure (SPOF), the system implements redundant fallback mechanisms, including local IP caching, raw configuration fallbacks, and DNS-over-HTTPS TXT record queries.
 
 ## 2. Component Layers
 

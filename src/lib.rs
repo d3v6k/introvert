@@ -3604,7 +3604,7 @@ pub extern "C" fn introvert_network_start_pull(
         filename,
         mime_type,
         file_hash,
-        total_size: total_size as usize,
+        total_size: total_size as u64,
         is_relayed,
         sender_peer_id: Some(peer_id_str.clone()),
         group_id,
