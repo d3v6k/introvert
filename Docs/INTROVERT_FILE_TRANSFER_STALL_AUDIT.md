@@ -52,20 +52,19 @@ To prevent the RBN daemon from stalling during file prefetching:
 
 ---
 
-## 4. Relayed Transfer Speed Optimization
+## 4. Relayed Transfer Speed & Congestion Optimization
 
-To address slow transfer speeds (~16 KB/s) on cross-network/cellular relays (where symmetric NAT prevents direct P2P connections), we analyzed the round-trip overhead of libp2p's `request_response` streams over high-latency RBN paths. 
+During production testing of the upgraded 256KB/8-deep pipeline over cellular networks (relayed WAN connections), we encountered extreme packet drops, stream timeouts, and congestion collapse. The 256KB chunks (base64 encoded to ~341KB) were too large for high-latency, limited-bandwidth mobile links. Requesting 8 chunks in parallel (2.7MB in-flight) flooded Yamux multiplexer windows, leading to connection resets and watchdog loops.
 
-Every single chunk pull request and chunk response opens a new TCP/Noise stream over the relay circuit, introducing a 3-RTT handshake overhead (often 600ms–900ms per stream).
-
-### Optimizations Implemented:
-1.  **Upgraded Chunk Size to 256KB:**
-    *   Increased the default relayed chunk size from `64KB` to `256KB` in both the client and RBN daemon (`src/network/mod.rs` and `for_linux/src/network/mod.rs`).
-    *   **Speedup:** This reduces the number of required stream handshakes by **75%** (4x fewer roundtrips per file), significantly mitigating stream negotiation latency.
-2.  **Expanded Pipeline Window size to 8-deep:**
-    *   Increased the primed pull pipeline size and pull sliding window limits from `4` to `8` in `src/network/mod.rs`.
-    *   **Speedup:** This allows the receiver to request up to **8 chunks in parallel** (up from 4), doubling concurrent throughput over high-latency paths.
-3.  **watchdog pull window:**
-    *   Increased the recovery watchdog pull window from `4` to `8` to match the pipeline speed.
-
-These optimizations result in a theoretical **8x speedup** for relayed transfers, dramatically improving cross-network speeds.
+### Optimizations Implemented (Adaptive Pipeline):
+1.  **Adaptive Chunk Sizing:**
+    *   **Direct P2P/LAN Connections:** Continue using the high-speed **256KB** chunks.
+    *   **Relayed Connections:** Dynamically scale down to **64KB** chunks. This prevents individual chunk responses from exceeding libp2p's default request-response timeouts (20-30s).
+2.  **Adaptive Pipeline Depth:**
+    *   Direct connections use a **12-chunk** pipeline.
+    *   Relayed connections restrict the pipeline to **4-chunk** depth (up to 256KB of data in-flight), maintaining parallel pipelining while preventing thundering-herd congestion.
+3.  **Adaptive Pacing Delay:**
+    *   Paced requests are delayed by **10ms** on direct connections, and **100ms** on relayed connections to allow remote buffers to clear.
+4.  **Watchdog Window Alignment:**
+    *   Watchdog window size scaled from hardcoded `8` to match the connection's active pipeline depth (`4` for relay, `12` for direct).
+    *   Aligned `next_pull_idx` dynamic initialization mapping to match the active pipeline size.

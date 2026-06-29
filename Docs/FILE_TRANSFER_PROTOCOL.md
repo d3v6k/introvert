@@ -114,10 +114,10 @@ sequenceDiagram
 #### Protocol Specification
 1. **Relay Strategy:** Port 443 (HTTPS fallback) is used for RBN transport to bypass firewalls. Outbound/inbound relay circuits are established through a selected RBN node.
 2. **Transmission Mode (Pull):** Instead of pushing data and overwhelming the relay bandwidth limits, the **Receiver drives the transfer** by sending `FileChunkRequest` packets.
-3. **Chunk Size:** Reduced to **16KB** (the MTU-safe size) to ensure maximum stability on high-jitter cellular or saturated networks.
+3. **Chunk Size:** Reduced to **64KB** (optimized for stability and cellular MTU constraints) to prevent congestion collapse.
 4. **Pacing & Pipelining:** 
-   - To mitigate latency round-trips over relays while preventing saturation, the receiver maintains a **2-deep request pipeline** (up to 2 chunk requests are inflight at any moment).
-   - The sender applies a **250ms pacing** delay when serving chunk responses to provide ample headroom for OS-level buffer clearing and relay latency.
+   - To mitigate latency round-trips over relays while preventing saturation, the receiver maintains a **4-deep request pipeline** (up to 4 chunk requests are inflight at any moment).
+   - The sender applies a **100ms pacing** delay between serving chunk requests to prevent buffer overflow and thundering herd collapse.
 5. **Redundancy Filtering & Error Recovery:**
    - **Watchdog Timer:** The receiver uses an 8-second watchdog. If no chunk is received in 8s, it re-requests the missing window.
    - **RAM Redundancy Filter:** During connection dips, the system purges older `FileChunkRequest` packets for the same transfer from the `pending_messages` queue, ensuring only the most recent request batch is flushed upon reconnection.
@@ -175,8 +175,8 @@ sequenceDiagram
 | Parameter | Direct P2P / WebRTC | Relayed (Cross-Network) | Group Chat (Sovereign Swarm) |
 | :--- | :--- | :--- | :--- |
 | **Transmission Model** | Sequential Push (Sender Driven) | Pipelined Pull (Receiver Driven) | Parallel Swarm Pull (Multi-source) |
-| **Chunk Size** | 256 KB | 16 KB (MTU Safe) | 16 KB |
-| **Pacing Interval** | 20 ms | 250 ms (Sender response delay) | Dynamic (Based on peer capacity) |
+| **Chunk Size** | 256 KB | 64 KB (Relay Safe) | Adaptive: 64 KB / 256 KB |
+| **Pacing Interval** | 10 ms | 100 ms (Sender response delay) | Dynamic (Based on peer capacity) |
 | **Discovery Protocol** | mDNS / Direct Address Book | RBN Circuit Dialing | Gossipsub + Kademlia DHT Lookup |
 | **Error Recovery** | Connection Re-dial | Redundancy Filtered Pull (8s watchdog) | Multi-source fallback + Watchdog |
 | **Seeding Expansion** | None | Limited (Privacy-first) | Aggressive (Group Cohesion) |

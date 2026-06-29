@@ -1,6 +1,6 @@
 # Debug Session Status — Group Chat & Android Push Wakeup
-**Date:** 2026-06-28  
-**Session:** Android Push Notification Wakeup + Protocol Handshake Alignments + Client Rebuilds
+**Date:** 2026-06-29  
+**Session:** Android Push Notification Wakeup + Protocol Handshake Alignments + Client Rebuilds + File Transfer Optimization + NAT64 Mobile Data Resolution
 
 ---
 
@@ -25,7 +25,7 @@
 
 ---
 
-## BUG FIXED: File transfer shown as VoIP call
+## BUG RESOLVED: File transfer shown as VoIP call
 ### Status: FIXED ✅
 
 ### Root Cause
@@ -38,7 +38,7 @@ When `SendFile` had no existing data channel, it called `InitiateWebRtc { media_
 
 ---
 
-## BUG FIXED: Gossipsub membership check rejecting relayed messages
+## BUG RESOLVED: Gossipsub membership check rejecting relayed messages
 ### Status: FIXED ✅
 
 ### Root Cause
@@ -49,7 +49,7 @@ Changed to use `message.source` (original author) when available, falling back t
 
 ---
 
-## BUG FIXED: Database "file is not a database" crash
+## BUG RESOLVED: Database "file is not a database" crash
 ### Status: FIXED ✅
 
 ### Root Cause
@@ -60,7 +60,40 @@ Added retry logic: if `StorageService::new` fails with "file is not a database",
 
 ---
 
-## Build & Deploy Status (as of 2026-06-28)
+## BUG RESOLVED: Large File Transfers (>7MB) Stalling Over Relayed Connections
+### Status: FIXED ✅
+
+### Symptoms
+Large file transfers (7MB+) over relays (pull sequence) took 10+ minutes to complete, or failed completely, even on fast networks.
+
+### Root Cause
+The client pulled 256KB chunks (base64 encoded to ~341KB) using an 8-deep in-flight window. On relayed links, this thundering herd (2.7MB of concurrent data) saturated Yamux multiplexer windows, leading to resets, lost packets, and continuous watchdog timeout loop collapse.
+
+### Fixes Applied
+1. **Adaptive Chunk Size:** Direct connection uses 256KB chunks, relayed connection automatically falls back to 64KB chunks.
+2. **Constrained Pipelining:** Direct connection uses 12-deep pipeline, relayed connection uses 4-deep pipeline (max 256KB in-flight).
+3. **Pacing Delay:** Added a 100ms request pacing interval on relays.
+4. **Watchdog Alignment:** Dynamically scaled the watchdog retry window and `next_pull_idx` to match the target pipeline size (4 for relay, 12 for direct P2P).
+
+---
+
+## BUG RESOLVED: Android Mobile Data Connection and Stale Sockets on Handover
+### Status: FIXED ✅
+
+### Symptoms
+Android could not send or receive messages on mobile data. Messages sent on mobile data remained stuck and were not sent/received even after switching back to working Wi-Fi networks (unless joining the same local group network).
+
+### Root Causes
+1. **IPv6-Only / NAT64 Cellular Routing:** Cellular data networks are commonly IPv6-only using NAT64 translation. Since RBN's address was configured as a raw IPv4 literal (`/ip4/47.89.252.80/tcp/443`), the carrier's DNS64 server was bypassed, making RBN completely unreachable.
+2. **Network Handover Delay:** The periodic loop that re-dials RBN bootstrap nodes and flushes pending messages ticked only once every 5 minutes, leaving the client stuck on dead/stale sockets after a network transition.
+
+### Fixes Applied
+1. **Wildcard DNS NAT64 Resolution:** Integrated native OS DNS resolution (`ToSocketAddrs`) on `47.89.252.80.sslip.io` in the bootstrap resolver (`src/network/config.rs`). On IPv6-only carriers, the OS automatically resolves this to a synthesized AAAA IPv6 address using the carrier's NAT64 prefix, allowing routing to the RBN node.
+2. **Proactive Handover Stack Refresh:** Updated `_triggerClawNetworkRecovery()` in Flutter's `main_shell.dart` to call `_client.forceNetworkRefresh()` immediately on connectivity changes. This aggressively teardowns stale sockets, clears noise sessions, and forces a re-dial of RBN nodes immediately.
+
+---
+
+## Build & Deploy Status (as of 2026-06-29)
 
 | Component | Status | Notes |
 | :--- | :--- | :--- |
@@ -76,7 +109,9 @@ Added retry logic: if `StorageService::new` fails with "file is not a database",
 | File | Purpose |
 | :--- | :--- |
 | [src/lib.rs](file:///Users/dev/Development/introvert/src/lib.rs) | FFI client functions |
-| [src/network/mod.rs](file:///Users/dev/Development/introvert/src/network/mod.rs) | Client network service, Identify-level push registration |
-| [for_linux/src/network/mod.rs](file:///Users/dev/Development/introvert/for_linux/src/network/mod.rs) | RBN network service, Identify-level push registration |
+| [src/network/config.rs](file:///Users/dev/Development/introvert/src/network/config.rs) | Bootstrap node definitions, ToSocketAddrs DNS fallback |
+| [src/network/mod.rs](file:///Users/dev/Development/introvert/src/network/mod.rs) | Client network service, Identify-level push registration, adaptive pull parameters |
+| [for_linux/src/network/config.rs](file:///Users/dev/Development/introvert/for_linux/src/network/config.rs) | Daemon bootstrap definitions with DNS resolver |
+| [for_linux/src/network/mod.rs](file:///Users/dev/Development/introvert/for_linux/src/network/mod.rs) | RBN network service, Identify-level push registration, adaptive pull parameters |
 | [lib/src/native/alert_service.dart](file:///Users/dev/Development/introvert/lib/src/native/alert_service.dart) | Push notification token status |
-| [lib/src/ui/main_shell.dart](file:///Users/dev/Development/introvert/lib/src/ui/main_shell.dart) | Main application shell and UI bootstrap |
+| [lib/src/ui/main_shell.dart](file:///Users/dev/Development/introvert/lib/src/ui/main_shell.dart) | Main application shell and UI bootstrap, network recovery handover |
