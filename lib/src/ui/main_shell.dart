@@ -163,12 +163,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   }
 
   void _triggerClawNetworkRecovery() {
-    debugPrint("[Intro-Claw] Network recovery: running recon + tick...");
+    debugPrint("[Intro-Claw] Network recovery: forcing refresh, recon, and tick...");
     _showClawNetworkAlert("Network Changed", "Intro-Claw: Re-optimizing connections...", AppTheme.current.accent);
 
-    // Run recon and trigger tick in background
+    // Run refresh, recon, and trigger tick in background
     Future.delayed(Duration(seconds: 2), () {
       try {
+        _client.forceNetworkRefresh(); // Force Stack Refresh & Re-dial RBNs immediately
         _client.runNetworkRecon();
         _client.triggerIntroClawTick(); // Execute intelligence modules
         if (mounted) {

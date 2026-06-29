@@ -4441,8 +4441,12 @@ impl NetworkService {
                 let is_direct_p2p = is_connected_now && !relayed_map_snapshot.unwrap_or(false);
                 let final_is_relayed = if is_direct_p2p { false } else { is_relayed };
 
-                let chunk_size = 256 * 1024;
+                // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay/Pull uses 64KB
+                let chunk_size = if final_is_relayed { 64 * 1024 } else { 256 * 1024 };
                 let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
+
+                let initial_pipeline = if is_direct_p2p { 12 } else { 4 };
+                let pacing_delay = if is_direct_p2p { 10 } else { 100 };
 
                 // DEDUPLICATION: If we already have an active transfer for this file_hash (regardless
                 // of transfer_id), merge the new sender as a provider into the existing transfer.
@@ -4480,10 +4484,11 @@ impl NetworkService {
                     if final_is_relayed && !was_relayed {
                         let mut next = 0u32;
                         while existing.received_chunks.contains_key(&next) { next += 1; }
+                        let pipeline_depth = 4;
                         let limit = if existing.total_chunks > 0 {
-                            std::cmp::min(next + 8, existing.total_chunks)
+                            std::cmp::min(next + pipeline_depth, existing.total_chunks)
                         } else {
-                            next + 8
+                            next + pipeline_depth
                         };
                         existing.next_pull_idx = limit;
                         
@@ -4524,7 +4529,7 @@ impl NetworkService {
                         last_update: Instant::now(),
                         is_relayed: final_is_relayed,
                         group_id: group_id.clone(),
-                        next_pull_idx: 8,
+                        next_pull_idx: initial_pipeline,
                         chunk_size,
                         stall_chunk_count: 0,
                     });
@@ -4574,11 +4579,6 @@ impl NetworkService {
                     // final_is_relayed=false means the sender will PUSH 256KB chunks directly to us.
                     // final_is_relayed=true means we must PULL chunks via FileChunkRequest.
                     if final_is_relayed {
-                        let is_direct = self.swarm.is_connected(&actual_seeder_peer)
-                            && self.is_relayed_map.read().get(&actual_seeder_peer).cloned() == Some(false);
-                        let initial_pipeline = if is_direct { 12 } else { 8 };
-                        let pacing_delay = if is_direct { 10 } else { 50 };
-
                         info!("[Mesh] Relay/Pull transfer detected. Initiating primed pull sequence ({} deep) for {}", initial_pipeline, transfer_id);
                         let tx = self.command_tx.clone();
                         let tid = transfer_id.clone();
@@ -5592,8 +5592,8 @@ impl NetworkService {
             format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
         });
         
-        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 256KB (Sovereign Swarm Pull)
-        let chunk_size = 256 * 1024;
+        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay/Pull uses 64KB
+        let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 };
         let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
         
         let transfer_payload = SignalingPayload::FileTransfer { 

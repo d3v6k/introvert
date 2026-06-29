@@ -4154,7 +4154,8 @@ impl NetworkService {
                     return;
                 }
 
-                let chunk_size = 256 * 1024;
+                // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay/Pull uses 64KB
+                let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 };
                 let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
 
                 let mut is_update = false;
@@ -5035,8 +5036,8 @@ impl NetworkService {
             format!("gft_{}_{}", file_hash, ts)
         });
         
-        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 256KB (Sovereign Swarm Pull)
-        let chunk_size = 256 * 1024;
+        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay/Pull uses 64KB
+        let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 };
         let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
         
         let transfer_payload = SignalingPayload::FileTransfer { 
