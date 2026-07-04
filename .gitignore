@@ -1,0 +1,83 @@
+# =============================================
+# Introvert FOSS — Strict .gitignore
+# Blocks all secrets, infrastructure, and server-side code
+# =============================================
+
+# === Secrets & Keys ===
+*.json
+*.env
+*.env.*
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+treasury-authority.json
+introvert-authority.json
+payouts.db
+firebase-service-account.json
+
+# === Databases & Logs ===
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.log
+*.log.*
+
+# === Server-side / Infrastructure (NEVER in FOSS) ===
+for_linux/
+introvert-daemon/
+deploy_rbn.sh
+deploy_local_rbn.sh
+deploy_anchor.sh
+deploy_first_light.sh
+build_and_deploy.sh
+scripts/setup_rbn.sh
+
+# === Build artifacts ===
+target/
+build/
+.dart_tool/
+.gradle/
+*.dylib
+*.so
+*.a
+*.o
+*.bak
+*.class
+*.aab
+*.ipa
+*.dSYM/
+*.iml
+ios/Pods/
+macos/Pods/
+
+# Allow release APKs
+!releases/*.apk
+
+# === IDE / OS ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# === Flutter generated ===
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# === Sensitive docs ===
+Docs/Economy/ECONOMY_DEEP_DIVE.md
+Docs/Economy/DAILY_REWARDS_SYSTEM.md
+Docs/SECURITY_AUDIT_GUIDE.md
+Docs/Operations/RBN_DASHBOARD_ACCESS_GUIDE.md
+firebase/
+mac seed.rtf
+releases/

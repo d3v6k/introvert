@@ -1,0 +1,4 @@
+# ninja log v5
+0	60	1780374351131426362	CMakeFiles/bbhelper.dir/c++/directBufferAndroid.cpp.o	7c5fad908ec7279d
+60	136	1780374351204734391	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/4e4391zr/obj/x86_64/libbbhelper.so	709e6da5ad8042cf
+0	59	1780382003631544368	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/4e4391zr/obj/x86_64/libbbhelper.so	709e6da5ad8042cf

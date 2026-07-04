@@ -1,0 +1,21 @@
+[toolchain]
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+introvert_registry = "RBNRegXy4vQszN2Cg8gqf91mYyL24p8cT32d1mY1111"
+
+[programs.devnet]
+introvert_registry = "RBNRegXy4vQszN2Cg8gqf91mYyL24p8cT32d1mY1111"
+
+[registry]
+url = "https://anchor.projectserum.com"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "echo 'No tests configured yet'"

@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "programs/introvert_registry"
+]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1

@@ -1,0 +1,73 @@
+use libp2p::{Multiaddr, PeerId};
+use std::net::ToSocketAddrs;
+
+/// Returns a list of Root Bootstrap Nodes (RBNs).
+/// These nodes provide initial entry points into the Sovereign P2P network.
+pub fn get_bootstrap_nodes() -> Vec<(PeerId, Multiaddr)> {
+    if std::env::var("INTROVERT_SKIP_BOOTSTRAP").is_ok() {
+        return Vec::new();
+    }
+    let mut nodes = vec![
+        // Introvert Global Root Bootstrap Node (RBN) - Port 443 (HTTPS Bypass)
+        ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/443".to_string()),
+        ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/udp/443/quic-v1".to_string()),
+        // Port 80 fallback (corporate firewalls, captive portals)
+        ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/80".to_string()),
+        // Additional RBNs can be added via INTROVERT_EXTRA_BOOTSTRAP env-var.
+    ];
+
+    // NAT64 Resolution: Resolve the wildcard DNS to support IPv6-only cellular networks
+    let rbn_pid = "12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a";
+    if let Ok(addrs) = ("47.89.252.80.sslip.io", 443).to_socket_addrs() {
+        for addr in addrs {
+            let ip = addr.ip();
+            // Avoid adding duplicate IPv4 if it was resolved
+            if ip.is_ipv4() && ip.to_string() == "47.89.252.80" {
+                continue;
+            }
+            let ip_str = ip.to_string();
+            let (tcp_addr, udp_addr) = if ip.is_ipv4() {
+                (format!("/ip4/{}/tcp/443", ip_str), format!("/ip4/{}/udp/443/quic-v1", ip_str))
+            } else {
+                (format!("/ip6/{}/tcp/443", ip_str), format!("/ip6/{}/udp/443/quic-v1", ip_str))
+            };
+            nodes.push((rbn_pid.to_string(), tcp_addr));
+            nodes.push((rbn_pid.to_string(), udp_addr));
+        }
+    }
+
+    // Support for extra bootstrap nodes via environment variable
+    // Format: "PID1:ADDR1,PID2:ADDR2"
+    if let Ok(extra) = std::env::var("INTROVERT_EXTRA_BOOTSTRAP") {
+        for entry in extra.split(',') {
+            if let Some((pid, addr)) = entry.split_once(':') {
+                nodes.push((pid.to_string(), addr.to_string()));
+            }
+        }
+    }
+
+    nodes.iter().filter_map(|(pid_str, addr_str)| {
+        let pid = pid_str.parse::<PeerId>().ok()?;
+        let addr = addr_str.parse::<Multiaddr>().ok()?;
+        if is_private_address(&addr) {
+            return None;
+        }
+        Some((pid, addr))
+    }).collect()
+}
+
+/// Checks if a Multiaddr belongs to a private/local IP address range.
+pub fn is_private_address(addr: &Multiaddr) -> bool {
+    let s = addr.to_string();
+    if s.contains("192.168.") || s.contains("10.") {
+        return true;
+    }
+    if s.contains("172.") {
+        for octet in 16..=31 {
+            if s.contains(&format!("172.{}.", octet)) {
+                return true;
+            }
+        }
+    }
+    false
+}

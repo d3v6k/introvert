@@ -1,0 +1,3 @@
+/Users/dev/Development/introvert/plugins/pdf_render_maintained/android/.cxx/Debug/3t602h4k/x86/CMakeFiles/bbhelper.dir
+/Users/dev/Development/introvert/plugins/pdf_render_maintained/android/.cxx/Debug/3t602h4k/x86/CMakeFiles/edit_cache.dir
+/Users/dev/Development/introvert/plugins/pdf_render_maintained/android/.cxx/Debug/3t602h4k/x86/CMakeFiles/rebuild_cache.dir
