@@ -1,5 +1,7 @@
 # Introvert: Open-Source, Sovereign P2P Mesh Network
 
+**Version:** 0.1.0 | **Status:** Beta | **Last Updated:** 2026-07-05
+
 Introvert is a privacy-focused, decentralized communication system that eliminates central servers entirely. Operating via a crowdsourced, self-healing Peer-to-Peer (P2P) mesh network, it ensures zero-knowledge, autonomous, and censorship-resistant utility for global users.
 
 ---
@@ -8,7 +10,7 @@ Introvert is a privacy-focused, decentralized communication system that eliminat
 
 ### 1. 📂 Open Source & Peer-to-Peer (P2P)
 *   **100% Transparent Codebase:** The entire core (Rust) and client UI (Flutter) are open-source, allowing auditability and eliminating hidden backdoors.
-*   **Serverless Network Swarm:** Utilizes standard libp2p configurations to routing events directly between edge peers, avoiding centralized hops or single points of failure.
+*   **Serverless Network Swarm:** Utilizes standard libp2p configurations to route events directly between edge peers, avoiding centralized hops or single points of failure.
 
 ### 2. 🔐 End-to-End Encryption (E2EE)
 *   **Cryptographic Sovereignty:** All messaging, file transfers, and group chats are encrypted locally before transmission using the Noise Protocol framework (`Noise_IK_25519_ChaChaPoly_BLAKE2s`) and AES-256-GCM. Intermediary nodes relay ciphertext without any visibility into plaintext or keys.
@@ -37,5 +39,15 @@ Introvert is a privacy-focused, decentralized communication system that eliminat
 *   **User Interface:** Flutter (Dart) with a high-performance native FFI bridge
 *   **Governance:** Squads V4 (3-of-5) Multisig for program upgrade authority
 *   **Staking PDA:** Unified keyless escrow registry on Solana Mainnet
+
+---
+
+## 📥 Download
+
+| Platform | Link |
+|----------|------|
+| Android | [app-release.apk](https://github.com/d3v6k/introvert/releases/download/v0.1.0/app-release.apk) |
+| macOS | [Introvert-macOS.zip](https://github.com/d3v6k/introvert/releases/download/v0.1.0/Introvert-macOS.zip) |
+| Linux | [Introvert-Linux.tar.gz](https://github.com/d3v6k/introvert/releases/download/v0.1.0/Introvert-Linux.tar.gz) |
 
 For details on configuration and build steps, refer to [Docs/README.md](./Docs/README.md).
