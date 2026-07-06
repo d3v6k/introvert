@@ -805,6 +805,18 @@ impl NetworkService {
                         let _ = self.swarm.dial(addr.clone());
                     }
 
+                    // Sweep RAM-buffered FileChunks to DB for restart survival
+                    for (recipient, payloads) in &self.pending_messages {
+                        let peer_str = recipient.to_string();
+                        for payload in payloads {
+                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
+                                if let Ok(chunk_data) = base64::decode(data_base64) {
+                                    let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer_str, *chunk_index, &chunk_data);
+                                }
+                            }
+                        }
+                    }
+
                     // Flush pending messages periodically (every 30 seconds)
                     let all_pending: Vec<(PeerId, Vec<SignalingPayload>)> = self.pending_messages.drain().collect();
                     for (recipient, payloads) in all_pending {
@@ -1972,9 +1984,16 @@ impl NetworkService {
                                 }
                             }
 
-                            if is_file_chunk {
-                                // Pull model: receiver will retry via FileChunkRequest — don't re-queue
-                                info!("[Mesh] FileChunk/Request send failed for {}. Receiver will re-request via pull model.", peer);
+                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
+                                // Re-queue to DB for retry on next circuit establishment or periodic flush.
+                                // increment_chunk_retry already called above — chunk auto-evicts at 5 retries.
+                                if let Ok(chunk_data) = base64::decode(data_base64) {
+                                    info!("[Mesh] FileChunk send failed for {}. Persisting to DB for retry.", peer);
+                                    let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer.to_string(), chunk_index, &chunk_data);
+                                }
+                            } else if is_file_chunk {
+                                // FileChunkRequest: tiny control message, receiver will regenerate — drop it.
+                                debug!("[Mesh] FileChunkRequest send failed for {}. Receiver will re-request.", peer);
                             } else if is_unexpected_eof && is_sent_to_anchor {
                                 info!("[Mesh] Outbound failure to anchor {} was UnexpectedEof. Bypassing re-queue as anchor likely processed it.", peer);
                             } else {
@@ -2069,9 +2088,12 @@ impl NetworkService {
                     IntrovertBehaviourEvent::RequestResponseV2(request_response::Event::OutboundFailure { request_id, peer, error, .. }) => {
                         warn!("[Codec] v2 OutboundFailure to {}: {:?}", peer, error);
                         if let Some((_, payload)) = self.outbound_tracker.remove(&request_id) {
-                            // PRIORITY 4: Increment retry count for failed v2 file chunks
-                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
+                            // Increment retry count for failed v2 file chunks and re-queue to DB
+                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
                                 let _ = self.storage.increment_chunk_retry(transfer_id, chunk_index, 5);
+                                if let Ok(chunk_data) = base64::decode(data_base64) {
+                                    let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer.to_string(), chunk_index, &chunk_data);
+                                }
                             }
                         }
                         if let Some(count) = self.inflight_requests.get_mut(&peer) {
@@ -2797,6 +2819,12 @@ impl NetworkService {
                 }
             }
             self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
+            // Also persist to DB so chunks survive app restart
+            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
+                if let Ok(chunk_data) = base64::decode(data_base64) {
+                    let _ = self.storage.enqueue_pending_chunk(transfer_id, &recipient_str, chunk_index, &chunk_data);
+                }
+            }
             return Ok(());
         }
 

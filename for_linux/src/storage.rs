@@ -941,6 +941,28 @@ impl StorageService {
         Ok(count > 0)
     }
 
+    /// Increment retry count for a pending chunk. Returns the new count.
+    /// If max_retries is exceeded, deletes the chunk to prevent infinite retry loops.
+    pub fn increment_chunk_retry(&self, transfer_id: &str, chunk_index: u32, max_retries: i32) -> Result<i32> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE pending_file_chunks SET retry_count = retry_count + 1 WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+        )?;
+        let new_count: i32 = conn.query_row(
+            "SELECT retry_count FROM pending_file_chunks WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        if new_count >= max_retries {
+            conn.execute(
+                "DELETE FROM pending_file_chunks WHERE transfer_id = ?1 AND chunk_index = ?2",
+                params![transfer_id, chunk_index as i32],
+            )?;
+        }
+        Ok(new_count)
+    }
+
     /// Fetch sent messages stuck at status=0 (Sent) older than `age_secs` seconds.
     /// Returns (msg_id, peer_id, content, reply_to) for retry.
     pub fn fetch_undelivered_messages(&self, age_secs: i64) -> Result<Vec<(String, String, String, Option<String>)>> {
