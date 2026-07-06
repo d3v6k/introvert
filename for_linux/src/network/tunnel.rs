@@ -85,8 +85,8 @@ async fn bridge_tcp_to_ws(tcp_stream: TcpStream, remote_ws_url: String) -> Resul
 /// Starts the RBN daemon-side WebSocket server that accepts tunnel connections and proxies them to the local libp2p port.
 pub fn start_tunnel_server(listen_port: u16, local_libp2p_port: u16) -> tokio::task::JoinHandle<Result<()>> {
     tokio::spawn(async move {
-        // SECURITY: Bind to localhost only — prevents external access to WebSocket tunnel
-        let addr = SocketAddr::from(([127, 0, 0, 1], listen_port));
+        // Allow external clients to connect to the WebSocket tunnel fallback
+        let addr = SocketAddr::from(([0, 0, 0, 0], listen_port));
         let listener = TcpListener::bind(addr).await?;
         info!("[Tunnel Server] Listening on {} proxying to local libp2p port {}", addr, local_libp2p_port);
 

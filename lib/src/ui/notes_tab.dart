@@ -213,6 +213,7 @@ class _NotesTabState extends State<NotesTab> with AutomaticKeepAliveClientMixin 
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 100),
         child: FloatingActionButton(
+          heroTag: null,
           onPressed: _createNote,
           backgroundColor: AppTheme.current.accent,
           child: Icon(Icons.add, color: Colors.black),

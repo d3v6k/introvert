@@ -32,10 +32,12 @@ pub struct NetworkService {
     pub(crate) discovered_anchors: Vec<PeerId>,
     pub(crate) mesh_active_peers: HashSet<PeerId>,
     pub(crate) is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>>,
+    pub(crate) connectivity_type: u8,
     pub(crate) direct_conn_count: HashMap<PeerId, usize>,
     pub(crate) relay_reservations: HashSet<PeerId>,
     pub(crate) relay_listeners: HashMap<ListenerId, PeerId>,
     pub(crate) relay_dial_limiter: HashMap<PeerId, (Instant, u32)>, // (last_attempt, failure_count)
+    pub(crate) last_file_chunk_dial: HashMap<PeerId, Instant>,     // Phase 3.4: file chunk dial cooldown
     pub(crate) outbound_tracker: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
     pub(crate) peer_supports_v2: HashSet<PeerId>,
     pub(crate) outbound_tracker_v2: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
@@ -47,6 +49,8 @@ pub struct NetworkService {
     pub(crate) anchor_mappings: HashMap<PeerId, Multiaddr>,
     pub(crate) bootstrap_nodes: Vec<(PeerId, Multiaddr)>,
     pub(crate) _tunnel_handle: Option<tokio::task::JoinHandle<Result<(), anyhow::Error>>>,
+    pub(crate) tunnel_active: bool,
+    pub(crate) tunnel_started_at: Option<Instant>,
     pub(crate) pending_diagnostics: HashMap<PeerId, PendingDiagnostic>,
     pub(crate) registry: registry::RegistryManager,
     pub(crate) pending_claims: HashMap<String, HashSet<String>>,
@@ -69,6 +73,16 @@ pub struct NetworkService {
     pub(crate) last_ack_flush: Instant,
     pub(crate) rbn_latencies: Arc<RwLock<HashMap<PeerId, u128>>>,
     pub(crate) pending_manual_rbns: Arc<RwLock<HashMap<Multiaddr, String>>>,
+    /// Verified RBNs trusted for persistent mailbox storage.
+    /// Populated from bootstrap_nodes (hardcoded) and future Solana registry.
+    pub(crate) verified_rbns: HashSet<PeerId>,
+    /// Chat syncs currently in progress (chat_id -> timestamp when sync started)
+    pub(crate) sync_in_progress: HashMap<String, Instant>,
+    /// Relay hints from FileChunkRequest: peer_id -> RBN peer_id they're behind
+    /// Used to prioritize which RBN to dial when sending file chunks
+    pub(crate) relay_hints: HashMap<PeerId, PeerId>,
+    /// Last time telemetry was sent to RBN (for cooldown tracking)
+    pub(crate) last_telemetry_sent: Instant,
 }
 
 #[derive(Debug, Clone)]

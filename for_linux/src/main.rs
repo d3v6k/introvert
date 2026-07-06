@@ -194,7 +194,7 @@ async fn main() -> anyhow::Result<()> {
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
                 "https://api.devnet.solana.com",
-                "NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn",
+                "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
                 "https://api.introvert.network/claim",
             ) {
                 Ok(c) => c,
@@ -269,7 +269,7 @@ async fn main() -> anyhow::Result<()> {
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
                 "https://api.devnet.solana.com",
-                "NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn",
+                "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
                 "https://api.introvert.network/claim",
             ) {
                 Ok(c) => std::sync::Arc::new(c),

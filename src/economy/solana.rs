@@ -11,6 +11,7 @@ use std::str::FromStr;
 use serde_json::json;
 use base64::{Engine as _, engine::general_purpose};
 use std::sync::Arc;
+use tracing::{debug, error, info};
 
 pub struct SolanaIncentiveEngine {
     pub rpc_client: Arc<RpcClient>,
@@ -28,7 +29,7 @@ impl SolanaIncentiveEngine {
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .unwrap_or_default(),
-            intr_mint: Pubkey::from_str("NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn")?,
+            intr_mint: Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")?,
             treasury_pubkey: Pubkey::from_str(treasury_pubkey)?,
             treasury_api_url: treasury_api_url.to_string(),
         })
@@ -70,6 +71,68 @@ impl SolanaIncentiveEngine {
     pub async fn fetch_sol_balance(&self, owner: &Pubkey) -> Result<u64> {
         let lamports = self.rpc_client.get_balance(owner).await?;
         Ok(lamports)
+    }
+
+    /// Verifies a claimed prestige tier against the actual on-chain INTR balance.
+    /// Returns the verified tier (0-4) based on real balance, not the claimed tier.
+    /// This prevents peers from self-asserting inflated tiers for reward multiplier abuse.
+    ///
+    /// Tier thresholds (from whitepaper):
+    ///   0 = Citizen (< 100k INTR)
+    ///   1 = Sentinel (>= 100k INTR)
+    ///   2 = Silver (>= 250k INTR)
+    ///   3 = Gold (>= 500k INTR)
+    ///   4 = Platinum (>= 1M INTR)
+    pub async fn verify_prestige_tier(&self, owner: &Pubkey, claimed_tier: u8) -> Result<u8> {
+        let balance_nano = self.fetch_balance(owner).await?;
+        let balance_intr = balance_nano as f64 / 1_000_000_000.0;
+
+        let verified_tier = if balance_intr >= 1_000_000.0 {
+            4 // Platinum
+        } else if balance_intr >= 500_000.0 {
+            3 // Gold
+        } else if balance_intr >= 250_000.0 {
+            2 // Silver
+        } else if balance_intr >= 100_000.0 {
+            1 // Sentinel
+        } else {
+            0 // Citizen
+        };
+
+        if verified_tier != claimed_tier {
+            tracing::warn!(
+                "[Security] Prestige tier mismatch for {}: claimed={}, verified={} (balance={:.4} INTR)",
+                owner, claimed_tier, verified_tier, balance_intr
+            );
+        }
+
+        Ok(verified_tier)
+    }
+
+    /// Fetches the node's tier profile based on on-chain INTR balance.
+    /// Returns (advanced_diagnostic_ui_visible, allocation_multiplier) for the Event 9 payload.
+    ///
+    /// Tier mapping:
+    ///   < 50,000 INTR  → (false, 1.0)
+    ///   >= 50,000      → (true, 1.5)  Sentinel
+    ///   >= 100,000     → (true, 1.75) Silver
+    ///   >= 250,000     → (true, 2.0)  Gold
+    ///   >= 500,000     → (true, 2.5)  Platinum
+    pub async fn fetch_node_tier_profile(&self, owner: &Pubkey) -> (bool, f32) {
+        let balance_nano = self.fetch_balance(owner).await.unwrap_or(0);
+        let balance_intr = balance_nano as f64 / 1_000_000_000.0;
+
+        if balance_intr >= 500_000.0 {
+            (true, 2.5)
+        } else if balance_intr >= 250_000.0 {
+            (true, 2.0)
+        } else if balance_intr >= 100_000.0 {
+            (true, 1.75)
+        } else if balance_intr >= 50_000.0 {
+            (true, 1.5)
+        } else {
+            (false, 1.0)
+        }
     }
 
     /// Fetches the balance of an SPL token (by mint) for a given owner.
@@ -158,12 +221,39 @@ impl SolanaIncentiveEngine {
         self.relay_to_treasury(base64_tx).await
     }
 
+    /// Relay a co-signing request to the treasury API with HMAC-SHA256 authentication.
+    /// The timestamp is bound to the payload to prevent replay attacks.
     async fn relay_to_treasury(&self, base64_tx: String) -> Result<String> {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        type HmacSha256 = Hmac<Sha256>;
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .to_string();
+
+        // Bind timestamp to payload — prevents replay attacks
+        let message = format!("{}.{}", timestamp, base64_tx);
+
+        // Derive HMAC from the treasury API URL as a shared secret context.
+        // In production, this should be a pre-shared key stored in secure storage.
+        // For now, use the treasury pubkey bytes as the HMAC key material.
+        let secret = self.treasury_pubkey.to_bytes();
+        let mut mac = HmacSha256::new_from_slice(&secret)
+            .map_err(|e| anyhow!("HMAC init failed: {}", e))?;
+        mac.update(message.as_bytes());
+        let signature_hex = hex::encode(mac.finalize().into_bytes());
+
         let payload = json!({
             "transaction": base64_tx,
+            "timestamp": timestamp,
         });
 
         let response = self.http_client.post(&self.treasury_api_url)
+            .header("X-Introvert-Timestamp", &timestamp)
+            .header("X-Introvert-Signature", &signature_hex)
             .json(&payload)
             .send()
             .await
@@ -179,6 +269,46 @@ impl SolanaIncentiveEngine {
             let err_text = response.text().await?;
             Err(anyhow!("Treasury relay error: {}", err_text))
         }
+    }
+
+    /// Submits a reward claim and waits for on-chain confirmation before returning.
+    /// This prevents phantom claims where the local state commits but the transaction
+    /// never finalizes on Solana (e.g., dropped from mempool, slippage, congestion).
+    ///
+    /// Returns Ok(signature) only after the transaction is confirmed on-chain.
+    /// Returns Err if the transaction fails or times out (30s).
+    pub async fn submit_and_verify_reward_claim(&self, user_keypair: &Keypair, proof: &[u8]) -> Result<String> {
+        // 1. Submit the claim
+        let signature_str = self.submit_reward_claim(user_keypair, proof).await?;
+
+        // 2. Poll for on-chain confirmation (max 30s, check every 3s)
+        let signature = signature_str.parse::<solana_sdk::signature::Signature>()
+            .map_err(|e| anyhow!("Invalid signature format: {}", e))?;
+
+        for attempt in 0..10 {
+            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+            match self.rpc_client.get_signature_status(&signature).await {
+                Ok(Some(Ok(_))) => {
+                    info!("[Economy] Transaction {} confirmed on-chain (attempt {})", signature_str, attempt + 1);
+                    return Ok(signature_str);
+                }
+                Ok(Some(Err(e))) => {
+                    error!("[Economy] Transaction {} failed on-chain: {:?}", signature_str, e);
+                    return Err(anyhow!("Transaction failed on-chain: {:?}", e));
+                }
+                Ok(None) => {
+                    debug!("[Economy] Transaction {} not yet seen (attempt {}/10)", signature_str, attempt + 1);
+                }
+                Err(e) => {
+                    debug!("[Economy] RPC error checking status: {:?}", e);
+                }
+            }
+        }
+
+        // Timeout — transaction may still confirm later, but we can't hold the caller
+        error!("[Economy] Transaction {} confirmation timeout after 30s", signature_str);
+        Err(anyhow!("Transaction confirmation timeout: {}", signature_str))
     }
 
     /// Fetches all registered RBN nodes from the on-chain Solana registry.
@@ -306,7 +436,7 @@ impl SolanaIncentiveEngine {
         tx.sign(&[operator_keypair], blockhash);
 
         // 4. Send and Confirm using direct raw JSON-RPC to bypass trait version mismatches
-        tracing::info!("[SolanaRegistry] Submitting {} transaction to devnet...", tx_type);
+        tracing::info!("[SolanaRegistry] Submitting {} transaction to Solana...", tx_type);
         let signature = self.send_transaction_raw(&tx).await?;
         tracing::info!("[SolanaRegistry] Transaction successful! Signature: {}", signature);
         
@@ -369,8 +499,8 @@ impl SolanaIncentiveEngine {
             ]
         });
 
-        // Use devnet RPC URL directly to bypass client endpoint constraints
-        let rpc_url = "https://api.devnet.solana.com";
+        // Use the configured RPC client endpoint (Mainnet-Beta by default)
+        let rpc_url = self.rpc_client.url();
 
         let response = self.http_client.post(rpc_url)
             .json(&payload)

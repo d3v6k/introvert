@@ -2,13 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../native/introvert_client.dart';
 import '../../theme/app_theme.dart';
 import '../../blueprint_ui.dart';
-
 
 class DriveTab extends StatefulWidget {
   const DriveTab({super.key});
@@ -23,15 +26,21 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
   List<dynamic> _allFiles = [];
   List<dynamic> _filteredFiles = [];
   String _searchQuery = '';
-  int _seedingCount = 0;
-  int _sovereignRemaining = 0;
   bool _isLoading = true;
   bool _isDisposing = false;
+  bool _isGridView = false;
+  bool _isMultiSelect = false;
+  Set<String> _selectedHashes = {};
   Timer? _refreshTimer;
   Map<String, FileTransferProgress> _activeTransfers = {};
   Map<String, dynamic>? _swarmStats;
   StreamSubscription? _networkSubscription;
   StreamSubscription? _swarmSubscription;
+
+  // Folder state
+  String _currentFolder = '';
+  final List<String> _breadcrumb = ['Drive'];
+  Map<String, List<dynamic>> _folderGroups = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -39,14 +48,577 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
   @override
   void initState() {
     super.initState();
-    _initPath();
-    _loadFiles();
+    _initDrive();
     _startListeners();
-    _refreshTimer = Timer.periodic(Duration(seconds: 120), (_) => _loadFiles()); // 2 min (FCM replaces frequent polling)
+    _refreshTimer = Timer.periodic(Duration(seconds: 60), (_) => _loadFiles());
   }
 
-  Future<void> _initPath() async {
-    // Path initialization - ready for future use
+  Future<void> _initDrive() async {
+    await _seedIntrovertExplained();
+    _loadFiles();
+  }
+
+  Future<void> _seedIntrovertExplained() async {
+    try {
+      final existing = _client.driveGetAll();
+      final hasExplained = existing.any((f) =>
+          (f['filename']?.toString() ?? '').contains('Sovereign_Login') ||
+          (f['local_path']?.toString() ?? '').contains('Introvert Explained'));
+      if (hasExplained) return;
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final explainedDir = Directory('${appDir.path}/Introvert Explained');
+      if (!explainedDir.existsSync()) await explainedDir.create(recursive: true);
+
+      const assets = [
+        'assets/images/introvert_explained/Account_Prestige_and_Point_Telemetry.png',
+        'assets/images/introvert_explained/Off-Grid_Messaging_Delivery_Manual.png',
+        'assets/images/introvert_explained/Self-Healing_Swarm_Resilience_Guide.png',
+        'assets/images/introvert_explained/Sovereign_Login_and_Security_Anatomy.png',
+      ];
+
+      for (final assetPath in assets) {
+        final filename = assetPath.split('/').last;
+        final destPath = '${explainedDir.path}/$filename';
+        final destFile = File(destPath);
+        if (!destFile.existsSync()) {
+          final bytes = await rootBundle.load(assetPath);
+          await destFile.writeAsBytes(bytes.buffer.asUint8List());
+        }
+        final fileBytes = await destFile.readAsBytes();
+        final hash = sha256.convert(fileBytes).toString();
+        _client.driveAddFile(filename, hash, 'image/png', fileBytes.length, destPath);
+      }
+    } catch (e) {
+      debugPrint('[Drive] Failed to seed Introvert Explained: $e');
+    }
+  }
+
+  void _startListeners() {
+    // Drive tab doesn't need network listeners
+  }
+
+  void _loadFiles() {
+    if (_isDisposing) return;
+    try {
+      final files = _client.driveGetAll();
+      if (mounted) {
+        setState(() {
+          _allFiles = files;
+          _applyFilter();
+          _buildFolderGroups();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[Drive] Load error: $e');
+    }
+  }
+
+  void _applyFilter() {
+    if (_searchQuery.isEmpty) {
+      _filteredFiles = List.from(_allFiles);
+    } else {
+      final q = _searchQuery.toLowerCase();
+      _filteredFiles = _allFiles.where((f) =>
+          (f['filename']?.toString().toLowerCase() ?? '').contains(q) ||
+          (f['folder']?.toString().toLowerCase() ?? '').contains(q)).toList();
+    }
+  }
+
+  void _buildFolderGroups() {
+    _folderGroups.clear();
+    for (final file in _filteredFiles) {
+      String folder = file['folder']?.toString() ?? '';
+      if (folder.isEmpty) folder = 'Uploads';
+      _folderGroups.putIfAbsent(folder, () => []).add(file);
+    }
+    // Sort: Introvert Explained first, then alphabetical
+    final sorted = _folderGroups.keys.toList()..sort((a, b) {
+      if (a == 'Introvert Explained') return -1;
+      if (b == 'Introvert Explained') return 1;
+      return a.compareTo(b);
+    });
+    final newGroups = <String, List<dynamic>>{};
+    for (final k in sorted) {
+      newGroups[k] = _folderGroups[k]!;
+    }
+    _folderGroups = newGroups;
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  IconData _getFileIcon(String mime) {
+    if (mime.startsWith('image/')) return Icons.image_rounded;
+    if (mime.startsWith('video/')) return Icons.videocam_rounded;
+    if (mime.startsWith('audio/')) return Icons.audiotrack_rounded;
+    if (mime.contains('pdf')) return Icons.picture_as_pdf_rounded;
+    if (mime.contains('zip') || mime.contains('archive')) return Icons.folder_zip_rounded;
+    return Icons.insert_drive_file_rounded;
+  }
+
+  Color _getFileColor(String mime) {
+    if (mime.startsWith('image/')) return Colors.greenAccent;
+    if (mime.startsWith('video/')) return Colors.redAccent;
+    if (mime.startsWith('audio/')) return Colors.orangeAccent;
+    if (mime.contains('pdf')) return Colors.redAccent;
+    return Colors.blueAccent;
+  }
+
+  void _navigateToFolder(String folder) {
+    setState(() {
+      _currentFolder = folder;
+      _breadcrumb.add(folder);
+      _filteredFiles = _folderGroups[folder] ?? [];
+    });
+  }
+
+  void _navigateBack() {
+    if (_breadcrumb.length > 1) {
+      setState(() {
+        _breadcrumb.removeLast();
+        _currentFolder = _breadcrumb.last;
+        if (_currentFolder == 'Drive') {
+          _filteredFiles = List.from(_allFiles);
+          _buildFolderGroups();
+        } else {
+          _filteredFiles = _folderGroups[_currentFolder] ?? [];
+        }
+      });
+    }
+  }
+
+  void _toggleMultiSelect() {
+    setState(() {
+      _isMultiSelect = !_isMultiSelect;
+      if (!_isMultiSelect) _selectedHashes.clear();
+    });
+  }
+
+  void _toggleSelection(String hash) {
+    setState(() {
+      if (_selectedHashes.contains(hash)) {
+        _selectedHashes.remove(hash);
+      } else {
+        _selectedHashes.add(hash);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      _selectedHashes = _filteredFiles.map((f) => f['file_hash']?.toString() ?? '').toSet();
+    });
+  }
+
+  void _deleteSelected() {
+    if (_selectedHashes.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete ${_selectedHashes.length} files?'),
+        content: Text('This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              for (final hash in _selectedHashes) {
+                _client.driveDelete(hash);
+              }
+              Navigator.pop(ctx);
+              _toggleMultiSelect();
+              _loadFiles();
+            },
+            child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _moveSelectedToFolder() {
+    if (_selectedHashes.isEmpty) return;
+    final folders = _folderGroups.keys.where((f) => f != _currentFolder).toList();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Move to folder'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: folders.length,
+            itemBuilder: (ctx, i) => ListTile(
+              leading: Icon(Icons.folder_rounded, color: Colors.amberAccent),
+              title: Text(folders[i]),
+              onTap: () {
+                for (final hash in _selectedHashes) {
+                  _client.driveUpdateFolder(hash, folders[i]);
+                }
+                Navigator.pop(ctx);
+                _toggleMultiSelect();
+                _loadFiles();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _shareSelectedFiles() {
+    if (_selectedHashes.isEmpty) return;
+    final paths = _allFiles
+        .where((f) => _selectedHashes.contains(f['file_hash']))
+        .map((f) => f['local_path']?.toString() ?? '')
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (paths.isNotEmpty) {
+      Share.shareXFiles(paths.map((p) => XFile(p)).toList());
+    }
+  }
+
+  Widget _buildBreadcrumb() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          for (int i = 0; i < _breadcrumb.length; i++) ...[
+            if (i > 0) Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.current.mutedText),
+            GestureDetector(
+              onTap: () {
+                if (i < _breadcrumb.length - 1) {
+                  setState(() {
+                    _breadcrumb.removeRange(i + 1, _breadcrumb.length);
+                    _currentFolder = _breadcrumb.last;
+                    if (_currentFolder == 'Drive') {
+                      _filteredFiles = List.from(_allFiles);
+                      _buildFolderGroups();
+                    } else {
+                      _filteredFiles = _folderGroups[_currentFolder] ?? [];
+                    }
+                  });
+                }
+              },
+              child: Text(
+                _breadcrumb[i],
+                style: TextStyle(
+                  color: i == _breadcrumb.length - 1 ? AppTheme.current.accent : AppTheme.current.mutedText,
+                  fontWeight: i == _breadcrumb.length - 1 ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStorageBar() {
+    final totalSize = _allFiles.fold<int>(0, (sum, f) => sum + ((f['total_size'] as int?) ?? 0));
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.current.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Storage', style: TextStyle(fontSize: 12, color: AppTheme.current.mutedText)),
+              Text('${_formatFileSize(totalSize)} used', style: TextStyle(fontSize: 12, color: AppTheme.current.accent)),
+            ],
+          ),
+          SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: (totalSize / (1024 * 1024 * 1024)).clamp(0.0, 1.0),
+            backgroundColor: AppTheme.current.surface,
+            valueColor: AlwaysStoppedAnimation(AppTheme.current.accent),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFolderView() {
+    if (_currentFolder.isNotEmpty && _currentFolder != 'Drive') {
+      return _buildFileList(_filteredFiles);
+    }
+
+    return ListView(
+      children: [
+        _buildStorageBar(),
+        ..._folderGroups.entries.map((entry) {
+          final folderName = entry.key;
+          final files = entry.value;
+          final totalSize = files.fold<int>(0, (sum, f) => sum + ((f['total_size'] as int?) ?? 0));
+          final isExplained = folderName == 'Introvert Explained';
+
+          return Container(
+            margin: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: isExplained
+                  ? AppTheme.current.accent.withValues(alpha: 0.08)
+                  : AppTheme.current.surface.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: isExplained
+                  ? Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3))
+                  : null,
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded: isExplained,
+                leading: Icon(
+                  isExplained ? Icons.auto_stories_rounded : Icons.folder_rounded,
+                  color: isExplained ? AppTheme.current.accent : Colors.amberAccent,
+                ),
+                title: Text(folderName, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                subtitle: Text('${files.length} files • ${_formatFileSize(totalSize)}',
+                    style: TextStyle(fontSize: 11, color: AppTheme.current.mutedText)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isExplained)
+                      IconButton(
+                        icon: Icon(Icons.share_rounded, size: 18, color: AppTheme.current.mutedText),
+                        onPressed: () => _shareFolder(folderName, files),
+                        tooltip: 'Share folder',
+                      ),
+                    Icon(Icons.expand_more_rounded, color: AppTheme.current.mutedText),
+                  ],
+                ),
+                children: files.map((file) => _buildFileTile(file)).toList(),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildFileList(List<dynamic> files) {
+    if (_isGridView) {
+      return GridView.builder(
+        padding: EdgeInsets.all(12),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 0.8,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        itemCount: files.length,
+        itemBuilder: (ctx, i) => _buildFileGridItem(files[i]),
+      );
+    }
+    return ListView.builder(
+      padding: EdgeInsets.all(8),
+      itemCount: files.length,
+      itemBuilder: (ctx, i) => _buildFileTile(files[i]),
+    );
+  }
+
+  Widget _buildFileGridItem(dynamic file) {
+    final hash = file['file_hash']?.toString() ?? '';
+    final mime = file['mime_type']?.toString() ?? '';
+    final size = (file['total_size'] as int?) ?? 0;
+    final isSelected = _selectedHashes.contains(hash);
+
+    return GestureDetector(
+      onTap: () {
+        if (_isMultiSelect) {
+          _toggleSelection(hash);
+        } else {
+          _openFile(file);
+        }
+      },
+      onLongPress: () {
+        if (!_isMultiSelect) {
+          _toggleMultiSelect();
+          _toggleSelection(hash);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.current.accent.withValues(alpha: 0.15)
+              : AppTheme.current.surface.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected
+              ? Border.all(color: AppTheme.current.accent, width: 2)
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_isMultiSelect)
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(
+                    isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                    size: 20,
+                    color: isSelected ? AppTheme.current.accent : AppTheme.current.mutedText,
+                  ),
+                ),
+              ),
+            Icon(_getFileIcon(mime), size: 36, color: _getFileColor(mime)),
+            SizedBox(height: 8),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                file['filename']?.toString() ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11),
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(_formatFileSize(size), style: TextStyle(fontSize: 10, color: AppTheme.current.mutedText)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileTile(dynamic file) {
+    final hash = file['file_hash']?.toString() ?? '';
+    final mime = file['mime_type']?.toString() ?? '';
+    final size = (file['total_size'] as int?) ?? 0;
+    final isSelected = _selectedHashes.contains(hash);
+
+    return ListTile(
+      leading: _isMultiSelect
+          ? Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
+              color: isSelected ? AppTheme.current.accent : AppTheme.current.mutedText,
+            )
+          : Icon(_getFileIcon(mime), color: _getFileColor(mime)),
+      title: Text(file['filename']?.toString() ?? '', style: TextStyle(fontSize: 13)),
+      subtitle: Text(_formatFileSize(size), style: TextStyle(fontSize: 11, color: AppTheme.current.mutedText)),
+      trailing: _isMultiSelect ? null : PopupMenuButton(
+        icon: Icon(Icons.more_vert_rounded, size: 18, color: AppTheme.current.mutedText),
+        itemBuilder: (ctx) => [
+          PopupMenuItem(value: 'open', child: Text('Open')),
+          PopupMenuItem(value: 'move', child: Text('Move to folder')),
+          PopupMenuItem(value: 'share', child: Text('Share')),
+          PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.redAccent))),
+        ],
+        onSelected: (action) => _handleFileAction(action, file),
+      ),
+      onTap: () {
+        if (_isMultiSelect) {
+          _toggleSelection(hash);
+        } else {
+          _openFile(file);
+        }
+      },
+      onLongPress: () {
+        if (!_isMultiSelect) {
+          _toggleMultiSelect();
+          _toggleSelection(hash);
+        }
+      },
+    );
+  }
+
+  void _openFile(dynamic file) {
+    final path = file['local_path']?.toString() ?? '';
+    if (path.isNotEmpty && File(path).existsSync()) {
+      OpenFile.open(path);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('File not found on device')),
+      );
+    }
+  }
+
+  void _handleFileAction(String action, dynamic file) {
+    final hash = file['file_hash']?.toString() ?? '';
+    switch (action) {
+      case 'open':
+        _openFile(file);
+        break;
+      case 'move':
+        _selectedHashes = {hash};
+        _moveSelectedToFolder();
+        break;
+      case 'share':
+        final path = file['local_path']?.toString() ?? '';
+        if (path.isNotEmpty) Share.shareXFiles([XFile(path)]);
+        break;
+      case 'delete':
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text('Delete file?'),
+            content: Text('This action cannot be undone.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
+              TextButton(
+                onPressed: () {
+                  _client.driveDelete(hash);
+                  Navigator.pop(ctx);
+                  _loadFiles();
+                },
+                child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+              ),
+            ],
+          ),
+        );
+        break;
+    }
+  }
+
+  void _shareFolder(String folderName, List<dynamic> files) {
+    // Share folder manifest to a contact
+    final manifest = {
+      'type': 'folder_share',
+      'folder_name': folderName,
+      'files': files.map((f) => {
+        'filename': f['filename'],
+        'file_hash': f['file_hash'],
+        'mime_type': f['mime_type'],
+        'total_size': f['total_size'],
+      }).toList(),
+    };
+    Share.share(json.encode(manifest), subject: 'Folder: $folderName');
+  }
+
+  void _uploadFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+      if (result == null || result.files.isEmpty) return;
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final uploadDir = Directory('${appDir.path}/Uploads');
+      if (!uploadDir.existsSync()) await uploadDir.create(recursive: true);
+
+      for (final file in result.files) {
+        if (file.path == null) continue;
+        final srcFile = File(file.path!);
+        final destPath = '${uploadDir.path}/${file.name}';
+        await srcFile.copy(destPath);
+        final bytes = await File(destPath).readAsBytes();
+        final hash = sha256.convert(bytes).toString();
+        _client.driveAddFile(file.name, hash, file.extension ?? 'application/octet-stream', bytes.length, destPath);
+      }
+      _loadFiles();
+    } catch (e) {
+      debugPrint('[Drive] Upload error: $e');
+    }
   }
 
   @override
@@ -59,604 +631,95 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     super.dispose();
   }
 
-  void _startListeners() {
-    _swarmSubscription = _client.swarmStatsStream.listen((stats) {
-      if (mounted) {
-        setState(() => _swarmStats = stats);
-      }
-    });
-
-    _networkSubscription = _client.networkStream.listen((event) {
-      if (_isDisposing) return;
-      if (event.type == 12) {
-        try {
-          final progress = FileTransferProgress.fromJson(json.decode(utf8.decode(event.data)));
-          if (mounted) {
-            setState(() {
-              _activeTransfers[progress.transferId] = progress;
-              if (progress.isComplete) {
-                _loadFiles();
-                Future.delayed(Duration(seconds: 2), () {
-                  if (mounted) setState(() => _activeTransfers.remove(progress.transferId));
-                });
-              }
-            });
-          }
-        } catch (_) {}
-      }
-    });
-  }
-
-  Future<void> _loadFiles() async {
-    try {
-      _client.requestSwarmStats();
-      final files = _client.driveGetAll();
-      
-      // Move file existence checks to background isolate to avoid UI jank
-      final counts = await _countSeedingFiles(files, _client);
-      final seeding = counts['seeding'] ?? 0;
-      final used = counts['used'] ?? 0;
-
-      const int sovereignLimit = 1024 * 1024 * 1024; // 1GB
-      final remaining = (sovereignLimit - used).clamp(0, sovereignLimit);
-
-      if (mounted) {
-        setState(() {
-          _allFiles = files;
-          _seedingCount = seeding;
-          _sovereignRemaining = remaining;
-          _filterFiles(_searchController.text);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error loading drive files: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  static Future<Map<String, int>> _countSeedingFiles(List<dynamic> files, IntrovertClient client) async {
-    int seeding = 0;
-    int used = 0;
-    for (var f in files) {
-      final path = client.resolveSandboxPath(f['local_path']?.toString()) ?? "";
-      final size = f['total_size'] as int? ?? 0;
-      if (path.isNotEmpty && await File(path).exists()) {
-        seeding++;
-        used += size;
-      }
-    }
-    return {'seeding': seeding, 'used': used};
-  }
-
-  void _filterFiles(String query) {
-    _searchQuery = query;
-    if (query.isEmpty) {
-      _filteredFiles = List.from(_allFiles);
-    } else {
-      _filteredFiles = _allFiles.where((f) {
-        final name = f['filename']?.toString().toLowerCase() ?? "";
-        return name.contains(query.toLowerCase());
-      }).toList();
-    }
-  }
-
-  Future<void> _pickAndUpload() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final size = await file.length();
-      final filename = result.files.single.name;
-      
-      // In a real app, we might move the file to our encrypted storage first.
-      // For this prototype, we'll just add it to the Drive tracking.
-      _client.driveAddFile(filename, "manual_${DateTime.now().millisecondsSinceEpoch}", "application/octet-stream", size, file.path);
-      _loadFiles();
-    }
-  }
-
-  void _openFile(String name, String path) async {
-    final result = await OpenFile.open(path);
-    if (!mounted) return;
-    if (result.type != ResultType.done) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Cannot open file: ${result.message}"),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
-  }
-
-  void _forwardFileToChat(String name, String hash, String mime, int size, String path) {
-    final contacts = _client.getContacts();
-    final groups = _client.getAllGroups();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppTheme.current.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  "Forward \"$name\"",
-                  style: TextStyle(color: AppTheme.current.text, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1), height: 1),
-              if (contacts.isEmpty && groups.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Text("No active chats available.", style: TextStyle(color: AppTheme.current.mutedText)),
-                )
-              else
-                Expanded(
-                  child: ListView(
-                    children: [
-                      if (contacts.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text("DIRECT CHATS", style: TextStyle(color: AppTheme.current.accent, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
-                        ),
-                        ...contacts.map((c) {
-                          return Material(color: Colors.transparent, child: ListTile(
-                            leading: Icon(Icons.person, color: AppTheme.current.mutedText),
-                            title: Text(c['alias']?.toString().isNotEmpty == true ? c['alias'] : (c['global_name'] ?? c['peer_id']), style: TextStyle(color: AppTheme.current.text)),
-                            onTap: () {
-                              _client.sendFile(c['peer_id'], path);
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File forwarded to direct chat.", style: TextStyle(color: AppTheme.current.accent))));
-                            },
-                          ));
-                        }),
-                        ],
-                        if (groups.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text("MESH ROOMS", style: TextStyle(color: AppTheme.current.accent, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
-                        ),
-                        ...groups.map((g) {
-                          return Material(color: Colors.transparent, child: ListTile(
-                            leading: Icon(Icons.group, color: AppTheme.current.mutedText),
-                            title: Text(g[1].toString(), style: TextStyle(color: AppTheme.current.text)),
-                            onTap: () {
-                              final transferId = "gft_${hash}_${DateTime.now().millisecondsSinceEpoch}";
-                              // 1. Register Seeder
-                              _client.registerSeeder(transferId, path, hash, size, g[0]);
-
-                              // 2. Broadcast Manifest
-                              final manifest = '{"transfer_id":"$transferId","peer_id":"${_client.localPeerId}","filename":"$name","mime_type":"$mime","total_size":$size,"file_hash":"$hash","is_relayed":true,"group_id":"${g[0]}"}';
-                              _client.sendGroupMessage(g[0], "[FILE]:$manifest");
-
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("File forwarded to group.", style: TextStyle(color: AppTheme.current.accent))));
-                            },
-                          ));
-                        }),
-
-                      ],
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _pullFromMesh(String name, String hash, String mime, int size) {
-    // Generate a new transfer ID for this pull
-    final tid = "pull_${hash.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}";
-    _client.startPull("", tid, name, mime, hash, size, true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Requesting '$name' from mesh swarm...")),
-    );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return "0 B";
-    const suffixes = ["B", "KB", "MB", "GB", "TB"];
-    var i = (math.log(bytes) / math.log(1024)).floor();
-    return '${(bytes / math.pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
-  }
-
-  ({IconData icon, Color color}) _fileIcon(String name) {
-    final ext = name.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'png': case 'jpg': case 'jpeg': case 'gif': case 'webp':
-        return (icon: Icons.image_rounded, color: Colors.blueAccent);
-      case 'mp4': case 'mov': case 'avi': case 'mkv':
-        return (icon: Icons.videocam_rounded, color: Colors.purpleAccent);
-      case 'mp3': case 'wav': case 'm4a': case 'flac':
-        return (icon: Icons.audiotrack_rounded, color: Colors.orangeAccent);
-      case 'pdf':
-        return (icon: Icons.picture_as_pdf_rounded, color: Colors.redAccent);
-      case 'zip': case 'rar': case '7z': case 'tar': case 'gz':
-        return (icon: Icons.folder_zip_rounded, color: Colors.amberAccent);
-      case 'txt': case 'doc': case 'docx':
-        return (icon: Icons.description_rounded, color: Colors.blueGrey);
-      default:
-        return (icon: Icons.insert_drive_file_rounded, color: AppTheme.current.accent);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBody: true,      body: Column(
-        children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
-          _buildMeshCapacityCard(),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: AppTheme.current.text, fontSize: 13),
-              onChanged: (val) { setState(() => _filterFiles(val)); },
-              decoration: InputDecoration(
-                hintText: "Search Sovereign Drive...",
-                hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 13),
-                prefixIcon: Icon(Icons.search, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _filterFiles(''));
-                        },
-                        icon: Icon(Icons.clear, color: AppTheme.current.mutedText.withValues(alpha: 0.5), size: 18),
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.black26,
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
-            ),
-          ),
-          // Search results indicator
-          if (_searchQuery.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  Icon(Icons.search, size: 14, color: AppTheme.current.accent),
-                  SizedBox(width: 6),
-                  Text(
-                    '${_filteredFiles.length} result${_filteredFiles.length == 1 ? '' : 's'}',
-                    style: TextStyle(color: AppTheme.current.accent, fontSize: 12, fontWeight: FontWeight.w600),
+    return Column(
+      children: [
+        // Search bar
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search files...',
+                    prefixIcon: Icon(Icons.search_rounded, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    filled: true,
+                    fillColor: AppTheme.current.surface.withValues(alpha: 0.5),
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    isDense: true,
                   ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: _isLoading 
-                ? Center(child: CircularProgressIndicator(color: AppTheme.current.accent))
-                : _allFiles.isEmpty 
-                    ? _buildEmptyState()
-                    : _buildFileList(),
-          ),
-        ],
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 100),
-        child: FloatingActionButton(
-          onPressed: _pickAndUpload,
-          backgroundColor: AppTheme.current.accent,
-          child: Icon(Icons.add, color: Colors.black),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.cloud_off_rounded, size: 64, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-          SizedBox(height: 16),
-          Text(
-            "Sovereign Drive is Empty",
-            style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          Text(
-            "Upload files to persist them in your mesh.",
-            style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFileList() {
-    // Group files by folder
-    final Map<String, List<Map<String, dynamic>>> groups = {};
-    for (final f in _filteredFiles) {
-      if (f is! Map<String, dynamic>) continue;
-      final localPath = _client.resolveSandboxPath(f['local_path']?.toString()) ?? "";
-      String folderName = "Sovereign Root";
-      if (localPath.isNotEmpty) {
-        final parts = localPath.split('/');
-        if (parts.length > 2) {
-          folderName = parts[parts.length - 2].replaceAll('_', ' ');
-        }
-      }
-      groups.putIfAbsent(folderName, () => []).add(f);
-    }
-
-    final sortedFolders = groups.keys.toList()..sort((a, b) {
-      if (a == "Sovereign Root") return -1;
-      if (b == "Sovereign Root") return 1;
-      return a.compareTo(b);
-    });
-
-    return ListView.builder(
-      itemCount: sortedFolders.length,
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      itemBuilder: (context, folderIdx) {
-        final folderName = sortedFolders[folderIdx];
-        final folderFiles = groups[folderName]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  Icon(Icons.folder_open_rounded, color: AppTheme.current.accent.withValues(alpha: 0.5), size: 16),
-                  SizedBox(width: 8),
-                  Text(
-                    folderName.toUpperCase(),
-                    style: TextStyle(color: AppTheme.current.accent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-                  ),
-                ],
-              ),
-            ),
-            ...folderFiles.map((f) {
-              final name = f['filename']?.toString() ?? "Unknown";
-              final hash = f['file_hash']?.toString() ?? "";
-              final size = f['total_size'] as int? ?? 0;
-              final isBackedUp = f['is_backed_up'] == true;
-              final localPath = _client.resolveSandboxPath(f['local_path']?.toString()) ?? "";
-              final (:icon, :color) = _fileIcon(name);
-              
-              bool exists = false;
-              if (localPath.isNotEmpty) {
-                exists = File(localPath).existsSync();
-              }
-
-              FileTransferProgress? active;
-              for (var t in _activeTransfers.values) {
-                if (t.transferId.contains(hash) && !t.isComplete) {
-                  active = t;
-                  break;
-                }
-              }
-
-              return GlassmorphicContainer(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                padding: EdgeInsets.zero,
-                borderRadius: BorderRadius.circular(12),
-                tintColor: AppTheme.current.accent,
-                blur: 10,
-                tintAlpha: 0.08,
-                borderAlpha: 0.12,
-                child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    if (exists) {
-                      _openFile(name, localPath);
-                    } else if (active == null) {
-                      _pullFromMesh(name, hash, f['mime_type']?.toString() ?? 'application/octet-stream', size);
-                    }
+                  onChanged: (v) {
+                    setState(() {
+                      _searchQuery = v;
+                      _applyFilter();
+                      _buildFolderGroups();
+                    });
                   },
-                  borderRadius: BorderRadius.circular(12),
-                  splashColor: AppTheme.current.accent.withValues(alpha: 0.08),
-                  child: ListTile(
-                    leading: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
-                      ),
-                      child: active != null
-                        ? Padding(
-                            padding: EdgeInsets.all(10),
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent),
-                          )
-                        : Icon(icon, color: color, size: 22),
-                    ),
-                    title: Text(
-                      name,
-                      style: TextStyle(color: AppTheme.current.text, fontSize: 14, fontWeight: FontWeight.bold),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              _formatBytes(size),
-                              style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11),
-                            ),
-                            SizedBox(width: 6),
-                            Container(
-                              padding: EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: exists
-                                    ? (isBackedUp ? AppTheme.current.accent.withValues(alpha: 0.1) : AppTheme.current.text.withValues(alpha: 0.05))
-                                    : Colors.orangeAccent.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                exists 
-                                  ? (isBackedUp ? 'MESH SECURED' : 'LOCAL ONLY')
-                                  : (active != null ? 'PULLING...' : 'REMOTE ONLY'),
-                                style: TextStyle(
-                                  color: exists 
-                                    ? (isBackedUp ? AppTheme.current.accent : AppTheme.current.mutedText.withValues(alpha: 0.5))
-                                    : (active != null ? AppTheme.current.accent : Colors.orangeAccent),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (active != null)
-                          Padding(
-                            padding: EdgeInsets.only(top: 6),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(2),
-                              child: LinearProgressIndicator(
-                                value: active.progress,
-                                minHeight: 2,
-                                backgroundColor: AppTheme.current.mutedText.withValues(alpha: 0.1),
-                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.current.accent),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    trailing: exists 
-                      ? PopupMenuButton<String>(
-                          icon: Icon(Icons.more_vert, color: AppTheme.current.mutedText.withValues(alpha: 0.5)),
-                          color: AppTheme.current.surface,
-                          onSelected: (val) {
-                            if (val == 'open') {
-                              _openFile(name, localPath);
-                            } else if (val == 'delete') {
-                              try {
-                                final fileToDelete = File(localPath);
-                                if (fileToDelete.existsSync()) fileToDelete.deleteSync();
-                              } catch (e) {
-                                debugPrint("Error deleting physical file: $e");
-                              }
-                              _client.driveDelete(hash);
-                              _loadFiles();
-                            } else if (val == 'forward') {
-                              _forwardFileToChat(name, hash, f['mime_type']?.toString() ?? 'application/octet-stream', size, localPath);
-                            }
-                          },
-                          itemBuilder: (ctx) => [
-                            PopupMenuItem(
-                              value: 'open',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.open_in_new_rounded, size: 18, color: AppTheme.current.text.withValues(alpha: 0.7)),
-                                  SizedBox(width: 10),
-                                  Text("Open", style: TextStyle(color: AppTheme.current.text)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'forward',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.forward_to_inbox_rounded, size: 18, color: AppTheme.current.text.withValues(alpha: 0.7)),
-                                  SizedBox(width: 10),
-                                  Text("Forward to Chat", style: TextStyle(color: AppTheme.current.text)),
-                                ],
-                              ),
-                            ),
-                            PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent.withValues(alpha: 0.7)),
-                                  SizedBox(width: 10),
-                                  Text("Delete", style: TextStyle(color: Colors.redAccent)),
-                                ],
-                              ),
-                            ),
-                          ],
-
-                        )
-                      : null,
-                  ),
                 ),
               ),
-              );
-            }).toList(),
-            SizedBox(height: 16),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildMeshCapacityCard() {
-    return GlassmorphicContainer(
-      margin: EdgeInsets.all(16),
-      padding: EdgeInsets.all(20),
-      borderRadius: BorderRadius.circular(20),
-      tintAlpha: 0.08,
-      borderAlpha: 0.15,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("MESH CAPACITY", style: TextStyle(color: AppTheme.current.accent, fontSize: 10, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text("Sovereign Storage", style: TextStyle(color: AppTheme.current.text, fontSize: 18, fontWeight: FontWeight.w900)),
-                ],
+              SizedBox(width: 8),
+              IconButton(
+                icon: Icon(_isGridView ? Icons.view_list_rounded : Icons.grid_view_rounded, size: 20),
+                onPressed: () => setState(() => _isGridView = !_isGridView),
+                tooltip: _isGridView ? 'List view' : 'Grid view',
               ),
-              Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.current.accent.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: Icon(Icons.storage_rounded, color: AppTheme.current.accent, size: 24),
+              IconButton(
+                icon: Icon(_isMultiSelect ? Icons.close_rounded : Icons.checklist_rounded, size: 20),
+                onPressed: _toggleMultiSelect,
+                tooltip: _isMultiSelect ? 'Cancel selection' : 'Select',
               ),
             ],
           ),
-          SizedBox(height: 20),
-          Row(
-            children: [
-              _buildStatItem("COLLECTIVE", _swarmStats != null ? "${(_swarmStats!['collective_capacity_gb'] as num? ?? 0)} GB" : "---", Icons.grain),
-              SizedBox(width: 24),
-              _buildStatItem("LOCAL", _formatBytes(_sovereignRemaining), Icons.sd_storage),
-              SizedBox(width: 24),
-              _buildStatItem("SEEDING", "$_seedingCount", Icons.upload_rounded),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 10, color: AppTheme.current.mutedText.withValues(alpha: 0.5)),
-            SizedBox(width: 4),
-            Text(label, style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.bold)),
-          ],
         ),
-        SizedBox(height: 4),
-        Text(value, style: TextStyle(color: AppTheme.current.text, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+
+        // Breadcrumb
+        _buildBreadcrumb(),
+
+        // Multi-select actions
+        if (_isMultiSelect)
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                Text('${_selectedHashes.length} selected', style: TextStyle(fontSize: 12, color: AppTheme.current.accent)),
+                Spacer(),
+                TextButton.icon(
+                  onPressed: _selectAll,
+                  icon: Icon(Icons.select_all_rounded, size: 16),
+                  label: Text('All', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton.icon(
+                  onPressed: _moveSelectedToFolder,
+                  icon: Icon(Icons.drive_file_move_rounded, size: 16),
+                  label: Text('Move', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton.icon(
+                  onPressed: _shareSelectedFiles,
+                  icon: Icon(Icons.share_rounded, size: 16),
+                  label: Text('Share', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton.icon(
+                  onPressed: _deleteSelected,
+                  icon: Icon(Icons.delete_rounded, size: 16, color: Colors.redAccent),
+                  label: Text('Delete', style: TextStyle(fontSize: 12, color: Colors.redAccent)),
+                ),
+              ],
+            ),
+          ),
+
+        // Content
+        Expanded(
+          child: _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : _currentFolder.isNotEmpty && _currentFolder != 'Drive'
+                  ? _buildFileList(_filteredFiles)
+                  : _buildFolderView(),
+        ),
       ],
     );
   }

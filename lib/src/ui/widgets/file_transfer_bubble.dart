@@ -18,6 +18,7 @@ class FileTransferBubble extends StatefulWidget {
   final VoidCallback? onTap;
   final List<dynamic>? reactions;
   final List<dynamic>? allMessages;
+  final DateTime? timestamp;
 
   const FileTransferBubble({
     required this.progress,
@@ -25,6 +26,7 @@ class FileTransferBubble extends StatefulWidget {
     this.onTap,
     this.reactions,
     this.allMessages,
+    this.timestamp,
     super.key,
   });
 
@@ -488,10 +490,7 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
     final bool isVerified = progress.isVerified;
     final String? localPath = progress.localPath;
 
-    // During download: show nothing — image appears when verified
-    if (!progress.isVerified && !widget.isMe) {
-      return const SizedBox.shrink();
-    }
+
 
     Color stateColor = isVerified 
         ? AppTheme.current.accent 
@@ -672,6 +671,15 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                        if (widget.timestamp != null)
+                                          Text(
+                                            "${widget.timestamp!.hour.toString().padLeft(2, '0')}:${widget.timestamp!.minute.toString().padLeft(2, '0')}",
+                                            style: TextStyle(
+                                              color: AppTheme.current.mutedText.withValues(alpha: 0.5),
+                                              fontSize: 8,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),

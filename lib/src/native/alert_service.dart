@@ -11,18 +11,35 @@ import '../services/background_sync_service.dart';
 /// - Route `showAlert` calls to the native side which posts a
 ///   `UNUserNotificationCenter` notification (iOS) or a
 ///   `NotificationCompat` notification (Android) and plays the Introvert ping.
+/// - Enforce 3-minute global cooldown on phone notifications.
+/// - Suppress notifications when app is in foreground (sound only).
 class AlertService {
   static const MethodChannel _channel = MethodChannel('introvert/alerts');
 
-  /// Set to `true` after the first permission request so we don't spam the
-  /// native side on every incoming message.
   static bool _permissionsRequested = false;
-
   static String? _apnsToken;
   static String? _pendingFcmToken;
   static bool _hasRegisteredToken = false;
 
+  // ── Notification cooldown (3 minutes) ─────────────────────────────────────
+  static DateTime? _lastNotificationTime;
+  static const Duration _notificationCooldown = Duration(minutes: 3);
+
+  // ── Foreground state (set by main_shell.dart) ─────────────────────────────
+  static bool _isInForeground = false;
+
   static bool get hasRegisteredToken => _hasRegisteredToken;
+
+  /// Called by main_shell.dart when app lifecycle changes.
+  static void setForegroundState(bool isForeground) {
+    _isInForeground = isForeground;
+  }
+
+  /// Returns true if a notification was suppressed by cooldown.
+  static bool get isOnCooldown {
+    if (_lastNotificationTime == null) return false;
+    return DateTime.now().difference(_lastNotificationTime!) < _notificationCooldown;
+  }
 
   /// Initializes the alert service and sets up listeners for native events.
   static void initialize() {
@@ -39,14 +56,12 @@ class AlertService {
           IntrovertClient().fetchMailbox();
           break;
         case 'onPushNotification':
-          // Push notification received from FCM/APNS
           final args = call.arguments as Map<dynamic, dynamic>;
           final openChat = args['open_chat'] as String?;
           final openGroup = args['open_group'] as String?;
           final incomingCall = args['incoming_call'] as String?;
           final fcmToken = args['fcm_token'] as String?;
           
-          // Register FCM token with RBN if provided
           if (fcmToken != null && fcmToken.isNotEmpty) {
             debugPrint("🔔 AlertService: FCM token received, caching for registration...");
             _pendingFcmToken = fcmToken;
@@ -54,7 +69,6 @@ class AlertService {
           }
           
           debugPrint("🔔 AlertService: Push notification received: chat=$openChat, group=$openGroup, call=$incomingCall");
-          // Trigger mailbox fetch to get the actual message
           IntrovertClient().fetchMailbox();
           break;
       }
@@ -64,7 +78,6 @@ class AlertService {
   static String? get apnsToken => _apnsToken;
 
   /// Attempts to register the pending FCM or APNs token with the active RBN.
-  /// Safely retries once the native engine is fully running.
   static void tryRegisterPendingToken() {
     final token = _apnsToken ?? _pendingFcmToken;
     if (token == null || token.isEmpty) return;
@@ -74,7 +87,7 @@ class AlertService {
       client.registerPushToken(Platform.isIOS ? "ios" : "android", token);
       debugPrint("🔔 AlertService: Push token successfully registered with RBN.");
       _hasRegisteredToken = true;
-      _pendingFcmToken = null; // Clear pending on success
+      _pendingFcmToken = null;
       BackgroundSyncService.instance.updatePushAvailability(true);
     } catch (e) {
       debugPrint("🔔 AlertService: Engine not ready yet to register push token: $e");
@@ -85,6 +98,12 @@ class AlertService {
 
   /// Shows a local notification with the Introvert ping sound.
   ///
+  /// **Cooldown:** Only one phone notification every 3 minutes. All others
+  /// are silently suppressed.
+  ///
+  /// **Foreground:** When the app is open, no phone notification is posted.
+  /// The caller should play an in-app sound instead.
+  ///
   /// - [title]: bold heading in the notification banner.
   /// - [body]: message preview text.
   /// - [isCall]: when `true` the notification uses a CALL category/channel
@@ -94,6 +113,18 @@ class AlertService {
     required String body,
     required bool isCall,
   }) async {
+    // FOREGOUND: Skip native notification entirely. Caller plays sound.
+    if (_isInForeground) {
+      debugPrint("🔔 AlertService: Suppressed notification (app in foreground): $title");
+      return;
+    }
+
+    // COOLDOWN: Skip if less than 3 minutes since last notification.
+    if (isOnCooldown) {
+      debugPrint("🔔 AlertService: Suppressed notification (3-min cooldown): $title");
+      return;
+    }
+
     // Ensure permissions have been requested at least once.
     if (!_permissionsRequested) {
       await requestPermissions();
@@ -105,19 +136,14 @@ class AlertService {
         'body': body,
         'isCall': isCall,
       });
-      debugPrint(
-        "🔔 AlertService: Alert sent → title='$title' isCall=$isCall",
-      );
+      _lastNotificationTime = DateTime.now();
+      debugPrint("🔔 AlertService: Alert sent → title='$title' isCall=$isCall");
     } catch (e) {
       debugPrint("🔔 AlertService: Failed to send native notification: $e");
     }
   }
 
   /// Explicitly requests notification permissions from the native layer.
-  ///
-  /// On Android < 13 this is a no-op (permissions not required at runtime).
-  /// On iOS the system shows a system dialog on first call.
-  /// Safe to call multiple times — the OS handles de-duplication.
   static Future<void> requestPermissions() async {
     _permissionsRequested = true;
     if (!Platform.isAndroid && !Platform.isIOS) return;
@@ -125,7 +151,6 @@ class AlertService {
     try {
       await _channel.invokeMethod('requestPermissions');
     } on MissingPluginException {
-      // Older native side that doesn't handle this method — silently ignore.
       debugPrint("🔔 AlertService: requestPermissions not implemented natively (OK)");
     } catch (e) {
       debugPrint("🔔 AlertService: requestPermissions error: $e");
@@ -153,7 +178,6 @@ class AlertService {
   }
 
   /// Sets whether the app should stay awake in the background (Android only).
-  /// Typically enabled for Anchor Nodes to maintain high-performance mesh duties.
   static Future<void> setStayAwake(bool awake) async {
     if (!Platform.isAndroid) return;
     try {

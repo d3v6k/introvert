@@ -199,6 +199,18 @@ impl StorageService {
             );
             CREATE INDEX IF NOT EXISTS idx_mesh_chunks_file ON mesh_chunks (file_hash);
             CREATE INDEX IF NOT EXISTS idx_mesh_chunks_timestamp ON mesh_chunks (timestamp);
+            CREATE TABLE IF NOT EXISTS pending_file_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transfer_id TEXT NOT NULL,
+                peer_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                chunk_data BLOB NOT NULL,
+                created_at INTEGER NOT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(transfer_id, chunk_index)
+            );
+            CREATE INDEX IF NOT EXISTS idx_pending_chunks_peer ON pending_file_chunks(peer_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_pending_chunks_transfer ON pending_file_chunks(transfer_id, chunk_index);
             CREATE TABLE IF NOT EXISTS group_secrets (
                 group_id TEXT PRIMARY KEY,
                 secret_blob BLOB NOT NULL
@@ -813,6 +825,17 @@ impl StorageService {
         Ok(())
     }
 
+    /// Sync-safe insert: only adds new messages, never overwrites existing ones.
+    /// Used by ChatSyncResponse to prevent stale sync data from overwriting current messages.
+    pub fn store_message_if_new(&self, peer_id: &str, msg_id: &str, content: &str, is_me: bool, reply_to: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR IGNORE INTO messages (peer_id, msg_id, content, is_me, status, reply_to_msg_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![peer_id, msg_id, content, is_me as i32, if is_me { 0 } else { 1 }, reply_to],
+        )?;
+        Ok(())
+    }
+
     pub fn update_message_status(&self, msg_id: &str, status: u8) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
@@ -829,6 +852,118 @@ impl StorageService {
             params![status as i32, peer_id],
         )?;
         Ok(())
+    }
+
+    pub fn update_message_status_if_higher(&self, msg_id: &str, new_status: u8) -> Result<bool> {
+        let conn = self.conn.lock();
+        let current: i32 = conn.query_row(
+            "SELECT COALESCE(status, 0) FROM messages WHERE msg_id = ?1",
+            params![msg_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        let current = current as u8;
+        // Allowed transitions: 0→3, 0→1, 0→2, 3→1, 3→2, 1→2
+        let allowed = match current {
+            0 => new_status <= 3,
+            3 => new_status == 1 || new_status == 2,
+            1 => new_status == 2,
+            _ => false,
+        };
+        if allowed && new_status > current {
+            conn.execute("UPDATE messages SET status = ?1 WHERE msg_id = ?2 AND status = ?3",
+                params![new_status as i32, msg_id, current as i32])?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    // --- Pending file chunk queue (persistent safety net for cross-network transfers) ---
+
+    pub fn enqueue_pending_chunk(&self, transfer_id: &str, peer_id: &str, chunk_index: u32, chunk_data: &[u8]) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO pending_file_chunks (transfer_id, peer_id, chunk_index, chunk_data, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![transfer_id, peer_id, chunk_index as i32, chunk_data, chrono::Utc::now().timestamp()],
+        )?;
+        Ok(())
+    }
+
+    pub fn dequeue_pending_chunks(&self, peer_id: &str, limit: usize) -> Result<Vec<(String, u32, Vec<u8>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT transfer_id, chunk_index, chunk_data FROM pending_file_chunks WHERE peer_id = ?1 ORDER BY transfer_id ASC, chunk_index ASC LIMIT ?2"
+        )?;
+        let rows = stmt.query_map(params![peer_id, limit as i32], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)? as u32, row.get::<_, Vec<u8>>(2)?))
+        })?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
+    pub fn remove_pending_chunk(&self, transfer_id: &str, chunk_index: u32) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM pending_file_chunks WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_pending_chunks_for_transfer(&self, transfer_id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM pending_file_chunks WHERE transfer_id = ?1",
+            params![transfer_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn cleanup_stale_pending_chunks(&self, max_age_secs: i64) -> Result<usize> {
+        let conn = self.conn.lock();
+        let cutoff = chrono::Utc::now().timestamp() - max_age_secs;
+        let deleted = conn.execute(
+            "DELETE FROM pending_file_chunks WHERE created_at < ?1",
+            params![cutoff],
+        )?;
+        Ok(deleted)
+    }
+
+    pub fn has_pending_chunks_for_peer(&self, peer_id: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let count: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM pending_file_chunks WHERE peer_id = ?1",
+            params![peer_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    /// Fetch sent messages stuck at status=0 (Sent) older than `age_secs` seconds.
+    /// Returns (msg_id, peer_id, content, reply_to) for retry.
+    pub fn fetch_undelivered_messages(&self, age_secs: i64) -> Result<Vec<(String, String, String, Option<String>)>> {
+        let conn = self.conn.lock();
+        let cutoff = chrono::Utc::now().timestamp() - age_secs;
+        let mut stmt = conn.prepare(
+            "SELECT msg_id, peer_id, content, reply_to_msg_id FROM messages \
+             WHERE is_me = 1 AND status = 0 AND msg_id IS NOT NULL \
+             AND CAST(strftime('%s', timestamp) AS INTEGER) < ?1"
+        )?;
+        let rows = stmt.query_map(params![cutoff], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
     }
 
     /// Retrieves all messages for a specific peer, ordered by timestamp.

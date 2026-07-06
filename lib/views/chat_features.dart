@@ -12,15 +12,15 @@ import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 
 // Helper to build a consistent reaction row for all bubbles
-Widget _buildReactionsRow(List<dynamic> reactions) {
+Widget _buildReactionsRow(List<dynamic> reactions, {VoidCallback? onTap}) {
   final Map<String, int> counts = {};
   for (var r in reactions) {
      final emoji = r['emoji']?.toString() ?? '';
      if (emoji.isNotEmpty) counts[emoji] = (counts[emoji] ?? 0) + 1;
   }
 
-  return Container(
-    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+  final row = Container(
+    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
     decoration: BoxDecoration(
       color: const Color(0xFF1E2430),
       borderRadius: BorderRadius.circular(12),
@@ -44,6 +44,18 @@ Widget _buildReactionsRow(List<dynamic> reactions) {
       )).toList(),
     ),
   );
+
+  if (onTap != null) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerUp: (_) {
+        debugPrint('[Reactions] chat_features onTap fired');
+        onTap();
+      },
+      child: row,
+    );
+  }
+  return row;
 }
 
 // ==========================================
@@ -74,60 +86,54 @@ class StickerBubble extends StatelessWidget {
     final bool exists = isFile && file.existsSync();
 
     return Container(
-      margin: EdgeInsets.only(top: 6, left: 16, right: 16, bottom: (reactions != null && reactions!.isNotEmpty) ? 20 : 6),
+      margin: EdgeInsets.only(top: 6, left: 16, right: 16, bottom: 6),
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: Colors.transparent,
-                ),
-                child: isFile
-                    ? (exists
-                        ? Image.file(
-                            file,
-                            width: 140,
-                            height: 140,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
-                          )
-                        : Container(
-                            width: 140,
-                            height: 140,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppTheme.current.mutedText.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent),
-                          ))
-                    : Image.asset(
-                        'assets/images/stickers/$name.png',
+          Container(
+            padding: EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.transparent,
+            ),
+            child: isFile
+                ? (exists
+                    ? Image.file(
+                        file,
                         width: 140,
                         height: 140,
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
-                      ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}",
-                style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 8, fontFamily: 'monospace'),
-              ),
-            ],
+                      )
+                    : Container(
+                        width: 140,
+                        height: 140,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppTheme.current.mutedText.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent),
+                      ))
+                : Image.asset(
+                    'assets/images/stickers/$name.png',
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => _buildErrorPlaceholder(),
+                  ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            "${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}",
+            style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 8, fontFamily: 'monospace'),
           ),
           if (reactions != null && reactions!.isNotEmpty)
-            Positioned(
-              bottom: -4,
-              left: isMe ? null : 8,
-              right: isMe ? 8 : null,
-              child: _buildReactionsRow(reactions!),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _buildReactionsRow(reactions!, onTap: onReactionTap),
             ),
         ],
       ),
@@ -173,47 +179,41 @@ class GifBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 6, left: 16, right: 16, bottom: (reactions != null && reactions!.isNotEmpty) ? 20 : 6),
+      margin: EdgeInsets.only(top: 6, left: 16, right: 16, bottom: 6),
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  color: AppTheme.current.text.withValues(alpha: 0.05),
-                  child: Image.network(
-                    url,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              color: AppTheme.current.text.withValues(alpha: 0.05),
+              child: Image.network(
+                url,
+                width: 200,
+                height: 150,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
                     width: 200,
                     height: 150,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 200,
-                        height: 150,
-                        alignment: Alignment.center,
-                        child: Text("GIF Load Error", style: TextStyle(color: Colors.redAccent)),
-                      );
-                    },
-                  ),
-                ),
+                    alignment: Alignment.center,
+                    child: Text("GIF Load Error", style: TextStyle(color: Colors.redAccent)),
+                  );
+                },
               ),
-              SizedBox(height: 4),
-              Text(
-                "${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}",
-                style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 8, fontFamily: 'monospace'),
-              ),
-            ],
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            "${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}",
+            style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 8, fontFamily: 'monospace'),
           ),
           if (reactions != null && reactions!.isNotEmpty)
-            Positioned(
-              bottom: -4,
-              left: isMe ? null : 8,
-              right: isMe ? 8 : null,
-              child: _buildReactionsRow(reactions!),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _buildReactionsRow(reactions!, onTap: onReactionTap),
             ),
         ],
       ),
@@ -339,10 +339,11 @@ class _VoiceMemoBubbleState extends State<VoiceMemoBubble> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 6, left: 12, right: 12, bottom: (widget.reactions != null && widget.reactions!.isNotEmpty) ? 20 : 6),
+      margin: EdgeInsets.only(top: 6, left: 12, right: 12, bottom: 6),
       alignment: widget.isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
@@ -426,11 +427,9 @@ class _VoiceMemoBubbleState extends State<VoiceMemoBubble> {
             ),
           ),
           if (widget.reactions != null && widget.reactions!.isNotEmpty)
-            Positioned(
-              bottom: -8,
-              left: widget.isMe ? null : 8,
-              right: widget.isMe ? 8 : null,
-              child: _buildReactionsRow(widget.reactions!),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _buildReactionsRow(widget.reactions!, onTap: widget.onReactionTap),
             ),
         ],
       ),
@@ -480,10 +479,11 @@ class _PollBubbleState extends State<PollBubble> {
     int totalVotes = widget.votes.values.fold(0, (sum, voters) => sum + voters.length);
 
     return Container(
-      margin: EdgeInsets.only(top: 8, left: 12, right: 12, bottom: (widget.reactions != null && widget.reactions!.isNotEmpty) ? 22 : 8),
+      margin: EdgeInsets.only(top: 8, left: 12, right: 12, bottom: 8),
       alignment: widget.isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
@@ -554,11 +554,9 @@ class _PollBubbleState extends State<PollBubble> {
             ),
           ),
           if (widget.reactions != null && widget.reactions!.isNotEmpty)
-            Positioned(
-              bottom: -8,
-              left: widget.isMe ? null : 8,
-              right: widget.isMe ? 8 : null,
-              child: _buildReactionsRow(widget.reactions!),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _buildReactionsRow(widget.reactions!, onTap: widget.onReactionTap),
             ),
         ],
       ),
@@ -613,7 +611,7 @@ class _StickerEmojiPanelState extends State<StickerEmojiPanel> {
 
   void _fetchTrendingGifs() async {
     final prefs = await SharedPreferences.getInstance();
-    String apiKey = prefs.getString('klipy_api_key') ?? '';
+    String apiKey = prefs.getString('klipy_api_key') ?? 'lh4LISPXX2wQQFRZ6JCfqmUeKNeHUJ2Ht8i3dxSqadvlKJC4T5jJLzDxx2jRfW5b';
     if (apiKey.isEmpty) { debugPrint('Klipy API key not configured'); if (mounted) setState(() => _loadingGifs = false); return; }
     setState(() => _loadingGifs = true);
     final client = HttpClient();
@@ -637,7 +635,7 @@ class _StickerEmojiPanelState extends State<StickerEmojiPanel> {
   void _searchGifs(String query) async {
     if (query.isEmpty) { _fetchTrendingGifs(); return; }
     final prefs = await SharedPreferences.getInstance();
-    String apiKey = prefs.getString('klipy_api_key') ?? '';
+    String apiKey = prefs.getString('klipy_api_key') ?? 'lh4LISPXX2wQQFRZ6JCfqmUeKNeHUJ2Ht8i3dxSqadvlKJC4T5jJLzDxx2jRfW5b';
     if (apiKey.isEmpty) { debugPrint('Klipy API key not configured'); if (mounted) setState(() => _loadingGifs = false); return; }
     setState(() => _loadingGifs = true);
     final client = HttpClient();
@@ -685,7 +683,8 @@ class _StickerEmojiPanelState extends State<StickerEmojiPanel> {
   Widget _buildGifsTab() {
     return Column(children: [
       Padding(padding: EdgeInsets.all(12), child: TextField(controller: _gifSearchController, onChanged: (v) { _debounceTimer?.cancel(); _debounceTimer = Timer(const Duration(milliseconds: 600), () => _searchGifs(v)); }, style: TextStyle(color: AppTheme.current.text, fontSize: 13), decoration: InputDecoration(hintText: "Search GIFs...", hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)), filled: true, fillColor: AppTheme.current.text.withValues(alpha: 0.05), border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)))),
-      Expanded(child: _loadingGifs ? Center(child: CircularProgressIndicator(color: AppTheme.current.accent)) : GridView.builder(padding: EdgeInsets.all(12), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.3), itemCount: _gifUrls.length, itemBuilder: (context, index) => GestureDetector(onTap: () => widget.onGifSelect(_gifUrls[index]), child: ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(_gifUrls[index], fit: BoxFit.cover)))))
+      Expanded(child: _loadingGifs ? Center(child: CircularProgressIndicator(color: AppTheme.current.accent)) : GridView.builder(padding: EdgeInsets.all(12), gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.3), itemCount: _gifUrls.length, itemBuilder: (context, index) => GestureDetector(onTap: () => widget.onGifSelect(_gifUrls[index]), child: ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(_gifUrls[index], fit: BoxFit.cover))))),
+      Padding(padding: EdgeInsets.only(bottom: 8), child: Image.asset('assets/images/kliphy/powered_by_klipy_gray.png', height: 20, fit: BoxFit.contain))
     ]);
   }
 }
@@ -721,10 +720,11 @@ class LocationBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 6, left: 12, right: 12, bottom: (reactions != null && reactions!.isNotEmpty) ? 20 : 6),
+      margin: EdgeInsets.only(top: 6, left: 12, right: 12, bottom: 6),
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
@@ -744,11 +744,9 @@ class LocationBubble extends StatelessWidget {
             ),
           ),
           if (reactions != null && reactions!.isNotEmpty)
-            Positioned(
-              bottom: -8,
-              left: isMe ? null : 8,
-              right: isMe ? 8 : null,
-              child: _buildReactionsRow(reactions!),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _buildReactionsRow(reactions!, onTap: onReactionTap),
             ),
         ],
       ),

@@ -138,11 +138,11 @@ class NoteBubble extends StatelessWidget {
 
           // Reactions
           if (reactions != null && reactions!.isNotEmpty)
-            GestureDetector(
-              onTap: onReactionTap,
+            Listener(
+              onPointerUp: (_) { if (onReactionTap != null) onReactionTap!(); },
               child: Container(
                 margin: EdgeInsets.only(top: 4),
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.current.surface,
                   borderRadius: BorderRadius.circular(12),

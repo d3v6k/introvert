@@ -115,8 +115,8 @@ impl IntrovertBehaviour {
                 .with_max_established_incoming(Some(max_connections))
                 .with_max_established_outgoing(Some(max_connections))
                 .with_max_established(Some(max_connections))
-                .with_max_pending_incoming(Some(max_connections / 10))
-                .with_max_pending_outgoing(Some(max_connections / 10))
+                .with_max_pending_incoming(Some(max_connections / 5))
+                .with_max_pending_outgoing(Some(max_connections / 5))
         );
 
         let message_id_fn = |message: &gossipsub::Message| {

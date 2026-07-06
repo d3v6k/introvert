@@ -5,6 +5,8 @@ use crate::storage::StorageService;
 
 pub mod solana;
 pub mod daily_rewards;
+pub mod balance_gating;
+pub mod ledger_cron;
 
 use std::collections::HashMap;
 
@@ -28,13 +30,15 @@ struct EconomyState {
 pub struct RewardTracker {
     state: Arc<RwLock<EconomyState>>,
     storage: Option<Arc<StorageService>>,
-    threshold: u64, // 1MB = 1,048,576 bytes
-    cooldown_secs: u64, // 5 minutes = 300 seconds
+    threshold: u64,
+    cooldown_secs: u64,
     start_time: std::time::Instant,
+    /// Shared metrics bridge: DailyRewardEngine writes, RewardTracker reads for telemetry
+    pub shared_metrics: Arc<RwLock<[u64; 9]>>,
 }
 
 impl RewardTracker {
-    pub fn new(storage: Option<Arc<StorageService>>) -> Self {
+    pub fn new(storage: Option<Arc<StorageService>>, shared_metrics: Arc<RwLock<[u64; 9]>>) -> Self {
         let initial_bytes = if let Some(ref s) = storage {
             s.get_total_relayed_from_db().unwrap_or(0)
         } else {
@@ -51,9 +55,10 @@ impl RewardTracker {
                 last_claim_timestamp: 0,
             })),
             storage,
-            threshold: 10_000_000_000, // 10 INTR (nano-INTR units, matching Solana 9-decimal precision)
-            cooldown_secs: 300, // 5 minutes
+            threshold: 10_000_000_000,
+            cooldown_secs: 300,
             start_time: std::time::Instant::now(),
+            shared_metrics,
         }
     }
 
@@ -177,9 +182,35 @@ impl RewardTracker {
         self.record_relay(peer_id, 1024);
     }
 
-    pub fn is_lease_valid(&self, _balance: u64) -> bool {
-        // Phase II: Identity Lease
-        // RELAXED: Always return true for now to ensure connectivity during testing.
+    /// Checks if the node's identity lease is valid.
+    /// A valid lease requires:
+    /// 1. Balance >= minimum threshold (100,000 INTR for edge nodes)
+    /// 2. Last claim was within the last 30 days (lease renewal window)
+    pub fn is_lease_valid(&self, balance: u64) -> bool {
+        const MIN_BALANCE_NANO: u64 = 100_000_000_000_000; // 100,000 INTR in nano-INTR
+        const LEASE_RENEWAL_SECS: u64 = 2_592_000; // 30 days in seconds
+
+        // Check minimum balance
+        if balance < MIN_BALANCE_NANO {
+            tracing::warn!("[Economy] Lease invalid: balance {} < minimum {}", balance, MIN_BALANCE_NANO);
+            return false;
+        }
+
+        // Check lease renewal window
+        let state = self.state.read();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        if state.last_claim_timestamp > 0 {
+            let elapsed = now.saturating_sub(state.last_claim_timestamp);
+            if elapsed > LEASE_RENEWAL_SECS {
+                tracing::warn!("[Economy] Lease expired: last claim was {} seconds ago (max {})", elapsed, LEASE_RENEWAL_SECS);
+                return false;
+            }
+        }
+
         true
     }
 
@@ -207,8 +238,36 @@ impl RewardTracker {
     }
 }
 
+
+
+/// Telemetry data for sending to RBN.
+#[derive(Debug, Clone)]
+pub struct TelemetryData {
+    pub peer_id: String,
+    pub metrics: [u64; 9],
+    pub timestamp: u64,
+}
+
+impl RewardTracker {
+    /// Packages current activity metrics into a TelemetryData for the RBN.
+    pub fn package_telemetry(&self, peer_id: &str) -> TelemetryData {
+        let state = self.state.read();
+        let mut metrics = *self.shared_metrics.read();
+        // Overlay relay_bytes and uptime from RewardTracker (more accurate for these)
+        metrics[7] = state.outbound_relayed_bytes;
+        metrics[8] = state.uptime_seconds;
+        TelemetryData {
+            peer_id: peer_id.to_string(),
+            metrics,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        }
+    }
+}
 impl Default for RewardTracker {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(None, Arc::new(RwLock::new([0u64; 9])))
     }
 }

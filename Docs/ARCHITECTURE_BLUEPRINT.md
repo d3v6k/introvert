@@ -20,6 +20,26 @@ The frontend handles user interaction and presentation:
 - **Main Shell (`lib/src/ui/main_shell.dart`):** Handles UI loops and serves as the presentation entry point.
 - **Sovereign Local Moderation:** To remain fully compliant with Apple and Google User-Generated Content (UGC) regulations without engineering a central censorship master-key, the client manages a localized block list inside SQLCipher. When a user blocks an offender, Flutter instructs the Rust core to drop all incoming Gossipsub frames from that specific `PeerId`.
 
+### C. Delivery Confirmation System
+Messages flow through a 4-tier delivery pipeline with end-to-end confirmation:
+1. **Direct P2P** — WebRTC Data Channel or libp2p request-response (256KB chunks)
+2. **Relay Circuit** — libp2p circuit relay through RBN (64KB chunks)
+3. **Anchor Mailbox** — Persistent storage on verified RBN nodes
+4. **RAM Buffer** — Pending messages flushed on circuit establishment
+
+**Message Status Flow:**
+- Status 0 (Sent): Message created locally, single tick
+- Status 3 (In Mailbox): Anchor confirmed storage via `MailboxStored` ACK, clock icon
+- Status 1 (Delivered): Recipient's node processed the message, double grey tick
+- Status 2 (Read): Recipient opened the chat, double blue tick
+
+**Mailbox Integrity:**
+- `MailboxStored` ACK confirms anchor storage before recipient delivery
+- `store_message_if_new` (INSERT OR IGNORE) prevents sync from overwriting current messages
+- `verified_rbns` filter ensures only trusted RBNs receive mailbox payloads
+- File messages excluded from chat sync to prevent metadata corruption
+- Stale `FileTransferComplete` ACKs are dropped if no active seeder exists
+
 ---
 
 ## 3. The Autonomous Escrow & Reward Pipeline
@@ -59,3 +79,30 @@ All network stakes and emission balances are consolidated into a single **Progra
 1. **RBN Bonding Sinks:** Operators must transfer and bond exactly 2,000,000 $INTR into the PDA Escrow to declare their multiaddress on the active network directory.
 2. **Unbonding Cooldown:** If an RBN withdraws from the network, their stake enters an unalterable 7-day on-chain cooldown state. This prevents exit-scams if the node drops offline or serves faulty data blocks.
 3. **Edge Node Tiers:** Standard client apps query the blockchain to check token balances. Mobile devices must maintain a fixed amount of $INTR to qualify for active P2P background relay features.
+
+### DynamicPromoStack (Customizable Campaign Layer)
+
+The DynamicPromoStack enables runtime promotion adjustments on the 10% Strategic Reserve allocation:
+
+**Year 1 Strategic Reserve:** 3,287.60 INTR/day
+
+**Campaign Types:**
+- CommunityThemeVote — Daily theme competitions with community voting
+- EarlyAdopterBonus — Early user onboarding rewards
+- DeveloperHackathonYield — Developer contribution bounties
+- DynamicBonusCampaign — Custom promotional campaigns
+
+**Math Model:**
+```
+[Strategic Reserve Daily Ceiling: 3,287.60 INTR]
+                    │
+                    ├──► [- Minus] Active Campaigns (e.g., Theme: 1,000 INTR)
+                    │
+                    └──► [= Equals] Referral Pool (2,287.60 INTR)
+```
+
+**Safety Features:**
+- Auto-eviction — Expired campaigns automatically removed at epoch close
+- Safety cap — Promo deductions cannot exceed Strategic Reserve ceiling
+- Runtime adjustments — No code rebuilds required
+- Referral pool compression — Core referral rewards always protected

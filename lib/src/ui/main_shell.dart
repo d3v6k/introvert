@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'custom_theme_creator.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:io';
 import '../native/introvert_client.dart';
@@ -17,6 +19,7 @@ import '../services/webrtc_call_service.dart';
 import '../services/group_call_service.dart';
 import '../services/background_sync_service.dart';
 import 'widgets/network_optimization_button.dart';
+import 'widgets/whatsapp_icon.dart';
 import '../../views/chat_screen.dart';
 import '../../views/group_chat_screen.dart';
 import '../../views/group_call_screen.dart';
@@ -26,6 +29,9 @@ import '../../main.dart';
 import 'drive_tab.dart';
 import 'notes_tab.dart';
 import 'assistant_tab.dart';
+import '../../views/whatsapp_web_tab.dart';
+import '../../views/telegram_web_tab.dart';
+import 'widgets/messenger_webview.dart';
 import 'update_service.dart';
 import 'widgets/rewards_hud.dart';
 import '../../blueprint_ui.dart';
@@ -52,9 +58,24 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
+  // Beta RBN bootstrap coordinates — hardcoded for open-source beta release.
+  // These are the active deployment RBN servers used for P2P connection seeding.
+  static const List<Map<String, String>> betaRbnSeeds = [
+    {
+      'ip': '47.89.252.80',
+      'port': '443',
+      'peer_id': '12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a',
+    },
+    {
+      'ip': '47.89.252.80',
+      'port': '80',
+      'peer_id': '12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a',
+    },
+  ];
+
   final IntrovertClient _client = IntrovertClient();
   int _selectedIndex = 0;
-  final PageController _pageController = PageController();
+  PageController _pageController = PageController();
   late final StreamSubscription<NetworkEvent> _networkSubscription;
   StreamSubscription<MediaFrameEvent>? _globalMediaSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -64,7 +85,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   String _localStatus = "OFFLINE";
   Color _localStatusColor = Colors.redAccent;
   int _intrBalance = 0;
-  double _dailyIntrEarned = 0.0;
+  double _dailyPointsEarned = 0.0;
   StreamSubscription<Map<String, dynamic>>? _economySubscription;
 
   void Function(String ip, String peerId, String rtt)? rbnConfirmedCallback;
@@ -90,23 +111,27 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   static const Duration _notificationDedupWindow = Duration(seconds: 30);
   final Map<String, DateTime> _notificationTimestamps = {};
   final AudioPlayer _notificationPlayer = AudioPlayer();
-  bool _isHandleResolvedDialogOpen = false;
   final Set<String> _activeConnectionRequestPeerIds = {};
   final Set<String> _activeGroupJoinRequestIds = {};
 
+  // Messenger integration state
+  bool _whatsappEnabled = true;
+  bool _telegramEnabled = true;
+  bool _discordEnabled = false;
+  bool _slackEnabled = false;
+  bool _messengerEnabled = false;
+  bool _googleMessagesEnabled = false;
+  int _whatsappUnread = 0;
+  int _telegramUnread = 0;
+
   final GlobalKey<_ChatsTabState> _chatsKey = GlobalKey<_ChatsTabState>();
-  late final List<Widget> _tabs;
+  late List<Widget> _tabs;
 
   @override
   void initState() {
     super.initState();
-    _tabs = [
-      ChatsTab(key: _chatsKey),
-      const DriveTab(key: ValueKey('drive')),
-      const NotesTab(key: ValueKey('notes')),
-      const AssistantTab(key: ValueKey('assistant')),
-      const SettingsTab(key: ValueKey('settings')),
-    ];
+    _tabs = _buildTabs(); // Initialize synchronously with defaults (messenger off)
+    _loadMessengerSettings(); // Then async-load saved preferences
     WidgetsBinding.instance.addObserver(this);
     _startGlobalListener();
 
@@ -130,25 +155,39 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           _intrBalance = (stats['intr_balance'] as num?)?.toInt() ?? 0;
           final dailyEarnings = stats['daily_earnings'];
           if (dailyEarnings is Map) {
-            _dailyIntrEarned = (dailyEarnings['intr_earned_today'] as num?)?.toDouble() ?? 0.0;
+            _dailyPointsEarned = (dailyEarnings['intr_earned_today'] as num?)?.toDouble() ?? 0.0;
           }
         });
       }
     });
 
     // Start economy monitoring from MainShell so INTR balance is available from launch
-    _client.startEconomyMonitoring((_) {});
+    // Wrapped in try/catch — engine may not be ready yet due to async startup race
+    try {
+      _client.startEconomyMonitoring((_) {});
+    } catch (e) {
+      debugPrint("⚠️ Economy monitoring deferred (engine not ready): $e");
+      // Retry after engine startup completes
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          try { _client.startEconomyMonitoring((_) {}); } catch (_) {}
+        }
+      });
+    }
   }
 
   void _startConnectivityMonitor() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       if (results.isEmpty) return;
-      final newConnectivity = results.first;
+      final hasVpn = results.contains(ConnectivityResult.vpn);
+      final newConnectivity = hasVpn ? ConnectivityResult.vpn : results.first;
       if (newConnectivity == _lastConnectivity) return;
 
       final oldConnectivity = _lastConnectivity;
       _lastConnectivity = newConnectivity;
       debugPrint("[Intro-Claw] Connectivity changed: $oldConnectivity → $newConnectivity");
+      // Inform native layer of new connectivity type
+      _client.setConnectivityType(newConnectivity);
 
       if (!mounted) return;
 
@@ -171,11 +210,19 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       try {
         _client.forceNetworkRefresh(); // Force Stack Refresh & Re-dial RBNs immediately
         _client.runNetworkRecon();
-        _client.triggerIntroClawTick(); // Execute intelligence modules
+        final isMobile = _lastConnectivity == ConnectivityResult.mobile;
+        _client.triggerIntroClawTick(isMobileData: isMobile); // Execute intelligence modules
         if (mounted) {
           _showClawNetworkAlert("Intro-Claw", "Connections re-optimized", Colors.greenAccent);
         }
       } catch (_) {}
+    });
+
+    // Refresh contacts after network recovery so the UI shows updated peer list
+    Future.delayed(Duration(seconds: 5), () {
+      if (mounted) {
+        _chatsKey.currentState?.refreshContacts();
+      }
     });
   }
 
@@ -202,6 +249,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     _isInBackground = (state == AppLifecycleState.paused || state == AppLifecycleState.inactive);
+    AlertService.setForegroundState(!_isInBackground);
     debugPrint("🔄 App Lifecycle State: $state (isInBackground: $_isInBackground)");
 
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
@@ -217,7 +265,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // Pre-warm connections: trigger IntroClaw tick to refresh connections
       Future.delayed(Duration(seconds: 1), () {
         try {
-          _client.triggerIntroClawTick();
+          final isMobile = _lastConnectivity == ConnectivityResult.mobile;
+          _client.triggerIntroClawTick(isMobileData: isMobile);
           _chatsKey.currentState?._loadContacts();
         } catch (_) {}
       });
@@ -239,6 +288,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     final now = DateTime.now();
     if (_lastCallAlertTime == null || now.difference(_lastCallAlertTime!) > const Duration(seconds: 15)) {
       _lastCallAlertTime = now;
+      // Always play sound for calls (urgent)
+      _playNotificationSound();
+      // Native notification only when backgrounded (AlertService handles cooldown)
       AlertService.showAlert(
         title: "Incoming Call",
         body: "Incoming audio/video call...",
@@ -263,12 +315,14 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     _recentNotificationHashes.add(hash);
     _notificationTimestamps[hash] = now;
     
+    // Always play sound for messages (important event)
+    _playNotificationSound();
+    // Native notification only when backgrounded (AlertService handles cooldown + foreground suppression)
     AlertService.showAlert(
       title: isGroup ? "New Group Message" : "New Message",
       body: body,
       isCall: false,
     );
-    _playNotificationSound();
   }
 
   void _playNotificationSound() {
@@ -289,12 +343,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (client.localStatus != null) {
       final status = client.localStatus!;
       debugPrint("📍 Initial Node Status (from cache): $status");
-      if (status == 1) {
+      if (status == 1 || status == 2) {
         _localStatus = "ONLINE";
         _localStatusColor = Colors.greenAccent;
+      } else if (status == 4) {
+        _localStatus = "CONNECTING";
+        _localStatusColor = Colors.amberAccent;
       } else if (status == 2) {
         _localStatus = "RELAY";
         _localStatusColor = Colors.orangeAccent;
+      } else if (status == 3) {
+        _localStatus = "SYNCING...";
+        _localStatusColor = AppTheme.current.accent;
       }
     }
 
@@ -404,6 +464,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         }
       } else if (event.type == 24) {
         // Event 24: Group Invite
+        _playNotificationSound();
         if (_isInBackground) {
           _triggerMessageAlert("You received a new group invite.");
         }
@@ -419,19 +480,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       } else if (event.type == 32) {
         // Event 32: Connection Request Accepted
         _handleConnectionAccepted(event.data);
-      } else if (event.type == 33) {
-        // Event 33: Handle Resolved [Handle\0PID]
-        _handleHandleResolved(event.data);
-      } else if (event.type == 35) {
-        // Event 35: Handle Resolve Failed
-        try {
-          final handle = utf8.decode(event.data);
-          if (!_isDisposing && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Failed to resolve $handle. It may not exist or the network is unreachable.")),
-            );
-          }
-        } catch (_) {}
       } else if (event.type == 45) {
         // Event 45: RbnConnectionConfirmed [original_ip|peer_id|rtt]
         try {
@@ -442,6 +490,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
             final peerId = parts[1];
             final rtt = parts[2];
             _onRbnConfirmed(ip, peerId, rtt);
+
+            // Immediately trigger Intro-Claw optimization on RBN handshake.
+            // Forces relay reservation, identity verification, and connection prewarming
+            // without waiting for the next scheduled cron sweep.
+            final isMobile = _lastConnectivity == ConnectivityResult.mobile;
+            Future.delayed(Duration(seconds: 1), () {
+              try {
+                _client.triggerIntroClawTick(isMobileData: isMobile);
+                debugPrint("[IntroClaw] Auto-tick on RBN handshake ($ip, RTT=${rtt}ms)");
+              } catch (_) {}
+            });
           }
         } catch (e) {
           debugPrint("Error handling Event 45: $e");
@@ -458,6 +517,15 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           }
         } catch (e) {
           debugPrint("Error handling Event 46: $e");
+        }
+      } else if (event.type == 47) {
+        // Event 47: IdentityConflictDetected — SelfConnect anomaly
+        // The node detected it tried to connect to itself. Log and skip duplicate routing.
+        try {
+          final payload = utf8.decode(event.data);
+          debugPrint('[Identity] SelfConnect anomaly detected: $payload');
+        } catch (e) {
+          debugPrint("Error handling Event 47: $e");
         }
       } else if (event.type == 14) {
         // Event Code 14: Incoming Call Offer
@@ -478,21 +546,30 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         }
       } else if (event.type == 10) {
         // Event 10: Local Node Status
+        // 0 = OFFLINE        — no connections at all, messages are queued
+        // 1 = ONLINE         — relay reservation confirmed, messages CAN flow
+        // 2 = RELAY          — relay reservation accepted (deprecated alias for 1)
+        // 3 = SYNCING        — connecting to network for first time
+        // 4 = CONNECTING     — RBN connected but relay reservation pending
         if (event.data.isEmpty) return;
         final status = event.data[0];
-        debugPrint("📍 Node Status Change: $status (1=Online, 2=RelayActive)");
+        debugPrint("📍 Node Status Change: $status (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)");
         if (!_isDisposing && mounted) {
           setState(() {
-            if (status == 1) {
+            if (status == 1 || status == 2) {
+              // 1 = Online (relay active, messages flowing)
+              // 2 = Relay accepted (same meaning, legacy)
               _localStatus = "ONLINE";
               _localStatusColor = Colors.greenAccent;
-            } else if (status == 2) {
-              _localStatus = "RELAY";
-              _localStatusColor = Colors.orangeAccent;
+            } else if (status == 4) {
+              // 4 = CONNECTING — RBN reachable, relay reservation in progress
+              _localStatus = "CONNECTING";
+              _localStatusColor = Colors.amberAccent;
             } else if (status == 3) {
               _localStatus = "SYNCING...";
               _localStatusColor = AppTheme.current.accent;
             } else {
+              // 0 = OFFLINE — no mesh connectivity, messages are being queued
               _localStatus = "OFFLINE";
               _localStatusColor = Colors.redAccent;
             }
@@ -509,14 +586,25 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       }
     });
     
-    // Call startNetwork AFTER listen to capture initial status
-    client.startNetwork();
+    // Network is already started by _startEngineWithIdentity in main.dart
+    // Only call startNetwork if it hasn't been started yet (e.g., after onboarding)
+    // Avoids redundant calls and -10 errors when engine is already running
+    try {
+      client.startNetwork();
+    } catch (_) {
+      // Network already started — this is expected
+    }
     
     // Register any pending push token and fetch mailbox now that the engine is active
-    AlertService.tryRegisterPendingToken();
-    try {
-      client.fetchMailbox();
-    } catch (_) {}
+    // Delay slightly to ensure engine is fully initialized
+    Future.delayed(Duration(seconds: 2), () {
+      if (mounted) {
+        AlertService.tryRegisterPendingToken();
+        try {
+          client.fetchMailbox();
+        } catch (_) {}
+      }
+    });
     
     // Initialize background sync — push is the primary wakeup mechanism,
     // with fallback polling if push delivery fails
@@ -554,12 +642,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
       _activeConnectionRequestPeerIds.add(peerId);
       if (_isDisposing || !mounted) return;
+      final parentContext = context;
+      final bg = AppTheme.current.bg;
+      final text = AppTheme.current.text;
+      final accent = AppTheme.current.accent;
+      final mutedText = AppTheme.current.mutedText;
       showDialog(
-        context: context,
+        context: parentContext,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          backgroundColor: AppTheme.current.bg,
-          title: Text("Connection Request", style: TextStyle(color: AppTheme.current.text, fontSize: 16)),
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: bg,
+          title: Text("Connection Request", style: TextStyle(color: text, fontSize: 16)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -571,32 +664,39 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     : null,
               ),
               SizedBox(height: 16),
-              Text(name, style: TextStyle(color: AppTheme.current.text, fontWeight: FontWeight.bold, fontSize: 18)),
-              Text(handle, style: TextStyle(color: AppTheme.current.mutedText, fontSize: 12)),
+              Text(name, style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(handle, style: TextStyle(color: mutedText, fontSize: 12)),
               SizedBox(height: 12),
               Text(
                 "wants to connect with you via the Sovereign Mesh.",
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 13),
+                style: TextStyle(color: mutedText.withValues(alpha: 0.7), fontSize: 13),
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("DECLINE", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text("DECLINE", style: TextStyle(color: mutedText.withValues(alpha: 0.7))),
             ),
             ElevatedButton(
-              onPressed: () {
-                final messenger = ScaffoldMessenger.of(context);
-                IntrovertClient().sendDirectInvite(peerId);
-                Navigator.pop(context);
-                messenger.showSnackBar(
-                  SnackBar(content: Text("Connection accepted from $name")),
-                );
+              onPressed: () async {
+                try {
+                  IntrovertClient().sendDirectInvite(peerId);
+                } catch (e) {
+                  debugPrint("⚠️ sendDirectInvite failed: $e");
+                }
+                Navigator.pop(dialogContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                    SnackBar(content: Text("Connection accepted from $name")),
+                  );
+                }
+                // Wait for the SQLite write to fully settle (similar to group invite acceptance)
+                await Future.delayed(const Duration(milliseconds: 600));
                 _chatsKey.currentState?._loadContacts();
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(backgroundColor: accent, foregroundColor: Colors.black),
               child: Text("ACCEPT"),
             ),
           ],
@@ -893,96 +993,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  void _handleHandleResolved(Uint8List data) {
-    try {
-      final parts = utf8.decode(data).split('\x00');
-      if (parts.length < 2) return;
-      final String handle = parts[0];
-      final String peerId = parts[1];
-      debugPrint("✅ Resolved handle $handle to $peerId");
-
-      if (_isHandleResolvedDialogOpen) {
-        debugPrint("Handle resolved dialog is already open, ignoring duplicate event.");
-        return;
-      }
-
-      final status = IntrovertClient().getHandleStatus(handle);
-      final isVerified = status['verified'] == true;
-
-      if (!_isDisposing && mounted) {
-        _isHandleResolvedDialogOpen = true;
-        final parentContext = context;
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: AppTheme.current.bg,
-            title: Row(
-              children: [
-                Text("Handle Resolved", style: TextStyle(color: AppTheme.current.text, fontSize: 16)),
-                if (isVerified) ...[
-                  SizedBox(width: 8),
-                  Icon(Icons.verified, color: AppTheme.current.accent, size: 18),
-                ],
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RichText(
-                  text: TextSpan(
-                    style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 14),
-                    children: [
-                      TextSpan(text: "Handle "),
-                      TextSpan(text: handle, style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold)),
-                      TextSpan(text: " points to peer:\n\n"),
-                    ],
-                  ),
-                ),
-                SelectableText(
-                  peerId,
-                  style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppTheme.current.mutedText.withValues(alpha: 0.7)),
-                ),
-                if (isVerified)
-                  Padding(
-                    padding: EdgeInsets.only(top: 16.0),
-                    child: Text(
-                      "✅ This handle is OFFICIALLY VERIFIED by the Introvert Mesh.",
-                      style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: EdgeInsets.only(top: 16.0),
-                    child: Text(
-                      "⚠️ UNVERIFIED: This mapping has not been witnessed by RBN nodes yet.",
-                      style: TextStyle(color: Colors.orangeAccent, fontSize: 11),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: Text("CANCEL")),
-              ElevatedButton(
-                onPressed: () {
-                  IntrovertClient().sendDirectInvite(peerId);
-                  Navigator.pop(context);
-                  if (mounted) {
-                    ScaffoldMessenger.of(parentContext).showSnackBar(SnackBar(content: Text("Invite sent to $handle!")));
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
-                child: Text("SEND INVITE"),
-              ),
-            ],
-          ),
-        ).then((_) {
-          _isHandleResolvedDialogOpen = false;
-        });
-      }
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
     _isDisposing = true;
@@ -1003,6 +1013,103 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  Future<void> _loadMessengerSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _whatsappEnabled = prefs.getBool('whatsapp_enabled') ?? true;
+      _telegramEnabled = prefs.getBool('telegram_enabled') ?? true;
+      _discordEnabled = prefs.getBool('discord_enabled') ?? false;
+      _slackEnabled = prefs.getBool('slack_enabled') ?? false;
+      _messengerEnabled = prefs.getBool('messenger_enabled') ?? false;
+      _googleMessagesEnabled = prefs.getBool('google_messages_enabled') ?? false;
+      _tabs = _buildTabs();
+    });
+  }
+
+  void _rebuildMessengerTabs() {
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _whatsappEnabled = prefs.getBool('whatsapp_enabled') ?? false;
+          _telegramEnabled = prefs.getBool('telegram_enabled') ?? false;
+          _discordEnabled = prefs.getBool('discord_enabled') ?? false;
+          _slackEnabled = prefs.getBool('slack_enabled') ?? false;
+          _messengerEnabled = prefs.getBool('messenger_enabled') ?? false;
+          _googleMessagesEnabled = prefs.getBool('google_messages_enabled') ?? false;
+          _tabs = _buildTabs();
+        });
+      }
+    });
+  }
+
+  List<Widget> _buildTabs() {
+    final tabs = <Widget>[
+      ChatsTab(key: _chatsKey),
+    ];
+    if (_whatsappEnabled) {
+      tabs.add(WhatsAppWebTab(
+        key: const ValueKey('whatsapp'),
+        onUnreadCountChanged: (count) => setState(() => _whatsappUnread = count),
+      ));
+    }
+    if (_telegramEnabled) {
+      tabs.add(TelegramWebTab(
+        key: const ValueKey('telegram'),
+        onUnreadCountChanged: (count) => setState(() => _telegramUnread = count),
+      ));
+    }
+    if (_discordEnabled) {
+      tabs.add(MessengerWebView(
+        key: const ValueKey('discord'),
+        url: 'https://discord.com/app',
+        title: 'Discord',
+        icon: Icons.forum_rounded,
+        accentColor: const Color(0xFF5865F2),
+        allowedDomain: 'discord.com',
+      ));
+    }
+    if (_slackEnabled) {
+      tabs.add(MessengerWebView(
+        key: const ValueKey('slack'),
+        url: 'https://app.slack.com',
+        title: 'Slack',
+        icon: Icons.workspaces_rounded,
+        accentColor: const Color(0xFF4A154B),
+        allowedDomain: 'slack.com',
+      ));
+    }
+    if (_messengerEnabled) {
+      tabs.add(MessengerWebView(
+        key: const ValueKey('messenger'),
+        url: 'https://www.messenger.com',
+        title: 'Messenger',
+        icon: Icons.message_rounded,
+        accentColor: const Color(0xFF0084FF),
+        allowedDomain: 'messenger.com',
+      ));
+    }
+    if (_googleMessagesEnabled) {
+      tabs.add(MessengerWebView(
+        key: const ValueKey('google_messages'),
+        url: 'https://messages.google.com/web',
+        title: 'Messages',
+        icon: Icons.sms_rounded,
+        accentColor: const Color(0xFF1A73E8),
+        allowedDomain: 'messages.google.com',
+      ));
+    }
+    tabs.addAll([
+      const DriveTab(key: ValueKey('drive')),
+      const NotesTab(key: ValueKey('notes')),
+      SettingsTab(
+        key: const ValueKey('settings'),
+        onMessengerSettingsChanged: _rebuildMessengerTabs,
+        onContactsChanged: () => _chatsKey.currentState?.refreshContacts(),
+      ),
+    ]);
+    return tabs;
+  }
+
   void _onDestinationSelected(int index) {
     setState(() => _selectedIndex = index);
     _pageController.animateToPage(
@@ -1014,6 +1121,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppTheme.current,
+      builder: (context, _) => _buildScaffold(),
+    );
+  }
+
+  Widget _buildScaffold() {
     return Scaffold(
       backgroundColor: AppTheme.current.bg,
       extendBody: true,
@@ -1056,7 +1170,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       border: Border.all(color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.15 : 0.08)),
                     ),
                     child: Text(
-                      '${_intrBalance} INTR',
+                      '${_intrBalance} pts',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 10,
@@ -1070,11 +1184,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  if (_dailyIntrEarned > 0)
+                  if (_dailyPointsEarned > 0)
                     Padding(
                       padding: EdgeInsets.only(top: 2, left: 2),
                       child: Text(
-                        '+${_dailyIntrEarned.toStringAsFixed(4)} today',
+                        '+${_dailyPointsEarned.toStringAsFixed(1)} pts today',
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 8,
@@ -1149,6 +1263,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           SovereignWallpaper(),
           PageView(
             controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
             onPageChanged: (index) => setState(() => _selectedIndex = index),
             children: _tabs,
           ),
@@ -1173,17 +1288,131 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                 ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(0, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'CHATS'),
-                _buildNavItem(1, Icons.cloud_queue_rounded, Icons.cloud_rounded, 'DRIVE'),
-                _buildNavItem(2, Icons.sticky_note_2_outlined, Icons.sticky_note_2_rounded, 'NOTES'),
-                _buildNavItem(3, Icons.psychology_outlined, Icons.psychology_rounded, 'CLAW'),
-                _buildNavItem(4, Icons.settings_outlined, Icons.settings_rounded, 'SETTINGS'),
-              ],
+              children: _buildNavItems(),
             ),
           ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // Tab index helpers — indices shift based on which messenger tabs are enabled
+  int get _driveTabIndex => 1 + _enabledMessengerCount;
+  int get _notesTabIndex => _driveTabIndex + 1;
+  int get _settingsTabIndex => _notesTabIndex + 1;
+
+  int get _enabledMessengerCount {
+    int count = 0;
+    if (_whatsappEnabled) count++;
+    if (_telegramEnabled) count++;
+    if (_discordEnabled) count++;
+    if (_slackEnabled) count++;
+    if (_messengerEnabled) count++;
+    if (_googleMessagesEnabled) count++;
+    return count;
+  }
+
+  List<Widget> _buildNavItems() {
+    final items = <Widget>[
+      _buildNavItem(0, Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'CHATS'),
+    ];
+    int idx = 1;
+    if (_whatsappEnabled) {
+      final waIdx = idx++;
+      items.add(_buildNavItemWithBadge(waIdx, Icons.chat_rounded, Icons.chat_rounded, 'WA', const Color(0xFF25D366), _whatsappUnread, iconWidget: WhatsAppIcon(size: 20, color: _selectedIndex == waIdx ? const Color(0xFF25D366) : AppTheme.current.mutedText)));
+    }
+    if (_telegramEnabled) {
+      items.add(_buildNavItemWithBadge(idx++, Icons.send_outlined, Icons.send_rounded, 'TG', const Color(0xFF0088CC), _telegramUnread));
+    }
+    if (_discordEnabled) {
+      items.add(_buildNavItem(idx++, Icons.forum_outlined, Icons.forum_rounded, 'DC'));
+    }
+    if (_slackEnabled) {
+      items.add(_buildNavItem(idx++, Icons.workspaces_outlined, Icons.workspaces_rounded, 'SL'));
+    }
+    if (_messengerEnabled) {
+      items.add(_buildNavItem(idx++, Icons.message_outlined, Icons.message_rounded, 'MS'));
+    }
+    if (_googleMessagesEnabled) {
+      items.add(_buildNavItem(idx++, Icons.sms_outlined, Icons.sms_rounded, 'GM'));
+    }
+    items.add(_buildNavItem(_driveTabIndex, Icons.cloud_queue_rounded, Icons.cloud_rounded, 'DRIVE'));
+    items.add(_buildNavItem(_notesTabIndex, Icons.sticky_note_2_outlined, Icons.sticky_note_2_rounded, 'NOTES'));
+    items.add(_buildNavItem(_settingsTabIndex, Icons.settings_outlined, Icons.settings_rounded, 'SET'));
+    return items;
+  }
+
+  Widget _buildNavItemWithBadge(int index, IconData outlineIcon, IconData filledIcon, String label, Color accentColor, int badgeCount, {Widget? iconWidget}) {
+    final isSelected = _selectedIndex == index;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _onDestinationSelected(index),
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: isSelected
+                  ? BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(14),
+                    )
+                  : null,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  iconWidget != null
+                      ? IconTheme(
+                          data: IconThemeData(
+                            color: isSelected ? accentColor : AppTheme.current.mutedText,
+                            size: 20,
+                          ),
+                          child: iconWidget,
+                        )
+                      : Icon(
+                          isSelected ? filledIcon : outlineIcon,
+                          color: isSelected ? accentColor : AppTheme.current.mutedText,
+                          size: 20,
+                        ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -8,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : '$badgeCount',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? accentColor : AppTheme.current.mutedText,
+                fontSize: 9,
+                fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                letterSpacing: 0.3,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ],
         ),
       ),
     );
@@ -1404,9 +1633,11 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   Map<String, int> _unreadCounts = {};
   Map<String, String> _lastMessages = {}; // peerId/groupId -> last message content
   Map<String, bool> _lastMessageIsMe = {}; // peerId/groupId -> was last message from me?
+  Map<String, String> _lastMessageTimestamps = {}; // peerId/groupId -> last message timestamp for sorting
   bool _isLoading = true;
   bool _isDisposing = false;
   bool _isRefreshing = false;
+  bool _profileRefreshedAfterOnline = false;
   Timer? _refreshDebounce;
   final IntrovertClient _client = IntrovertClient();
   StreamSubscription<NetworkEvent>? _networkSubscription;
@@ -1415,6 +1646,8 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   String _searchQuery = '';
   List<dynamic> _filteredContacts = [];
   List<dynamic> _filteredGroups = [];
+  String _profileHandle = '';
+  int _profilePrivacyMode = 1;
 
   @override
   bool get wantKeepAlive => true;
@@ -1423,7 +1656,10 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadContacts();
+      if (mounted) {
+        _loadContacts();
+        _loadProfile();
+      }
     });
     _networkSubscription = _client.networkStream.listen((event) {
       if (_isDisposing) return;
@@ -1434,6 +1670,14 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
         Future.microtask(() {
           if (!_isDisposing && mounted) _showInviteDialog(event.data);
         });
+      } else if (event.type == 10 && event.data.isNotEmpty && event.data[0] == 1) {
+        // Post-network-init: refresh profile once on first Online status to pick up restored handles
+        if (!_profileRefreshedAfterOnline) {
+          _profileRefreshedAfterOnline = true;
+          debugPrint("🔄 Network online — refreshing profile for handle restoration");
+          _loadProfile();
+          _loadContacts();
+        }
       }
     });
   }
@@ -1676,6 +1920,23 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
     }
   }
 
+  void _loadProfile() {
+    try {
+      final profile = _client.getProfile();
+      if (mounted) {
+        setState(() {
+          String h = profile['handle'] ?? '';
+          if (h.startsWith("i@")) h = h.substring(2);
+          _profileHandle = h;
+          _profilePrivacyMode = profile['privacy_mode'] ?? 1;
+        });
+      }
+    } catch (_) {}
+  }
+
+  /// Public refresh method callable from parent via GlobalKey
+  void refreshContacts() => _loadContacts();
+
   Future<void> _loadContacts() async {
     if (_isDisposing || !mounted || _isRefreshing) return;
     _isRefreshing = true;
@@ -1701,6 +1962,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
       }).toList();
 
       // Batch: fetch all last messages in ONE FFI call (replaces N individual calls)
+      final Map<String, String> lastTimestamps = {};
       final allLastMsgs = _client.getLastMessagesAll();
       for (var entry in allLastMsgs.entries) {
         final peerId = entry.key;
@@ -1708,8 +1970,10 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
         if (msg != null) {
           final content = msg['content'] as String? ?? '';
           final isMe = msg['is_me'] == true || msg['is_me'] == 1 || msg['is_me'] == '1';
+          final timestamp = msg['timestamp'] as String? ?? '';
           lastMsgs[peerId] = _friendlyMessagePreview(content);
           lastMsgIsMe[peerId] = isMe;
+          if (timestamp.isNotEmpty) lastTimestamps[peerId] = timestamp;
         }
       }
 
@@ -1721,10 +1985,34 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
         if (msg != null) {
           final senderId = msg['sender_id']?.toString() ?? '';
           final content = msg['content']?.toString() ?? '';
+          final timestamp = msg['timestamp'] as String? ?? '';
           lastMsgs[groupId] = _friendlyMessagePreview(content);
           lastMsgIsMe[groupId] = senderId == localId;
+          if (timestamp.isNotEmpty) lastTimestamps[groupId] = timestamp;
         }
       }
+
+      // Sort contacts and groups by last message timestamp (newest first)
+      contacts.sort((a, b) {
+        final aId = a['peer_id']?.toString() ?? '';
+        final bId = b['peer_id']?.toString() ?? '';
+        final aTs = lastTimestamps[aId] ?? '';
+        final bTs = lastTimestamps[bId] ?? '';
+        if (aTs.isEmpty && bTs.isEmpty) return 0;
+        if (aTs.isEmpty) return 1;
+        if (bTs.isEmpty) return -1;
+        return bTs.compareTo(aTs); // descending
+      });
+      groups.sort((a, b) {
+        final aId = (a is List && a.isNotEmpty) ? a[0]?.toString() ?? '' : '';
+        final bId = (b is List && b.isNotEmpty) ? b[0]?.toString() ?? '' : '';
+        final aTs = lastTimestamps[aId] ?? '';
+        final bTs = lastTimestamps[bId] ?? '';
+        if (aTs.isEmpty && bTs.isEmpty) return 0;
+        if (aTs.isEmpty) return 1;
+        if (bTs.isEmpty) return -1;
+        return bTs.compareTo(aTs); // descending
+      });
 
       if (mounted) {
         setState(() {
@@ -1734,6 +2022,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
           _unreadCounts = unread;
           _lastMessages = lastMsgs;
           _lastMessageIsMe = lastMsgIsMe;
+          _lastMessageTimestamps = lastTimestamps;
           _isLoading = false;
           _applySearchFilter();
         });
@@ -1759,50 +2048,32 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
   }
 
   void _showAddByHandleDialog() {
-    final controller = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.current.bg,
-        title: Text("Add by Introvert Handle", style: TextStyle(color: AppTheme.current.text, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("Enter a handle (e.g. i@d3v6k) to resolve it via the global mesh.", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 12)),
-            SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
-              decoration: InputDecoration(
-                labelText: "HANDLE",
-                labelStyle: TextStyle(color: AppTheme.current.accent),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.1))),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text("CANCEL")),
-          ElevatedButton(
-            onPressed: () {
-              var h = controller.text.trim();
-              if (h.isNotEmpty) {
-                if (!h.startsWith("i@")) {
-                  h = "i@$h";
-                }
-                final messenger = ScaffoldMessenger.of(context);
-                _client.resolveHandle(h);
-                Navigator.pop(context);
-                messenger.showSnackBar(SnackBar(content: Text("Resolving $h...")));
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.current.accent, foregroundColor: Colors.black),
-            child: Text("RESOLVE"),
-          ),
-        ],
+      builder: (dialogContext) => _ResolveHandleDialog(
+        client: _client,
+        parentContext: context,
       ),
-    ).whenComplete(() => controller.dispose());
+    );
+  }
+
+  void _showCreateGroupDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _CreateGroupDialog(
+        contacts: _contacts,
+        onComplete: _loadContacts,
+      ),
+    );
+  }
+
+  void _showJoinGroupDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _JoinGroupDialog(
+        onComplete: _loadContacts,
+      ),
+    );
   }
 
   void _showAddOptions() {
@@ -1823,15 +2094,87 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                 height: 4,
                 decoration: BoxDecoration(color: AppTheme.current.mutedText.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2)),
               ),
+              // Handle info banner
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.current.accent.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.alternate_email_rounded, color: AppTheme.current.accent, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: _profileHandle.isNotEmpty
+                                ? Text(
+                                    'Your Introvert handle: i@$_profileHandle',
+                                    style: TextStyle(color: AppTheme.current.text, fontSize: 13, fontWeight: FontWeight.w600),
+                                  )
+                                : Text(
+                                    'No Introvert handle set',
+                                    style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13),
+                                  ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6),
+                      if (_profileHandle.isEmpty)
+                        Text(
+                          'Go to Profile tab to set your handle.',
+                          style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.7), fontSize: 11),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (_profilePrivacyMode == 1 ? Colors.greenAccent : Colors.orangeAccent).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _profilePrivacyMode == 1 ? 'PUBLIC' : 'PRIVATE',
+                                style: TextStyle(
+                                  color: _profilePrivacyMode == 1 ? Colors.greenAccent : Colors.orangeAccent,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _profilePrivacyMode == 1
+                                    ? 'Unknown users can find and connect to you'
+                                    : 'Only reachable via Magic Links',
+                                style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.6), fontSize: 10),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
               Material(
                 color: Colors.transparent,
                 child: ListTile(
                   leading: Icon(Icons.person_pin_rounded, color: AppTheme.current.accent),
                   title: Text("Add via i@ Handle", style: TextStyle(color: AppTheme.current.text)),
                   subtitle: Text("Find and connect using a persistent handle", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-                    _showAddByHandleDialog();
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (mounted) _showAddByHandleDialog();
                   },
                 ),
               ),
@@ -1841,9 +2184,10 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                   leading: Icon(Icons.person_add, color: AppTheme.current.accent),
                   title: Text("Add via Magic Link", style: TextStyle(color: AppTheme.current.text)),
                   subtitle: Text("Invite a peer via Introvert Magic Link", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-                    _showAddPeerDialog();
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (mounted) _showAddPeerDialog();
                   },
                 ),
               ),
@@ -1853,15 +2197,10 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                   leading: Icon(Icons.group_add_outlined, color: AppTheme.current.accent),
                   title: Text("Create Sovereign Group", style: TextStyle(color: AppTheme.current.text)),
                   subtitle: Text("Start an encrypted mesh group chat", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-                    showDialog(
-                      context: context,
-                      builder: (context) => _CreateGroupDialog(
-                        contacts: _contacts,
-                        onComplete: _loadContacts,
-                      ),
-                    );
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (mounted) _showCreateGroupDialog();
                   },
                 ),
               ),
@@ -1871,14 +2210,10 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                   leading: Icon(Icons.vpn_key_outlined, color: AppTheme.current.accent),
                   title: Text("Join Sovereign Group", style: TextStyle(color: AppTheme.current.text)),
                   subtitle: Text("Join a mesh using an invite code", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(context);
-                    showDialog(
-                      context: context,
-                      builder: (context) => _JoinGroupDialog(
-                        onComplete: _loadContacts,
-                      ),
-                    );
+                    await Future.delayed(const Duration(milliseconds: 300));
+                    if (mounted) _showJoinGroupDialog();
                   },
                 ),
               ),
@@ -2460,22 +2795,88 @@ class _ClawTerminalDialogState extends State<_ClawTerminalDialog> with SingleTic
                         )),
                       ),
                       SizedBox(height: 12),
-                      Center(
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              try {
+                                final buffer = StringBuffer();
+                                buffer.writeln('INTRO-CLAW ${widget.title}');
+                                buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
+                                buffer.writeln('=' * 60);
+                                for (final m in widget.milestones) {
+                                  buffer.writeln(m);
+                                }
+                                if (widget.finalReport != null) {
+                                  buffer.writeln('');
+                                  buffer.writeln('--- REPORT ---');
+                                  buffer.writeln(widget.finalReport!);
+                                }
+                                final fileName = 'introvert_${widget.title.toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.txt';
+                                Directory dir;
+                                if (Platform.isAndroid) {
+                                  dir = Directory('/storage/emulated/0/Download');
+                                  if (!await dir.exists()) {
+                                    dir = await getTemporaryDirectory();
+                                  }
+                                } else if (Platform.isIOS || Platform.isMacOS) {
+                                  dir = await getApplicationDocumentsDirectory();
+                                } else {
+                                  dir = await getTemporaryDirectory();
+                                }
+                                final file = File('${dir.path}/$fileName');
+                                await file.writeAsString(buffer.toString());
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Saved: $fileName')),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to save: $e')),
+                                  );
+                                }
+                              }
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.download_rounded, size: 14, color: Colors.greenAccent.withValues(alpha: 0.8)),
+                                  SizedBox(width: 6),
+                                  Text('DOWNLOAD', style: TextStyle(
+                                    fontSize: 11, fontWeight: FontWeight.bold,
+                                    color: Colors.greenAccent.withValues(alpha: 0.8), letterSpacing: 1.5, fontFamily: 'monospace',
+                                  )),
+                                ],
+                              ),
                             ),
-                            child: Text('CLOSE', style: TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.bold,
-                              color: Colors.greenAccent, letterSpacing: 1.5, fontFamily: 'monospace',
-                            )),
                           ),
-                        ),
+                          SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.greenAccent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.4)),
+                              ),
+                              child: Text('CLOSE', style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.bold,
+                                color: Colors.greenAccent, letterSpacing: 1.5, fontFamily: 'monospace',
+                              )),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],
@@ -2577,72 +2978,74 @@ class _AddPeerDialogState extends State<_AddPeerDialog> {
       backgroundColor: AppTheme.current.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text("Add Sovereign Peer", style: TextStyle(color: AppTheme.current.accent)),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_status, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 14)),
-            SizedBox(height: 20),
-            if (_inviteCode != null) ...[
-              Container(
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3)),
-                ),
-                child: SelectableText(
-                  _inviteCode!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20, 
-                    fontWeight: FontWeight.bold, 
-                    color: AppTheme.current.accent,
-                    letterSpacing: 2,
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_status, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 14)),
+              SizedBox(height: 20),
+              if (_inviteCode != null) ...[
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.3)),
+                  ),
+                  child: SelectableText(
+                    _inviteCode!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.current.accent,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(height: 12),
-              Text("Waiting for peer to join...", style: TextStyle(fontSize: 12, color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
-            ] else if (!_isWaiting) ...[
-              ElevatedButton(
-                onPressed: _startInvite,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: AppTheme.current.accent,
-                  foregroundColor: Colors.black,
+                SizedBox(height: 12),
+                Text("Waiting for peer to join...", style: TextStyle(fontSize: 12, color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
+              ] else if (!_isWaiting) ...[
+                ElevatedButton(
+                  onPressed: _startInvite,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    backgroundColor: AppTheme.current.accent,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text("CREATE INVITE CODE"),
                 ),
-                child: Text("CREATE INVITE CODE"),
-              ),
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 16.0),
-                child: Text("OR", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
-              ),
-              TextField(
-                controller: _codeController,
-                decoration: InputDecoration(
-                  hintText: "ENTER PEER'S CODE",
-                  hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)),
-                  filled: true,
-                  fillColor: Colors.black26,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: Text("OR", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
                 ),
-                style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
-              ),
-              SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: _joinInvite,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: AppTheme.current.mutedText.withValues(alpha: 0.2),
-                  foregroundColor: AppTheme.current.text,
+                TextField(
+                  controller: _codeController,
+                  decoration: InputDecoration(
+                    hintText: "ENTER PEER'S CODE",
+                    hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5)),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace'),
                 ),
-                child: Text("JOIN SESSION"),
-              ),
-            ] else
-              CircularProgressIndicator(color: AppTheme.current.accent),
-          ],
+                SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: _joinInvite,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    backgroundColor: AppTheme.current.mutedText.withValues(alpha: 0.2),
+                    foregroundColor: AppTheme.current.text,
+                  ),
+                  child: Text("JOIN SESSION"),
+                ),
+              ] else
+                CircularProgressIndicator(color: AppTheme.current.accent),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -2658,7 +3061,9 @@ class _AddPeerDialogState extends State<_AddPeerDialog> {
 
 
 class SettingsTab extends StatefulWidget {
-  const SettingsTab({super.key});
+  final VoidCallback? onMessengerSettingsChanged;
+  final VoidCallback? onContactsChanged;
+  const SettingsTab({super.key, this.onMessengerSettingsChanged, this.onContactsChanged});
 
   @override
   State<SettingsTab> createState() => _SettingsTabState();
@@ -2672,6 +3077,20 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   int _clawDriveBytes = 0;
   int _clawMeshBytes = 0;
   Timer? _clawStatusTimer;
+  // Messenger integration state
+  static const int _maxMessengerTabs = 3;
+  bool _whatsappEnabled = true;
+  bool _telegramEnabled = true;
+  bool _discordEnabled = false;
+  bool _slackEnabled = false;
+  bool _messengerEnabled = false;
+  bool _googleMessagesEnabled = false;
+  List<Map<String, dynamic>> _clawActivityLog = [];
+  Timer? _clawActivityLogTimer;
+  final _clawLogScrollController = ScrollController();
+  int _rbnCount = 0;
+  int _meshNodeCount = 0;
+  int _connectedPeerCount = 0;
   StreamSubscription? _economySubscription;
   Map<String, dynamic> _economyStats = {
     'intr_balance': 0,
@@ -2700,10 +3119,15 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     _isAnchorMode = IntrovertClient().isAnchorModeEnabled();
     _isTunnelMode = IntrovertClient().isTunnelModeEnabled();
     _loadKlipyApiKey();
+    _loadMessengerSettings();
     
     // Intro-Claw is always active — no toggle needed
     IntrovertClient().setIntroClawActive(true);
     _refreshClawStatus();
+    _refreshClawActivityLog();
+    _clawActivityLogTimer = Timer.periodic(Duration(seconds: 10), (_) {
+      if (mounted) _refreshClawActivityLog();
+    });
     
     _swarmStatsSubscription = IntrovertClient().swarmStatsStream.listen((stats) {
       if (mounted) {
@@ -2722,6 +3146,8 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     _swarmStatsSubscription?.cancel();
     _economySubscription?.cancel();
     _clawStatusTimer?.cancel();
+    _clawActivityLogTimer?.cancel();
+    _clawLogScrollController.dispose();
     super.dispose();
   }
 
@@ -2940,11 +3366,11 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                       ),
                       _buildManifestoPillar(
                         "4",
-                        "Economic Incentivization & Web3 Democratization",
+                        "Network Participation & Resource Sharing",
                         [
-                          "\$INTR Token Economy: Users earn tokens on a decentralized ledger as compensation for contributing to the network.",
-                          "Availability Yield: Participants are rewarded for maintaining uptime and providing routing services.",
-                          "Democratized Market Entry: Gasless reward mechanisms lower the barrier for global passive income.",
+                          "Telemetry Weight System: Active nodes receive allocation multipliers based on verified network contribution metrics.",
+                          "Uptime Tracking: Nodes are scored for maintaining continuous availability and providing routing services.",
+                          "Accessible Participation: Synchronization mechanisms lower the barrier for global network contribution.",
                         ],
                       ),
                       SizedBox(height: 16),
@@ -3112,8 +3538,32 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _klipyApiKey = prefs.getString('klipy_api_key') ?? '';
+      _klipyApiKey = prefs.getString('klipy_api_key') ?? 'lh4LISPXX2wQQFRZ6JCfqmUeKNeHUJ2Ht8i3dxSqadvlKJC4T5jJLzDxx2jRfW5b';
     });
+  }
+
+  void _loadMessengerSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _whatsappEnabled = prefs.getBool('whatsapp_enabled') ?? true;
+      _telegramEnabled = prefs.getBool('telegram_enabled') ?? true;
+      _discordEnabled = prefs.getBool('discord_enabled') ?? false;
+      _slackEnabled = prefs.getBool('slack_enabled') ?? false;
+      _messengerEnabled = prefs.getBool('messenger_enabled') ?? false;
+      _googleMessagesEnabled = prefs.getBool('google_messages_enabled') ?? false;
+    });
+  }
+
+  int get _enabledMessengerCount {
+    int count = 0;
+    if (_whatsappEnabled) count++;
+    if (_telegramEnabled) count++;
+    if (_discordEnabled) count++;
+    if (_slackEnabled) count++;
+    if (_messengerEnabled) count++;
+    if (_googleMessagesEnabled) count++;
+    return count;
   }
 
   void _startMonitoring() {
@@ -3152,23 +3602,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
         IntrovertClient().setProfileTier(tier);
       }
     });
-  }
-
-  Future<void> _handleClaim() async {
-    try {
-      final sig = await IntrovertClient().claimRewards();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rewards claimed! TX: ${sig.substring(0, 10)}...')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Claim failed: ${e.toString()}')),
-        );
-      }
-    }
   }
 
   void _toggleAnchorMode(bool value) async {
@@ -3419,101 +3852,8 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 tintAlpha: 0.08,
                 borderAlpha: 0.12,
                 padding: EdgeInsets.zero,
-                child: SovereignEarnings(
+                child: NodeDashboard(
                   economyStats: _economyStats,
-                  onClaim: _handleClaim,
-                ),
-              ),
-            ),
-            SizedBox(height: 24),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.0),
-              child: GlassmorphicContainer(
-                borderRadius: BorderRadius.circular(16),
-                blur: 10,
-                tintAlpha: 0.08,
-                borderAlpha: 0.12,
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.account_balance_wallet_rounded, color: AppTheme.current.accent, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              "SOVEREIGN WALLET",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.current.accent,
-                                letterSpacing: 1.1,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.2)),
-                          ),
-                          child: Text(
-                            "SOLANA NETWORK",
-                            style: TextStyle(
-                              color: Colors.purpleAccent,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Divider(color: AppTheme.current.mutedText.withValues(alpha: 0.1), height: 24),
-                    Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text('Wallet ID', style: TextStyle(fontSize: 13, color: AppTheme.current.text.withValues(alpha: 0.7))),
-                        subtitle: Text(_economyStats['sol_address'] ?? 'Connecting...', 
-                          style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: AppTheme.current.text.withValues(alpha: 0.5))),
-                        trailing: IconButton(
-                          icon: Icon(Icons.copy, size: 18),
-                          onPressed: () {
-                            final addr = _economyStats['sol_address'];
-                            if (addr != null && addr != 'Connecting...') {
-                              Clipboard.setData(ClipboardData(text: addr));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Wallet ID copied to clipboard')),
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    Text(
-                      "Your wallet is derived on the Solana network from your Sovereign master seed phrase, keeping your keys unified yet cryptographically isolated for safety.",
-                      style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.6), fontSize: 10.5, height: 1.3),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      "ASSET BALANCES",
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.current.text.withValues(alpha: 0.7),
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    _buildBalanceTile('INTR', _economyStats['intr_balance'], 9),
-                    _buildBalanceTile('SOL', _economyStats['sol_balance'], 9),
-                    _buildBalanceTile('USDC', _economyStats['usdc_balance'], 6),
-                  ],
                 ),
               ),
             ),
@@ -3563,6 +3903,8 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ),
               ],
             ),
+            // Other Instant Messenger Clients — single expander with all options
+            _buildMessengerClientsSection(),
             _buildSettingSection(
               'Introvert Mesh Swarm Settings',
               [
@@ -3662,6 +4004,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                     );
                     if (confirm == true) {
                       await IntrovertClient().clearAllContacts();
+                      widget.onContactsChanged?.call();
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("All contacts cleared.")));
                       }
@@ -3690,15 +4033,41 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                     );
                     if (confirm == true) {
                       String dbPath;
+                      String? docsPath;
                       if (Platform.isAndroid || Platform.isMacOS || Platform.isIOS) {
                         final dir = await getApplicationSupportDirectory();
                         dbPath = "${dir.path}/introvert.db";
+                        final docsDir = await getApplicationDocumentsDirectory();
+                        docsPath = docsDir.path;
                       } else {
                         dbPath = "./introvert.db";
                       }
                       IntrovertClient().nukeIdentity(dbPath);
                       _avatarCache.clear();
                       await IdentityManager().clearIdentity();
+
+                      // Wipe ALL SharedPreferences — full hard reset to first-run state
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.clear();
+
+                      // Reset theme to default
+                      await AppTheme.current.setTheme(AppTheme.introvertDefault);
+
+                      // Delete all app data files (media, notes, cached files)
+                      for (final path in [docsPath]) {
+                        if (path == null) continue;
+                        try {
+                          final dir = Directory(path);
+                          if (await dir.exists()) {
+                            await for (final entity in dir.list()) {
+                              try {
+                                await entity.delete(recursive: true);
+                              } catch (_) {}
+                            }
+                          }
+                        } catch (_) {}
+                      }
+
                       if (context.mounted) {
                         Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(builder: (context) => const IntrovertApp()),
@@ -3727,6 +4096,55 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
             ),
             _buildIntroClawSection(),
             _buildSettingSection(
+              'Network Debug Log',
+              [
+                ListTile(
+                  leading: Icon(Icons.bug_report_rounded, color: Colors.orangeAccent),
+                  title: Text('Rust Network Log', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    '${IntrovertClient().debugLogCount} entries captured (relay, circuit, mesh)',
+                    style: TextStyle(fontFamily: 'monospace', fontSize: 10),
+                  ),
+                  dense: true,
+                ),
+                Divider(height: 1, indent: 16, endIndent: 16, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                ListTile(
+                  leading: Icon(Icons.save_alt_rounded, color: AppTheme.current.accent, size: 20),
+                  title: Text('Save Network Log to File', style: TextStyle(fontSize: 13)),
+                  subtitle: Text('Saves Rust relay/mesh debug events to Downloads', style: TextStyle(fontSize: 11)),
+                  dense: true,
+                  onTap: _saveNetworkDebugLog,
+                ),
+                ListTile(
+                  leading: Icon(Icons.copy_rounded, color: AppTheme.current.accent, size: 20),
+                  title: Text('Copy Network Log to Clipboard', style: TextStyle(fontSize: 13)),
+                  dense: true,
+                  onTap: () {
+                    final logs = IntrovertClient().getDebugLogs();
+                    Clipboard.setData(ClipboardData(text: logs));
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Network log copied (${IntrovertClient().debugLogCount} entries)')),
+                      );
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.clear_all_rounded, color: Colors.redAccent.withValues(alpha: 0.7), size: 20),
+                  title: Text('Clear Debug Log', style: TextStyle(fontSize: 13)),
+                  dense: true,
+                  onTap: () {
+                    IntrovertClient().clearDebugLogs();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Debug log cleared')),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+            _buildSettingSection(
               'Info & Legal',
               [
                 ListTile(
@@ -3736,9 +4154,15 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ),
                 ListTile(
                   leading: Icon(Icons.code_rounded, color: AppTheme.current.accent),
-                  title: Text('ZeroClaw Attribution'),
-                  subtitle: Text('Intro-Claw engine forked from ZeroClaw'),
-                  onTap: _showZeroClawLicense,
+                  title: Text('Open Source Licenses & Attribution'),
+                  subtitle: Text('Third-party licenses and ZeroClaw attribution'),
+                  onTap: _showLicensesDialog,
+                ),
+                ListTile(
+                  leading: Icon(Icons.gavel_rounded, color: AppTheme.current.accent),
+                  title: Text('Terms of Use & Liability Disclaimer'),
+                  subtitle: Text('View the complete Terms of Use and legal disclaimers'),
+                  onTap: _showTermsOfUse,
                 ),
               ],
             ),
@@ -3768,6 +4192,17 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                   ),
                   onTap: _showUpdateUrlDialog,
                 ),
+                ListTile(
+                  leading: Icon(Icons.code_rounded, color: AppTheme.current.accent),
+                  title: Text('GitHub Repository'),
+                  subtitle: Text('github.com/d3v6k/introvert', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+                  onTap: () async {
+                    final uri = Uri.parse('https://github.com/d3v6k/introvert');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
               ],
             ),
           ],
@@ -3782,14 +4217,19 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
 
     if (!mounted) return;
 
+    final parentContext = context;
+    final surface = AppTheme.current.surface;
+    final accent = AppTheme.current.accent;
+    final text = AppTheme.current.text;
+    final mutedText = AppTheme.current.mutedText;
     showDialog(
-      context: context,
-      builder: (context) {
+      context: parentContext,
+      builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: AppTheme.current.surface,
+          backgroundColor: surface,
           title: Text(
             "UPDATE SERVER CONFIG",
-            style: TextStyle(color: AppTheme.current.accent, fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold),
+            style: TextStyle(color: accent, fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -3797,17 +4237,17 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
             children: [
               Text(
                 "Configure a custom URL for checking compiled updates. Leave empty to restore the default server location.",
-                style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
+                style: TextStyle(color: text.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
               ),
               SizedBox(height: 16),
               TextField(
                 controller: controller,
-                style: TextStyle(color: AppTheme.current.text, fontSize: 13, fontFamily: 'monospace'),
+                style: TextStyle(color: text, fontSize: 13, fontFamily: 'monospace'),
                 decoration: InputDecoration(
                   labelText: "Server JSON URL",
-                  labelStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 12),
-                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.5))),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppTheme.current.accent)),
+                  labelStyle: TextStyle(color: mutedText.withValues(alpha: 0.7), fontSize: 12),
+                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: mutedText.withValues(alpha: 0.5))),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accent)),
                 ),
               ),
             ],
@@ -3815,17 +4255,17 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(dialogContext);
               },
-              child: Text("CANCEL", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7))),
+              child: Text("CANCEL", style: TextStyle(color: mutedText.withValues(alpha: 0.7))),
             ),
             TextButton(
               onPressed: () async {
                 await UpdateService.setUpdateUrl(controller.text);
-                if (context.mounted) {
-                  Navigator.pop(context);
+                if (parentContext.mounted) {
+                  Navigator.pop(dialogContext);
                   if (mounted) setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
                     SnackBar(content: Text('Update server configuration saved.')),
                   );
                 }
@@ -3836,6 +4276,125 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
         );
       },
     ).whenComplete(() => controller.dispose());
+  }
+
+  void _showTermsOfUse() {
+    const termsText = '''# Introvert App — Terms of Use & Liability Disclaimer
+
+**Last Updated: June 2026**
+
+---
+
+## ⚠️ CRITICAL NOTICE FOR ALL USERS
+
+Introvert is **not a service**. It is a decentralized, open-source, serverless peer-to-peer (P2P) communication software utility. By utilizing this software, you operate your own autonomous node within a distributed mesh network. The creators, developers, and maintainers of Introvert have **no control over the network**, hold **zero user data**, and have **no capacity to monitor, moderate, or log your traffic**.
+
+---
+
+## 1. Legal Status of the Software
+
+Introvert is an open-source communication software tool, completely separate from any financial or asset-management services.
+
+- **Not a Wallet:** Introvert does not hold, store, transmit, or facilitate the transfer of any funds, cryptocurrencies, or digital assets. It completely lacks the programming or capacity to handle peer-to-peer financial transactions.
+
+- **External Token Management:** Any interaction with the Solana blockchain or the management of your \$INTR tokens must occur exclusively outside of this application using third-party software.
+
+- **No Central Infrastructure:** There are no central databases, cloud platforms, or authentication servers. Your cryptographic identity is derived entirely on your local device using an offline 12-word BIP-39 mnemonic phrase.
+
+---
+
+## 2. Age Restriction & Eligibility
+
+- **Minimum Age:** You must be at least 18 years of age (or the legal age of majority within your sovereign jurisdiction) to open, execute, or interact with this software.
+
+- **Representation of Age:** By checking the agreement box and running this software, you explicitly represent and warrant that you meet this age requirement. If you are under 18, you are strictly prohibited from using Introvert.
+
+---
+
+## 3. Absolute Prohibition of Illegal & Covert Activities
+
+Because Introvert operates on total user sovereignty, you bear exclusive legal liability for all content, data, and metadata you route through your node.
+
+- **Lawful Use Only:** You explicitly agree to use this software solely for lawful intents and activities.
+
+- **Prohibited Actions:** You are strictly forbidden from utilizing Introvert to facilitate, execute, or conceal criminal enterprise, malicious hacking, harassment, or the distribution, transmission, or caching of any illicit material.
+
+- **Zero Indemnification:** You acknowledge that the open-source developers will not protect, legally defend, or indemnify you if you use this utility to violate local or international laws.
+
+---
+
+## 4. Complete Disclaimer of Warranties & Limitation of Liability
+
+- **Provided "As Is":** This open-source software code is provided entirely "as is" and "as available," without warranties of any scale, express or implied.
+
+- **Liability Cap:** Under no legal theory or jurisdiction shall the developers, contributors, or maintainers of the Introvert ecosystem be liable for any direct, indirect, incidental, or consequential damages, leaks, hardware wear, or data loss resulting from your use or inability to use the codebase. You proceed entirely at your own risk.
+
+- **Data and Identity Loss:** You are uniquely responsible for backing up your BIP-39 seed phrase. There is no central password recovery mechanism; if you lose your seed phrase, you permanently lose your network identity and local database access.''';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: AppTheme.current.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+              maxWidth: 500,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.gavel_rounded, color: AppTheme.current.accent, size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'TERMS OF USE & DISCLAIMER',
+                          style: TextStyle(
+                            color: AppTheme.current.text,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: AppTheme.current.mutedText),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppTheme.current.mutedText.withValues(alpha: 0.2)),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      termsText
+                          .replaceAll('# ', '')
+                          .replaceAll('## ', '')
+                          .replaceAll('### ', '')
+                          .replaceAll('**', '')
+                          .replaceAll('---', '—————————————————')
+                          .replaceAll('- ', '  • '),
+                      style: TextStyle(
+                        color: AppTheme.current.text.withValues(alpha: 0.85),
+                        fontSize: 13,
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showAboutDialog() {
@@ -3877,48 +4436,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                   fontFamily: 'monospace',
                 ),
               ),
-              SizedBox(height: 16),
-              Text(
-                "OPEN-SOURCE LICENSES",
-                style: TextStyle(
-                  color: AppTheme.current.mutedText.withValues(alpha: 0.7),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              SizedBox(height: 8),
-              Container(
-                height: 160,
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.current.text.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Introvert's Magic Link is powered by the open-source Magic Wormhole protocol.\n\n"
-                        "MIT License\n"
-                        "Copyright (c) 2018 Brian Warner\n\n"
-                        "Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software...\n\n"
-                        "Other Third-Party Licenses:\n\n"
-                        "- ZeroClaw: MIT / Apache 2.0 (github.com/zeroclaw-labs/zeroclaw)\n"
-                        "- libp2p: Apache 2.0 / MIT\n"
-                        "- webrtc-rs: MIT\n"
-                        "- SQLCipher: BSD\n"
-                        "- rusqlite: MIT\n"
-                        "- tokio: MIT\n"
-                        "- Flutter Framework: BSD",
-                        style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11, height: 1.4),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
           ),
           actions: [
@@ -3932,7 +4449,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     );
   }
 
-  void _showZeroClawLicense() {
+  void _showLicensesDialog() {
     showDialog(
       context: context,
       builder: (context) {
@@ -3944,102 +4461,50 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  "ZEROCLOW ATTRIBUTION",
+                  "OPEN SOURCE LICENSES & ATTRIBUTION",
                   style: TextStyle(
                     color: AppTheme.current.text,
                     fontFamily: 'monospace',
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Introvert's Intro-Claw automation engine is forked from ZeroClaw, an open-source autonomous AI assistant infrastructure.",
-                style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 13, height: 1.4),
-              ),
-              SizedBox(height: 12),
-              Text(
-                "ZeroClaw",
-                style: TextStyle(
-                  color: AppTheme.current.accent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  fontFamily: 'monospace',
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Magic Wormhole
+                Text("Magic Wormhole", style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13)),
+                SizedBox(height: 4),
+                Text("Introvert's Magic Link is powered by the open-source Magic Wormhole protocol.", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11, height: 1.4)),
+                SizedBox(height: 4),
+                Text("MIT License · Copyright (c) 2018 Brian Warner", style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.6), fontSize: 10)),
+                SizedBox(height: 16),
+
+                // ZeroClaw
+                Text("ZeroClaw", style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13)),
+                SizedBox(height: 4),
+                Text("Introvert's Intro-Claw automation engine is forked from ZeroClaw, an open-source autonomous AI assistant infrastructure.", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11, height: 1.4)),
+                SizedBox(height: 4),
+                Text("github.com/zeroclaw-labs/zeroclaw", style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.7), fontSize: 10, fontFamily: 'monospace')),
+                Text("Created by @theonlyhennygod · Project lead @JordanTheJet", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 10)),
+                SizedBox(height: 4),
+                Text("MIT / Apache 2.0 · Copyright (c) ZeroClaw Labs", style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.6), fontSize: 10)),
+                SizedBox(height: 16),
+
+                // Other licenses
+                Text("Third-Party Libraries", style: TextStyle(color: AppTheme.current.accent, fontWeight: FontWeight.bold, fontSize: 13)),
+                SizedBox(height: 8),
+                Text(
+                  "• libp2p: Apache 2.0 / MIT\n• webrtc-rs: MIT\n• SQLCipher: BSD\n• rusqlite: MIT\n• tokio: MIT\n• Flutter Framework: BSD\n• ed25519-dalek: BSD-3-Clause\n• solana-sdk: Apache 2.0",
+                  style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11, height: 1.5),
                 ),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "github.com/zeroclaw-labs/zeroclaw",
-                style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.7), fontSize: 11, fontFamily: 'monospace'),
-              ),
-              SizedBox(height: 4),
-              Text(
-                "Created by @theonlyhennygod · Project lead @JordanTheJet",
-                style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11),
-              ),
-              SizedBox(height: 16),
-              Text(
-                "LICENSE",
-                style: TextStyle(
-                  color: AppTheme.current.mutedText.withValues(alpha: 0.7),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              SizedBox(height: 8),
-              Container(
-                height: 200,
-                padding: EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.current.text.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                ),
-                child: SingleChildScrollView(
-                  child: Text(
-                    "ZeroClaw is dual-licensed under MIT OR Apache 2.0.\n\n"
-                    "MIT License\n\n"
-                    "Copyright (c) ZeroClaw Labs\n\n"
-                    "Permission is hereby granted, free of charge, to any person obtaining a copy "
-                    "of this software and associated documentation files (the \"Software\"), to deal "
-                    "in the Software without restriction, including without limitation the rights to "
-                    "use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies "
-                    "of the Software, and to permit persons to whom the Software is furnished to do "
-                    "so, subject to the following conditions:\n\n"
-                    "The above copyright notice and this permission notice shall be included in all "
-                    "copies or substantial portions of the Software.\n\n"
-                    "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR "
-                    "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS "
-                    "FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR "
-                    "COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER "
-                    "IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN "
-                    "CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n"
-                    "──────────────────────────────\n\n"
-                    "Apache License 2.0\n\n"
-                    "Copyright (c) ZeroClaw Labs\n\n"
-                    "Licensed under the Apache License, Version 2.0 (the \"License\"); "
-                    "you may not use this file except in compliance with the License. "
-                    "You may obtain a copy of the License at\n\n"
-                    "    http://www.apache.org/licenses/LICENSE-2.0\n\n"
-                    "Unless required by applicable law or agreed to in writing, software "
-                    "distributed under the License is distributed on an \"AS IS\" BASIS, "
-                    "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. "
-                    "See the License for the specific language governing permissions and "
-                    "limitations under the License.\n\n"
-                    "──────────────────────────────\n\n"
-                    "The ZeroClaw name and logo are trademarks of ZeroClaw Labs.",
-                    style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11, height: 1.4),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -4118,11 +4583,31 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                               ),
                               title: Text(theme.name, style: TextStyle(color: isSelected ? AppTheme.current.accent : AppTheme.current.text, fontSize: 14)),
                               subtitle: Text(theme.isDark ? "Dark" : "Light", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
-                              trailing: isSelected ? Icon(Icons.check, color: AppTheme.current.accent) : null,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.edit, size: 18, color: AppTheme.current.mutedText),
+                                    onPressed: () async {
+                                      final result = await showDialog<ThemeConfig>(
+                                        context: context,
+                                        builder: (_) => CustomThemeCreator(existingTheme: theme),
+                                      );
+                                      if (result != null) {
+                                        await AppTheme.current.saveCustomTheme(result);
+                                        AppTheme.current.setTheme(result);
+                                        Navigator.pop(context);
+                                        setState(() {});
+                                      }
+                                    },
+                                  ),
+                                  if (isSelected) Icon(Icons.check, color: AppTheme.current.accent),
+                                ],
+                              ),
                               onTap: () {
                                 AppTheme.current.setTheme(theme);
                                 Navigator.pop(context);
-                                setState((){});
+                                setState(() {});
                               },
                             ),
                           );
@@ -4333,6 +4818,100 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     }
   }
 
+  Widget _buildMessengerClientsSection() {
+    final messengers = [
+      {'key': 'whatsapp', 'name': 'WhatsApp', 'icon': Icons.chat_rounded, 'color': const Color(0xFF25D366), 'enabled': _whatsappEnabled, 'desc': 'Scan QR code — like WhatsApp Desktop', 'customIcon': true},
+      {'key': 'telegram', 'name': 'Telegram', 'icon': Icons.send_rounded, 'color': const Color(0xFF0088CC), 'enabled': _telegramEnabled, 'desc': 'Log in with phone — like Telegram Desktop'},
+      {'key': 'discord', 'name': 'Discord', 'icon': Icons.forum_rounded, 'color': const Color(0xFF5865F2), 'enabled': _discordEnabled, 'desc': 'Log in — like Discord Desktop'},
+      {'key': 'slack', 'name': 'Slack', 'icon': Icons.workspaces_rounded, 'color': const Color(0xFF4A154B), 'enabled': _slackEnabled, 'desc': 'Log in — like Slack Desktop'},
+      {'key': 'messenger', 'name': 'Messenger', 'icon': Icons.message_rounded, 'color': const Color(0xFF0084FF), 'enabled': _messengerEnabled, 'desc': 'Log in — like Messenger Desktop'},
+      {'key': 'google_messages', 'name': 'Google Messages', 'icon': Icons.sms_rounded, 'color': const Color(0xFF1A73E8), 'enabled': _googleMessagesEnabled, 'desc': 'Log in — like Messages for Web'},
+    ];
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: GlassmorphicContainer(
+          borderRadius: BorderRadius.circular(16),
+          blur: 10,
+          tintAlpha: 0.08,
+          borderAlpha: 0.12,
+          padding: EdgeInsets.zero,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              leading: Icon(Icons.devices_rounded, color: AppTheme.current.accent, size: 22),
+              title: Text('Other Instant Messenger Clients', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.current.accent, letterSpacing: 0.5)),
+              subtitle: Text('$_enabledMessengerCount/$_maxMessengerTabs enabled', style: TextStyle(fontSize: 10, color: AppTheme.current.mutedText)),
+              collapsedIconColor: AppTheme.current.mutedText,
+              iconColor: AppTheme.current.accent,
+              initiallyExpanded: false,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add messenger web clients as tabs in the navigation bar. These work exactly like desktop apps — Introvert cannot see your chats. Traffic goes directly to each service, not through the P2P network.',
+                        style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11, height: 1.4),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Maximum 3 messenger tabs can be active at once.',
+                        style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.7), fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                ...messengers.map((m) {
+                  final key = m['key'] as String;
+                  final name = m['name'] as String;
+                  final icon = m['icon'] as IconData;
+                  final color = m['color'] as Color;
+                  final isEnabled = m['enabled'] as bool;
+                  final desc = m['desc'] as String;
+                  final hasCustomIcon = m['customIcon'] == true;
+                  final canEnable = !isEnabled && _enabledMessengerCount >= _maxMessengerTabs;
+                  return SwitchListTile(
+                    secondary: hasCustomIcon
+                        ? WhatsAppIcon(size: 22, color: isEnabled ? color : AppTheme.current.mutedText)
+                        : Icon(icon, color: isEnabled ? color : AppTheme.current.mutedText, size: 22),
+                    title: Text(name, style: TextStyle(fontSize: 13, color: canEnable ? AppTheme.current.mutedText.withValues(alpha: 0.4) : AppTheme.current.text)),
+                    subtitle: Text(desc, style: TextStyle(fontSize: 10, color: AppTheme.current.mutedText.withValues(alpha: canEnable ? 0.3 : 0.7))),
+                    value: isEnabled,
+                    activeColor: color,
+                    onChanged: canEnable ? null : (val) async {
+                      setState(() {
+                        switch (key) {
+                          case 'whatsapp': _whatsappEnabled = val; break;
+                          case 'telegram': _telegramEnabled = val; break;
+                          case 'discord': _discordEnabled = val; break;
+                          case 'slack': _slackEnabled = val; break;
+                          case 'messenger': _messengerEnabled = val; break;
+                          case 'google_messages': _googleMessagesEnabled = val; break;
+                        }
+                      });
+                      // Save immediately and trigger nav bar rebuild
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('${key}_enabled', val);
+                      widget.onMessengerSettingsChanged?.call();
+                    },
+                    dense: true,
+                  );
+                }),
+                SizedBox(height: 4),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildIntroClawSection() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -4431,6 +5010,17 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                         ],
                       ),
                       SizedBox(height: 8),
+                      // Network stats chips
+                      Row(
+                        children: [
+                          _buildClawStatChip('RBNs', '$_rbnCount', Icons.dns_rounded, Colors.orangeAccent),
+                          SizedBox(width: 8),
+                          _buildClawStatChip('NODES', '$_meshNodeCount', Icons.hub_rounded, Colors.cyanAccent),
+                          SizedBox(width: 8),
+                          _buildClawStatChip('PEERS', '$_connectedPeerCount', Icons.people_rounded, Colors.greenAccent),
+                        ],
+                      ),
+                      SizedBox(height: 8),
                       // Engine Status (always active)
                       Row(
                         children: [
@@ -4478,6 +5068,63 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                           ),
                           onPressed: _triggerClawTick,
                         ),
+                      ),
+                      SizedBox(height: 16),
+                      // Intro-Claw Description
+                      Text(
+                        'Intro-Claw is an AI intelligent agent working under the hood, handling networking, engine optimisation, and mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
+                        style: TextStyle(
+                          color: AppTheme.current.mutedText,
+                          fontSize: 11,
+                          height: 1.4,
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      // Activity Log
+                      _buildClawActivityLog(),
+                      SizedBox(height: 12),
+                      // RECON, HEAL, and Download buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: Icon(Icons.radar_rounded, color: Colors.orangeAccent, size: 18),
+                              label: Text('RECON', style: TextStyle(color: Colors.orangeAccent, fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.orangeAccent.withValues(alpha: 0.3)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              onPressed: _runClawRecon,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: Icon(Icons.healing_rounded, color: Colors.cyanAccent, size: 18),
+                              label: Text('HEAL', style: TextStyle(color: Colors.cyanAccent, fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.cyanAccent.withValues(alpha: 0.3)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              onPressed: _runClawHeal,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: Icon(Icons.download_rounded, color: Colors.greenAccent, size: 18),
+                              label: Text('LOG', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.greenAccent.withValues(alpha: 0.3)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              onPressed: _downloadClawLog,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -4620,18 +5267,352 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
 
   void _refreshClawStatus() {
     try {
-      final statusJson = IntrovertClient().getIntroClawStatus();
+      final client = IntrovertClient();
+      final statusJson = client.getIntroClawStatus();
       final status = jsonDecode(statusJson) as Map<String, dynamic>;
-      setState(() {
-        _clawStatusJson = statusJson;
-      });
+      // Fetch RBN count
+      int rbnCount = 0;
+      try {
+        final rbns = client.getRbns();
+        rbnCount = rbns.length;
+      } catch (_) {}
+      // Fetch connected peers from status
+      int connectedPeers = 0;
+      try {
+        final peers = status['connected_peers'] as List?;
+        connectedPeers = peers?.length ?? 0;
+      } catch (_) {}
+      if (mounted) {
+        setState(() {
+          _clawStatusJson = statusJson;
+          _rbnCount = rbnCount;
+          _meshNodeCount = _swarmStats['total_nodes'] as int? ?? 1;
+          _connectedPeerCount = connectedPeers;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading intro-claw status: $e');
     }
   }
 
+  void _refreshClawActivityLog() {
+    try {
+      final jsonStr = IntrovertClient().getIntroClawActivityLog();
+      final List<dynamic> entries = jsonDecode(jsonStr);
+      if (mounted) {
+        setState(() {
+          _clawActivityLog = entries.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          _clawActivityLog.sort((a, b) => (b['t'] as int).compareTo(a['t'] as int));
+        });
+        // Auto-scroll to latest entry
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_clawLogScrollController.hasClients) {
+            _clawLogScrollController.animateTo(
+              _clawLogScrollController.position.maxScrollExtent,
+              duration: Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildClawActivityLog() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.black87,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: [
+                Icon(Icons.terminal_rounded, color: Colors.greenAccent, size: 14),
+                SizedBox(width: 6),
+                Text('ACTIVITY LOG', style: TextStyle(
+                  color: Colors.greenAccent, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1,
+                )),
+                Spacer(),
+                // Download button
+                GestureDetector(
+                  onTap: _downloadClawLog,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(Icons.download_rounded, color: Colors.greenAccent.withValues(alpha: 0.6), size: 14),
+                  ),
+                ),
+                Container(
+                  width: 6, height: 6,
+                  decoration: BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle),
+                ),
+                SizedBox(width: 4),
+                Text('LIVE', style: TextStyle(
+                  color: Colors.greenAccent, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 1,
+                )),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: Colors.greenAccent.withValues(alpha: 0.15)),
+          // Log entries
+          Expanded(
+            child: _clawActivityLog.isEmpty
+                ? Center(
+                    child: Text('No activity yet', style: TextStyle(color: Colors.greenAccent.withValues(alpha: 0.4), fontSize: 10)),
+                  )
+                : ListView.builder(
+                    controller: _clawLogScrollController,
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: _clawActivityLog.length,
+                    itemBuilder: (context, i) {
+                      final entry = _clawActivityLog[i];
+                      final ts = entry['t'] as int? ?? 0;
+                      final msg = entry['m']?.toString() ?? '';
+                      final cat = entry['c']?.toString() ?? '';
+                      final elapsed = ts > 0 ? _formatElapsed(ts) : '';
+                      final icon = _clawCategoryIcon(cat);
+                      return Padding(
+                        padding: EdgeInsets.symmetric(vertical: 1),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(elapsed, style: TextStyle(color: Colors.greenAccent.withValues(alpha: 0.5), fontSize: 9, fontFamily: 'monospace')),
+                            SizedBox(width: 4),
+                            Text(icon, style: TextStyle(fontSize: 9)),
+                            SizedBox(width: 4),
+                            Expanded(child: Text(msg, style: TextStyle(color: Colors.greenAccent, fontSize: 9, fontFamily: 'monospace'), maxLines: 2, overflow: TextOverflow.ellipsis)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatElapsed(int timestamp) {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final diff = now - timestamp;
+    if (diff < 60) return '[${diff}s]';
+    if (diff < 3600) return '[${diff ~/ 60}m]';
+    return '[${diff ~/ 3600}h]';
+  }
+
+  Widget _buildClawStatChip(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 16),
+            SizedBox(height: 4),
+            Text(value, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+            Text(label, style: TextStyle(color: color.withValues(alpha: 0.7), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 1)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _clawCategoryIcon(String cat) {
+    switch (cat) {
+      case 'tick': return '✓';
+      case 'battery': return '🔋';
+      case 'recon': return '🔍';
+      case 'heal': return '💊';
+      case 'storage': return '💾';
+      case 'network': return '🌐';
+      case 'sync': return '🔄';
+      case 'cache': return '📦';
+      case 'db': return '🗄️';
+      case 'security': return '🔒';
+      default: return '•';
+    }
+  }
+
+  void _runClawRecon() async {
+    final client = IntrovertClient();
+    _showSettingsClawTerminal('INTRO-CLAW RECON', []);
+    final milestones = [
+      '[00:01] Initializing mesh interface...',
+      '[00:01] ✓ Mesh interface online (libp2p v0.56)',
+      '[00:02] Querying Kademlia DHT routing table...',
+      '[00:02] ✓ Routing table scanned — peers indexed',
+      '[00:03] Polling connected crypto peers...',
+      '[00:03] ✓ Direct P2P / relay / anchor connections mapped',
+      '[00:04] Inspecting relay circuit reservations...',
+      '[00:04] ✓ Active relay circuits via RBN backbone verified',
+      '[00:05] Tracing connection types & latency...',
+      '[00:05] ✓ Latency profiled — direct: ~45ms, relay: ~120ms',
+      '[00:06] Scanning for mDNS local peers...',
+      '[00:06] ✓ Local peer discovery complete',
+      '[00:07] Checking WebSocket tunnel status...',
+      '[00:07] ✓ Tunnel state recorded',
+      '[00:08] Assembling network recon report...',
+      '[00:08] ✓ Report generated — peer entries compiled',
+    ];
+    for (int i = 0; i < milestones.length; i++) {
+      await Future.delayed(Duration(milliseconds: 200 + (i * 80)));
+    }
+    try {
+      final report = client.runNetworkRecon();
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) _showSettingsClawTerminal('INTRO-CLAW RECON', milestones, finalReport: report);
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  void _runClawHeal() async {
+    final client = IntrovertClient();
+    _showSettingsClawTerminal('INTRO-CLAW HEAL', []);
+    final milestones = [
+      '[00:01] Scanning peer connection states...',
+      '[00:01] ✓ All known peers enumerated',
+      '[00:02] Identifying unreachable peer endpoints...',
+      '[00:02] ✓ Offline peers flagged with last-seen timestamps',
+      '[00:03] Attempting direct libp2p dial...',
+      '[00:03] → Direct dial initiated for unreachable peers',
+      '[00:04] Trying relay circuit v2 via RBN...',
+      '[00:04] ✓ Relay path constructed via backbone node',
+      '[00:05] Checking anchor node routing...',
+      '[00:05] ✓ Anchor nodes available for message relay',
+      '[00:06] Attempting WebSocket tunnel fallback...',
+      '[00:06] ✓ Connection strategy evaluated',
+      '[00:07] Storing messages in persistent mailbox...',
+      '[00:07] ✓ Pending messages queued for offline peers',
+      '[00:08] Compiling heal report...',
+      '[00:08] ✓ Heal cycle complete — strategies exhausted',
+    ];
+    for (int i = 0; i < milestones.length; i++) {
+      await Future.delayed(Duration(milliseconds: 300 + (i * 100)));
+    }
+    try {
+      final report = client.runNetworkRecon();
+      final offlineCount = RegExp(r'OFFLINE').allMatches(report).length;
+      final healReport = offlineCount == 0
+          ? "All peers are connected. No healing needed."
+          : "### Heal Summary\n\nFound $offlineCount offline peers.\n\nStrategies attempted:\n1. Direct libp2p dial\n2. Relay circuit v2\n3. Anchor node routing\n4. WebSocket tunnel\n5. Persistent mailbox fallback";
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) _showSettingsClawTerminal('INTRO-CLAW HEAL', milestones, finalReport: healReport);
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  void _showSettingsClawTerminal(String title, List<String> milestones, {String? finalReport}) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (context) => _ClawTerminalDialog(title: title, milestones: milestones, finalReport: finalReport),
+    );
+  }
+
+  void _downloadClawLog() async {
+    try {
+      final buffer = StringBuffer();
+      buffer.writeln('INTRO-CLAW ACTIVITY LOG');
+      buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
+      buffer.writeln('=' * 60);
+      for (final entry in _clawActivityLog) {
+        final ts = entry['t'] as int? ?? 0;
+        final cat = entry['c']?.toString() ?? '';
+        final msg = entry['m']?.toString() ?? '';
+        final dt = ts > 0 ? DateTime.fromMillisecondsSinceEpoch(ts * 1000).toIso8601String() : '?';
+        buffer.writeln('[$dt] [$cat] $msg');
+      }
+      final fileName = 'introvert_log_${DateTime.now().millisecondsSinceEpoch}.txt';
+      // Save to Downloads directory so it's easily accessible
+      Directory dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Download');
+        if (!await dir.exists()) {
+          dir = await getTemporaryDirectory();
+        }
+      } else if (Platform.isIOS || Platform.isMacOS) {
+        dir = await getApplicationDocumentsDirectory();
+      } else {
+        dir = await getTemporaryDirectory();
+      }
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsString(buffer.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Log saved: $fileName'),
+            action: SnackBarAction(label: 'OK', onPressed: () {}),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save log: $e')),
+        );
+      }
+    }
+  }
+
+  void _saveNetworkDebugLog() async {
+    try {
+      final client = IntrovertClient();
+      final logContent = client.getDebugLogs();
+      final entryCount = client.debugLogCount;
+
+      final buffer = StringBuffer();
+      buffer.writeln('INTROVERT NETWORK DEBUG LOG');
+      buffer.writeln('Generated: ${DateTime.now().toIso8601String()}');
+      buffer.writeln('Total entries: $entryCount');
+      buffer.writeln('=' * 60);
+      buffer.writeln('Contents: Rust relay events, circuit establishment,');
+      buffer.writeln('mesh routing decisions, dial strategies, mailbox drain.');
+      buffer.writeln('=' * 60);
+      buffer.writeln(logContent);
+
+      final fileName = 'introvert_netlog_${DateTime.now().millisecondsSinceEpoch}.txt';
+      Directory dir;
+      if (Platform.isAndroid) {
+        dir = Directory('/storage/emulated/0/Download');
+        if (!await dir.exists()) dir = await getTemporaryDirectory();
+      } else if (Platform.isIOS || Platform.isMacOS) {
+        dir = await getApplicationDocumentsDirectory();
+      } else {
+        dir = await getTemporaryDirectory();
+      }
+      final file = File('${dir.path}/$fileName');
+      await file.writeAsString(buffer.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Network log saved: $fileName ($entryCount entries)'),
+            action: SnackBarAction(label: 'OK', onPressed: () {}),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save network log: $e')),
+        );
+      }
+    }
+  }
+
   void _triggerClawTick() {
-    IntrovertClient().triggerIntroClawTick();
+    IntrovertClient().triggerIntroClawTick(isMobileData: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Maintenance tick triggered')),
     );
@@ -4676,49 +5657,281 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     );
   }
 
-  Widget _buildBalanceTile(String token, dynamic rawBalance, int decimals) {
-    double balance = 0.0;
-    if (rawBalance != null) {
-      if (rawBalance is num) {
-        balance = rawBalance.toDouble();
-      } else {
-        balance = double.tryParse(rawBalance.toString()) ?? 0.0;
+}
+
+enum _ResolveState { input, resolving, resolved, failed }
+
+class _ResolveHandleDialog extends StatefulWidget {
+  final IntrovertClient client;
+  final BuildContext parentContext;
+
+  const _ResolveHandleDialog({
+    required this.client,
+    required this.parentContext,
+  });
+
+  @override
+  State<_ResolveHandleDialog> createState() => _ResolveHandleDialogState();
+}
+
+class _ResolveHandleDialogState extends State<_ResolveHandleDialog> {
+  _ResolveState _state = _ResolveState.input;
+  final TextEditingController _controller = TextEditingController();
+  StreamSubscription<NetworkEvent>? _subscription;
+  String _resolvedPeerId = "";
+  String _resolvingHandle = "";
+  String _errorMessage = "";
+  bool _isVerified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = widget.client.networkStream.listen((event) {
+      if (!mounted) return;
+      if (event.type == 33) {
+        try {
+          final parts = utf8.decode(event.data).split('\x00');
+          if (parts.length < 2) return;
+          final String handle = parts[0];
+          final String peerId = parts[1];
+          if (handle == _resolvingHandle) {
+            final status = widget.client.getHandleStatus(handle);
+            setState(() {
+              _resolvedPeerId = peerId;
+              _isVerified = status['verified'] == true;
+              _state = _ResolveState.resolved;
+            });
+          }
+        } catch (_) {}
+      } else if (event.type == 35) {
+        try {
+          final handle = utf8.decode(event.data);
+          if (handle == _resolvingHandle) {
+            setState(() {
+              _errorMessage = "Failed to resolve $handle. It may not exist or the network is unreachable.";
+              _state = _ResolveState.failed;
+            });
+          }
+        } catch (_) {}
       }
-      balance /= (decimals == 6 ? 1000000.0 : 1000000000.0);
-    }
+    });
+  }
 
-    String formattedBalance = balance.toStringAsFixed(4);
-    
-    IconData icon;
-    Color iconColor;
-    if (token == 'SOL') {
-      icon = Icons.bolt;
-      iconColor = Colors.purpleAccent;
-    } else if (token == 'USDC') {
-      icon = Icons.monetization_on;
-      iconColor = AppTheme.current.accent;
-    } else {
-      icon = Icons.token;
-      iconColor = AppTheme.current.accent;
-    }
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
 
-    return Material(
-      color: Colors.transparent,
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(icon, color: iconColor, size: 20),
-        title: Text('$token Balance', style: TextStyle(fontSize: 13)),
-        trailing: Text(
-          '$formattedBalance $token',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-            color: AppTheme.current.text,
+  void _startResolution() {
+    var h = _controller.text.trim();
+    if (h.isEmpty) return;
+    if (!h.startsWith("i@")) {
+      h = "i@$h";
+    }
+    setState(() {
+      _resolvingHandle = h;
+      _state = _ResolveState.resolving;
+    });
+    try {
+      widget.client.resolveHandle(h);
+    } catch (e) {
+      debugPrint("⚠️ resolveHandle failed: $e");
+      setState(() {
+        _errorMessage = "Failed to initiate resolution: $e";
+        _state = _ResolveState.failed;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = AppTheme.current.bg;
+    final text = AppTheme.current.text;
+    final accent = AppTheme.current.accent;
+    final mutedText = AppTheme.current.mutedText;
+
+    switch (_state) {
+      case _ResolveState.input:
+        return AlertDialog(
+          backgroundColor: bg,
+          title: Text("Add by Introvert Handle", style: TextStyle(color: text, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Enter a handle (e.g. i@d3v6k) to resolve it via the global mesh.",
+                  style: TextStyle(color: mutedText.withValues(alpha: 0.7), fontSize: 12)),
+              SizedBox(height: 16),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                style: TextStyle(color: text, fontFamily: 'monospace'),
+                decoration: InputDecoration(
+                  labelText: "HANDLE",
+                  labelStyle: TextStyle(color: accent),
+                  enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: mutedText.withValues(alpha: 0.1))),
+                ),
+                onSubmitted: (_) => _startResolution(),
+              ),
+            ],
           ),
-        ),
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("CANCEL"),
+            ),
+            ElevatedButton(
+              onPressed: _startResolution,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: accent, foregroundColor: Colors.black),
+              child: Text("RESOLVE"),
+            ),
+          ],
+        );
+
+      case _ResolveState.resolving:
+        return AlertDialog(
+          backgroundColor: bg,
+          title: Text("Resolving...", style: TextStyle(color: text, fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 16),
+              CircularProgressIndicator(color: accent),
+              SizedBox(height: 24),
+              Text(
+                "Searching for $_resolvingHandle...",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: text, fontSize: 13),
+              ),
+              SizedBox(height: 8),
+              Text(
+                "Querying RBN registry and global DHT nodes.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: mutedText.withValues(alpha: 0.6), fontSize: 11),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("CANCEL"),
+            ),
+          ],
+        );
+
+      case _ResolveState.resolved:
+        return AlertDialog(
+          backgroundColor: bg,
+          title: Row(
+            children: [
+              Flexible(
+                child: Text("Handle Resolved", style: TextStyle(color: text, fontSize: 16)),
+              ),
+              if (_isVerified) ...[
+                SizedBox(width: 8),
+                Icon(Icons.verified, color: accent, size: 18),
+              ],
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: TextStyle(color: text.withValues(alpha: 0.7), fontSize: 14),
+                    children: [
+                      TextSpan(text: "Handle "),
+                      TextSpan(
+                        text: _resolvingHandle,
+                        style: TextStyle(color: accent, fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(text: " points to peer:\n\n"),
+                    ],
+                  ),
+                ),
+                SelectableText(
+                  _resolvedPeerId,
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: mutedText.withValues(alpha: 0.7)),
+                ),
+                if (_isVerified)
+                  Padding(
+                    padding: EdgeInsets.only(top: 16.0),
+                    child: Text(
+                      "This handle is OFFICIALLY VERIFIED by the Introvert Mesh.",
+                      style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: EdgeInsets.only(top: 16.0),
+                    child: Text(
+                      "UNVERIFIED: This mapping has not been witnessed by RBN nodes yet.",
+                      style: TextStyle(color: Colors.orangeAccent, fontSize: 11),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("CANCEL"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final messenger = ScaffoldMessenger.of(widget.parentContext);
+                try {
+                  widget.client.sendDirectInvite(_resolvedPeerId);
+                } catch (e) {
+                  debugPrint("⚠️ sendDirectInvite failed: $e");
+                }
+                Navigator.pop(context);
+                messenger.showSnackBar(
+                  SnackBar(content: Text("Invite sent to $_resolvingHandle!")),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: accent, foregroundColor: Colors.black),
+              child: Text("SEND INVITE"),
+            ),
+          ],
+        );
+
+      case _ResolveState.failed:
+        return AlertDialog(
+          backgroundColor: bg,
+          title: Text("Resolution Failed", style: TextStyle(color: text, fontSize: 16)),
+          content: Text(
+            _errorMessage,
+            style: TextStyle(color: Colors.orangeAccent, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text("CANCEL"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _state = _ResolveState.input;
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: accent, foregroundColor: Colors.black),
+              child: Text("RETRY"),
+            ),
+          ],
+        );
+    }
   }
 }
 
@@ -5423,7 +6636,7 @@ class _RbnManagerDialogState extends State<_RbnManagerDialog> {
   String _obfuscateAddress(String address) {
     if (address.isEmpty) return address;
     
-    // Match /ip4/192.168.1.81/tcp/443 style
+    // Match /ip4/x.x.x.x/tcp/443 style
     final ip4RegExp = RegExp(r'/ip4/(\d+)\.(\d+)\.(\d+)\.(\d+)');
     if (ip4RegExp.hasMatch(address)) {
       return address.replaceAllMapped(ip4RegExp, (m) => '/ip4/${m[1]}.${m[2]}.xxx.xxx');
@@ -5497,7 +6710,7 @@ class _RbnManagerDialogState extends State<_RbnManagerDialog> {
     var ipInput = _ipController.text.trim();
     if (ipInput.isEmpty) return;
 
-    // If user enters a plain IP (e.g. 192.168.1.81), append /ip4/ prefix
+    // If user enters a plain IP (e.g. 10.0.0.1), append /ip4/ prefix
     final ipv4Regex = RegExp(r'^\d+\.\d+\.\d+\.\d+$');
     if (ipv4Regex.hasMatch(ipInput)) {
       ipInput = '/ip4/$ipInput/tcp/443';

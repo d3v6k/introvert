@@ -11,9 +11,9 @@ pub fn get_bootstrap_nodes() -> Vec<(PeerId, Multiaddr)> {
         // Introvert Global Root Bootstrap Node (RBN) - Port 443 (HTTPS Bypass)
         ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/443".to_string()),
         ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/udp/443/quic-v1".to_string()),
-        
-        // Local RBN on thinkpad.local (relay circuit via Alibaba) — v37 baseline
-        ("12D3KooWGzorWx3pLhJCSdSZPApADf7aDM1g71WwvjjzubWSkCkG".to_string(), "/ip4/192.168.1.81/tcp/8443".to_string()),
+        // Port 80 fallback (corporate firewalls, captive portals)
+        ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/80".to_string()),
+        // Additional RBNs can be added via INTROVERT_EXTRA_BOOTSTRAP env-var.
     ];
 
     // NAT64 Resolution: Resolve the wildcard DNS to support IPv6-only cellular networks
@@ -49,6 +49,25 @@ pub fn get_bootstrap_nodes() -> Vec<(PeerId, Multiaddr)> {
     nodes.iter().filter_map(|(pid_str, addr_str)| {
         let pid = pid_str.parse::<PeerId>().ok()?;
         let addr = addr_str.parse::<Multiaddr>().ok()?;
+        if is_private_address(&addr) {
+            return None;
+        }
         Some((pid, addr))
     }).collect()
+}
+
+/// Checks if a Multiaddr belongs to a private/local IP address range.
+pub fn is_private_address(addr: &Multiaddr) -> bool {
+    let s = addr.to_string();
+    if s.contains("192.168.") || s.contains("10.") {
+        return true;
+    }
+    if s.contains("172.") {
+        for octet in 16..=31 {
+            if s.contains(&format!("172.{}.", octet)) {
+                return true;
+            }
+        }
+    }
+    false
 }

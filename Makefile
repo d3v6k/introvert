@@ -1,15 +1,15 @@
 # Introvert Native Build System
-# Supports macOS (local), Android (cross-compile), and iOS (cross-compile)
 
-.PHONY: help mac android ios clean all
+.PHONY: help mac android ios clean all bk
 
 help:
 	@echo "Introvert Build System"
 	@echo "Usage:"
 	@echo "  make mac      - Build native library for macOS"
 	@echo "  make android  - Build native libraries for Android (arm64 and x64)"
-	@echo "  make ios      - Build native static libraries for iOS (device and simulator)"
+	@echo "  make ios      - Build native static libraries for iOS"
 	@echo "  make all      - Build for all platforms"
+	@echo "  make bk       - Comprehensive backup to external SSD"
 	@echo "  make clean    - Remove build artifacts"
 
 mac:
@@ -39,8 +39,8 @@ all: mac android ios
 
 clean:
 	cargo clean
-	rm -rf android/app/src/main/jniLibs/*
-	rm -rf ios/libs/*
-	rm -f libintrovert.dylib
-	rm -f build_mac.log build_android.log build_ios_device.log build_ios_sim.log
-	@echo "🧹 Workspace cleaned."
+
+bk:
+	@echo "💾 Running comprehensive backup..."
+	@chmod +x scripts/backup.sh
+	@./scripts/backup.sh

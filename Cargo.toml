@@ -1,6 +1,6 @@
 [package]
 name = "introvert"
-version = "0.17.0"
+version = "0.1.0"
 edition = "2021"
 
 [dependencies]
@@ -12,6 +12,7 @@ snow = "0.9"
 bip39 = { version = "2.0.0", features = ["rand"] }
 hkdf = "0.12"
 sha2 = "0.10"
+hmac = "0.12"
 rand = "0.8"
 hex = "0.4"
 serde_json = "1.0"
@@ -20,6 +21,7 @@ bytes = "1.5"
 
 # Storage
 rusqlite = { version = "0.31", features = ["bundled-sqlcipher-vendored-openssl"] }
+zeroize = { version = "1.8", features = ["derive"] }
 
 # Wormhole Onboarding
 magic-wormhole = { version = "0.7", features = ["transfer", "transit", "tls"] }

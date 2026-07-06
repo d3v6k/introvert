@@ -60,7 +60,7 @@ async fn run_virtual_node(index: usize) -> anyhow::Result<()> {
         command_rx: rx,
         command_tx: tx_clone,
         storage: storage.clone(),
-        reward_tracker: Arc::new(introvert::economy::RewardTracker::new(Some(storage))),
+        reward_tracker: Arc::new(introvert::economy::RewardTracker::new(Some(storage), Arc::new(parking_lot::RwLock::new([0u64; 9])))),
         solana_client: Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new(
             "http://localhost:8899", 
             "11111111111111111111111111111111",

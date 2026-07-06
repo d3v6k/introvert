@@ -3244,7 +3244,7 @@ dependencies = [
 
 [[package]]
 name = "introvert"
-version = "0.17.0"
+version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3267,6 +3267,7 @@ dependencies = [
  "hex",
  "hf-hub",
  "hkdf",
+ "hmac",
  "indexmap",
  "libc",
  "libp2p",
@@ -3295,6 +3296,7 @@ dependencies = [
  "webpki-roots 0.25.4",
  "webrtc",
  "x25519-dalek",
+ "zeroize",
 ]
 
 [[package]]

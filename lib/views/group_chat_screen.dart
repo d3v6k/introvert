@@ -274,6 +274,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
 
   @override
   void dispose() {
+    _client.clearActiveChat();
     _isDisposing = true;
     _loadMessagesDebounce?.cancel();
     _loadContactNamesDebounce?.cancel();
@@ -622,23 +623,44 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               (_pullRequestedAt[tid]?.isBefore(DateTime.now().subtract(_pullRetryTimeout)) ?? false)
             );
 
+            debugPrint("[FilePull] tid=$tid isOutgoing=$isOutgoing exists=$exists alreadyRequested=${_pullRequested.contains(tid)} shouldPull=$shouldPull");
+
             if (shouldPull) {
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                 _pullRequested.add(tid);
                 _pullRequestedAt[tid] = DateTime.now();
+                debugPrint("[FilePull] ⭐ Calling startPull for $tid from $senderId (size=$totalSize)");
                 _client.startPull(senderId, tid, filename, mimeType, fileHash, totalSize, true, widget.groupId);
+                debugPrint("[FilePull] ✅ startPull called for $tid");
             }
             
+            final metaProgress = ((meta['progress'] as num?)?.toDouble() ?? 0.0);
+            final metaComplete = meta['is_complete'] == true;
+            final metaVerified = meta['is_verified'] == true;
+
+            var finalProgress = exists ? 1.0 : metaProgress;
+            var finalComplete = exists || metaComplete;
+            var finalVerified = isOutgoing ? metaVerified : (exists || metaVerified);
+
+            if (_groupTransfers.containsKey(tid)) {
+              final existing = _groupTransfers[tid]!;
+              if (!exists || isOutgoing) {
+                finalProgress = existing.progress;
+                finalComplete = existing.isComplete;
+                finalVerified = isOutgoing ? existing.isVerified : (exists || existing.isVerified);
+              }
+            }
+
             final progressObj = FileTransferProgress(
               transferId: tid,
               peerId: senderId,
               filename: filename,
               mimeType: mimeType,
               fileHash: fileHash,
-              progress: exists ? 1.0 : 0.0,
+              progress: finalProgress,
               speedBps: 0.0,
-              isComplete: exists,
-              isVerified: exists,
+              isComplete: finalComplete,
+              isVerified: finalVerified,
               isOutgoing: isOutgoing,
               isCancelled: false,
               localPath: localPath,
@@ -707,7 +729,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         if (m is FileTransferProgress) msgId = m.transferId;
         else if (m is List && m.length > 4) msgId = m[4]?.toString();
         if (msgId != null && msgId.isNotEmpty) {
-          try { _reactionsCache[msgId] = (_reactionsCache[msgId] ?? []); } catch (_) {}
+          try { _reactionsCache[msgId] = _client.getMessageReactions(msgId); } catch (_) {}
         }
       }
 
@@ -779,7 +801,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         progress: exists ? 1.0 : msg.progress,
         speedBps: msg.speedBps,
         isComplete: exists || msg.isComplete,
-        isVerified: exists || msg.isVerified,
+        isVerified: isMe ? msg.isVerified : (exists || msg.isVerified),
         isOutgoing: isMe,
         isCancelled: msg.isCancelled,
         localPath: localPath,
@@ -811,6 +833,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         isMe: isMe,
         reactions: (_reactionsCache[msgId] ?? []),
         allMessages: _messages,
+        timestamp: ts,
         onTap: () {
           if (!updatedProgress.isComplete && !updatedProgress.isVerified && !isMe) {
             final msgs = _client.getGroupMessages(widget.groupId);
@@ -1099,6 +1122,30 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
+                icon: Icon(Icons.emoji_emotions_outlined, color: AppTheme.current.accent),
+                tooltip: 'React',
+                onPressed: () {
+                  if (msgId != null) {
+                    setState(() => _selectedMsg = null);
+                    _showEmojiReactionPicker(msgId);
+                  }
+                },
+              ),
+              if (msgId != null && (_reactionsCache[msgId] ?? []).isNotEmpty)
+                IconButton(
+                  icon: Badge(
+                    label: Text('${(_reactionsCache[msgId] ?? []).length}', style: TextStyle(fontSize: 9, color: Colors.white)),
+                    backgroundColor: AppTheme.current.accent,
+                    child: Icon(Icons.remove_red_eye_outlined, color: AppTheme.current.accent),
+                  ),
+                  tooltip: 'View Reactions',
+                  onPressed: () {
+                    final reactions = _reactionsCache[msgId] ?? [];
+                    setState(() => _selectedMsg = null);
+                    _showReactionDetails(msgId, reactions);
+                  },
+                ),
+              IconButton(
           icon: Icon(Icons.copy_rounded, color: AppTheme.current.accent),
           tooltip: 'Copy',
           onPressed: () {
@@ -1354,6 +1401,78 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     );
   }
 
+  void _showEmojiReactionPicker(String msgId) {
+    final TextEditingController emojiController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.current.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: AppTheme.current.mutedText.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text("React with any emoji", style: TextStyle(color: AppTheme.current.mutedText, fontSize: 13)),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: TextField(
+                controller: emojiController,
+                autofocus: true,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 40),
+                maxLength: 8,
+                decoration: InputDecoration(
+                  hintText: "😀",
+                  hintStyle: TextStyle(fontSize: 40, color: AppTheme.current.mutedText.withValues(alpha: 0.3)),
+                  counterText: "",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.2))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: AppTheme.current.accent)),
+                  filled: true,
+                  fillColor: AppTheme.current.text.withValues(alpha: 0.03),
+                ),
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) {
+                  if (value.trim().isNotEmpty) {
+                    _client.sendReaction(widget.groupId, msgId, value.trim(), true);
+                    Navigator.pop(ctx);
+                    _loadMessages();
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Quick access row for common emojis
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯"].map((emoji) =>
+                  GestureDetector(
+                    onTap: () {
+                      _client.sendReaction(widget.groupId, msgId, emoji, true);
+                      Navigator.pop(ctx);
+                      _loadMessages();
+                    },
+                    child: Text(emoji, style: const TextStyle(fontSize: 28)),
+                  ),
+                ).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showFullEmojiPicker(String msgId) {
     showModalBottomSheet(
       context: context,
@@ -1507,8 +1626,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       if (event.type == 21) {
         _debouncedLoadMessages();
       } else if (event.type == 23) {
-        _loadContactNames();
-        _debouncedReloadMessages();
+        final syncedGroupId = utf8.decode(event.data);
+        if (syncedGroupId == widget.groupId) {
+          _loadContactNames();
+          _debouncedReloadMessages();
+        }
       } else if (event.type == 12) {
         if (!mounted) return;
         try {
@@ -1904,6 +2026,22 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         contactNames: _contactNames,
         contactAvatars: _contactAvatars,
         isAdmin: _isAdmin,
+        onSyncChat: () {
+          setState(() => _isSyncing = true);
+          final memberIds = _contactNames.keys.toList();
+          for (final memberId in memberIds) {
+            _client.pollPeerProfile(memberId);
+            _client.syncChatMessages(memberId, widget.groupId, true);
+          }
+          Future.delayed(Duration(seconds: 5), () {
+            if (mounted) {
+              setState(() {
+                _isSyncing = false;
+                _loadMessages();
+              });
+            }
+          });
+        },
       ),
     );
     if (result == true && mounted) {
@@ -2028,7 +2166,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           String path = pickedFile.path;
           String filename = pickedFile.name;
           final ext = path.split('.').last.toLowerCase();
-          // Convert HEIC/HEIF to JPEG for universal compatibility
           if (ext == 'heic' || ext == 'heif') {
             path = await _convertHeicToJpeg(path);
             filename = filename.replaceAll(RegExp(r'\.(heic|heif)$', caseSensitive: false), '.jpg');
@@ -2050,6 +2187,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             "group_id": widget.groupId,
           })}";
           _client.sendGroupMessage(widget.groupId, manifest);
+          _addSendingPlaceholder(transferId, filename, 'image/jpeg', path);
         }
         _loadMessages();
       }
@@ -2093,6 +2231,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           "group_id": widget.groupId,
         })}";
         _client.sendGroupMessage(widget.groupId, manifest);
+        _addSendingPlaceholder(transferId, pickedFile.name, 'video/mp4', pickedFile.path);
         _loadMessages();
       }
     } catch (_) {}
@@ -2120,9 +2259,33 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           "group_id": widget.groupId,
         })}";
         _client.sendGroupMessage(widget.groupId, manifest);
+        _addSendingPlaceholder(transferId, result.files.single.name, 'application/octet-stream', path);
         _loadMessages();
       }
     } catch (_) {}
+  }
+
+  void _addSendingPlaceholder(String transferId, String filename, String mimeType, String localPath) {
+    if (!mounted) return;
+    final placeholder = FileTransferProgress(
+      transferId: transferId,
+      peerId: _client.localPeerId ?? '',
+      filename: filename,
+      mimeType: mimeType,
+      fileHash: '',
+      progress: 1.0,
+      speedBps: 0,
+      isComplete: true,
+      isVerified: true,
+      isOutgoing: true,
+      isCancelled: false,
+      localPath: localPath,
+      startTimeMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    setState(() {
+      _messages.add(placeholder);
+    });
+    _scrollToBottom();
   }
 
   void _shareLocation() async {
@@ -3201,7 +3364,8 @@ class _GroupInfoDialog extends StatefulWidget {
   final Map<String, String> contactNames;
   final Map<String, String> contactAvatars;
   final bool isAdmin;
-  const _GroupInfoDialog({required this.groupId, required this.groupName, required this.onUpdate, required this.contactNames, required this.contactAvatars, required this.isAdmin});
+  final VoidCallback? onSyncChat;
+  const _GroupInfoDialog({required this.groupId, required this.groupName, required this.onUpdate, required this.contactNames, required this.contactAvatars, required this.isAdmin, this.onSyncChat});
   @override
   State<_GroupInfoDialog> createState() => _GroupInfoDialogState();
 }
@@ -3231,6 +3395,12 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
 
     // Auto-recon: Let Intro-Claw optimize group mesh connections
     try {
+      _client.setActiveChat(widget.groupId, null, true);
+      final List<String> memberIds = _members
+          .map((m) => m['peer_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList();
+      _client.setActiveGroupMembers(memberIds);
       _client.runNetworkRecon();
     } catch (_) {}
   }
@@ -3499,18 +3669,8 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
         SizedBox(height: 8),
         TextButton.icon(
           onPressed: () {
-            final memberIds = widget.contactNames.keys.toList();
-            for (final memberId in memberIds) {
-              _client.pollPeerProfile(memberId);
-              _client.syncChatMessages(memberId, widget.groupId, true);
-            }
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("Syncing chat...", style: TextStyle(color: AppTheme.current.accent)),
-                backgroundColor: AppTheme.current.surface,
-              ),
-            );
+            Navigator.pop(context); // Dismiss dialog first
+            widget.onSyncChat?.call(); // Trigger sync on parent
           },
           icon: Icon(Icons.sync, size: 18, color: AppTheme.current.accent),
           label: Text("SYNC CHAT", style: TextStyle(color: AppTheme.current.accent, fontSize: 11, fontWeight: FontWeight.bold))

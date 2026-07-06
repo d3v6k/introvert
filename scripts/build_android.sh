@@ -71,6 +71,15 @@ build_target() {
     # Note: 'strip = true' in Cargo.toml handles most stripping, but we ensure it here.
     cp "$src_path" "$dest_dir/$LIB_NAME"
     
+    # Copy libc++_shared.so from NDK (required by Rust's std library)
+    local cxx_shared="$NDK_PATH/toolchains/llvm/prebuilt/$HOST_TAG/sysroot/usr/lib/$target/libc++_shared.so"
+    if [ -f "$cxx_shared" ]; then
+        cp "$cxx_shared" "$dest_dir/"
+        echo -e "${GREEN}  ✓ libc++_shared.so bundled${NC}"
+    else
+        echo -e "${RED}  ⚠ libc++_shared.so not found at: $cxx_shared${NC}"
+    fi
+    
     # Attempt to use NDK strip if available in PATH, otherwise rely on Cargo's strip
     if command -v llvm-strip &> /dev/null; then
         llvm-strip "$dest_dir/$LIB_NAME"

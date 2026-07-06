@@ -13,12 +13,17 @@ import com.google.firebase.messaging.RemoteMessage
 
 /**
  * Handles FCM push notifications for Introvert.
- * 
+ *
  * Flow:
  * 1. App registers FCM token with RBN via IdentifySleepState
  * 2. When message stored in mailbox, RBN sends FCM push
  * 3. This service receives the push and wakes the app
  * 4. App fetches actual encrypted message from RBN mailbox
+ *
+ * Notification rules:
+ * - Maximum 1 phone notification every 3 minutes (cooldown)
+ * - No notification when app is in foreground (sound only via Dart)
+ * - Sound and vibration enabled for all notifications
  */
 class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -27,22 +32,25 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
         private const val MSG_CHANNEL = "introvert_messages"
         private const val CALL_CHANNEL = "introvert_calls"
         private const val NOTIFICATION_ID_BASE = 2000
+
+        // 3-minute cooldown
+        private var lastNotificationTime: Long = 0
+        private const val COOLDOWN_MS = 3 * 60 * 1000L
+
+        // Foreground state (set by MainActivity)
+        var isAppInForeground: Boolean = false
     }
 
     /**
      * Called when a new FCM registration token is generated.
-     * Persists the token to SharedPreferences and forwards it to MainActivity
-     * for registration with the RBN.
      */
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d(TAG, "New FCM token received: ${token.take(20)}...")
 
-        // Persist the token so MainActivity can read it on next resume
         val prefs = getSharedPreferences("introvert_fcm", Context.MODE_PRIVATE)
         prefs.edit().putString("pending_fcm_token", token).apply()
 
-        // Try to forward token to MainActivity (may not work if app is killed on some OEMs)
         try {
             val intent = Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -56,30 +64,38 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
 
     /**
      * Called when a push notification is received.
-     * 
-     * Payload from RBN contains only:
-     * - sender_peer_id: Who sent the message
-     * - message_type: "chat" | "call" | "group"
-     * 
-     * Actual message content is NOT in the push (stays encrypted in mailbox).
      */
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
         Log.d(TAG, "Push notification received: ${message.data}")
-        
+
         val data = message.data
         val senderPeerId = data["sender_peer_id"] ?: ""
-        val messageType = data["message_type"] ?: "chat"
-        
-        // Wake up the foreground service to fetch messages
+        val messageType = data["msg_type"] ?: data["message_type"] ?: "chat"
+
+        // Always wake the foreground service to fetch messages
         wakeForegroundService()
-        
-        // Show local notification
+
+        // FOREGROUND: Skip native notification. Dart plays sound only.
+        if (isAppInForeground) {
+            Log.d(TAG, "App in foreground — skipping native notification, Dart handles sound")
+            return
+        }
+
+        // COOLDOWN: Skip if less than 3 minutes since last notification.
+        val now = System.currentTimeMillis()
+        if (now - lastNotificationTime < COOLDOWN_MS) {
+            Log.d(TAG, "Notification suppressed (3-min cooldown): $messageType")
+            return
+        }
+
+        // Show notification
         when (messageType) {
             "call" -> showCallNotification(senderPeerId)
             "group" -> showGroupNotification(senderPeerId, data)
             else -> showMessageNotification(senderPeerId)
         }
+        lastNotificationTime = now
     }
 
     /**
@@ -105,7 +121,7 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
     private fun showMessageNotification(senderPeerId: String) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel(notificationManager, MSG_CHANNEL, "Messages", "New message notifications")
-        
+
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("open_chat", senderPeerId)
@@ -122,6 +138,7 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID_BASE, notification)
@@ -133,7 +150,7 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
     private fun showCallNotification(senderPeerId: String) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel(notificationManager, CALL_CHANNEL, "Calls", "Incoming call notifications")
-        
+
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("incoming_call", senderPeerId)
@@ -151,6 +168,7 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID_BASE + 1, notification)
@@ -162,7 +180,7 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
     private fun showGroupNotification(senderPeerId: String, data: Map<String, String>) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel(notificationManager, MSG_CHANNEL, "Messages", "New message notifications")
-        
+
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("open_group", data["group_id"] ?: "")
@@ -179,6 +197,7 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID_BASE + 2, notification)
@@ -194,6 +213,13 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
             ).apply {
                 this.description = description
                 enableVibration(true)
+                setSound(
+                    android.provider.Settings.System.DEFAULT_NOTIFICATION_URI,
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
             }
             manager.createNotificationChannel(channel)
         }

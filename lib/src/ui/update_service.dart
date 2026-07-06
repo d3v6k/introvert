@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_theme.dart';
 
 class UpdateService {
-  static const String _defaultUrl = "https://raw.githubusercontent.com/introvert-chat/introvert/main/update.json";
+  static const String _defaultUrl = "https://raw.githubusercontent.com/d3v6k/introvert/main/update.json";
   static const String _prefsUrlKey = "update_server_url";
   static const String _prefsLastCheckedKey = "update_last_checked";
 

@@ -33,7 +33,7 @@ class _NativeVideoRendererState extends State<NativeVideoRenderer> {
 
     // Register media frame callback
     final client = IntrovertClient();
-    client.startNetwork();
+    try { client.startNetwork(); } catch (_) {} // Network already started
     _mediaSubscription = client.mediaStream.listen((event) {
       if (_textureId != null) {
         // In production: IntrovertClient().updateTexture(_textureId!, event.payload, event.payloadLen);

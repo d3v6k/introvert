@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'connectivity_listener.dart';
 import 'src/native/introvert_client.dart';
 import 'src/native/identity_manager.dart';
 import 'src/native/alert_service.dart';
 import 'src/ui/main_shell.dart';
 import 'src/ui/onboarding_screen.dart';
+import 'src/ui/terms_screen.dart';
 import 'src/repository/sync_repository.dart';
 import 'theme/app_theme.dart';
 
@@ -31,15 +35,17 @@ void main() async {
   final syncRepository = SyncRepository();
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => SyncStateNotifier(syncRepository)),
-        Provider<IntrovertClient>.value(value: client),
-        Provider<IdentityManager>.value(value: idManager),
-      ],
-      child: const IntrovertApp(),
-    ),
-  );
+      ConnectivityListener(
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider(create: (_) => SyncStateNotifier(syncRepository)),
+            Provider<IntrovertClient>.value(value: client),
+            Provider<IdentityManager>.value(value: idManager),
+          ],
+          child: const IntrovertApp(),
+        ),
+      ),
+    );
 }
 
 class IntrovertApp extends StatefulWidget {
@@ -52,7 +58,10 @@ class IntrovertApp extends StatefulWidget {
 class _IntrovertAppState extends State<IntrovertApp> {
   bool _isLoading = true;
   bool _showOnboarding = false;
+  bool _showTerms = false;
+  bool _termsAccepted = false;
   String? _dbPath;
+  Uint8List? _existingSeed;
   final GlobalKey<ScaffoldMessengerState> _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
@@ -82,53 +91,132 @@ class _IntrovertAppState extends State<IntrovertApp> {
       final existingSeed = await idManager.getSeed();
       
       if (existingSeed != null) {
-        debugPrint("🧠 Identity found. Starting native engine...");
-        // Non-blocking delay to allow UI to breathe
-        await Future.delayed(const Duration(milliseconds: 500));
+        _existingSeed = existingSeed;
         
-        try {
-          client.startEngine(existingSeed, _dbPath!);
-        } catch (e) {
-          debugPrint("🚨 Engine failed on existing DB. Attempting forced reset...");
-          final file = File(_dbPath!);
-          if (await file.exists()) await file.delete();
-          client.startEngine(existingSeed, _dbPath!);
-        }
-        debugPrint("📡 Starting networking plane...");
-        client.startNetwork();
+        // MANDATORY: Check disclaimer acceptance BEFORE engine starts.
+        // Use SharedPreferences only — avoids SQLCipher FFI issues on iOS sandbox paths
+        debugPrint("📜 Checking Terms of Use acceptance...");
+        final prefs = await SharedPreferences.getInstance();
+        final disclaimerAccepted = prefs.getBool('disclaimer_accepted') ?? false;
         
-        // Register any pending push token and fetch mailbox on boot
-        AlertService.tryRegisterPendingToken();
-        try {
-          client.fetchMailbox();
-        } catch (_) {}
-        
-        debugPrint("🚀 Introvert Engine Started Successfully!");
-        
-        // Restore saved Anchor Mode settings
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          final isAnchorMode = prefs.getBool('isAnchorMode') ?? false;
-          if (isAnchorMode) {
-            debugPrint("⚓ Restoring saved Anchor Mode setting...");
-            client.setAnchorMode(true);
-            AlertService.setStayAwake(true);
+        if (!disclaimerAccepted) {
+          debugPrint("⚠️ Terms not accepted. Blocking engine initialization.");
+          if (mounted) {
+            setState(() {
+              _showTerms = true;
+              _isLoading = false;
+            });
           }
-        } catch (e) {
-          debugPrint("⚠️ Failed to restore Anchor Mode setting: $e");
+          return; // HALT — no engine, no networking, no RBN connections
         }
+        
+        debugPrint("✅ Terms accepted. Proceeding with engine start...");
+        _termsAccepted = true;
+        _startEngineWithIdentity(client, existingSeed);
       } else {
-        debugPrint("🆕 No identity found. Transitioning to onboarding.");
+        // New user — show terms first, then onboarding
+        debugPrint("🆕 No identity found. Checking if terms accepted via SharedPreferences...");
+        final prefs = await SharedPreferences.getInstance();
+        final termsAcceptedNewUser = prefs.getBool('disclaimer_accepted_new_user') ?? false;
+        
+        if (!termsAcceptedNewUser) {
+          debugPrint("⚠️ Terms not accepted for new user. Showing terms screen.");
+          if (mounted) {
+            setState(() {
+              _showTerms = true;
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+        
+        debugPrint("🆕 Terms accepted. Transitioning to onboarding.");
         _showOnboarding = true;
       }
     } catch (e) {
       debugPrint("❌ Initialization Error: $e");
       _showOnboarding = true;
     } finally {
-      if (mounted) {
+      if (mounted && !_showTerms) {
         debugPrint("✅ Initialization complete. Loading UI.");
         setState(() {
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _startEngineWithIdentity(IntrovertClient client, Uint8List seed) async {
+    try {
+      debugPrint("🧠 Identity found. Starting native engine...");
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      try {
+        client.startEngine(seed, _dbPath!);
+      } catch (e) {
+        debugPrint("🚨 Engine failed on existing DB. Attempting forced reset...");
+        final file = File(_dbPath!);
+        if (await file.exists()) await file.delete();
+        client.startEngine(seed, _dbPath!);
+      }
+      debugPrint("📡 Starting networking plane...");
+      client.startNetwork();
+      client.onAppLaunch();
+      
+      AlertService.tryRegisterPendingToken();
+      try {
+        client.fetchMailbox();
+      } catch (_) {}
+      
+      debugPrint("🚀 Introvert Engine Started Successfully!");
+      
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final isAnchorMode = prefs.getBool('isAnchorMode') ?? false;
+        if (isAnchorMode) {
+          debugPrint("⚓ Restoring saved Anchor Mode setting...");
+          client.setAnchorMode(true);
+          AlertService.setStayAwake(true);
+        }
+      } catch (e) {
+        debugPrint("⚠️ Failed to restore Anchor Mode setting: $e");
+      }
+    } catch (e) {
+      debugPrint("❌ Engine start failed: $e");
+    }
+  }
+
+  /// Called when the user accepts the Terms of Use.
+  void _onTermsAccepted() async {
+    final client = IntrovertClient();
+    
+    if (_existingSeed != null && _dbPath != null) {
+      // Existing user — save acceptance to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('disclaimer_accepted', true);
+      debugPrint("✅ Disclaimer accepted and saved.");
+      
+      setState(() {
+        _termsAccepted = true;
+        _showTerms = false;
+        _isLoading = true;
+      });
+      
+      await _startEngineWithIdentity(client, _existingSeed!);
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } else {
+      // New user — save to SharedPreferences and proceed to onboarding
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('disclaimer_accepted_new_user', true);
+      debugPrint("✅ Disclaimer accepted for new user (saved to SharedPreferences).");
+      
+      if (mounted) {
+        setState(() {
+          _showTerms = false;
+          _showOnboarding = true;
         });
       }
     }
@@ -147,7 +235,13 @@ class _IntrovertAppState extends State<IntrovertApp> {
         if (await file.exists()) await file.delete();
         client.startEngine(seed, _dbPath!);
       }
+
+      // Save disclaimer acceptance to SQLCipher now that engine is running
+      client.setDisclaimerAccepted(_dbPath!, seed, true);
+      debugPrint("✅ Disclaimer acceptance saved to SQLCipher for new user.");
+
       client.startNetwork();
+      client.onAppLaunch();
       AlertService.tryRegisterPendingToken();
       try {
         client.fetchMailbox();
@@ -245,9 +339,11 @@ class _IntrovertAppState extends State<IntrovertApp> {
                     child: CircularProgressIndicator(color: theme.accent),
                   ),
                 )
-              : (_showOnboarding
-                  ? OnboardingScreen(onComplete: _onOnboardingComplete, messengerKey: _messengerKey)
-                  : const MainShell()),
+              : (_showTerms
+                  ? TermsScreen(onAccepted: _onTermsAccepted)
+                  : (_showOnboarding
+                      ? OnboardingScreen(onComplete: _onOnboardingComplete, messengerKey: _messengerKey)
+                      : const MainShell())),
         );
       }
     );

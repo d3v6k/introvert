@@ -26,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSaving = false;
   bool _isClaimed = false;
   bool _isClaiming = false;
+  String _originalHandle = ''; // Immutable: handle from DB, never changes once set
   bool _hasExistingHandle = false;
   bool _isDisposing = false;
   StreamSubscription? _networkSubscription;
@@ -128,6 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       String h = profile['handle'] ?? '';
       if (h.startsWith("i@")) h = h.substring(2);
       _handleController.text = h;
+      _originalHandle = h; // Store original for immutability guard
       _hasExistingHandle = h.isNotEmpty;
       _base64Avatar = profile['avatar'];
       _privacyMode = profile['privacy_mode'] ?? 1; // Default to allowed
@@ -202,7 +204,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isSaving = true);
     final client = IntrovertClient();
     
-    String h = _handleController.text.trim();
+    // IMMUTABILITY: Always use the original handle if one exists.
+    // The handle field is read-only in the UI when claimed or existing,
+    // but we also enforce it here to prevent any code path from changing it.
+    String h = _hasExistingHandle ? _originalHandle : _handleController.text.trim();
     String handle = h.isNotEmpty ? "i@$h" : "";
 
     try {
@@ -231,25 +236,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return 'CITIZEN';
   }
 
-  Future<void> _claimRewards() async {
-    final client = IntrovertClient();
-    try {
-      final sig = await client.claimRewards();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Claim Successful! Sig: ${sig.substring(0, 8)}..."),
-            backgroundColor: AppTheme.current.accent,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Claim failed: $e"), backgroundColor: Colors.redAccent),
-        );
-      }
-    }
+  void _showNetworkMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.current.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.signal_cellular_alt_rounded, color: AppTheme.current.accent, size: 20),
+                  SizedBox(width: 8),
+                  Text('INTRO-CLAW NETWORK', style: TextStyle(
+                    color: AppTheme.current.accent, fontWeight: FontWeight.bold,
+                    fontSize: 13, letterSpacing: 1.2,
+                  )),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.orangeAccent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.radar_rounded, color: Colors.orangeAccent, size: 18),
+                ),
+                title: Text('Network Tune', style: TextStyle(color: AppTheme.current.text, fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: Text('Scan mesh topology & connection quality', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  IntrovertClient().runNetworkRecon();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Network recon started'), backgroundColor: AppTheme.current.surface),
+                  );
+                },
+              ),
+            ),
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.cyanAccent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.healing_rounded, color: Colors.cyanAccent, size: 18),
+                ),
+                title: Text('Network Heal', style: TextStyle(color: AppTheme.current.text, fontSize: 14, fontWeight: FontWeight.w600)),
+                subtitle: Text('Attempt to reconnect offline peers', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  IntrovertClient().runNetworkRecon();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Network heal started'), backgroundColor: AppTheme.current.surface),
+                  );
+                },
+              ),
+            ),
+            SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -262,7 +320,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          NetworkOptimizationButton(),
+          IconButton(
+            icon: Icon(Icons.signal_cellular_alt_rounded, color: AppTheme.current.accent, size: 22),
+            tooltip: 'Network Tools',
+            onPressed: () => _showNetworkMenu(context),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -401,9 +463,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Text('SAVE IDENTITY', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             SizedBox(height: 40),
-            SovereignEarnings(
+            NodeDashboard(
               economyStats: _economyStats,
-              onClaim: _claimRewards,
             ),
             SizedBox(height: 40),
             ElevatedButton(

@@ -68,7 +68,13 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        IntrovertFirebaseMessagingService.isAppInForeground = true
         forwardPendingFcmToken()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        IntrovertFirebaseMessagingService.isAppInForeground = false
     }
 
     /**

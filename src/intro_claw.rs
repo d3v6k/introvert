@@ -8,7 +8,7 @@ use std::collections::{HashMap, VecDeque, HashSet};
 use std::time::{SystemTime, Duration};
 use parking_lot::RwLock;
 use libp2p::PeerId;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use crate::storage::StorageService;
 
 // ============================================================
@@ -87,6 +87,8 @@ pub struct ClawTickContext {
     pub connected_peers: Vec<String>,
     pub mdns_discovered: Vec<String>,
     pub active_transfer_hashes: Vec<String>,
+    pub is_mobile_data: bool,
+    pub network_type: String,
 }
 
 /// Actions that IntroClaw wants the NetworkService to execute
@@ -97,6 +99,7 @@ pub struct ClawActions {
     pub retry_dead_letters: Vec<String>,   // Message IDs to retry
     pub upgrade_connections: Vec<String>,  // Peers to upgrade from relay to direct
     pub pre_establish_relays: Vec<String>, // Unstable peers to pre-establish relays for
+    pub force_mesh_refresh: bool,          // Trigger ForceMeshRefresh for connectivity recovery
     // Node mode specific actions
     pub cache_files_for_offline: Vec<(String, String)>, // (file_hash, peer_id) to cache for offline peers
     pub serve_cached_chunks: Vec<(String, String)>,     // (transfer_id, peer_id) to serve cached chunks
@@ -109,6 +112,7 @@ impl ClawActions {
             && self.retry_dead_letters.is_empty()
             && self.upgrade_connections.is_empty()
             && self.pre_establish_relays.is_empty()
+            && !self.force_mesh_refresh
             && self.cache_files_for_offline.is_empty()
             && self.serve_cached_chunks.is_empty()
     }
@@ -155,6 +159,15 @@ pub struct IntroClawService {
 
     // Tick counter for diagnostics
     tick_count: u64,
+
+    // Network state (updated from Flutter connectivity monitor)
+    is_mobile_data: bool,
+
+    // Active Chat Session Context (Task: Session-Aware Connection Optimization)
+    pub(crate) active_chat_id: Option<String>,
+    pub(crate) active_chat_peer: Option<String>,
+    pub(crate) active_chat_is_group: bool,
+    pub(crate) active_group_members: Vec<String>,
 }
 
 // ============================================================
@@ -285,6 +298,17 @@ impl ConnectionOptimizer {
         self.last_optimize.elapsed() >= std::time::Duration::from_secs(CONN_OPTIMIZE_INTERVAL_SECS)
     }
 
+    fn should_attempt_dcutr(&self, peer_id: &str) -> bool {
+        // Attempt DCUtR hole-punch for relayed remote peers if their health is stable.
+        // libp2p DCUtR fires automatically when swarm.dial() targets a peer with an
+        // active relay reservation — we just need to greenlight the attempt here.
+        if let Some(&last_score) = self.peer_scores.get(peer_id) {
+            last_score > 0.5
+        } else {
+            true // Unknown peer — give it a baseline discovery attempt
+        }
+    }
+
     pub fn should_attempt_direct_upgrade(
         &self,
         peer_id: &str,
@@ -294,7 +318,8 @@ impl ConnectionOptimizer {
     ) -> bool {
         if !is_currently_relayed { return false; }
         if !battery_ok { return false; }
-        has_mdns  // mDNS means same LAN, direct should work
+        // mDNS = same LAN, instant direct. Remote peers attempt DCUtR hole-punch.
+        has_mdns || self.should_attempt_dcutr(peer_id)
     }
 
     pub fn record_score(&mut self, peer_id: &str, score: f64) {
@@ -538,6 +563,28 @@ impl AdaptiveChunkSizer {
             }
         }
         CHUNK_SIZE_256KB // default
+    }
+
+    pub fn get_optimal_pipeline_depth(&self, peer_id: &str, is_direct_p2p: bool, is_mobile: bool, is_call_active: bool) -> u32 {
+        // Phase 3.4: VoIP priority — collapse pipeline to prevent media buffer contention
+        if is_call_active {
+            return 2;
+        }
+
+        // Phase 3.3: Mobile data hard-caps to protect data plans and battery
+        if is_mobile {
+            return if is_direct_p2p { 6 } else { 4 };
+        }
+
+        if let Some(history) = self.observations.get(peer_id) {
+            if let Some(&last_rate) = history.last() {
+                if last_rate >= THROUGHPUT_HIGH_THRESHOLD { return 16; }
+                if last_rate >= THROUGHPUT_MID_THRESHOLD { return 8; }
+                return 4;
+            }
+        }
+        // No observation history — fall back to stable v51 defaults
+        if is_direct_p2p { 12 } else { 8 }
     }
 }
 
@@ -1353,6 +1400,11 @@ impl IntroClawService {
             node_bandwidth_manager: NodeBandwidthManager::new(),
             activity_log: ActivityLog::new(),
             tick_count: 0,
+            is_mobile_data: false,
+            active_chat_id: None,
+            active_chat_peer: None,
+            active_chat_is_group: false,
+            active_group_members: Vec::new(),
         }
     }
 
@@ -1460,6 +1512,7 @@ impl IntroClawService {
             retry_dead_letters: Vec::new(),
             upgrade_connections: Vec::new(),
             pre_establish_relays: Vec::new(),
+            force_mesh_refresh: false,
             cache_files_for_offline: Vec::new(),
             serve_cached_chunks: Vec::new(),
         };
@@ -1467,6 +1520,7 @@ impl IntroClawService {
         if !self.is_active { return actions; }
 
         self.tick_count += 1;
+        self.is_mobile_data = ctx.is_mobile_data;
         let is_idle = ctx.is_background && ctx.connected_peers.is_empty();
 
         // Auto-disable anchor mode when battery drops below 30%
@@ -1602,9 +1656,52 @@ impl IntroClawService {
             }
         }
 
+        // 17b. Active Chat Session optimization — prioritize connection healing
+        if let Some(ref peer) = self.active_chat_peer {
+            if !ctx.connected_peers.contains(peer) {
+                self.activity_log.log(
+                    "session",
+                    &format!("Active chat partner {} is offline. Proactively healing connection.", &peer[..16.min(peer.len())]),
+                    "warn",
+                );
+                if !actions.heal_peers.contains(peer) {
+                    actions.heal_peers.push(peer.clone());
+                }
+            }
+        }
+
+        // 17c. Active Group Chat session optimization — proactively heal offline group members (up to 3)
+        if self.active_chat_is_group && !self.active_group_members.is_empty() {
+            let mut heal_count = 0;
+            for member in &self.active_group_members {
+                if heal_count >= 3 { break; }
+                if !ctx.connected_peers.contains(member) {
+                    if !actions.heal_peers.contains(member) {
+                        actions.heal_peers.push(member.clone());
+                        heal_count += 1;
+                    }
+                }
+            }
+            if heal_count > 0 {
+                self.activity_log.log(
+                    "session",
+                    &format!("Proactively healing connections to {} offline group member(s)", heal_count),
+                    "info",
+                );
+            }
+        }
+
         // 18. Node mode specific optimizations
         if self.is_node_mode {
             self.run_node_mode_optimizations(ctx, &mut actions);
+        }
+
+        // 19. Network resilience check — if isolated, trigger mesh refresh
+        if ctx.connected_peers.len() < 2 && !ctx.is_background {
+            self.activity_log.log("network", &format!(
+                "Network isolation detected ({} peers). Triggering mesh refresh for connectivity recovery.",
+                ctx.connected_peers.len()), "warn");
+            actions.force_mesh_refresh = true;
         }
 
         self.activity_log.log("tick", &format!("Tick #{} complete — {} actions queued (node_mode={})", self.tick_count,
@@ -1695,6 +1792,15 @@ impl IntroClawService {
         let _ = self.storage.prune_expired_sessions(SESSION_CACHE_MAX_AGE_SECS);
         let _ = self.storage.prune_expired_crypto_sessions(CRYPTO_SESSION_MAX_AGE_SECS);
         let _ = self.storage.prune_old_mesh_chunks();
+
+        // 7-day TTL sweeps — prunes stale cleared_chats and reward_log telemetry
+        if let Err(e) = self.storage.cleanup_cleared_chats() {
+            error!("[IntroClaw] Failed to prune cleared_chats: {:?}", e);
+        }
+        if let Err(e) = self.storage.cleanup_expired_reward_logs() {
+            error!("[IntroClaw] Failed to prune reward_log: {:?}", e);
+        }
+
         self.db_pruner.last_prune = std::time::Instant::now();
 
         if self.db_pruner.should_optimize() {
@@ -1741,7 +1847,11 @@ impl IntroClawService {
 
     fn run_connection_optimization(&mut self, ctx: &ClawTickContext) -> Vec<String> {
         let mut upgrades = Vec::new();
-        if !self.conn_optimizer.should_run() { return upgrades; }
+        
+        // Aggressively bypass cooldown for active chat peer optimization
+        let bypass_cooldown = self.active_chat_peer.is_some();
+
+        if !bypass_cooldown && !self.conn_optimizer.should_run() { return upgrades; }
         if self.battery_throttler.should_emergency_throttle() { return upgrades; }
 
         let battery_ok = !self.battery_throttler.should_throttle();
@@ -1755,8 +1865,16 @@ impl IntroClawService {
             let is_relayed = self.is_relayed_map.read().get(&peer_id).cloned().unwrap_or(false);
             let has_mdns = ctx.mdns_discovered.contains(peer_id_str);
 
-            if self.conn_optimizer.should_attempt_direct_upgrade(peer_id_str, is_relayed, has_mdns, battery_ok) {
-                info!("[IntroClaw] Direct P2P upgrade candidate: {} (mDNS={}, battery={})", peer_id_str, has_mdns, battery_ok);
+            // Active chat peer gets prioritized direct upgrade attempts even on battery warning
+            let is_target_peer = self.active_chat_peer.as_ref().map(|p| p == peer_id_str).unwrap_or(false);
+            let should_upgrade = if is_target_peer && is_relayed {
+                battery_ok // Allow upgrade if battery is not critical
+            } else {
+                self.conn_optimizer.should_attempt_direct_upgrade(peer_id_str, is_relayed, has_mdns, battery_ok)
+            };
+
+            if should_upgrade {
+                info!("[IntroClaw] Direct P2P upgrade candidate: {} (mDNS={}, battery={}, active_chat={})", peer_id_str, has_mdns, battery_ok, is_target_peer);
                 upgrades.push(peer_id_str.clone());
             }
         }
@@ -2037,6 +2155,67 @@ impl IntroClawService {
         result
     }
 
+    // ---- Active Chat Session Context & App Launch ----
+
+    pub fn set_active_chat(&mut self, chat_id: &str, peer_id: Option<&str>, is_group: bool) {
+        self.active_chat_id = Some(chat_id.to_string());
+        self.active_chat_peer = peer_id.map(|s| s.to_string());
+        self.active_chat_is_group = is_group;
+        self.active_group_members.clear();
+
+        if is_group {
+            self.activity_log.log(
+                "session",
+                &format!("Active group chat session detected for group {}", chat_id),
+                "info",
+            );
+        } else if let Some(ref peer) = self.active_chat_peer {
+            self.activity_log.log(
+                "session",
+                &format!("Active 1:1 chat session with peer {} detected", &peer[..16.min(peer.len())]),
+                "info",
+            );
+        }
+    }
+
+    pub fn set_active_group_members(&mut self, members: Vec<String>) {
+        self.active_group_members = members;
+    }
+
+    pub fn clear_active_chat(&mut self) {
+        if self.active_chat_id.is_some() {
+            self.activity_log.log("session", "Active chat session cleared", "info");
+        }
+        self.active_chat_id = None;
+        self.active_chat_peer = None;
+        self.active_chat_is_group = false;
+        self.active_group_members.clear();
+    }
+
+    pub fn on_app_launch(&mut self) -> ClawActions {
+        self.activity_log.log("app_launch", "App launch detected — executing initial warm-up optimizations", "success");
+        
+        let mut actions = ClawActions {
+            heal_peers: Vec::new(),
+            prefetch_files: Vec::new(),
+            retry_dead_letters: Vec::new(),
+            upgrade_connections: Vec::new(),
+            pre_establish_relays: Vec::new(),
+            force_mesh_refresh: true, // Force a fresh routing check on launch
+            cache_files_for_offline: Vec::new(),
+            serve_cached_chunks: Vec::new(),
+        };
+
+        // Pre-warm top contacts on launch
+        let prewarm_targets = self.get_prewarm_targets();
+        if !prewarm_targets.is_empty() {
+            self.activity_log.log("app_launch", &format!("Pre-warming connections to top {} contacts", prewarm_targets.len()), "info");
+            actions.pre_establish_relays.extend(prewarm_targets);
+        }
+
+        actions
+    }
+
     // ---- Core Public API ----
 
     pub fn get_optimal_chunk_size(&self, peer_id: &str) -> u32 {
@@ -2045,6 +2224,14 @@ impl IntroClawService {
 
     pub fn record_throughput(&mut self, peer_id: &str, bytes_per_sec: f64) {
         self.adaptive_chunker.record_throughput(peer_id, bytes_per_sec);
+    }
+
+    pub fn get_optimal_pipeline_depth(&self, peer_id: &str, is_direct_p2p: bool) -> u32 {
+        self.adaptive_chunker.get_optimal_pipeline_depth(peer_id, is_direct_p2p, self.is_mobile_data, self.voip_monitor.is_call_active())
+    }
+
+    pub fn is_on_mobile_data(&self) -> bool {
+        self.is_mobile_data
     }
 
     pub fn get_peer_health(&self, peer_id: &str) -> f64 {
@@ -2662,6 +2849,23 @@ pub fn run_network_recon(ctx: &ReconContext, storage: &StorageService) -> String
     out.push_str(&format!("Relay:         {:>3} peers\n", relay_count));
     out.push_str(&format!("Offline:       {:>3} peers\n", offline_count));
     out.push_str(&format!("```\n\n"));
+
+    // ─── Network Quality ─────────────────────────────────────────────
+    out.push_str("### Network Quality\n");
+    out.push_str(&format!("| Metric | Value |\n|---|---|\n"));
+    out.push_str(&format!("| RBNs Detected | `{}` |\n", ctx.discovered_anchors.len()));
+    out.push_str(&format!("| Mesh Nodes | `{}` |\n", ctx.total_known_peers));
+    out.push_str(&format!("| Connected | `{}` |\n", ctx.connected_peers.len()));
+    let connectivity_pct = if ctx.total_known_peers > 0 {
+        ctx.connected_peers.len() as f64 / ctx.total_known_peers as f64 * 100.0
+    } else { 0.0 };
+    out.push_str(&format!("| Connectivity | `{:.0}%` |\n", connectivity_pct));
+    let health_status = if connectivity_pct >= 80.0 { "EXCELLENT" }
+        else if connectivity_pct >= 50.0 { "GOOD" }
+        else if connectivity_pct >= 20.0 { "DEGRADED" }
+        else { "CRITICAL" };
+    out.push_str(&format!("| Health | `{}` |\n", health_status));
+    out.push_str(&format!("| Pending Messages | `{}` |\n\n", ctx.pending_messages));
 
     // ─── Upgrade Recommendations ─────────────────────────────────────
     if !upgrade_candidates.is_empty() {

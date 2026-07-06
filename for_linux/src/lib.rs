@@ -27,6 +27,7 @@ use crate::economy::RewardTracker;
 use crate::economy::solana::SolanaIncentiveEngine;
 use serde_json::json;
 use tracing::{info, warn, error};
+use chrono;
 
 // --- FFI Types & Callbacks ---
 
@@ -433,6 +434,8 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
         }
 
         let mut interval = tokio::time::interval(Duration::from_secs(30));
+        let mut last_epoch_sent = String::new();
+        
         loop {
             interval.tick().await;
 
@@ -456,6 +459,43 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
 
             if let Ok(stats_str) = serde_json::to_string(&stats) {
                 dispatch_global_event(9, stats_str.as_bytes());
+            }
+
+            // Check if we're in a new epoch (midnight UTC) and should send telemetry
+            let now = chrono::Utc::now();
+            let epoch_id = now.format("%Y_%m_%d").to_string();
+            let hour = now.format("%H").to_string().parse::<u32>().unwrap_or(25);
+            let minute = now.format("%M").to_string().parse::<u32>().unwrap_or(60);
+            
+            if epoch_id != last_epoch_sent && hour == 0 && minute < 1 {
+                // Package and send telemetry to RBN
+                let intr_mint = solana_sdk::pubkey::Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf").unwrap();
+                let token_program = solana_sdk::pubkey::Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap();
+                let ata_program = solana_sdk::pubkey::Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap();
+                
+                let (solana_ata, _) = solana_sdk::pubkey::Pubkey::find_program_address(
+                    &[&my_pubkey.to_bytes(), &token_program.to_bytes(), &intr_mint.to_bytes()],
+                    &ata_program,
+                );
+                
+                let envelope = tracker.package_telemetry(
+                    &my_pubkey.to_string(), // peer_id (using Solana pubkey as identifier)
+                    &my_pubkey.to_string(), // solana_wallet
+                    &solana_ata.to_string(), // solana_ata
+                    &epoch_id,
+                    &solana_signing_key,
+                    false, // is_rbn (will be determined by PDA bond verification)
+                    false, // is_edge_node
+                    0,     // prestige_tier
+                );
+                
+                // Send to RBN daemon on Alibaba
+                if let Err(e) = tracker.send_telemetry_to_rbn(&envelope, "47.89.252.80:9002").await {
+                    eprintln!("[Telemetry] Failed to send to RBN: {}", e);
+                } else {
+                    println!("[Telemetry] Sent epoch {} telemetry to RBN", epoch_id);
+                    last_epoch_sent = epoch_id;
+                }
             }
         }
     });

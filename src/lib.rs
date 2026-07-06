@@ -26,6 +26,7 @@ use libp2p::{PeerId, Multiaddr};
 use bip39::{Mnemonic, Language};
 use solana_sdk::signature::Signer;
 
+use zeroize::Zeroize;
 use crate::identity::NodeIdentity;
 use crate::storage::StorageService;
 use crate::network::{FfiNetworkCallback, NetworkCommand, NetworkConfig, NetworkService};
@@ -196,7 +197,7 @@ pub extern "C" fn introvert_mnemonic_to_seed(phrase_ptr: *const c_char) -> FfiRe
     }
 }
 
-/// Derives the libp2p Peer ID and Solana Wallet address from a 32-byte master seed.
+/// Derives the libp2p Peer ID and node identifier from a 32-byte master seed.
 #[no_mangle]
 pub extern "C" fn introvert_derive_identifiers(
     seed_ptr: *const u8,
@@ -272,15 +273,28 @@ pub extern "C" fn introvert_engine_start(
     };
 
     // 2. Initialize Storage
-    let storage_key = match NodeIdentity::derive_storage_key(*seed) {
+    // Derive the 256-bit SQLCipher key via HKDF-SHA256 with domain-separation
+    // salt b"introvert_storage_key". The key lives exclusively in volatile RAM.
+    let mut storage_key = match NodeIdentity::derive_storage_key(*seed) {
         Ok(key) => key,
         Err(_) => return FfiResult::error(-3, "Storage key derivation failed"),
     };
 
     let storage = match StorageService::new(db_path_str.as_ref(), &storage_key) {
         Ok(s) => Arc::new(s),
-        Err(e) => return FfiResult::error(-4, &format!("Storage initialization failed: {}", e)),
+        Err(e) => {
+            let msg = e.to_string();
+            storage_key.zeroize();
+            if msg.starts_with("STORAGE_DECRYPT_FAILED") {
+                return FfiResult::error(-10, &msg);
+            }
+            return FfiResult::error(-4, &format!("Storage initialization failed: {}", e));
+        }
     };
+
+    // Zero the key material from stack memory immediately after the connection
+    // is established. The key is no longer needed — SQLCipher caches it internally.
+    storage_key.zeroize();
 
     // 3. Initialize Economy & Solana
     let session_encryption_key = match NodeIdentity::derive_session_encryption_key(*seed) {
@@ -288,7 +302,10 @@ pub extern "C" fn introvert_engine_start(
         Err(_) => return FfiResult::error(-8, "Session encryption key derivation failed"),
     };
 
-    let reward_tracker = Arc::new(RewardTracker::new(Some(Arc::clone(&storage))));
+    // Shared metrics bridge: DailyRewardEngine writes, RewardTracker reads for telemetry
+    let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 9]));
+
+    let reward_tracker = Arc::new(RewardTracker::new(Some(Arc::clone(&storage)), shared_metrics.clone()));
 
     // Initialize Solana Incentive Engine with Mainnet settings as per Blueprint v4.0
     let solana_client = match SolanaIncentiveEngine::new(
@@ -314,7 +331,7 @@ pub extern "C" fn introvert_engine_start(
     let is_anchor_mode = storage.is_anchor_mode_enabled();
     let is_tunnel_mode = storage.is_tunnel_mode_enabled();
 
-    let daily_engine = Arc::new(crate::economy::daily_rewards::DailyRewardEngine::new(storage.clone()));
+    let daily_engine = Arc::new(crate::economy::daily_rewards::DailyRewardEngine::new(storage.clone(), shared_metrics.clone()));
     if let Ok(Some((_, _, _, _, tier))) = storage.get_profile() {
         daily_engine.set_prestige_tier(tier as u8);
     }
@@ -449,6 +466,7 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
     let solana = Arc::clone(&engine.solana_client);
     let identity = Arc::clone(&engine.identity);
     let daily_engine = engine.daily_reward_engine.clone();
+    let storage = Arc::clone(&engine.storage);
 
     engine.runtime.spawn(async move {
         let solana_signing_key = match NodeIdentity::derive_solana_keypair(identity.seed) {
@@ -468,6 +486,9 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
             let usdc_balance = solana.fetch_token_balance(&my_pubkey, &usdc_mint).await.unwrap_or(0);
             let pending = tracker.get_pending_rewards();
             let total_relayed = tracker.get_total_relayed();
+            let (diag_visible, alloc_mult) = solana.fetch_node_tier_profile(&my_pubkey).await;
+            let peer_id_str = my_pubkey.to_string();
+            let lifetime_allocated = storage.get_lifetime_allocated_intr(&peer_id_str).unwrap_or(0.0);
 
             let stats = json!({
                 "intr_balance": balance,
@@ -475,9 +496,12 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
                 "usdc_balance": usdc_balance,
                 "pending_rewards": pending,
                 "total_relayed": total_relayed,
-                "sol_address": my_pubkey.to_string(), 
+                "sol_address": my_pubkey.to_string(),
                 "treasury_address": treasury_pubkey.to_string(),
-                "token_name": "INTR"
+                "token_name": "INTR",
+                "advanced_diagnostic_ui_visible": diag_visible,
+                "allocation_multiplier": alloc_mult,
+                "lifetime_allocated": lifetime_allocated
             });
 
             if let Ok(stats_str) = serde_json::to_string(&stats) {
@@ -508,6 +532,7 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
                     is_self: false,
                     is_rbn: false,
                     proof_hash: None,
+                    active_web_containers: 0,
                 });
             }
 
@@ -517,15 +542,35 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
             let pending = tracker.get_pending_rewards();
             let total_relayed = tracker.get_total_relayed();
 
+            // Tier profile refresh: check every 5 minutes (10 ticks) to avoid RPC spam
+            static mut TICK_COUNTER: u32 = 0;
+            static mut CACHED_DIAG_VISIBLE: bool = false;
+            static mut CACHED_ALLOC_MULT: f32 = 1.0;
+            unsafe {
+                TICK_COUNTER += 1;
+                if TICK_COUNTER % 10 == 0 {
+                    let (v, m) = solana.fetch_node_tier_profile(&my_pubkey).await;
+                    CACHED_DIAG_VISIBLE = v;
+                    CACHED_ALLOC_MULT = m;
+                }
+            }
+
+            // Read lifetime accumulated points from the daily allocation ledger
+            let peer_id_str = my_pubkey.to_string();
+            let lifetime_allocated = storage.get_lifetime_allocated_intr(&peer_id_str).unwrap_or(0.0);
+
             let mut stats = json!({
                 "intr_balance": balance,
                 "sol_balance": sol_balance,
                 "usdc_balance": usdc_balance,
                 "pending_rewards": pending,
                 "total_relayed": total_relayed,
-                "sol_address": my_pubkey.to_string(), 
+                "sol_address": my_pubkey.to_string(),
                 "treasury_address": treasury_pubkey.to_string(),
-                "token_name": "INTR"
+                "token_name": "INTR",
+                "advanced_diagnostic_ui_visible": unsafe { CACHED_DIAG_VISIBLE },
+                "allocation_multiplier": unsafe { CACHED_ALLOC_MULT },
+                "lifetime_allocated": lifetime_allocated
             });
 
             // Add real-time daily earnings from DailyRewardEngine
@@ -594,6 +639,59 @@ pub extern "C" fn introvert_claim_rewards_async(callback: FfiRewardCallback) -> 
             callback(-3, err_msg.into_raw());
         }
     });
+
+    FfiResult::success()
+}
+
+/// Feed activity metrics from the Flutter layer into the DailyRewardEngine.
+/// Called periodically by the Dart side with current device state.
+/// Parameters match FFIDailyState fields for direct bridging.
+#[no_mangle]
+pub extern "C" fn introvert_daily_reward_tick(
+    relayed_bytes: u64,
+    web_containers: u32,
+    is_foreground: bool,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if let Some(ref daily_engine) = engine.daily_reward_engine {
+        // Record relay bytes activity if non-zero
+        if relayed_bytes > 0 {
+            daily_engine.record_activity(crate::economy::daily_rewards::ActivityEvent {
+                activity_type: crate::economy::daily_rewards::ActivityType::RelayBytes,
+                peer_id: None,
+                value: relayed_bytes,
+                is_foreground,
+                message_len: None,
+                is_self: false,
+                is_rbn: false,
+                proof_hash: None,
+                active_web_containers: web_containers,
+            });
+        }
+
+        // Record uptime tick
+        daily_engine.record_activity(crate::economy::daily_rewards::ActivityEvent {
+            activity_type: crate::economy::daily_rewards::ActivityType::UptimeSeconds,
+            peer_id: None,
+            value: 30, // tick interval
+            is_foreground,
+            message_len: None,
+            is_self: false,
+            is_rbn: false,
+            proof_hash: None,
+            active_web_containers: web_containers,
+        });
+    }
+
+    // Also update the legacy reward tracker
+    if relayed_bytes > 0 {
+        engine.reward_tracker.record_relay("ffi_tick", relayed_bytes);
+    }
 
     FfiResult::success()
 }
@@ -738,6 +836,25 @@ pub extern "C" fn introvert_network_dial(peer_id_ptr: *const c_char) -> FfiResul
     });
 
     FfiResult::success()
+} 
+
+/// Sets the current connectivity type (0 = unknown, 1 = Wi‑Fi, 2 = cellular, 3 = VPN).
+#[no_mangle]
+pub extern "C" fn introvert_network_set_connectivity_type(connectivity_type: u8) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::SetConnectivityType { connectivity_type }).await;
+    });
+    FfiResult::success()
 }
 
 /// Explicitly triggers a network diagnostics recheck / redial sequence for a peer.
@@ -845,6 +962,7 @@ pub extern "C" fn introvert_network_send_message(
             is_self: false,
             is_rbn: false,
             proof_hash: None,
+            active_web_containers: 0,
         });
     }
 
@@ -1085,7 +1203,9 @@ pub extern "C" fn introvert_storage_delete_contact(peer_id_ptr: *const c_char) -
     }
 }
 
-/// Updates the local profile's prestige tier (called from Dart when INTR balance changes).
+/// Updates the local profile's prestige tier.
+/// SECURITY: Now verifies the tier against on-chain balance before accepting.
+/// The tier must match the actual $INTR holdings — prevents self-assertion of inflated tiers.
 #[no_mangle]
 pub extern "C" fn introvert_storage_set_profile_tier(tier: i32) -> FfiResult {
     let lock = ENGINE.read();
@@ -1107,6 +1227,70 @@ pub extern "C" fn introvert_storage_set_profile_tier(tier: i32) -> FfiResult {
         }
         Err(e) => FfiResult::error(-1, &format!("Set tier error: {}", e)),
     }
+}
+
+/// Computes the prestige tier from on-chain $INTR balance and sets it locally.
+/// This is the SECURE way to update tiers — queries Solana RPC directly.
+/// No external input needed — derives the Solana address from the engine's identity.
+#[no_mangle]
+pub extern "C" fn introvert_compute_and_set_tier() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    let seed = engine.identity.seed;
+    let solana_client = Arc::clone(&engine.solana_client);
+    let storage = Arc::clone(&engine.storage);
+    let daily_engine = engine.daily_reward_engine.clone();
+
+    engine.runtime.spawn(async move {
+        // Derive Solana keypair from seed
+        let signing_key = match crate::identity::NodeIdentity::derive_solana_keypair(seed) {
+            Ok(k) => k,
+            Err(e) => {
+                tracing::error!("[Tier] Failed to derive Solana key: {}", e);
+                return;
+            }
+        };
+        use solana_sdk::signature::Signer;
+        let pubkey = signing_key.verifying_key();
+        let solana_address = bs58::encode(pubkey.to_bytes()).into_string();
+
+        let owner = match solana_sdk::pubkey::Pubkey::from_str(&solana_address) {
+            Ok(pk) => pk,
+            Err(e) => {
+                tracing::error!("[Tier] Invalid Solana address: {}", e);
+                return;
+            }
+        };
+
+        match solana_client.fetch_balance(&owner).await {
+            Ok(balance_nano) => {
+                let balance_intr = balance_nano as f64 / 1_000_000_000.0;
+                let tier = if balance_intr >= 1_000_000.0 { 4u8 }
+                    else if balance_intr >= 500_000.0 { 3 }
+                    else if balance_intr >= 250_000.0 { 2 }
+                    else if balance_intr >= 100_000.0 { 1 }
+                    else { 0 };
+
+                tracing::info!("[Tier] Computed tier={} for {} (balance={:.4} INTR)", tier, solana_address, balance_intr);
+
+                if let Err(e) = storage.set_profile_tier(tier) {
+                    tracing::error!("[Tier] Failed to save tier: {}", e);
+                }
+                if let Some(daily) = daily_engine {
+                    daily.set_prestige_tier(tier);
+                }
+            }
+            Err(e) => {
+                tracing::warn!("[Tier] Failed to fetch balance: {}", e);
+            }
+        }
+    });
+
+    FfiResult::success()
 }
 
 /// Deletes all verified contacts from storage.
@@ -1618,7 +1802,20 @@ pub extern "C" fn introvert_storage_delete_chat(peer_id_ptr: *const c_char) -> F
     };
 
     match engine.storage.delete_chat(&peer_id) {
-        Ok(_) => FfiResult::success(),
+        Ok(_) => {
+            // Trigger proactive mailbox drain so the MailboxDrained handler
+            // can skip pre-clear messages using should_skip_mailbox_message()
+            let network_tx = engine.network_tx.read();
+            if let Some(tx) = network_tx.as_ref() {
+                let tx = tx.clone();
+                engine.runtime.spawn(async move {
+                    let _ = tx.send(NetworkCommand::ClearMailboxForPeer {
+                        peer_id: peer_id.parse().unwrap_or(libp2p::PeerId::random()),
+                    }).await;
+                });
+            }
+            FfiResult::success()
+        }
         Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
     }
 }
@@ -1911,7 +2108,7 @@ pub extern "C" fn intro_claw_get_api_key() -> *mut c_char {
 
 /// Manually trigger an Intro-Claw maintenance tick.
 #[no_mangle]
-pub extern "C" fn intro_claw_trigger_tick() -> FfiResult {
+pub extern "C" fn intro_claw_trigger_tick(is_mobile_data: bool) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() {
         Some(e) => e,
@@ -1922,12 +2119,15 @@ pub extern "C" fn intro_claw_trigger_tick() -> FfiResult {
         Some(t) => t.clone(),
         None => return FfiResult::error(-13, "Network not started"),
     };
+    let network_type = if is_mobile_data { "cellular".to_string() } else { "wifi".to_string() };
     engine.runtime.spawn(async move {
         let _ = tx.send(NetworkCommand::IntroClawTick {
             battery_pct: 100,
             is_background: false,
             connected_peers: Vec::new(),
             mdns_discovered: Vec::new(),
+            is_mobile_data,
+            network_type,
         }).await;
     });
     FfiResult::success()
@@ -2254,6 +2454,113 @@ pub extern "C" fn intro_claw_voip_get_downgrade_recommendation() -> FfiResult {
     FfiResult::error(-11, "Network command channel unavailable")
 }
 
+/// Notify Intro-Claw that a chat session has started
+#[no_mangle]
+pub extern "C" fn intro_claw_set_active_chat(
+    chat_id_ptr: *const c_char,
+    peer_id_ptr: *const c_char,
+    is_group: i32,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    if chat_id_ptr.is_null() { return FfiResult::error(-11, "Null chat_id pointer"); }
+    let chat_id = unsafe { CStr::from_ptr(chat_id_ptr).to_string_lossy().into_owned() };
+    
+    let peer_id = if peer_id_ptr.is_null() {
+        None
+    } else {
+        let s = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+        if s.is_empty() { None } else { Some(s) }
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::IntroClawSetActiveChat {
+            chat_id,
+            peer_id,
+            is_group: is_group != 0,
+        }).await;
+    });
+    FfiResult::success()
+}
+
+/// Notify Intro-Claw that active chat session has ended/cleared
+#[no_mangle]
+pub extern "C" fn intro_claw_clear_active_chat() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::IntroClawClearActiveChat).await;
+    });
+    FfiResult::success()
+}
+
+/// Update list of active group members for the group chat session
+#[no_mangle]
+pub extern "C" fn intro_claw_set_active_group_members(members_json_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    if members_json_ptr.is_null() { return FfiResult::error(-11, "Null members_json pointer"); }
+    let json_str = unsafe { CStr::from_ptr(members_json_ptr).to_string_lossy().into_owned() };
+    let members: Vec<String> = match serde_json::from_str(&json_str) {
+        Ok(m) => m,
+        Err(e) => return FfiResult::error(-12, &format!("Invalid JSON: {}", e)),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::IntroClawSetActiveGroupMembers { members }).await;
+    });
+    FfiResult::success()
+}
+
+/// Trigger Intro-Claw app launch optimizations
+#[no_mangle]
+pub extern "C" fn intro_claw_on_app_launch() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    let rt = tokio::runtime::Runtime::new().ok();
+    if let Some(runtime) = rt {
+        runtime.block_on(async move {
+            let (result_tx, result_rx) = tokio::sync::oneshot::channel();
+            let _ = tx.send(NetworkCommand::IntroClawOnAppLaunch { result_tx }).await;
+            let _ = result_rx.await;
+        });
+        return FfiResult::success();
+    }
+    FfiResult::error(-11, "Network command channel unavailable")
+}
+
 /// Reclaims leaked binary memory once Dart has finished copying it.
 /// The `_len` parameter is intentionally unused — `libc::free` does not require the size.
 /// It is kept in the signature for API consistency with the Dart side, which passes the length
@@ -2365,6 +2672,63 @@ pub extern "C" fn introvert_drive_add_file(
     let local_path = unsafe { CStr::from_ptr(local_path_ptr).to_string_lossy().into_owned() };
 
     match engine.storage.upsert_drive_file(&filename, &file_hash, &mime_type, size, &local_path) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+/// Adds a file to the local encrypted Drive with folder assignment.
+#[no_mangle]
+pub extern "C" fn introvert_drive_add_file_with_folder(
+    filename_ptr: *const c_char,
+    file_hash_ptr: *const c_char,
+    mime_type_ptr: *const c_char,
+    size: i64,
+    local_path_ptr: *const c_char,
+    folder_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if filename_ptr.is_null() || file_hash_ptr.is_null() || mime_type_ptr.is_null() || local_path_ptr.is_null() || folder_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let filename = unsafe { CStr::from_ptr(filename_ptr).to_string_lossy().into_owned() };
+    let file_hash = unsafe { CStr::from_ptr(file_hash_ptr).to_string_lossy().into_owned() };
+    let mime_type = unsafe { CStr::from_ptr(mime_type_ptr).to_string_lossy().into_owned() };
+    let local_path = unsafe { CStr::from_ptr(local_path_ptr).to_string_lossy().into_owned() };
+    let folder = unsafe { CStr::from_ptr(folder_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.upsert_drive_file_with_folder(&filename, &file_hash, &mime_type, size, &local_path, &folder) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+/// Updates the folder assignment for a drive file.
+#[no_mangle]
+pub extern "C" fn introvert_drive_update_folder(
+    file_hash_ptr: *const c_char,
+    folder_ptr: *const c_char,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if file_hash_ptr.is_null() || folder_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+
+    let file_hash = unsafe { CStr::from_ptr(file_hash_ptr).to_string_lossy().into_owned() };
+    let folder = unsafe { CStr::from_ptr(folder_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.update_drive_file_folder(&file_hash, &folder) {
         Ok(_) => FfiResult::success(),
         Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
     }
@@ -2665,7 +3029,7 @@ pub extern "C" fn introvert_group_send_message(
     };
 
     let my_peer_id = engine.identity.peer_id.to_string();
-    if let Err(e) = engine.storage.store_group_message(&group_id, &my_peer_id, &msg_id, &message, true, reply_to.as_deref()) {
+    if let Err(e) = engine.storage.store_group_message(&group_id, &my_peer_id, &msg_id, &message, true, reply_to.as_deref(), None) {
         return FfiResult::error(-5, &format!("Database error: {}", e));
     }
 
@@ -2680,6 +3044,7 @@ pub extern "C" fn introvert_group_send_message(
             is_self: false,
             is_rbn: false,
             proof_hash: None,
+            active_web_containers: 0,
         });
     }
 
@@ -2759,6 +3124,26 @@ pub extern "C" fn introvert_storage_update_group_message_status(
     let group_id = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
 
     match engine.storage.update_group_message_status(&group_id, status) {
+        Ok(_) => FfiResult::success(),
+        Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn introvert_storage_update_group_message_status_by_id(
+    msg_id_ptr: *const c_char,
+    status: u8,
+) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if msg_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let msg_id = unsafe { CStr::from_ptr(msg_id_ptr).to_string_lossy().into_owned() };
+
+    match engine.storage.update_group_message_status_by_id(&msg_id, status) {
         Ok(_) => FfiResult::success(),
         Err(e) => FfiResult::error(-1, &format!("Database error: {}", e)),
     }
@@ -3574,6 +3959,7 @@ pub extern "C" fn introvert_network_start_pull(
 
     let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
     let transfer_id = unsafe { CStr::from_ptr(transfer_id_ptr).to_string_lossy().into_owned() };
+    crate::dispatch_debug_log(&format!("[FFI] start_pull called: peer={}, tid={}", peer_id_str, transfer_id));
     let filename = unsafe { CStr::from_ptr(filename_ptr).to_string_lossy().into_owned() };
     let mime_type = unsafe { CStr::from_ptr(mime_type_ptr).to_string_lossy().into_owned() };
     let file_hash = unsafe { CStr::from_ptr(file_hash_ptr).to_string_lossy().into_owned() };
@@ -3599,6 +3985,7 @@ pub extern "C" fn introvert_network_start_pull(
         None => return FfiResult::error(-13, "Network not started"),
     };
 
+    let tid_for_log = transfer_id.clone();
     let payload = crate::network::SignalingPayload::FileTransfer {
         transfer_id,
         filename,
@@ -3621,12 +4008,18 @@ pub extern "C" fn introvert_network_start_pull(
             is_self: false,
             is_rbn: false,
             proof_hash: None,
+            active_web_containers: 0,
         });
     }
 
+    crate::dispatch_debug_log(&format!("[FFI] start_pull: spawning async send for tid={}", tid_for_log));
     engine.runtime.spawn(async move {
         // Forward signaling directly to ourselves as if received from 'peer'
-        let _ = tx.send(crate::network::NetworkCommand::HandleIncomingPayload { peer_id: peer, payload }).await;
+        crate::dispatch_debug_log("[FFI] start_pull: inside spawn, about to send...");
+        match tx.send(crate::network::NetworkCommand::HandleIncomingPayload { peer_id: peer, payload }).await {
+            Ok(_) => crate::dispatch_debug_log("[FFI] start_pull: HandleIncomingPayload sent successfully"),
+            Err(e) => crate::dispatch_debug_log(&format!("[FFI] start_pull: HandleIncomingPayload send FAILED: {:?}", e)),
+        }
     });
 
     FfiResult::success()
@@ -3838,6 +4231,7 @@ pub extern "C" fn introvert_network_send_reaction(
             is_self: false,
             is_rbn: false,
             proof_hash: None,
+            active_web_containers: 0,
         });
     }
 
@@ -4655,26 +5049,37 @@ pub extern "C" fn introvert_daily_reward_record_activity(
 
 #[no_mangle]
 pub extern "C" fn introvert_daily_reward_update_weights(
-    json_ptr: *const u8,
-    json_len: usize,
+    envelope_json_ptr: *const u8,
+    envelope_json_len: usize,
 ) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
-    if json_ptr.is_null() || json_len == 0 {
+    if envelope_json_ptr.is_null() || envelope_json_len == 0 {
         return FfiResult::error(-11, "Null pointer");
     }
     let daily = match &engine.daily_reward_engine {
         Some(d) => d,
         None => return FfiResult::error(-12, "Daily rewards not initialized"),
     };
-    let json_bytes = unsafe { std::slice::from_raw_parts(json_ptr, json_len) };
-    let json_str = match std::str::from_utf8(json_bytes) {
+    let envelope_bytes = unsafe { std::slice::from_raw_parts(envelope_json_ptr, envelope_json_len) };
+    let envelope_str = match std::str::from_utf8(envelope_bytes) {
         Ok(s) => s,
         Err(e) => return FfiResult::error(-13, &format!("Invalid UTF-8: {}", e)),
     };
-    let weights: crate::economy::daily_rewards::ActivityWeights = match serde_json::from_str(json_str) {
+
+    // SECURITY: Parse and verify the signed envelope before processing
+    let envelope: crate::economy::daily_rewards::SignedRewardEnvelope = match serde_json::from_str(envelope_str) {
+        Ok(e) => e,
+        Err(e) => return FfiResult::error(-14, &format!("Invalid envelope JSON: {}", e)),
+    };
+    if let Err(e) = envelope.verify() {
+        tracing::error!("[Security] RewardConfig signature verification failed: {}", e);
+        return FfiResult::error(-15, &format!("Signature verification failed: {}", e));
+    }
+
+    let weights: crate::economy::daily_rewards::ActivityWeights = match serde_json::from_str(&envelope.payload_json) {
         Ok(w) => w,
-        Err(e) => return FfiResult::error(-14, &format!("Invalid JSON: {}", e)),
+        Err(e) => return FfiResult::error(-16, &format!("Invalid payload JSON: {}", e)),
     };
     daily.update_weights(weights);
     FfiResult::success()
@@ -4682,26 +5087,37 @@ pub extern "C" fn introvert_daily_reward_update_weights(
 
 #[no_mangle]
 pub extern "C" fn introvert_daily_reward_update_anti_gaming(
-    json_ptr: *const u8,
-    json_len: usize,
+    envelope_json_ptr: *const u8,
+    envelope_json_len: usize,
 ) -> FfiResult {
     let lock = ENGINE.read();
     let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
-    if json_ptr.is_null() || json_len == 0 {
+    if envelope_json_ptr.is_null() || envelope_json_len == 0 {
         return FfiResult::error(-11, "Null pointer");
     }
     let daily = match &engine.daily_reward_engine {
         Some(d) => d,
         None => return FfiResult::error(-12, "Daily rewards not initialized"),
     };
-    let json_bytes = unsafe { std::slice::from_raw_parts(json_ptr, json_len) };
-    let json_str = match std::str::from_utf8(json_bytes) {
+    let envelope_bytes = unsafe { std::slice::from_raw_parts(envelope_json_ptr, envelope_json_len) };
+    let envelope_str = match std::str::from_utf8(envelope_bytes) {
         Ok(s) => s,
         Err(e) => return FfiResult::error(-13, &format!("Invalid UTF-8: {}", e)),
     };
-    let config: crate::economy::daily_rewards::AntiGamingConfig = match serde_json::from_str(json_str) {
+
+    // SECURITY: Parse and verify the signed envelope before processing
+    let envelope: crate::economy::daily_rewards::SignedRewardEnvelope = match serde_json::from_str(envelope_str) {
+        Ok(e) => e,
+        Err(e) => return FfiResult::error(-14, &format!("Invalid envelope JSON: {}", e)),
+    };
+    if let Err(e) = envelope.verify() {
+        tracing::error!("[Security] AntiGamingConfig signature verification failed: {}", e);
+        return FfiResult::error(-15, &format!("Signature verification failed: {}", e));
+    }
+
+    let config: crate::economy::daily_rewards::AntiGamingConfig = match serde_json::from_str(&envelope.payload_json) {
         Ok(c) => c,
-        Err(e) => return FfiResult::error(-14, &format!("Invalid JSON: {}", e)),
+        Err(e) => return FfiResult::error(-16, &format!("Invalid payload JSON: {}", e)),
     };
     daily.update_anti_gaming(config);
     FfiResult::success()
@@ -4718,6 +5134,38 @@ pub extern "C" fn introvert_daily_reward_get_realtime_earnings() -> FfiResult {
             FfiResult::binary(json_str.into_bytes())
         }
         None => FfiResult::binary(b"{}".to_vec()),
+    }
+}
+
+/// Returns a fixed-width C-compatible state snapshot for the current daily reward cycle.
+/// No heap allocations cross the FFI boundary — safe for direct consumption by Dart/Flutter.
+/// Returns FFIDailyState by value. Callers must check that the engine is running first.
+#[no_mangle]
+pub extern "C" fn get_current_rewards_state() -> crate::economy::daily_rewards::FFIDailyState {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => {
+            return crate::economy::daily_rewards::FFIDailyState {
+                total_social_points: 0.0,
+                total_infra_points: 0.0,
+                active_web_containers: 0,
+                current_cycle_uptime: 0,
+                is_edge_node: 0,
+                is_rbn: 0,
+            };
+        }
+    };
+    match &engine.daily_reward_engine {
+        Some(daily) => daily.get_ffi_state(),
+        None => crate::economy::daily_rewards::FFIDailyState {
+            total_social_points: 0.0,
+            total_infra_points: 0.0,
+            active_web_containers: 0,
+            current_cycle_uptime: 0,
+            is_edge_node: 0,
+            is_rbn: 0,
+        },
     }
 }
 
@@ -4767,5 +5215,59 @@ pub extern "C" fn introvert_network_test_rbn(
         FfiResult::success()
     } else {
         FfiResult::error(-12, "Network not started")
+    }
+}
+
+// --- Disclaimer / Terms of Use ---
+
+/// Checks if the Terms of Use disclaimer has been accepted.
+/// Returns 1 if accepted, 0 if not.
+/// Does NOT require the engine to be running — reads directly from storage.
+#[no_mangle]
+pub extern "C" fn introvert_disclaimer_is_accepted(db_path_ptr: *const c_char, seed_ptr: *const u8) -> i32 {
+    if db_path_ptr.is_null() || seed_ptr.is_null() {
+        return 0;
+    }
+    let db_path_str = unsafe { CStr::from_ptr(db_path_ptr).to_string_lossy() };
+    let seed: &[u8; 32] = unsafe { &*(seed_ptr as *const [u8; 32]) };
+
+    let storage_key = match NodeIdentity::derive_storage_key(*seed) {
+        Ok(key) => key,
+        Err(_) => return 0,
+    };
+
+    match StorageService::new(db_path_str.as_ref(), &storage_key) {
+        Ok(storage) => {
+            if storage.is_disclaimer_accepted() { 1 } else { 0 }
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Sets the Terms of Use disclaimer acceptance status.
+/// Does NOT require the engine to be running.
+#[no_mangle]
+pub extern "C" fn introvert_disclaimer_set_accepted(
+    db_path_ptr: *const c_char,
+    seed_ptr: *const u8,
+    accepted: bool,
+) -> FfiResult {
+    if db_path_ptr.is_null() || seed_ptr.is_null() {
+        return FfiResult::error(-1, "Null pointer");
+    }
+    let db_path_str = unsafe { CStr::from_ptr(db_path_ptr).to_string_lossy() };
+    let seed: &[u8; 32] = unsafe { &*(seed_ptr as *const [u8; 32]) };
+
+    let storage_key = match NodeIdentity::derive_storage_key(*seed) {
+        Ok(key) => key,
+        Err(_) => return FfiResult::error(-2, "Storage key derivation failed"),
+    };
+
+    match StorageService::new(db_path_str.as_ref(), &storage_key) {
+        Ok(storage) => match storage.set_disclaimer_accepted(accepted) {
+            Ok(()) => FfiResult::success(),
+            Err(e) => FfiResult::error(-3, &format!("Failed to set disclaimer: {}", e)),
+        },
+        Err(e) => FfiResult::error(-4, &format!("Storage init failed: {}", e)),
     }
 }

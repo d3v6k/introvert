@@ -55,6 +55,7 @@ pub struct DriveFileMetadata {
     pub local_path: String,
     pub is_backed_up: bool,
     pub timestamp: String,
+    pub folder: String,
 }
 
 pub struct GroupMeshInfo {
@@ -90,12 +91,42 @@ impl StorageService {
     }
 
     /// Creates a new SQLCipher encrypted database at the given path.
-    pub fn new<P: AsRef<Path>>(path: P, key: &[u8; 32]) -> Result<Self> {
-        let conn = Connection::open(path)?;
+    ///
+    /// The 256-bit key must be derived via HKDF-SHA256 from the master seed
+    /// using the `b"introvert_storage_key"` domain-separation salt. This
+    /// function never writes the key to disk — it lives exclusively in
+    /// volatile RAM for the duration of the connection setup.
+    pub fn new<P: AsRef<Path> + std::fmt::Display>(path: P, key: &[u8; 32]) -> Result<Self> {
+        let path_display = format!("{}", path);
+        let conn = Connection::open(&path)?;
 
-        // Initialize SQLCipher encryption
+        // Initialize SQLCipher encryption — key must be set first.
+        // Cipher PRAGMAs (page_size, kdf_iter, hmac, kdf_algorithm) are NOT
+        // set here because they must match the database's original creation
+        // settings. Changing them on an existing database causes SQLITE_NOTADB.
         let key_hex = hex::encode(key);
         conn.pragma_update(None, "key", format!("x'{}'", key_hex))?;
+
+        // Corruption detection: if the key is wrong or the header is damaged,
+        // the first real SQL operation returns SQLITE_NOTADB or SQLITE_CORRUPT.
+        match conn.query_row("SELECT count(*) FROM sqlite_master", [], |row| row.get::<_, i64>(0)) {
+            Ok(_) => {}
+            Err(rusqlite::Error::SqliteFailure(e, _))
+                if e.code == rusqlite::ffi::ErrorCode::NotADatabase
+                    || e.code == rusqlite::ffi::ErrorCode::DatabaseCorrupt =>
+            {
+                warn!("[Storage] Database decryption failed at '{}'", path_display);
+                return Err(anyhow::anyhow!(
+                    "STORAGE_DECRYPT_FAILED: Cannot decrypt database at '{}'. \
+                     The encryption key may be incorrect or the file is corrupt.",
+                    path_display
+                ));
+            }
+            Err(e) => {
+                warn!("[Storage] Unexpected error during decryption probe: {}", e);
+                return Err(anyhow::anyhow!("STORAGE_INIT_FAILED: {}", e));
+            }
+        }
 
         // WAL mode: crash-safe, better concurrent read performance
         conn.pragma_update(None, "journal_mode", "WAL")?;
@@ -248,6 +279,13 @@ impl StorageService {
                 UNIQUE(msg_id, sender_id)
             );
             CREATE INDEX IF NOT EXISTS idx_drive_hash ON drive_files (file_hash);
+            CREATE TABLE IF NOT EXISTS drive_folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                folder_name TEXT NOT NULL UNIQUE,
+                is_shared INTEGER DEFAULT 0,
+                shared_to TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
             CREATE TABLE IF NOT EXISTS mesh_chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_hash TEXT NOT NULL,
@@ -285,6 +323,31 @@ impl StorageService {
             );
             CREATE INDEX IF NOT EXISTS idx_dlq_peer ON dead_letter_queue (peer_id);
             CREATE INDEX IF NOT EXISTS idx_dlq_queued ON dead_letter_queue (queued_at);"
+        )?;
+
+        // Pending file chunks — persistent queue for cross-network file transfers
+        // Used when no RBNs are connected and chunks would otherwise be lost on app restart
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS pending_file_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transfer_id TEXT NOT NULL,
+                peer_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                chunk_data BLOB NOT NULL,
+                created_at INTEGER NOT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(transfer_id, chunk_index)
+            );
+            CREATE INDEX IF NOT EXISTS idx_pending_chunks_peer ON pending_file_chunks(peer_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_pending_chunks_transfer ON pending_file_chunks(transfer_id, chunk_index);"
+        )?;
+
+        // Cleared chats — tracks when a chat was cleared to prevent mailbox re-delivery of old messages
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS cleared_chats (
+                peer_id TEXT PRIMARY KEY,
+                cleared_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );"
         )?;
 
         // Notes table
@@ -346,7 +409,17 @@ impl StorageService {
         )?;
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_elevated_chat ON elevated_messages (chat_id, elevated_at DESC)", []);
 
-        // Daily rewards system
+        // Daily rewards system — consolidated reward records with anti-farming tracking
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS daily_reward_records (
+                cycle_date TEXT PRIMARY KEY,
+                total_social_points REAL NOT NULL DEFAULT 0.0,
+                total_infra_points REAL NOT NULL DEFAULT 0.0,
+                active_containers_highwater INTEGER NOT NULL DEFAULT 0,
+                total_cycle_uptime_secs INTEGER NOT NULL DEFAULT 0
+            )", []
+        )?;
+
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS daily_cycles (
                 cycle_date TEXT PRIMARY KEY,
@@ -379,6 +452,22 @@ impl StorageService {
                 weights_json TEXT NOT NULL,
                 anti_gaming_json TEXT NOT NULL,
                 updated_at INTEGER NOT NULL
+            )", []
+        )?;
+
+        // Per-node daily allocation results from the 10-year emission decay ledger
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS node_daily_allocations (
+                cycle_date TEXT NOT NULL,
+                peer_id TEXT NOT NULL,
+                sol_address TEXT NOT NULL DEFAULT '',
+                raw_points REAL NOT NULL DEFAULT 0.0,
+                weighted_points REAL NOT NULL DEFAULT 0.0,
+                share_of_pool REAL NOT NULL DEFAULT 0.0,
+                intr_allocated REAL NOT NULL DEFAULT 0.0,
+                tier_multiplier REAL NOT NULL DEFAULT 1.0,
+                created_at INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (cycle_date, peer_id)
             )", []
         )?;
 
@@ -602,6 +691,35 @@ impl StorageService {
         false
     }
 
+    /// Sets the Terms of Use disclaimer acceptance status and version.
+    pub fn set_disclaimer_accepted(&self, accepted: bool) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO economy_meta (key, value) VALUES ('disclaimer_accepted', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![accepted.to_string()],
+        )?;
+        conn.execute(
+            "INSERT INTO economy_meta (key, value) VALUES ('disclaimer_version', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params!["1.0"],
+        )?;
+        Ok(())
+    }
+
+    /// Checks if the Terms of Use disclaimer has been accepted.
+    pub fn is_disclaimer_accepted(&self) -> bool {
+        let conn = self.conn.lock();
+        if let Ok(mut stmt) = conn.prepare("SELECT value FROM economy_meta WHERE key = 'disclaimer_accepted'") {
+            if let Ok(mut rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                if let Some(Ok(val)) = rows.next() {
+                    return val == "true";
+                }
+            }
+        }
+        false
+    }
+
     /// Sets the anchor node mode status.
     pub fn set_anchor_mode_enabled(&self, enabled: bool) -> Result<()> {
         let conn = self.conn.lock();
@@ -745,6 +863,9 @@ impl StorageService {
     pub fn update_contact_verification(&self, peer_id: &str, is_verified: bool) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute("UPDATE contacts SET is_verified = ?1 WHERE peer_id = ?2", params![if is_verified { 1 } else { 0 }, peer_id])?;
+        // Invalidate contacts cache so get_all_contacts() picks up the change
+        let mut cache = self.contacts_cache.lock();
+        *cache = None;
         Ok(())
     }
 
@@ -809,16 +930,74 @@ impl StorageService {
         // Also clean up any cached session, mailbox, and messages
         conn.execute("DELETE FROM session_cache WHERE peer_id = ?1", params![peer_id])?;
         conn.execute("DELETE FROM messages WHERE peer_id = ?1", params![peer_id])?;
-        
+
         let recipient_hash = Self::hash_peer_id(&peer_id.parse().unwrap_or(libp2p::PeerId::random()));
         conn.execute("DELETE FROM mailbox_messages WHERE recipient_hash = ?1", params![recipient_hash])?;
+        drop(conn);
+        // Invalidate contacts cache so get_all_contacts() reflects the deletion
+        let mut cache = self.contacts_cache.lock();
+        *cache = None;
+        let mut anchor_cache = self.anchor_nodes_cache.lock();
+        *anchor_cache = None;
         Ok(())
     }
 
-    /// Removes all messages for a specific peer (Deletes chat history).
+    /// Removes all messages for a specific peer (Deletes chat history) and clears local mailbox entries.
     pub fn delete_chat(&self, peer_id: &str) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM messages WHERE peer_id = ?1", params![peer_id])?;
+        // Also clear local mailbox entries for this peer to prevent re-delivery
+        if let Ok(parsed) = peer_id.parse::<libp2p::PeerId>() {
+            let recipient_hash = Self::hash_peer_id(&parsed);
+            conn.execute("DELETE FROM mailbox_messages WHERE recipient_hash = ?1", params![recipient_hash])?;
+        }
+        // Record the clear timestamp to prevent mailbox drain from re-delivering old messages
+        conn.execute(
+            "INSERT OR REPLACE INTO cleared_chats (peer_id, cleared_at) VALUES (?1, CURRENT_TIMESTAMP)",
+            params![peer_id],
+        )?;
+        Ok(())
+    }
+
+    /// Check if a message should be skipped because the chat was cleared after it was sent.
+    pub fn should_skip_mailbox_message(&self, sender_peer_id: &str, msg_timestamp: i64) -> bool {
+        let conn = self.conn.lock();
+        let result = conn.query_row(
+            "SELECT cleared_at FROM cleared_chats WHERE peer_id = ?1",
+            params![sender_peer_id],
+            |row| row.get::<_, String>(0),
+        );
+        match result {
+            Ok(cleared_at_str) => {
+                // Parse the cleared_at timestamp and compare with message timestamp
+                if let Ok(cleared_dt) = chrono::NaiveDateTime::parse_from_str(&cleared_at_str, "%Y-%m-%d %H:%M:%S") {
+                    let cleared_ts = cleared_dt.and_utc().timestamp();
+                    msg_timestamp < cleared_ts
+                } else {
+                    false
+                }
+            }
+            Err(_) => false, // No clear record, don't skip
+        }
+    }
+
+    /// Clean up old cleared_chats entries (older than 7 days).
+    pub fn cleanup_cleared_chats(&self) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM cleared_chats WHERE cleared_at < datetime('now', '-7 days')",
+            [],
+        )?;
+        Ok(())
+    }
+
+    /// Clean up old reward_log telemetry entries (older than 7 days) to prevent database bloat.
+    pub fn cleanup_expired_reward_logs(&self) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM reward_log WHERE timestamp < datetime('now', '-7 days')",
+            [],
+        )?;
         Ok(())
     }
 
@@ -828,6 +1007,12 @@ impl StorageService {
         conn.execute("DELETE FROM contacts", [])?;
         conn.execute("DELETE FROM session_cache", [])?;
         conn.execute("DELETE FROM mailbox_messages", [])?;
+        drop(conn);
+        // Invalidate contacts cache so get_all_contacts() reflects the deletion
+        let mut cache = self.contacts_cache.lock();
+        *cache = None;
+        let mut anchor_cache = self.anchor_nodes_cache.lock();
+        *anchor_cache = None;
         Ok(())
     }
 
@@ -1045,6 +1230,28 @@ impl StorageService {
 
     /// Saves or updates the local profile.
     pub fn set_profile(&self, name: Option<&str>, handle: Option<&str>, avatar: Option<&str>, privacy_mode: i32) -> Result<()> {
+        // IMMUTABILITY GUARD: If the existing handle is permanently verified in handle_registry,
+        // reject any attempt to change it to a different value.
+        if let Ok(Some((_, existing_handle, _, _, _))) = self.get_profile() {
+            if let Some(ref h) = existing_handle {
+                if !h.is_empty() {
+                    if let Ok(claimed) = self.is_handle_permanently_claimed(h) {
+                        if claimed {
+                            // Only allow the update if the handle is unchanged (or null, meaning "don't update")
+                            let handle_unchanged = match handle {
+                                Some(new_h) => new_h == h,
+                                None => true, // null means "keep existing"
+                            };
+                            if !handle_unchanged {
+                                tracing::warn!("[Storage] Rejecting handle change: '{}' is permanently claimed. Cannot change to '{}'.", h, handle.unwrap_or("null"));
+                                anyhow::bail!("Handle '{}' is permanently claimed and cannot be changed", h);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let conn = self.conn.lock();
         conn.execute(
             "INSERT INTO profile (id, name, handle, avatar_base64, privacy_mode) VALUES (1, ?1, ?2, ?3, ?4)
@@ -1092,14 +1299,35 @@ impl StorageService {
         Ok(())
     }
 
-    pub fn store_message_with_id(&self, peer_id: &str, msg_id: &str, content: &str, is_me: bool, reply_to: Option<&str>) -> Result<()> {
+    pub fn store_message_with_id(&self, peer_id: &str, msg_id: &str, content: &str, is_me: bool, reply_to: Option<&str>, timestamp: Option<&str>) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
-            "INSERT INTO messages (peer_id, msg_id, content, is_me, status, reply_to_msg_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6) 
-             ON CONFLICT(msg_id) DO UPDATE SET content = ?3, reply_to_msg_id = ?6",
-            params![peer_id, msg_id, content, is_me as i32, if is_me { 0 } else { 1 }, reply_to],
+            "INSERT INTO messages (peer_id, msg_id, content, is_me, status, reply_to_msg_id, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, CURRENT_TIMESTAMP)) 
+             ON CONFLICT(msg_id) DO UPDATE SET content = ?3, reply_to_msg_id = ?6, timestamp = COALESCE(?7, timestamp)",
+            params![peer_id, msg_id, content, is_me as i32, if is_me { 0 } else { 1 }, reply_to, timestamp],
         )?;
         Ok(())
+    }
+
+    /// Sync-safe insert: only adds new messages, never overwrites existing ones.
+    /// Used by ChatSyncResponse to prevent stale sync data from overwriting current messages.
+    pub fn store_message_if_new(&self, peer_id: &str, msg_id: &str, content: &str, is_me: bool, reply_to: Option<&str>, timestamp: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR IGNORE INTO messages (peer_id, msg_id, content, is_me, status, reply_to_msg_id, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, CURRENT_TIMESTAMP))",
+            params![peer_id, msg_id, content, is_me as i32, if is_me { 0 } else { 1 }, reply_to, timestamp],
+        )?;
+        Ok(())
+    }
+
+    /// Check if a message already exists by msg_id (for dedup).
+    pub fn message_exists(&self, msg_id: &str) -> bool {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT COUNT(*) FROM messages WHERE msg_id = ?1",
+            params![msg_id],
+            |row| row.get::<_, i64>(0),
+        ).unwrap_or(0) > 0
     }
 
     pub fn update_message_status(&self, msg_id: &str, status: u8) -> Result<()> {
@@ -1118,6 +1346,140 @@ impl StorageService {
             params![status as i32, peer_id],
         )?;
         Ok(())
+    }
+
+    pub fn update_message_status_if_higher(&self, msg_id: &str, new_status: u8) -> Result<bool> {
+        let conn = self.conn.lock();
+        let current: i32 = conn.query_row(
+            "SELECT COALESCE(status, 0) FROM messages WHERE msg_id = ?1",
+            params![msg_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        let current = current as u8;
+        // Allowed transitions: 0→3, 0→1, 0→2, 3→1, 3→2, 1→2
+        let allowed = match current {
+            0 => new_status <= 3,
+            3 => new_status == 1 || new_status == 2,
+            1 => new_status == 2,
+            _ => false,
+        };
+        if allowed && new_status > current {
+            conn.execute("UPDATE messages SET status = ?1 WHERE msg_id = ?2 AND status = ?3",
+                params![new_status as i32, msg_id, current as i32])?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    // --- Pending file chunk queue (persistent safety net for cross-network transfers) ---
+
+    pub fn enqueue_pending_chunk(&self, transfer_id: &str, peer_id: &str, chunk_index: u32, chunk_data: &[u8]) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO pending_file_chunks (transfer_id, peer_id, chunk_index, chunk_data, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![transfer_id, peer_id, chunk_index as i32, chunk_data, chrono::Utc::now().timestamp()],
+        )?;
+        Ok(())
+    }
+
+    pub fn dequeue_pending_chunks(&self, peer_id: &str, limit: usize) -> Result<Vec<(String, u32, Vec<u8>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT transfer_id, chunk_index, chunk_data FROM pending_file_chunks WHERE peer_id = ?1 ORDER BY transfer_id ASC, chunk_index ASC LIMIT ?2"
+        )?;
+        let rows = stmt.query_map(params![peer_id, limit as i32], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)? as u32, row.get::<_, Vec<u8>>(2)?))
+        })?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
+    pub fn remove_pending_chunk(&self, transfer_id: &str, chunk_index: u32) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM pending_file_chunks WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+        )?;
+        Ok(())
+    }
+
+    /// Increment retry count for a pending chunk. Returns the new count.
+    /// If max_retries is exceeded, deletes the chunk to prevent infinite retry loops.
+    pub fn increment_chunk_retry(&self, transfer_id: &str, chunk_index: u32, max_retries: i32) -> Result<i32> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE pending_file_chunks SET retry_count = retry_count + 1 WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+        )?;
+        let new_count: i32 = conn.query_row(
+            "SELECT retry_count FROM pending_file_chunks WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        if new_count >= max_retries {
+            conn.execute(
+                "DELETE FROM pending_file_chunks WHERE transfer_id = ?1 AND chunk_index = ?2",
+                params![transfer_id, chunk_index as i32],
+            )?;
+        }
+        Ok(new_count)
+    }
+
+    pub fn remove_pending_chunks_for_transfer(&self, transfer_id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM pending_file_chunks WHERE transfer_id = ?1",
+            params![transfer_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn cleanup_stale_pending_chunks(&self, max_age_secs: i64) -> Result<usize> {
+        let conn = self.conn.lock();
+        let cutoff = chrono::Utc::now().timestamp() - max_age_secs;
+        let deleted = conn.execute(
+            "DELETE FROM pending_file_chunks WHERE created_at < ?1",
+            params![cutoff],
+        )?;
+        Ok(deleted)
+    }
+
+    pub fn has_pending_chunks_for_peer(&self, peer_id: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let count: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM pending_file_chunks WHERE peer_id = ?1",
+            params![peer_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    /// Fetch sent messages stuck at status=0 (Sent) older than `age_secs` seconds.
+    /// Returns (msg_id, peer_id, content, reply_to) for retry.
+    pub fn fetch_undelivered_messages(&self, age_secs: i64) -> Result<Vec<(String, String, String, Option<String>)>> {
+        let conn = self.conn.lock();
+        let cutoff = chrono::Utc::now().timestamp() - age_secs;
+        let mut stmt = conn.prepare(
+            "SELECT msg_id, peer_id, content, reply_to_msg_id FROM messages \
+             WHERE is_me = 1 AND status = 0 AND msg_id IS NOT NULL \
+             AND CAST(strftime('%s', timestamp) AS INTEGER) < ?1"
+        )?;
+        let rows = stmt.query_map(params![cutoff], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
     }
 
     /// Retrieves all messages for a specific peer, ordered by timestamp.
@@ -1195,7 +1557,7 @@ impl StorageService {
     pub fn get_last_messages_all(&self) -> Result<serde_json::Value> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT peer_id, content, timestamp, is_me, msg_id FROM messages WHERE id IN (SELECT MAX(id) FROM messages GROUP BY peer_id)"
+            "SELECT peer_id, content, timestamp, is_me, msg_id FROM messages m1 WHERE timestamp = (SELECT MAX(timestamp) FROM messages m2 WHERE m2.peer_id = m1.peer_id) GROUP BY peer_id"
         )?;
         let mut map = serde_json::Map::new();
         let rows = stmt.query_map([], |row| {
@@ -1223,7 +1585,7 @@ impl StorageService {
     pub fn get_last_group_messages_all(&self) -> Result<serde_json::Value> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
-            "SELECT group_id, sender_id, content, timestamp, msg_id FROM group_messages WHERE id IN (SELECT MAX(id) FROM group_messages GROUP BY group_id)"
+            "SELECT group_id, sender_id, content, timestamp, msg_id FROM group_messages gm1 WHERE timestamp = (SELECT MAX(timestamp) FROM group_messages gm2 WHERE gm2.group_id = gm1.group_id) GROUP BY group_id"
         )?;
         let mut map = serde_json::Map::new();
         let rows = stmt.query_map([], |row| {
@@ -1397,12 +1759,12 @@ impl StorageService {
         if let Some(row) = rows.next() { Ok(Some(row?)) } else { Ok(None) }
     }
 
-    pub fn store_group_message(&self, group_id: &str, sender_id: &str, msg_id: &str, content: &str, is_me: bool, reply_to: Option<&str>) -> Result<()> {
+    pub fn store_group_message(&self, group_id: &str, sender_id: &str, msg_id: &str, content: &str, is_me: bool, reply_to: Option<&str>, timestamp: Option<&str>) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute(
-            "INSERT INTO group_messages (group_id, sender_id, msg_id, content, is_me, status, reply_to_msg_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-             ON CONFLICT(msg_id) DO UPDATE SET content = excluded.content, reply_to_msg_id = excluded.reply_to_msg_id",
-            params![group_id, sender_id, msg_id, content, is_me as i32, if is_me { 0 } else { 1 }, reply_to],
+            "INSERT INTO group_messages (group_id, sender_id, msg_id, content, is_me, status, reply_to_msg_id, timestamp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, COALESCE(?8, CURRENT_TIMESTAMP))
+             ON CONFLICT(msg_id) DO UPDATE SET content = excluded.content, reply_to_msg_id = excluded.reply_to_msg_id, timestamp = COALESCE(?8, timestamp)",
+            params![group_id, sender_id, msg_id, content, is_me as i32, if is_me { 0 } else { 1 }, reply_to, timestamp],
         )?;
         Ok(())
     }
@@ -1633,6 +1995,22 @@ impl StorageService {
             |row| row.get(0),
         ).ok();
         Ok(result)
+    }
+
+    /// Looks up a verified handle by peer_id from the local handle_registry table.
+    /// Returns the handle if the peer has a verified claim, None otherwise.
+    pub fn get_handle_by_peer(&self, peer_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT handle FROM handle_registry WHERE peer_id = ?1 AND verified = 1 LIMIT 1"
+        )?;
+        let mut rows = stmt.query_map(params![peer_id], |row| {
+            row.get::<_, String>(0)
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
     }
 
     // --- Push Tokens (Background Proxy) ---
@@ -1884,9 +2262,57 @@ impl StorageService {
         Ok(())
     }
 
+    pub fn upsert_drive_file_with_folder(&self, filename: &str, file_hash: &str, mime_type: &str, size: i64, local_path: &str, folder: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO drive_files (filename, file_hash, mime_type, total_size, local_path, folder) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(file_hash) DO UPDATE SET filename = excluded.filename, local_path = excluded.local_path, folder = excluded.folder",
+            params![filename, file_hash, mime_type, size, local_path, folder],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_group_name(&self, group_id: &str) -> String {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT name FROM groups WHERE id = ?1",
+            params![group_id],
+            |row| row.get(0),
+        ).unwrap_or_else(|_| group_id.to_string())
+    }
+
+    pub fn get_contact_alias(&self, peer_id: &str) -> String {
+        let conn = self.conn.lock();
+        conn.query_row(
+            "SELECT alias FROM contacts WHERE peer_id = ?1",
+            params![peer_id],
+            |row| row.get(0),
+        ).unwrap_or_else(|_| peer_id.to_string())
+    }
+
+    pub fn update_drive_file_folder(&self, file_hash: &str, folder: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE drive_files SET folder = ?1 WHERE file_hash = ?2",
+            params![folder, file_hash],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_drive_folders(&self) -> Result<Vec<String>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare("SELECT DISTINCT folder FROM drive_files WHERE folder IS NOT NULL AND folder != '' ORDER BY folder")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        let mut folders = Vec::new();
+        for row in rows {
+            if let Ok(f) = row { folders.push(f); }
+        }
+        Ok(folders)
+    }
+
     pub fn get_all_drive_files(&self) -> Result<Vec<DriveFileMetadata>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp FROM drive_files ORDER BY timestamp DESC")?;
+        let mut stmt = conn.prepare("SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp, COALESCE(folder, '') FROM drive_files ORDER BY timestamp DESC")?;
         let rows = stmt.query_map([], |row| {
             Ok(DriveFileMetadata {
                 filename: row.get(0)?,
@@ -1896,6 +2322,7 @@ impl StorageService {
                 local_path: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
                 is_backed_up: row.get::<_, i32>(5)? != 0,
                 timestamp: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                folder: row.get(7)?,
             })
         })?;
         let mut files = Vec::new();
@@ -1909,7 +2336,7 @@ impl StorageService {
 
     pub fn get_drive_file_by_hash(&self, file_hash: &str) -> Result<Option<DriveFileMetadata>> {
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp FROM drive_files WHERE file_hash = ?1")?;
+        let mut stmt = conn.prepare("SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp, COALESCE(folder, '') FROM drive_files WHERE file_hash = ?1")?;
         let mut rows = stmt.query_map(params![file_hash], |row| {
             Ok(DriveFileMetadata {
                 filename: row.get(0)?,
@@ -1919,6 +2346,7 @@ impl StorageService {
                 local_path: row.get::<_, Option<String>>(4)?.unwrap_or_default(),
                 is_backed_up: row.get::<_, i32>(5)? != 0,
                 timestamp: row.get::<_, Option<String>>(6)?.unwrap_or_default(),
+                folder: row.get(7)?,
             })
         })?;
 
@@ -2368,7 +2796,7 @@ impl StorageService {
         let is_generic_type = type_keywords.iter().any(|kw| query.to_lowercase().contains(kw));
 
         let mut sql = String::from(
-            "SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp FROM drive_files WHERE 1=1"
+            "SELECT filename, file_hash, mime_type, total_size, local_path, is_backed_up, timestamp, COALESCE(folder, '') FROM drive_files WHERE 1=1"
         );
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
 
@@ -2402,6 +2830,7 @@ impl StorageService {
                 local_path: row.get(4)?,
                 is_backed_up: row.get::<_, i32>(5)? != 0,
                 timestamp: row.get(6)?,
+                folder: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
             })
         })?;
         let mut files = Vec::new();
@@ -2632,5 +3061,149 @@ impl StorageService {
         let mut cycles = Vec::new();
         for row in rows { cycles.push(row?); }
         Ok(cycles)
+    }
+
+    /// Persists a consolidated reward record for the given cycle date.
+    ///
+    /// Anti-farming guard: if `active_containers_highwater > 3`, the write is
+    /// aborted and an error is returned. All point values are truncated to
+    /// exactly 4 decimal places before writing to prevent cross-cycle float drift.
+    pub fn save_daily_reward_record(
+        &self,
+        cycle_date: &str,
+        total_social_points: f64,
+        total_infra_points: f64,
+        active_containers_highwater: u32,
+        total_cycle_uptime_secs: u64,
+    ) -> Result<()> {
+        if active_containers_highwater > 3 {
+            return Err(anyhow::anyhow!(
+                "ANTI_FARMING_REJECTED: active_containers_highwater={} exceeds maximum of 3",
+                active_containers_highwater
+            ));
+        }
+
+        // Truncate to 4 decimal places to match the in-memory scoring engine
+        let truncate = |v: f64| (v * 10_000.0).trunc() / 10_000.0;
+        let social = truncate(total_social_points);
+        let infra = truncate(total_infra_points);
+
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO daily_reward_records \
+             (cycle_date, total_social_points, total_infra_points, \
+              active_containers_highwater, total_cycle_uptime_secs) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                cycle_date,
+                social,
+                infra,
+                active_containers_highwater as i64,
+                total_cycle_uptime_secs as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Loads a consolidated reward record by cycle date.
+    pub fn load_daily_reward_record(
+        &self,
+        cycle_date: &str,
+    ) -> Result<Option<(f64, f64, u32, u64)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT total_social_points, total_infra_points, \
+             active_containers_highwater, total_cycle_uptime_secs \
+             FROM daily_reward_records WHERE cycle_date = ?1"
+        )?;
+        let mut rows = stmt.query_map(params![cycle_date], |row| {
+            Ok((
+                row.get::<_, f64>(0)?,
+                row.get::<_, f64>(1)?,
+                row.get::<_, i64>(2)? as u32,
+                row.get::<_, i64>(3)? as u64,
+            ))
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    // ── Daily Allocation Ledger ──────────────────────────────────────────
+
+    /// Saves a batch of daily allocation results from the 10-year emission decay engine.
+    pub fn save_daily_allocations(&self, cycle_date: &str, allocations: &[crate::economy::ledger_cron::DailyAllocation]) -> Result<()> {
+        let conn = self.conn.lock();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        for alloc in allocations {
+            conn.execute(
+                "INSERT OR REPLACE INTO node_daily_allocations \
+                 (cycle_date, peer_id, sol_address, raw_points, weighted_points, share_of_pool, intr_allocated, tier_multiplier, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    cycle_date,
+                    alloc.peer_id,
+                    alloc.sol_address,
+                    alloc.raw_points,
+                    alloc.weighted_points,
+                    alloc.share_of_pool,
+                    alloc.intr_allocated,
+                    alloc.tier_multiplier as f64,
+                    now
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Returns the lifetime accumulated INTR allocations for a specific peer.
+    pub fn get_lifetime_allocated_intr(&self, peer_id: &str) -> Result<f64> {
+        let conn = self.conn.lock();
+        let total: f64 = conn.query_row(
+            "SELECT COALESCE(SUM(intr_allocated), 0.0) FROM node_daily_allocations WHERE peer_id = ?1",
+            params![peer_id],
+            |row| row.get(0),
+        )?;
+        Ok(total)
+    }
+
+    /// Returns the daily allocation for a specific peer on a specific date.
+    pub fn get_daily_allocation(&self, cycle_date: &str, peer_id: &str) -> Result<Option<f64>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT intr_allocated FROM node_daily_allocations WHERE cycle_date = ?1 AND peer_id = ?2"
+        )?;
+        let mut rows = stmt.query_map(params![cycle_date, peer_id], |row| {
+            Ok(row.get::<_, f64>(0)?)
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Returns all allocations for a given cycle date (for nightly cron aggregation).
+    pub fn get_allocations_for_cycle(&self, cycle_date: &str) -> Result<Vec<(String, String, f64, f32)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT peer_id, sol_address, intr_allocated, tier_multiplier FROM node_daily_allocations WHERE cycle_date = ?1"
+        )?;
+        let rows = stmt.query_map(params![cycle_date], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, f64>(2)?,
+                row.get::<_, f64>(3)? as f32,
+            ))
+        })?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
     }
 }

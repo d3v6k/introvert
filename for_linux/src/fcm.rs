@@ -331,16 +331,16 @@ impl FcmPushService {
 
         let mut data = std::collections::HashMap::new();
         data.insert("sender_peer_id".to_string(), sender_peer_id.to_string());
-        data.insert("message_type".to_string(), "chat".to_string());
+        data.insert("msg_type".to_string(), "chat".to_string());
 
-        let notification = FcmNotification {
-            title: "New Message".to_string(),
-            body: "You have a new message from Introvert".to_string(),
-        };
-
+        // DATA-ONLY message: no notification field.
+        // If notification field is present, Firebase auto-displays it on the fallback
+        // channel when app is backgrounded, bypassing our IntrovertFirebaseMessagingService
+        // handler and its 3-minute cooldown. Data-only messages always route through
+        // onMessageReceived() where we control display and cooldown.
         let message = FcmPayload {
             token: push_token.to_string(),
-            notification: Some(notification),
+            notification: None,
             data,
         };
 
@@ -439,7 +439,7 @@ impl FcmPushService {
 
         let mut data = std::collections::HashMap::new();
         data.insert("sender_peer_id".to_string(), sender_peer_id.to_string());
-        data.insert("message_type".to_string(), "chat".to_string());
+        data.insert("msg_type".to_string(), "chat".to_string());
 
         let payload = ApnsPayload {
             aps: ApnsAps {

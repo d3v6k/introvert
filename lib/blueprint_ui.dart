@@ -49,6 +49,9 @@ class GlassmorphicBubble extends StatelessWidget {
     } else if (status == 2) {
       icon = Icons.done_all_rounded; // Double Blue (Read)
       color = AppTheme.current.accent;
+    } else if (status == 3) {
+      icon = Icons.schedule_rounded; // Clock (In Mailbox — awaiting recipient)
+      color = AppTheme.current.mutedText.withValues(alpha: 0.5);
     }
 
     return Icon(icon, size: 10, color: color);
@@ -58,77 +61,70 @@ class GlassmorphicBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-      margin: EdgeInsets.only(bottom: (reactions != null && reactions!.isNotEmpty) ? 14 : 0),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(
-            crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16).copyWith(
-                  bottomRight: isMe ? const Radius.circular(0) : null,
-                  bottomLeft: !isMe ? const Radius.circular(0) : null,
-                ),
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isMe ? AppTheme.current.accent.withValues(alpha: 0.1) : AppTheme.current.text.withValues(alpha: 0.05),
-                      border: Border.all(color: isMe ? AppTheme.current.accent.withValues(alpha: 0.2) : AppTheme.current.mutedText.withValues(alpha: 0.1)),
-                      borderRadius: BorderRadius.circular(16).copyWith(
-                        bottomRight: isMe ? const Radius.circular(0) : null,
-                        bottomLeft: !isMe ? const Radius.circular(0) : null,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (replyTo != null) ...[
-                          GestureDetector(
-                            onTap: onReplyTap,
-                            child: _buildReplyPreview(replyTo),
-                          ),
-                          SizedBox(height: 8),
-                        ],
-                        if (content == "[DELETED_BY_ADMIN]")
-                          Text(
-                            "DELETED BY ADMIN",
-                            style: TextStyle(color: Colors.redAccent.withValues(alpha: 0.7), fontSize: 11, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                          )
-                        else
-                          Text(
-                            content,
-                            style: TextStyle(color: AppTheme.current.text, fontSize: 14),
-                          ),
-                        SizedBox(height: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _formatTime(timestamp),
-                              style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 8),
-                            ),
-                            if (isMe) ...[
-                              SizedBox(width: 4),
-                              _buildStatusTicks(),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16).copyWith(
+              bottomRight: isMe ? const Radius.circular(0) : null,
+              bottomLeft: !isMe ? const Radius.circular(0) : null,
+            ),
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isMe ? AppTheme.current.accent.withValues(alpha: 0.1) : AppTheme.current.text.withValues(alpha: 0.05),
+                  border: Border.all(color: isMe ? AppTheme.current.accent.withValues(alpha: 0.2) : AppTheme.current.mutedText.withValues(alpha: 0.1)),
+                  borderRadius: BorderRadius.circular(16).copyWith(
+                    bottomRight: isMe ? const Radius.circular(0) : null,
+                    bottomLeft: !isMe ? const Radius.circular(0) : null,
                   ),
                 ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (replyTo != null) ...[
+                      GestureDetector(
+                        onTap: onReplyTap,
+                        child: _buildReplyPreview(replyTo),
+                      ),
+                      SizedBox(height: 8),
+                    ],
+                    if (content == "[DELETED_BY_ADMIN]")
+                      Text(
+                        "DELETED BY ADMIN",
+                        style: TextStyle(color: Colors.redAccent.withValues(alpha: 0.7), fontSize: 11, fontStyle: FontStyle.italic, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                      )
+                    else
+                      Text(
+                        content,
+                        style: TextStyle(color: AppTheme.current.text, fontSize: 14),
+                      ),
+                    SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _formatTime(timestamp),
+                          style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 8),
+                        ),
+                        if (isMe) ...[
+                          SizedBox(width: 4),
+                          _buildStatusTicks(),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-          // Reaction Overlay
+          // Reactions row — inside the Column so it receives taps
           if (reactions != null && reactions!.isNotEmpty)
-            Positioned(
-              bottom: -10,
-              left: isMe ? null : 8,
-              right: isMe ? 8 : null,
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
               child: _buildReactionsRow(),
             ),
         ],
@@ -143,10 +139,14 @@ class GlassmorphicBubble extends StatelessWidget {
        if (emoji.isNotEmpty) counts[emoji] = (counts[emoji] ?? 0) + 1;
     }
 
-    return GestureDetector(
-      onTap: onReactionTap,
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerUp: (_) {
+        debugPrint('[Reactions] Tapped — calling onReactionTap, reactions=${reactions!.length}');
+        if (onReactionTap != null) onReactionTap!();
+      },
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: AppTheme.current.surface,
           borderRadius: BorderRadius.circular(12),

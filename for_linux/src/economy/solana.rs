@@ -28,7 +28,7 @@ impl SolanaIncentiveEngine {
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .unwrap_or_default(),
-            intr_mint: Pubkey::from_str("NCdrqtdCzUBkmNFHEBKLqkcppGj7GW8gfCSEhoWoSMn")?,
+            intr_mint: Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")?,
             treasury_pubkey: Pubkey::from_str(treasury_pubkey)?,
             treasury_api_url: treasury_api_url.to_string(),
         })

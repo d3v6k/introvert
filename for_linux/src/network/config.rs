@@ -11,6 +11,8 @@ pub fn get_bootstrap_nodes() -> Vec<(PeerId, Multiaddr)> {
         // Introvert Global Root Bootstrap Node (RBN) - Port 443 (HTTPS Bypass)
         ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/443".to_string()),
         ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/udp/443/quic-v1".to_string()),
+        // Port 80 fallback (corporate firewalls, captive portals)
+        ("12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a".to_string(), "/ip4/47.89.252.80/tcp/80".to_string()),
     ];
 
     // NAT64 Resolution: Resolve the wildcard DNS to support IPv6-only cellular networks

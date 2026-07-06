@@ -1,66 +1,91 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# =============================================
+# Introvert FOSS — Strict .gitignore
+# Blocks all secrets, infrastructure, and server-side code
+# =============================================
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# === Secrets & Keys ===
+*.json
+*.env
+*.env.*
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+treasury-authority.json
+introvert-authority.json
+payouts.db
+firebase-service-account.json
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Rust
-target/
-**/*.rs.bak*
-debug/
-release/
-
-# Project Specific
+# === Databases & Logs ===
 *.db
-*.seed
-*.so
-introvertd
-*.bak*
-*.stable
-*.bak_*
+*.db-journal
+*.db-shm
+*.db-wal
 *.log
-*.bak2
-*.bak3
-*.bak4
-.antigravitycli/
-.openssl_linux/
+*.log.*
+
+# === Server-side / Infrastructure (NEVER in FOSS) ===
+for_linux/
+introvert-daemon/
+deploy_rbn.sh
+deploy_local_rbn.sh
+deploy_anchor.sh
+deploy_first_light.sh
+build_and_deploy.sh
+scripts/setup_rbn.sh
+
+# === Build artifacts ===
+target/
+build/
+.dart_tool/
+.gradle/
+*.dylib
+*.so
+*.a
+*.o
+*.bak
+*.class
+*.aab
+*.ipa
+*.dSYM/
+*.iml
+ios/Pods/
+macos/Pods/
+
+# Allow release APKs
+!releases/*.apk
+
+# === IDE / OS ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# === Flutter generated ===
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# === Sensitive docs ===
+Docs/Economy/ECONOMY_DEEP_DIVE.md
+Docs/Economy/DAILY_REWARDS_SYSTEM.md
+Docs/SECURITY_AUDIT_GUIDE.md
+Docs/Operations/RBN_DASHBOARD_ACCESS_GUIDE.md
+firebase/
+mac seed.rtf
+releases/
+
+# Compiled native libraries (too large for git)
+libintrovert.dylib
+libintrovert.so
+introvertd
+*.a
+android/app/src/main/jniLibs/**/*.so
+firebase/*adminsdk*.json

@@ -1,6 +1,6 @@
-# Introvert: Open-Source, Sovereign P2P Mesh Network
+# Introvert: Open-Source, Sovereign P2P Mesh Messenger
 
-**Version:** 0.1.0 | **Status:** Beta | **Last Updated:** 2026-07-05
+**Version:** 0.29.0 | **Status:** Beta | **Last Updated:** 2026-07-06
 
 Introvert is a privacy-focused, decentralized communication system that eliminates central servers entirely. Operating via a crowdsourced, self-healing Peer-to-Peer (P2P) mesh network, it ensures zero-knowledge, autonomous, and censorship-resistant utility for global users.
 

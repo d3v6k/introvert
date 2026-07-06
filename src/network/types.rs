@@ -6,6 +6,7 @@ use crate::identity::SovereignIdentity;
 pub const ANCHOR_PROVIDER_KEY: &[u8] = b"/introvert/anchor_nodes";
 pub const RBN_PEER_ID: &str = "12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a";
 pub const RBN_WS_URL: &str = "wss://47.89.252.80/tunnel";
+pub const RBN_WS_URL_PLAIN: &str = "ws://47.89.252.80:80/tunnel";
 
 // --- Message Priority Levels ---
 
@@ -92,10 +93,11 @@ pub enum SignalingPayload {
     Standard(String),
     WebRtc(WebRtcSignal),
     Secure(SecureMessage),
-    MailboxStore { recipient_id: String, payload: Vec<u8> },
+    MailboxStore { recipient_id: String, payload: Vec<u8>, #[serde(default)] original_msg_id: Option<String> },
     MailboxDrain,
     MailboxDrained(Vec<MailboxMessage>),
     Acknowledgement { msg_id: String, status: u8 },
+    MailboxStored { recipient_id: String, original_msg_id: String },
     Handshake(SovereignIdentity),
     Offer(WebRtcSignal),
     Answer(WebRtcSignal),
@@ -145,7 +147,7 @@ pub enum SignalingPayload {
         #[serde(default)]
         group_id: Option<String>,
     },
-    FileChunkRequest { transfer_id: String, chunk_index: u32, #[serde(default)] chunk_size: Option<u32> },
+    FileChunkRequest { transfer_id: String, chunk_index: u32, #[serde(default)] chunk_size: Option<u32>, #[serde(default)] relay_hint: Option<String> },
     FileChunk { transfer_id: String, chunk_index: u32, total_chunks: u32, data_base64: String },
     FileTransferComplete { transfer_id: String },
     FileTransferError { transfer_id: String, reason: String },
@@ -181,6 +183,19 @@ pub enum SignalingPayload {
         missing_ids: Vec<String>,
         #[serde(default)]
         is_relay: bool,
+    },
+    /// Client telemetry submission for reward processing
+    TelemetryEnvelope {
+        peer_id: String,
+        metrics: [u64; 9], // 0=MsgSent,1=MsgRcvd,2=GrpMsg,3=GrpReact,4=FileSend,5=FileRecv,6=CallSecs,7=RelayBytes,8=Uptime
+        timestamp: u64,
+    },
+    /// RBN acknowledgment that telemetry was received and processed
+    TelemetryAck {
+        peer_id: String,
+        epoch_id: String,
+        total_points: f64,
+        timestamp: u64,
     },
 }
 
@@ -277,6 +292,7 @@ pub enum NetworkCommand {
     BroadcastWitness { handle: String, peer_id: String, timestamp: i64, pubkey: Vec<u8>, signature: Vec<u8> },
     AddGroupMember { group_id: String, peer_id: String },
     RemoveGroupMember { group_id: String, peer_id: String, members_json: Option<String> },
+    SetConnectivityType { connectivity_type: u8 },
     UpdateGroupRole { group_id: String, peer_id: String, role: GroupRole },
     PublishGroupManifest { group_id: String, code: String },
     JoinMeshByCode { code: String },
@@ -290,10 +306,12 @@ pub enum NetworkCommand {
     PublishGossipsub { topic: String, data: Vec<u8> },
     SubscribeGossipsub { group_id: String },
     ForceMeshRefresh,
+    ActivateTunnel,
     RegisterSeeder { peer_id: PeerId, transfer_id: String, file_path: String, file_hash: String, chunk_size: u32, total_chunks: u32, group_id: Option<String> },
     UnregisterSeeder { transfer_id: String },
     FindProviders { file_hash: String },
     StoreInMailbox { peer_id: PeerId, payload: SignalingPayload },
+    ClearMailboxForPeer { peer_id: PeerId },
     CancelFileTransfer { transfer_id: String },
     RecheckConnection { peer_id: PeerId },
     HandleDiagnosticTimeout { peer_id: PeerId },
@@ -306,6 +324,8 @@ pub enum NetworkCommand {
         is_background: bool,
         connected_peers: Vec<String>,
         mdns_discovered: Vec<String>,
+        is_mobile_data: bool,
+        network_type: String,
     },
     IntroClawSetActive { active: bool },
     IntroClawSetNodeMode { enabled: bool },
@@ -337,6 +357,18 @@ pub enum NetworkCommand {
     },
     IntroClawVoipGetDowngradeRecommendation {
         result_tx: tokio::sync::oneshot::Sender<String>,
+    },
+    IntroClawSetActiveChat {
+        chat_id: String,
+        peer_id: Option<String>,
+        is_group: bool,
+    },
+    IntroClawClearActiveChat,
+    IntroClawSetActiveGroupMembers {
+        members: Vec<String>,
+    },
+    IntroClawOnAppLaunch {
+        result_tx: tokio::sync::oneshot::Sender<()>,
     },
 }
 

@@ -4,6 +4,8 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
+import 'rewards_bridge.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 // --- Native C Signatures & Dart Mapping ---
 
@@ -153,11 +155,14 @@ typedef IntrovertRejectCallDart = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertSetAnchorModeC = FfiResult Function(Bool enabled);
 typedef IntrovertSetAnchorModeDart = FfiResult Function(bool enabled);
 
+typedef IntrovertNetworkSetConnectivityTypeC = FfiResult Function(Uint8 connectivity_type);
+typedef IntrovertNetworkSetConnectivityTypeDart = FfiResult Function(int connectivity_type);
+
 typedef IntrovertNetworkSetTunnelModeC = FfiResult Function(Bool enabled);
 typedef IntrovertNetworkSetTunnelModeDart = FfiResult Function(bool enabled);
-
 typedef IntrovertNetworkGetTunnelModeC = Int32 Function();
 typedef IntrovertNetworkGetTunnelModeDart = int Function();
+
 
 typedef IntrovertNetworkRecheckConnectionC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertNetworkRecheckConnectionDart = FfiResult Function(Pointer<Utf8> peerId);
@@ -239,8 +244,8 @@ typedef IntroClawSetAiModeDart = FfiResult Function(int mode, Pointer<Utf8> apiK
 typedef IntroClawGetApiKeyC = Pointer<Utf8> Function();
 typedef IntroClawGetApiKeyDart = Pointer<Utf8> Function();
 
-typedef IntroClawTriggerTickC = FfiResult Function();
-typedef IntroClawTriggerTickDart = FfiResult Function();
+typedef IntroClawTriggerTickC = FfiResult Function(Bool isMobileData);
+typedef IntroClawTriggerTickDart = FfiResult Function(bool isMobileData);
 
 typedef IntroClawSetActiveC = FfiResult Function(Bool active);
 typedef IntroClawSetActiveDart = FfiResult Function(bool active);
@@ -277,6 +282,18 @@ typedef IntroClawVoipEndCallDart = FfiResult Function();
 
 typedef IntroClawVoipRecordSampleC = FfiResult Function(Uint64 rttMs, Double packetLossPct, Uint64 jitterMs, Uint64 bitrateKbps, Int32 isRelayed, Pointer<Utf8> codec);
 typedef IntroClawVoipRecordSampleDart = FfiResult Function(int rttMs, double packetLossPct, int jitterMs, int bitrateKbps, int isRelayed, Pointer<Utf8> codec);
+
+typedef IntroClawSetActiveChatC = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> peerId, Int32 isGroup);
+typedef IntroClawSetActiveChatDart = FfiResult Function(Pointer<Utf8> chatId, Pointer<Utf8> peerId, int isGroup);
+
+typedef IntroClawClearActiveChatC = FfiResult Function();
+typedef IntroClawClearActiveChatDart = FfiResult Function();
+
+typedef IntroClawSetActiveGroupMembersC = FfiResult Function(Pointer<Utf8> membersJson);
+typedef IntroClawSetActiveGroupMembersDart = FfiResult Function(Pointer<Utf8> membersJson);
+
+typedef IntroClawOnAppLaunchC = FfiResult Function();
+typedef IntroClawOnAppLaunchDart = FfiResult Function();
 
 typedef IntroClawVoipGetQualityC = FfiResult Function();
 typedef IntroClawVoipGetQualityDart = FfiResult Function();
@@ -352,6 +369,12 @@ typedef IntrovertDriveGetByHashDart = FfiResult Function(Pointer<Utf8> fileHash)
 
 typedef IntrovertDriveDeleteC = FfiResult Function(Pointer<Utf8> fileHash);
 typedef IntrovertDriveDeleteDart = FfiResult Function(Pointer<Utf8> fileHash);
+
+typedef IntrovertDriveAddFileWithFolderC = FfiResult Function(Pointer<Utf8> filename, Pointer<Utf8> fileHash, Pointer<Utf8> mimeType, Int64 size, Pointer<Utf8> localPath, Pointer<Utf8> folder);
+typedef IntrovertDriveAddFileWithFolderDart = FfiResult Function(Pointer<Utf8> filename, Pointer<Utf8> fileHash, Pointer<Utf8> mimeType, int size, Pointer<Utf8> localPath, Pointer<Utf8> folder);
+
+typedef IntrovertDriveUpdateFolderC = FfiResult Function(Pointer<Utf8> fileHash, Pointer<Utf8> folder);
+typedef IntrovertDriveUpdateFolderDart = FfiResult Function(Pointer<Utf8> fileHash, Pointer<Utf8> folder);
 
 typedef IntrovertGetMeshCapacityC = Int64 Function();
 typedef IntrovertGetMeshCapacityDart = int Function();
@@ -586,10 +609,13 @@ class IntrovertClient {
   late IntrovertRejectCallDart _rejectCall;
   late IntrovertSetAnchorModeDart _setAnchorMode;
   late IntrovertGetAnchorModeDart _getAnchorMode;
+  late IntrovertNetworkSetConnectivityTypeDart _setConnectivityType;
   late IntrovertNetworkSetTunnelModeDart _setTunnelMode;
   late IntrovertNetworkGetTunnelModeDart _getTunnelMode;
   late IntrovertNetworkGetRbnsDart _getRbns;
   late IntrovertNetworkTestRbnDart _testRbn;
+  late IntrovertDisclaimerIsAcceptedDart _disclaimerIsAccepted;
+  late IntrovertDisclaimerSetAcceptedDart _disclaimerSetAccepted;
   late IntrovertNetworkRecheckConnectionDart _recheckConnection;
   late IntrovertNetworkResolveHandleDart _resolveHandle;
   late IntrovertNetworkSendDirectInviteDart _sendDirectInvite;
@@ -642,6 +668,8 @@ class IntrovertClient {
   late IntrovertDriveGetAllDart _driveGetAll;
   late IntrovertDriveGetByHashDart _driveGetByHash;
   late IntrovertDriveDeleteDart _driveDelete;
+  late IntrovertDriveAddFileWithFolderDart _driveAddFileWithFolder;
+  late IntrovertDriveUpdateFolderDart _driveUpdateFolder;
   late IntrovertGetMeshCapacityDart _getMeshCapacity;
   late IntrovertGetDiskSpaceDart _getDiskSpace;
   late IntrovertNetworkRegisterSeederDart _registerSeeder;
@@ -674,6 +702,10 @@ class IntrovertClient {
   late IntroClawVoipRecordSampleDart _clawVoipRecordSample;
   late IntroClawVoipGetQualityDart _clawVoipGetQuality;
   late IntroClawVoipGetDowngradeRecommendationDart _clawVoipGetDowngradeRecommendation;
+  late IntroClawSetActiveChatDart _clawSetActiveChat;
+  late IntroClawClearActiveChatDart _clawClearActiveChat;
+  late IntroClawSetActiveGroupMembersDart _clawSetActiveGroupMembers;
+  late IntroClawOnAppLaunchDart _clawOnAppLaunch;
 
   // Elevated Messages
   late IntrovertElevateMessageDart _elevateMessage;
@@ -694,6 +726,7 @@ class IntrovertClient {
   late IntrovertDailyRewardUpdateWeightsDart _dailyRewardUpdateWeights;
   late IntrovertDailyRewardUpdateAntiGamingDart _dailyRewardUpdateAntiGaming;
   late IntrovertDailyRewardGetRealtimeEarningsDart _dailyRewardGetRealtimeEarnings;
+  GetRewardsStateDart? _getRewardsState;
 
   NativeCallable<NativeNetworkCallback>? _unifiedCallable;
 
@@ -714,6 +747,24 @@ class IntrovertClient {
 
   final StreamController<Map<String, dynamic>> _swarmStatsStreamController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get swarmStatsStream => _swarmStatsStreamController.stream;
+
+  // --- In-App Rust Debug Log Ring Buffer ---
+  // Captures event-99 (Rust debug) messages so they can be saved/copied on-device
+  // without needing a USB-connected debugger. Holds the last 500 entries.
+  static const int _maxDebugLogEntries = 500;
+  final List<String> _rustDebugLogs = [];
+
+  /// Returns all captured Rust debug log entries as a single formatted string.
+  String getDebugLogs() {
+    if (_rustDebugLogs.isEmpty) return '(no debug logs captured)';
+    return _rustDebugLogs.join('\n');
+  }
+
+  /// Returns the number of Rust debug log entries captured.
+  int get debugLogCount => _rustDebugLogs.length;
+
+  /// Clears all captured Rust debug log entries.
+  void clearDebugLogs() => _rustDebugLogs.clear();
 
   String? _supportDirPath;
   String? _documentsDirPath;
@@ -854,7 +905,15 @@ class IntrovertClient {
         }
       } else if (eventType == 99) { // Rust Debug
         final data = castedPtr.asTypedList(dataLen);
-        debugPrint('🦀 Rust Debug: ${utf8.decode(data)}');
+        final msg = utf8.decode(data);
+        debugPrint('🦀 Rust Debug: $msg');
+        // Store in ring buffer for on-device capture
+        final ts = DateTime.now().toIso8601String();
+        final entry = '[$ts] $msg';
+        if (_rustDebugLogs.length >= _maxDebugLogEntries) {
+          _rustDebugLogs.removeAt(0); // Drop oldest
+        }
+        _rustDebugLogs.add(entry);
         _freeBinary(dataPtr, dataLen);
       } else {
         // All other events (2, 4, 7, 8, 10, 11, 13, etc.) go to network stream
@@ -895,7 +954,11 @@ class IntrovertClient {
         rethrow;
       }
     } else if (Platform.isMacOS) {
+      // App bundle path: .app/Contents/Frameworks/libintrovert.dylib
+      final exeDir = File(Platform.resolvedExecutable).parent; // Contents/MacOS/
+      final bundleFrameworks = '${exeDir.parent.path}/Frameworks/libintrovert.dylib';
       final List<String> possiblePaths = [
+        bundleFrameworks,
         '${Directory.current.path}/libintrovert.dylib',
         '${Directory.current.path}/macos/Flutter/ephemeral/libintrovert.dylib',
         'libintrovert.dylib',
@@ -978,6 +1041,8 @@ class IntrovertClient {
       _getTunnelMode = safeLookup('get_tunnel_mode', () => _dylib.lookupFunction<IntrovertNetworkGetTunnelModeC, IntrovertNetworkGetTunnelModeDart>('introvert_network_get_tunnel_mode'), () => 0);
       _getRbns = safeLookup('get_rbns', () => _dylib.lookupFunction<IntrovertNetworkGetRbnsC, IntrovertNetworkGetRbnsDart>('introvert_network_get_rbns'), () => FfiResult.dummy);
       _testRbn = safeLookup('test_rbn', () => _dylib.lookupFunction<IntrovertNetworkTestRbnC, IntrovertNetworkTestRbnDart>('introvert_network_test_rbn'), (addr) => FfiResult.dummy);
+      _disclaimerIsAccepted = safeLookup('disclaimer_is_accepted', () => _dylib.lookupFunction<IntrovertDisclaimerIsAcceptedC, IntrovertDisclaimerIsAcceptedDart>('introvert_disclaimer_is_accepted'), (p, s) => 0);
+      _disclaimerSetAccepted = safeLookup('disclaimer_set_accepted', () => _dylib.lookupFunction<IntrovertDisclaimerSetAcceptedC, IntrovertDisclaimerSetAcceptedDart>('introvert_disclaimer_set_accepted'), (p, s, a) => FfiResult.dummy);
       _recheckConnection = safeLookup('recheck_connection', () => _dylib.lookupFunction<IntrovertNetworkRecheckConnectionC, IntrovertNetworkRecheckConnectionDart>('introvert_network_recheck_connection'), (p) => FfiResult.dummy);
       _resolveHandle = safeLookup('resolve_handle', () => _dylib.lookupFunction<IntrovertNetworkResolveHandleC, IntrovertNetworkResolveHandleDart>('introvert_network_resolve_handle'), (h) => FfiResult.dummy);
       _sendDirectInvite = safeLookup('send_direct_invite', () => _dylib.lookupFunction<IntrovertNetworkSendDirectInviteC, IntrovertNetworkSendDirectInviteDart>('introvert_network_send_direct_invite'), (p) => FfiResult.dummy);
@@ -999,6 +1064,7 @@ class IntrovertClient {
       _sendFile = safeLookup('send_file', () => _dylib.lookupFunction<IntrovertNetworkSendFileC, IntrovertNetworkSendFileDart>('introvert_network_send_file'), (p, f, g) => FfiResult.dummy);
       _cancelFileTransfer = safeLookup('cancel_file', () => _dylib.lookupFunction<IntrovertNetworkCancelFileTransferC, IntrovertNetworkCancelFileTransferDart>('introvert_network_cancel_file_transfer'), (id) => FfiResult.dummy);
       _forceNetworkRefresh = safeLookup('force_refresh', () => _dylib.lookupFunction<IntrovertNetworkForceRefreshC, IntrovertNetworkForceRefreshDart>('introvert_network_force_refresh'), () => FfiResult.dummy);
+      _setConnectivityType = safeLookup('set_connectivity_type', () => _dylib.lookupFunction<IntrovertNetworkSetConnectivityTypeC, IntrovertNetworkSetConnectivityTypeDart>('introvert_network_set_connectivity_type'), (type) => FfiResult.dummy);
       _groupCreate = safeLookup('group_create', () => _dylib.lookupFunction<IntrovertGroupCreateC, IntrovertGroupCreateDart>('introvert_group_create'), (n, d, m) => FfiResult.dummy);
       _groupSendMessage = safeLookup('group_send', () => _dylib.lookupFunction<IntrovertGroupSendMessageC, IntrovertGroupSendMessageDart>('introvert_group_send_message'), (g, m, r) => FfiResult.dummy);
       _groupGetAll = safeLookup('group_get_all', () => _dylib.lookupFunction<IntrovertGroupGetAllC, IntrovertGroupGetAllDart>('introvert_group_get_all'), () => FfiResult.dummy);
@@ -1030,6 +1096,8 @@ class IntrovertClient {
       _driveGetAll = safeLookup('drive_get_all', () => _dylib.lookupFunction<IntrovertDriveGetAllC, IntrovertDriveGetAllDart>('introvert_drive_get_all'), () => FfiResult.dummy);
       _driveGetByHash = safeLookup('drive_get_by_hash', () => _dylib.lookupFunction<IntrovertDriveGetByHashC, IntrovertDriveGetByHashDart>('introvert_drive_get_by_hash'), (h) => FfiResult.dummy);
       _driveDelete = safeLookup('drive_delete', () => _dylib.lookupFunction<IntrovertDriveDeleteC, IntrovertDriveDeleteDart>('introvert_drive_delete'), (h) => FfiResult.dummy);
+      _driveAddFileWithFolder = safeLookup('drive_add_with_folder', () => _dylib.lookupFunction<IntrovertDriveAddFileWithFolderC, IntrovertDriveAddFileWithFolderDart>('introvert_drive_add_file_with_folder'), (n, h, m, s, p, f) => FfiResult.dummy);
+      _driveUpdateFolder = safeLookup('drive_update_folder', () => _dylib.lookupFunction<IntrovertDriveUpdateFolderC, IntrovertDriveUpdateFolderDart>('introvert_drive_update_folder'), (h, f) => FfiResult.dummy);
       _getMeshCapacity = safeLookup('mesh_capacity', () => _dylib.lookupFunction<IntrovertGetMeshCapacityC, IntrovertGetMeshCapacityDart>('introvert_get_mesh_capacity'), () => 0);
       _getDiskSpace = safeLookup('get_disk_space', () => _dylib.lookupFunction<IntrovertGetDiskSpaceC, IntrovertGetDiskSpaceDart>('introvert_get_disk_space'), (path, total, free) => -1);
       _registerSeeder = safeLookup('register_seeder', () => _dylib.lookupFunction<IntrovertNetworkRegisterSeederC, IntrovertNetworkRegisterSeederDart>('introvert_network_register_seeder'), (t, p, h, s, g) => FfiResult.dummy);
@@ -1053,7 +1121,7 @@ class IntrovertClient {
       _getAiMode = safeLookup('get_ai_mode', () => _dylib.lookupFunction<IntroClawGetAiModeC, IntroClawGetAiModeDart>('intro_claw_get_ai_mode'), () => 0);
       _setAiMode = safeLookup('set_ai_mode', () => _dylib.lookupFunction<IntroClawSetAiModeC, IntroClawSetAiModeDart>('intro_claw_set_ai_mode'), (m, k) => FfiResult.dummy);
       _getApiKey = safeLookup('get_api_key', () => _dylib.lookupFunction<IntroClawGetApiKeyC, IntroClawGetApiKeyDart>('intro_claw_get_api_key'), () => nullptr);
-      _clawTriggerTick = safeLookup('claw_trigger_tick', () => _dylib.lookupFunction<IntroClawTriggerTickC, IntroClawTriggerTickDart>('intro_claw_trigger_tick'), () => FfiResult.dummy);
+      _clawTriggerTick = safeLookup('claw_trigger_tick', () => _dylib.lookupFunction<IntroClawTriggerTickC, IntroClawTriggerTickDart>('intro_claw_trigger_tick'), (b) => FfiResult.dummy);
       _clawSetActive = safeLookup('claw_set_active', () => _dylib.lookupFunction<IntroClawSetActiveC, IntroClawSetActiveDart>('intro_claw_set_active'), (a) => FfiResult.dummy);
       _clawSetNodeMode = safeLookup('claw_set_node_mode', () => _dylib.lookupFunction<IntroClawSetNodeModeC, IntroClawSetNodeModeDart>('intro_claw_set_node_mode'), (e) => FfiResult.dummy);
       _clawGetStatus = safeLookup('claw_get_status', () => _dylib.lookupFunction<IntroClawGetStatusC, IntroClawGetStatusDart>('intro_claw_get_status'), () => FfiResult.dummy);
@@ -1068,6 +1136,10 @@ class IntrovertClient {
       _clawVoipRecordSample = safeLookup('claw_voip_record_sample', () => _dylib.lookupFunction<IntroClawVoipRecordSampleC, IntroClawVoipRecordSampleDart>('intro_claw_voip_record_sample'), (r, p, j, b, rel, c) => FfiResult.dummy);
       _clawVoipGetQuality = safeLookup('claw_voip_get_quality', () => _dylib.lookupFunction<IntroClawVoipGetQualityC, IntroClawVoipGetQualityDart>('intro_claw_voip_get_quality'), () => FfiResult.dummy);
       _clawVoipGetDowngradeRecommendation = safeLookup('claw_voip_get_downgrade_recommendation', () => _dylib.lookupFunction<IntroClawVoipGetDowngradeRecommendationC, IntroClawVoipGetDowngradeRecommendationDart>('intro_claw_voip_get_downgrade_recommendation'), () => FfiResult.dummy);
+      _clawSetActiveChat = safeLookup('claw_set_active_chat', () => _dylib.lookupFunction<IntroClawSetActiveChatC, IntroClawSetActiveChatDart>('intro_claw_set_active_chat'), (c, p, g) => FfiResult.dummy);
+      _clawClearActiveChat = safeLookup('claw_clear_active_chat', () => _dylib.lookupFunction<IntroClawClearActiveChatC, IntroClawClearActiveChatDart>('intro_claw_clear_active_chat'), () => FfiResult.dummy);
+      _clawSetActiveGroupMembers = safeLookup('claw_set_active_group_members', () => _dylib.lookupFunction<IntroClawSetActiveGroupMembersC, IntroClawSetActiveGroupMembersDart>('intro_claw_set_active_group_members'), (m) => FfiResult.dummy);
+      _clawOnAppLaunch = safeLookup('claw_on_app_launch', () => _dylib.lookupFunction<IntroClawOnAppLaunchC, IntroClawOnAppLaunchDart>('intro_claw_on_app_launch'), () => FfiResult.dummy);
 
       // Elevated Messages
       _elevateMessage = safeLookup('elevate_message', () => _dylib.lookupFunction<IntrovertElevateMessageC, IntrovertElevateMessageDart>('introvert_elevate_message'), (c, m, co, s, i) => FfiResult.dummy);
@@ -1088,6 +1160,11 @@ class IntrovertClient {
       _dailyRewardUpdateWeights = safeLookup('daily_reward_update_weights', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateWeightsC, IntrovertDailyRewardUpdateWeightsDart>('introvert_daily_reward_update_weights'), (p, l) => FfiResult.dummy);
       _dailyRewardUpdateAntiGaming = safeLookup('daily_reward_update_anti_gaming', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateAntiGamingC, IntrovertDailyRewardUpdateAntiGamingDart>('introvert_daily_reward_update_anti_gaming'), (p, l) => FfiResult.dummy);
       _dailyRewardGetRealtimeEarnings = safeLookup('daily_reward_get_realtime_earnings', () => _dylib.lookupFunction<IntrovertDailyRewardGetRealtimeEarningsC, IntrovertDailyRewardGetRealtimeEarningsDart>('introvert_daily_reward_get_realtime_earnings'), () => FfiResult.dummy);
+      try {
+        _getRewardsState = loadGetRewardsState(_dylib);
+      } catch (_) {
+        debugPrint('⚠️ get_current_rewards_state not available in native library');
+      }
 
       debugPrint('✅ All native functions bound successfully.');
     } catch (e) {
@@ -1097,6 +1174,31 @@ class IntrovertClient {
 
   void forceNetworkRefresh() {
     _forceNetworkRefresh();
+  }
+
+  // Inform native layer of current connectivity type (0=unknown,1=wifi,2=mobile,3=ethernet,4=bluetooth)
+  void setConnectivityType(ConnectivityResult connectivity) {
+    int type;
+    switch (connectivity) {
+      case ConnectivityResult.wifi:
+        type = 1;
+        break;
+      case ConnectivityResult.mobile:
+        type = 2;
+        break;
+      case ConnectivityResult.ethernet:
+        type = 3;
+        break;
+      case ConnectivityResult.bluetooth:
+        type = 4;
+        break;
+      case ConnectivityResult.vpn:
+        type = 5;
+        break;
+      default:
+        type = 0;
+    }
+    _setConnectivityType(type);
   }
 
   void createGroup(String name, String description, List<String> members) {
@@ -1366,6 +1468,24 @@ class IntrovertClient {
       size,
       path.toNativeUtf8(allocator: arena),
     ), context: "Drive Add File"));
+  }
+
+  void driveAddFileWithFolder(String name, String hash, String mime, int size, String path, String folder) {
+    using((Arena arena) => _handleFfiResult(_driveAddFileWithFolder(
+      name.toNativeUtf8(allocator: arena),
+      hash.toNativeUtf8(allocator: arena),
+      mime.toNativeUtf8(allocator: arena),
+      size,
+      path.toNativeUtf8(allocator: arena),
+      folder.toNativeUtf8(allocator: arena),
+    ), context: "Drive Add File With Folder"));
+  }
+
+  void driveUpdateFolder(String hash, String folder) {
+    using((Arena arena) => _handleFfiResult(_driveUpdateFolder(
+      hash.toNativeUtf8(allocator: arena),
+      folder.toNativeUtf8(allocator: arena),
+    ), context: "Drive Update Folder"));
   }
 
   List<dynamic> driveGetAll() {
@@ -1681,7 +1801,7 @@ class IntrovertClient {
   }
 
   // --- Intro-Claw Automation Methods ---
-  void triggerIntroClawTick() => _handleFfiResult(_clawTriggerTick(), context: "IntroClaw Tick");
+  void triggerIntroClawTick({bool isMobileData = false}) => _handleFfiResult(_clawTriggerTick(isMobileData), context: "IntroClaw Tick");
   void setIntroClawActive(bool active) => _handleFfiResult(_clawSetActive(active), context: "IntroClaw Active");
   void setIntroClawNodeMode(bool enabled) => _handleFfiResult(_clawSetNodeMode(enabled), context: "IntroClaw Node Mode");
   String getIntroClawStatus() {
@@ -1752,6 +1872,37 @@ class IntrovertClient {
 
   void voipEndCall() {
     _handleFfiResult(_clawVoipEndCall(), context: "VoIP End Call");
+  }
+
+  void setActiveChat(String chatId, String? peerId, bool isGroup) {
+    using((Arena arena) {
+      _handleFfiResult(
+        _clawSetActiveChat(
+          chatId.toNativeUtf8(allocator: arena),
+          (peerId ?? '').toNativeUtf8(allocator: arena),
+          isGroup ? 1 : 0,
+        ),
+        context: "IntroClaw Set Active Chat",
+      );
+    });
+  }
+
+  void clearActiveChat() {
+    _handleFfiResult(_clawClearActiveChat(), context: "IntroClaw Clear Active Chat");
+  }
+
+  void setActiveGroupMembers(List<String> members) {
+    using((Arena arena) {
+      final jsonStr = jsonEncode(members);
+      _handleFfiResult(
+        _clawSetActiveGroupMembers(jsonStr.toNativeUtf8(allocator: arena)),
+        context: "IntroClaw Set Active Group Members",
+      );
+    });
+  }
+
+  void onAppLaunch() {
+    _handleFfiResult(_clawOnAppLaunch(), context: "IntroClaw On App Launch");
   }
 
   void voipRecordSample(int rttMs, double packetLossPct, int jitterMs, int bitrateKbps, bool isRelayed, String codec) {
@@ -2042,6 +2193,15 @@ class IntrovertClient {
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
     }
+  }
+
+  /// Returns the current daily reward state as a fixed-width FFI struct.
+  /// Returns null if the native symbol is unavailable or the engine is not running.
+  /// No heap allocations cross the FFI boundary — safe for direct UI consumption.
+  FFIDailyState? getRewardsState() {
+    final fn = _getRewardsState;
+    if (fn == null) return null;
+    return fn();
   }
 
   void claimHandle(String handle) {
@@ -2369,6 +2529,29 @@ class IntrovertClient {
   void testRbn(String address) {
     using((Arena arena) => _handleFfiResult(_testRbn(address.toNativeUtf8(allocator: arena)), context: "Test RBN Connection"));
   }
+
+  // --- Disclaimer / Terms of Use ---
+
+  /// Checks if the disclaimer has been accepted.
+  /// Requires dbPath and seed because this runs BEFORE the engine starts.
+  bool isDisclaimerAccepted(String dbPath, Uint8List seed) {
+    return using((Arena arena) {
+      final dbPtr = dbPath.toNativeUtf8(allocator: arena);
+      final seedPtr = arena.allocate<Uint8>(32);
+      seedPtr.asTypedList(32).setAll(0, seed);
+      return _disclaimerIsAccepted(dbPtr, seedPtr) == 1;
+    });
+  }
+
+  /// Sets the disclaimer acceptance status.
+  void setDisclaimerAccepted(String dbPath, Uint8List seed, bool accepted) {
+    using((Arena arena) {
+      final dbPtr = dbPath.toNativeUtf8(allocator: arena);
+      final seedPtr = arena.allocate<Uint8>(32);
+      seedPtr.asTypedList(32).setAll(0, seed);
+      _handleFfiResult(_disclaimerSetAccepted(dbPtr, seedPtr, accepted), context: "Set Disclaimer Accepted");
+    });
+  }
 }
 
 // ==================== CALL HISTORY TYPEDEFS ====================
@@ -2396,3 +2579,9 @@ typedef IntrovertNetworkGetRbnsC = FfiResult Function();
 typedef IntrovertNetworkGetRbnsDart = FfiResult Function();
 typedef IntrovertNetworkTestRbnC = FfiResult Function(Pointer<Utf8> address);
 typedef IntrovertNetworkTestRbnDart = FfiResult Function(Pointer<Utf8> address);
+
+// Disclaimer / Terms of Use
+typedef IntrovertDisclaimerIsAcceptedC = Int32 Function(Pointer<Utf8> dbPath, Pointer<Uint8> seed);
+typedef IntrovertDisclaimerIsAcceptedDart = int Function(Pointer<Utf8> dbPath, Pointer<Uint8> seed);
+typedef IntrovertDisclaimerSetAcceptedC = FfiResult Function(Pointer<Utf8> dbPath, Pointer<Uint8> seed, Bool accepted);
+typedef IntrovertDisclaimerSetAcceptedDart = FfiResult Function(Pointer<Utf8> dbPath, Pointer<Uint8> seed, bool accepted);
