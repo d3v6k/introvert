@@ -52,6 +52,7 @@ impl NetworkService {
             storage,
             reward_tracker,
             solana_client,
+            daily_reward_engine,
             local_static_secret,
             session_encryption_key,
             enable_mdns,
@@ -178,6 +179,7 @@ impl NetworkService {
             peer_connections: Arc::new(RwLock::new(HashMap::new())),
             reward_tracker,
             solana_client,
+            daily_reward_engine,
             local_static_secret,
             local_static_public,
             session_encryption_key,
@@ -959,7 +961,7 @@ impl NetworkService {
                                 let solana_wallet = sol_pubkey.to_string();
                                 let solana_ata = crate::economy::derive_ata(&solana_wallet, "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")
                                     .unwrap_or_else(|| solana_wallet.clone());
-                                let epoch_id = chrono::Utc::now().format("%Y_%m_%d").to_string();
+                                let epoch_id = crate::economy::daily_rewards::economy_epoch_id();
 
                                 let mut prestige_tier = 0u8;
                                 if let Ok(Some((_, _, _, _, tier))) = self.storage.get_profile() {
@@ -1332,6 +1334,21 @@ impl NetworkService {
 
                         if write_ok {
                             local_path = Some(path.clone());
+
+                            // Record FileTransferRecv activity for daily rewards
+                            if let Some(ref daily) = self.daily_reward_engine {
+                                daily.record_activity(crate::economy::daily_rewards::ActivityEvent {
+                                    activity_type: crate::economy::daily_rewards::ActivityType::FileTransferRecv,
+                                    peer_id: Some(peer.to_string()),
+                                    value: 1,
+                                    is_foreground: true,
+                                    message_len: None,
+                                    is_self: false,
+                                    is_rbn: false,
+                                    proof_hash: None,
+                                    active_web_containers: 0,
+                                });
+                            }
 
                             // SOVEREIGN SWARM: Register as seeder AFTER disk write succeeds.
                             // Ordering matters: if a peer discovers us via Kademlia and sends a
@@ -3111,7 +3128,8 @@ impl NetworkService {
                 SignalingPayload::SetRetention { .. } |
                 SignalingPayload::HandleClaimWitnessed { .. } |
                 SignalingPayload::ChatSyncRequest { .. } |
-                SignalingPayload::ChatSyncResponse { .. }
+                SignalingPayload::ChatSyncResponse { .. } |
+                SignalingPayload::TelemetryEnvelope { .. }
             );
 
             if !allowed_in_mailbox {
@@ -3250,6 +3268,13 @@ impl NetworkService {
                 // will skip pre-clear messages via should_skip_mailbox_message()
                 self.perform_mailbox_fetch().await;
                 info!("[Mailbox] Proactive drain triggered for chat clear");
+            }
+            NetworkCommand::LookupPeerHandle { peer_id } => {
+                // Query Kademlia DHT for ph_<peer_id> reverse mapping
+                // Result arrives via GetRecord handler (Event 37: PeerHandleRestored)
+                let ph_key = RecordKey::new(&format!("ph_{}", peer_id).as_bytes());
+                info!("[Registry] Looking up handle for peer {} via DHT...", peer_id);
+                let _ = self.swarm.behaviour_mut().kademlia.get_record(ph_key);
             }
             NetworkCommand::UpdateAnchorStatus { enabled } => {
                 let key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
@@ -4252,7 +4277,7 @@ impl NetworkService {
                 let solana_wallet = sol_pubkey.to_string();
                 let solana_ata = crate::economy::derive_ata(&solana_wallet, "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")
                     .unwrap_or_else(|| solana_wallet.clone());
-                let epoch_id = chrono::Utc::now().format("%Y_%m_%d").to_string();
+                let epoch_id = crate::economy::daily_rewards::economy_epoch_id();
 
                 let mut prestige_tier = 0u8;
                 if let Ok(Some((_, _, _, _, tier))) = self.storage.get_profile() {
@@ -5343,13 +5368,29 @@ impl NetworkService {
                 let c = content.clone();
                 let mid = msg_id.clone();
                 let rt = reply_to.clone();
+                let peer_id_str_clone = peer_id_str.clone();
                 let ts_str = chrono::DateTime::from_timestamp(timestamp, 0)
                     .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string());
                 if !self.is_stress_test {
-                    tokio::task::spawn_blocking(move || storage.store_message_with_id(&peer_id_str, &mid, &c, false, rt.as_deref(), ts_str.as_deref()));
+                    tokio::task::spawn_blocking(move || storage.store_message_with_id(&peer_id_str_clone, &mid, &c, false, rt.as_deref(), ts_str.as_deref()));
                 }
                 let ack = SignalingPayload::Acknowledgement { msg_id: msg_id.clone(), status: 1 };
                 let _ = self.forward_to_mesh(peer, ack, false).await;
+
+                // Record MessageReceived activity for daily rewards
+                if let Some(ref daily) = self.daily_reward_engine {
+                    daily.record_activity(crate::economy::daily_rewards::ActivityEvent {
+                        activity_type: crate::economy::daily_rewards::ActivityType::MessageReceived,
+                        peer_id: Some(peer_id_str.clone()),
+                        value: 1,
+                        is_foreground: true,
+                        message_len: Some(content.len()),
+                        is_self: false,
+                        is_rbn: false,
+                        proof_hash: None,
+                        active_web_containers: 0,
+                    });
+                }
 
                 // Pack [timestamp, msg_id_len, msg_id, reply_to_len, reply_to, content] for UI
                 let mut data = timestamp.to_be_bytes().to_vec();
@@ -7068,6 +7109,10 @@ impl NetworkService {
 
                     warn!("[Economy] Failed to mark local telemetry synced: {:?}", e);
 
+                }
+                // Feed RBN-reported total points into DailyRewardEngine to bypass static ceiling
+                if let Some(ref daily) = self.daily_reward_engine {
+                    daily.accept_rbn_estimate(total_points, timestamp);
                 }
                 // Dispatch to Flutter as Event 40 (Telemetry Acknowledgment)
                 let ack_json = serde_json::json!({

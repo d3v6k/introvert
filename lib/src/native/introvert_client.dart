@@ -203,6 +203,9 @@ typedef IntrovertStorageGetLocalHandleDart = FfiResult Function();
 typedef IntrovertStorageIsHandleClaimedC = FfiResult Function(Pointer<Utf8> handle);
 typedef IntrovertStorageIsHandleClaimedDart = FfiResult Function(Pointer<Utf8> handle);
 
+typedef IntrovertNetworkLookupPeerHandleC = FfiResult Function(Pointer<Utf8> peerId);
+typedef IntrovertNetworkLookupPeerHandleDart = FfiResult Function(Pointer<Utf8> peerId);
+
 typedef IntrovertNetworkRequestSwarmStatsC = FfiResult Function();
 typedef IntrovertNetworkRequestSwarmStatsDart = FfiResult Function();
 
@@ -447,6 +450,15 @@ typedef IntrovertDailyRewardUpdateAntiGamingDart = FfiResult Function(Pointer<Ui
 typedef IntrovertDailyRewardGetRealtimeEarningsC = FfiResult Function();
 typedef IntrovertDailyRewardGetRealtimeEarningsDart = FfiResult Function();
 
+typedef IntrovertDailyRewardRecordCallDurationC = FfiResult Function(Uint64 durationSecs, Pointer<Utf8> peerId);
+typedef IntrovertDailyRewardRecordCallDurationDart = FfiResult Function(int durationSecs, Pointer<Utf8> peerId);
+
+typedef IntrovertDailyRewardRecordWebActivityC = FfiResult Function(Uint64 seconds, Uint32 activeContainers);
+typedef IntrovertDailyRewardRecordWebActivityDart = FfiResult Function(int seconds, int activeContainers);
+
+typedef IntrovertDailyRewardRecordWebviewMediaCallC = FfiResult Function(Uint64 seconds, Uint32 activeContainers);
+typedef IntrovertDailyRewardRecordWebviewMediaCallDart = FfiResult Function(int seconds, int activeContainers);
+
 // --- Event Models ---
 
 
@@ -632,6 +644,7 @@ class IntrovertClient {
   late IntrovertStorageGetHandleStatusDart _getHandleStatus;
   late IntrovertStorageGetLocalHandleDart _getLocalHandle;
   late IntrovertStorageIsHandleClaimedDart _isHandleClaimed;
+  late IntrovertNetworkLookupPeerHandleDart _lookupPeerHandle;
   late IntrovertNetworkRequestSwarmStatsDart _requestSwarmStats;
   late IntrovertNetworkPollPeerProfileDart _pollPeerProfile;
   late IntrovertNetworkSyncChatMessagesDart _syncChatMessages;
@@ -730,6 +743,9 @@ class IntrovertClient {
   late IntrovertDailyRewardUpdateWeightsDart _dailyRewardUpdateWeights;
   late IntrovertDailyRewardUpdateAntiGamingDart _dailyRewardUpdateAntiGaming;
   late IntrovertDailyRewardGetRealtimeEarningsDart _dailyRewardGetRealtimeEarnings;
+  late IntrovertDailyRewardRecordCallDurationDart _dailyRewardRecordCallDuration;
+  late IntrovertDailyRewardRecordWebActivityDart _dailyRewardRecordWebActivity;
+  late IntrovertDailyRewardRecordWebviewMediaCallDart _dailyRewardRecordWebviewMediaCall;
   GetRewardsStateDart? _getRewardsState;
 
   NativeCallable<NativeNetworkCallback>? _unifiedCallable;
@@ -1073,6 +1089,7 @@ class IntrovertClient {
       _getHandleStatus = safeLookup('get_handle_status', () => _dylib.lookupFunction<IntrovertStorageGetHandleStatusC, IntrovertStorageGetHandleStatusDart>('introvert_storage_get_handle_status'), (h) => FfiResult.dummy);
       _getLocalHandle = safeLookup('get_local_handle', () => _dylib.lookupFunction<IntrovertStorageGetLocalHandleC, IntrovertStorageGetLocalHandleDart>('introvert_storage_get_local_handle'), () => FfiResult.dummy);
       _isHandleClaimed = safeLookup('is_handle_claimed', () => _dylib.lookupFunction<IntrovertStorageIsHandleClaimedC, IntrovertStorageIsHandleClaimedDart>('introvert_storage_is_handle_claimed'), (h) => FfiResult.dummy);
+      _lookupPeerHandle = safeLookup('lookup_peer_handle', () => _dylib.lookupFunction<IntrovertNetworkLookupPeerHandleC, IntrovertNetworkLookupPeerHandleDart>('introvert_network_lookup_peer_handle'), (p) => FfiResult.dummy);
       _requestSwarmStats = safeLookup('request_swarm_stats', () => _dylib.lookupFunction<IntrovertNetworkRequestSwarmStatsC, IntrovertNetworkRequestSwarmStatsDart>('introvert_network_request_swarm_stats'), () => FfiResult.dummy);
       _pollPeerProfile = safeLookup('poll_peer_profile', () => _dylib.lookupFunction<IntrovertNetworkPollPeerProfileC, IntrovertNetworkPollPeerProfileDart>('introvert_network_poll_peer_profile'), (p) => FfiResult.dummy);
       _syncChatMessages = safeLookup('sync_chat_messages', () => _dylib.lookupFunction<IntrovertNetworkSyncChatMessagesC, IntrovertNetworkSyncChatMessagesDart>('introvert_network_sync_chat_messages'), (p, a, b, c) => FfiResult.dummy);
@@ -1178,6 +1195,9 @@ class IntrovertClient {
       _dailyRewardUpdateWeights = safeLookup('daily_reward_update_weights', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateWeightsC, IntrovertDailyRewardUpdateWeightsDart>('introvert_daily_reward_update_weights'), (p, l) => FfiResult.dummy);
       _dailyRewardUpdateAntiGaming = safeLookup('daily_reward_update_anti_gaming', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateAntiGamingC, IntrovertDailyRewardUpdateAntiGamingDart>('introvert_daily_reward_update_anti_gaming'), (p, l) => FfiResult.dummy);
       _dailyRewardGetRealtimeEarnings = safeLookup('daily_reward_get_realtime_earnings', () => _dylib.lookupFunction<IntrovertDailyRewardGetRealtimeEarningsC, IntrovertDailyRewardGetRealtimeEarningsDart>('introvert_daily_reward_get_realtime_earnings'), () => FfiResult.dummy);
+      _dailyRewardRecordCallDuration = safeLookup('daily_reward_record_call_duration', () => _dylib.lookupFunction<IntrovertDailyRewardRecordCallDurationC, IntrovertDailyRewardRecordCallDurationDart>('introvert_daily_reward_record_call_duration'), (d, p) => FfiResult.dummy);
+      _dailyRewardRecordWebActivity = safeLookup('daily_reward_record_web_activity', () => _dylib.lookupFunction<IntrovertDailyRewardRecordWebActivityC, IntrovertDailyRewardRecordWebActivityDart>('introvert_daily_reward_record_web_activity'), (s, c) => FfiResult.dummy);
+      _dailyRewardRecordWebviewMediaCall = safeLookup('daily_reward_record_webview_media_call', () => _dylib.lookupFunction<IntrovertDailyRewardRecordWebviewMediaCallC, IntrovertDailyRewardRecordWebviewMediaCallDart>('introvert_daily_reward_record_webview_media_call'), (s, c) => FfiResult.dummy);
       try {
         _getRewardsState = loadGetRewardsState(_dylib);
       } catch (_) {
@@ -2221,6 +2241,33 @@ class IntrovertClient {
     }
   }
 
+  /// Record VoIP call duration for daily rewards. Called when a call ends.
+  void recordCallDuration(int durationSecs, {String? peerId}) {
+    using((Arena arena) {
+      final peerPtr = peerId != null ? peerId.toNativeUtf8(allocator: arena) : nullptr;
+      _handleFfiResult(
+        _dailyRewardRecordCallDuration(durationSecs, peerPtr),
+        context: "Record Call Duration",
+      );
+    });
+  }
+
+  /// Record focused web view active time for daily rewards. Called periodically.
+  void recordWebActivity(int seconds, int activeContainers) {
+    _handleFfiResult(
+      _dailyRewardRecordWebActivity(seconds, activeContainers),
+      context: "Record Web Activity",
+    );
+  }
+
+  /// Record webview media call hook for daily rewards. Called during active media calls in webviews.
+  void recordWebviewMediaCall(int seconds, int activeContainers) {
+    _handleFfiResult(
+      _dailyRewardRecordWebviewMediaCall(seconds, activeContainers),
+      context: "Record Webview Media Call",
+    );
+  }
+
   /// Returns the current daily reward state as a fixed-width FFI struct.
   /// Returns null if the native symbol is unavailable or the engine is not running.
   /// No heap allocations cross the FFI boundary — safe for direct UI consumption.
@@ -2274,6 +2321,15 @@ class IntrovertClient {
     } finally {
       if (res.len > 0) _freeBinary(res.data, res.len);
     }
+  }
+
+  /// Triggers a Kademlia DHT lookup for a peer's handle (reverse mapping).
+  /// Result arrives asynchronously as Event 37 (PeerHandleRestored).
+  void lookupPeerHandle(String peerId) {
+    using((Arena arena) => _handleFfiResult(
+      _lookupPeerHandle(peerId.toNativeUtf8(allocator: arena)),
+      context: "Lookup Peer Handle",
+    ));
   }
 
   Map<String, dynamic> getProfile() {

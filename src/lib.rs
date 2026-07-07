@@ -396,6 +396,7 @@ pub extern "C" fn introvert_network_start_production(
     let storage = Arc::clone(&engine.storage);
     let reward_tracker = Arc::clone(&engine.reward_tracker);
     let solana_client = Arc::clone(&engine.solana_client);
+    let daily_reward_engine = engine.daily_reward_engine.clone();
     let (tx, rx) = mpsc::channel(1_000);
     let tx_clone = tx.clone();
 
@@ -422,6 +423,7 @@ pub extern "C" fn introvert_network_start_production(
             storage,
             reward_tracker,
             solana_client,
+            daily_reward_engine,
             local_static_secret,
             session_encryption_key,
             enable_mdns: true,
@@ -510,6 +512,9 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
         }
 
         let mut interval = tokio::time::interval(Duration::from_secs(30));
+        let mut tick_counter: u32 = 0;
+        let mut cached_diag_visible: bool = false;
+        let mut cached_alloc_mult: f32 = 1.0;
         loop {
             interval.tick().await;
 
@@ -517,7 +522,7 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
 
             // Daily reward cycle transition check
             if let Some(ref daily) = daily_engine {
-                let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                let today = crate::economy::daily_rewards::economy_today();
                 if daily.needs_cycle_transition(&today) {
                     daily.transition_cycle(&today, &tracker);
                     let bal = solana.fetch_balance(&my_pubkey).await.unwrap_or(0);
@@ -543,20 +548,15 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
             let total_relayed = tracker.get_total_relayed();
 
             // Tier profile refresh: check every 5 minutes (10 ticks) to avoid RPC spam
-            static mut TICK_COUNTER: u32 = 0;
-            static mut CACHED_DIAG_VISIBLE: bool = false;
-            static mut CACHED_ALLOC_MULT: f32 = 1.0;
-            unsafe {
-                TICK_COUNTER += 1;
-                if TICK_COUNTER % 10 == 0 {
-                    let (v, m) = solana.fetch_node_tier_profile(&my_pubkey).await;
-                    CACHED_DIAG_VISIBLE = v;
-                    CACHED_ALLOC_MULT = m;
+            tick_counter += 1;
+            if tick_counter % 10 == 0 {
+                let (v, m) = solana.fetch_node_tier_profile(&my_pubkey).await;
+                cached_diag_visible = v;
+                cached_alloc_mult = m;
 
-                    // Persist activities every 5 minutes (10 ticks) to survive restarts
-                    if let Some(ref daily) = daily_engine {
-                        daily.persist_current_activities();
-                    }
+                // Persist activities every 5 minutes (10 ticks) to survive restarts
+                if let Some(ref daily) = daily_engine {
+                    daily.persist_current_activities();
                 }
             }
 
@@ -573,8 +573,8 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
                 "sol_address": my_pubkey.to_string(),
                 "treasury_address": treasury_pubkey.to_string(),
                 "token_name": "INTR",
-                "advanced_diagnostic_ui_visible": unsafe { CACHED_DIAG_VISIBLE },
-                "allocation_multiplier": unsafe { CACHED_ALLOC_MULT },
+                "advanced_diagnostic_ui_visible": cached_diag_visible,
+                "allocation_multiplier": cached_alloc_mult,
                 "lifetime_allocated": lifetime_allocated
             });
 
@@ -622,9 +622,10 @@ pub extern "C" fn introvert_claim_rewards_async(callback: FfiRewardCallback) -> 
         let consumers = tracker.get_pending_consumers();
         let mut claim_count = 0;
 
+        // Phase 1: Claim relay-based rewards (per-consumer proofs)
         for consumer_id in consumers {
             if let Some((amount, proof)) = tracker.prepare_reward_proof(&provider_pubkey, &consumer_id) {
-                match solana.submit_reward_claim(&user_keypair, &proof).await {
+                match solana.submit_and_verify_reward_claim(&user_keypair, &proof).await {
                     Ok(sig) => {
                         tracker.commit_reward_claim(&consumer_id, amount);
                         let sig_msg = CString::new(sig).unwrap();
@@ -635,6 +636,24 @@ pub extern "C" fn introvert_claim_rewards_async(callback: FfiRewardCallback) -> 
                         let err_msg = CString::new(format!("Claim error for {}: {}", consumer_id, e)).unwrap();
                         callback(-2, err_msg.into_raw());
                     }
+                }
+            }
+        }
+
+        // Phase 2: Claim accumulated daily cycle rewards
+        if let Some((amount_nano, proof)) = tracker.drain_daily_rewards_for_claim(&provider_pubkey) {
+            match solana.submit_and_verify_reward_claim(&user_keypair, &proof).await {
+                Ok(sig) => {
+                    tracing::info!("[Economy] Daily reward claim confirmed: {} nano-INTR, sig={}", amount_nano, sig);
+                    let sig_msg = CString::new(sig).unwrap();
+                    callback(0, sig_msg.into_raw());
+                    claim_count += 1;
+                }
+                Err(e) => {
+                    // Return the drained amount back to the pool on failure
+                    tracker.record_daily_reward(amount_nano as f64 / 1_000_000_000.0);
+                    let err_msg = CString::new(format!("Daily reward claim error: {}", e)).unwrap();
+                    callback(-2, err_msg.into_raw());
                 }
             }
         }
@@ -4157,6 +4176,32 @@ pub extern "C" fn introvert_storage_get_local_handle() -> FfiResult {
     }
 }
 
+/// Triggers a Kademlia DHT lookup for a peer's handle (reverse mapping ph_<peer_id>).
+/// Result arrives asynchronously as Event 37 (PeerHandleRestored).
+#[no_mangle]
+pub extern "C" fn introvert_network_lookup_peer_handle(peer_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    if peer_id_ptr.is_null() { return FfiResult::error(-11, "Null pointer"); }
+    let peer_id = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(crate::network::NetworkCommand::LookupPeerHandle { peer_id }).await;
+    });
+
+    FfiResult::success()
+}
+
 /// Checks if a handle is permanently claimed (verified) by any peer.
 #[no_mangle]
 pub extern "C" fn introvert_storage_is_handle_claimed(handle_ptr: *const c_char) -> FfiResult {
@@ -5157,6 +5202,74 @@ pub extern "C" fn introvert_daily_reward_get_realtime_earnings() -> FfiResult {
         }
         None => FfiResult::binary(b"{}".to_vec()),
     }
+}
+
+/// Record VoIP call duration for daily rewards. Called by Flutter when a call ends.
+#[no_mangle]
+pub extern "C" fn introvert_daily_reward_record_call_duration(duration_secs: u64, peer_id_ptr: *const c_char) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if let Some(ref daily) = engine.daily_reward_engine {
+        let peer_id = if peer_id_ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() })
+        };
+        daily.record_activity(crate::economy::daily_rewards::ActivityEvent {
+            activity_type: crate::economy::daily_rewards::ActivityType::CallDurationSecs,
+            peer_id,
+            value: duration_secs,
+            is_foreground: true,
+            message_len: None,
+            is_self: false,
+            is_rbn: false,
+            proof_hash: None,
+            active_web_containers: 0,
+        });
+    }
+    FfiResult::success()
+}
+
+/// Record focused web view active time for daily rewards. Called periodically by Flutter.
+#[no_mangle]
+pub extern "C" fn introvert_daily_reward_record_web_activity(seconds: u64, active_containers: u32) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if let Some(ref daily) = engine.daily_reward_engine {
+        daily.record_activity(crate::economy::daily_rewards::ActivityEvent {
+            activity_type: crate::economy::daily_rewards::ActivityType::WebFocusedActiveTime,
+            peer_id: None,
+            value: seconds,
+            is_foreground: true,
+            message_len: None,
+            is_self: false,
+            is_rbn: false,
+            proof_hash: None,
+            active_web_containers: active_containers,
+        });
+    }
+    FfiResult::success()
+}
+
+/// Record webview media call hook for daily rewards. Called when a media call is active in a webview.
+#[no_mangle]
+pub extern "C" fn introvert_daily_reward_record_webview_media_call(seconds: u64, active_containers: u32) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() { Some(e) => e, None => return FfiResult::error(-10, "Engine not started") };
+    if let Some(ref daily) = engine.daily_reward_engine {
+        daily.record_activity(crate::economy::daily_rewards::ActivityEvent {
+            activity_type: crate::economy::daily_rewards::ActivityType::WebViewMediaCallHook,
+            peer_id: None,
+            value: seconds,
+            is_foreground: true,
+            message_len: None,
+            is_self: false,
+            is_rbn: false,
+            proof_hash: None,
+            active_web_containers: active_containers,
+        });
+    }
+    FfiResult::success()
 }
 
 /// Returns a fixed-width C-compatible state snapshot for the current daily reward cycle.

@@ -87,37 +87,37 @@ impl BalanceGatingService {
 
     /// Fetches the node's tier profile based on on-chain INTR balance.
     ///
-    /// Tier mapping:
-    ///   Balance < 50,000 INTR    → (visible: false, multiplier: 1.0, tier: 0)
-    ///   50,000 - 99,999 INTR     → (visible: true,  multiplier: 1.5, tier: 1) Sentinel
-    ///   100,000 - 249,999 INTR   → (visible: true,  multiplier: 1.75, tier: 2) Silver
-    ///   250,000 - 499,999 INTR   → (visible: true,  multiplier: 2.0, tier: 3) Gold
-    ///   500,000+ INTR            → (visible: true,  multiplier: 2.5, tier: 4) Platinum
+    /// Tier mapping (unified with solana.rs verify_prestige_tier thresholds):
+    ///   Balance < 100,000 INTR   → (visible: false, multiplier: 1.0, tier: 0) Citizen
+    ///   100,000 - 249,999 INTR   → (visible: true,  multiplier: 1.5, tier: 1) Sentinel
+    ///   250,000 - 499,999 INTR   → (visible: true,  multiplier: 1.75, tier: 2) Silver
+    ///   500,000 - 999,999 INTR   → (visible: true,  multiplier: 2.0, tier: 3) Gold
+    ///   1,000,000+ INTR          → (visible: true,  multiplier: 2.5, tier: 4) Platinum
     ///
     /// Balance is in nano-INTR (9 decimals). Thresholds converted from INTR.
     pub async fn fetch_node_tier_profile(&self, owner: &Pubkey) -> NodeTierProfile {
         let balance_nano = self.fetch_intr_balance(owner).await;
         let balance_intr = balance_nano as f64 / 1_000_000_000.0;
 
-        let profile = if balance_intr >= 500_000.0 {
+        let profile = if balance_intr >= 1_000_000.0 {
             NodeTierProfile {
                 advanced_diagnostic_ui_visible: true,
                 allocation_multiplier: 2.5,
                 tier: 4, // Platinum
             }
-        } else if balance_intr >= 250_000.0 {
+        } else if balance_intr >= 500_000.0 {
             NodeTierProfile {
                 advanced_diagnostic_ui_visible: true,
                 allocation_multiplier: 2.0,
                 tier: 3, // Gold
             }
-        } else if balance_intr >= 100_000.0 {
+        } else if balance_intr >= 250_000.0 {
             NodeTierProfile {
                 advanced_diagnostic_ui_visible: true,
                 allocation_multiplier: 1.75,
                 tier: 2, // Silver
             }
-        } else if balance_intr >= 50_000.0 {
+        } else if balance_intr >= 100_000.0 {
             NodeTierProfile {
                 advanced_diagnostic_ui_visible: true,
                 allocation_multiplier: 1.5,

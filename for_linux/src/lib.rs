@@ -406,14 +406,14 @@ pub extern "C" fn introvert_network_start_production(
                 let hour = now.hour();
                 let minute = now.minute();
                 
-                // Trigger daily at 00:00 UTC
-                if hour == 0 && minute == 0 {
+                // Trigger daily at 12:00 UTC (noon) — allows US/EU operators to monitor live
+                if hour == 12 && minute == 0 {
                     // Grace Period: Close the epoch from 2 days ago (giving 24 hours for offline clients to sync)
                     let prev_day = now - chrono::Duration::days(2);
                     let epoch_id = prev_day.format("%Y_%m_%d").to_string();
                     
                     if epoch_id != last_processed_epoch {
-                        info!("[RbnRewards] 🕒 Midnight UTC reached. Closing epoch: {}", epoch_id);
+                        info!("[RbnRewards] 🕛 Noon UTC reached. Closing epoch: {}", epoch_id);
                         
                         // 1. Close epoch
                         let claims = reward_engine_payout.close_current_epoch(&epoch_id);
@@ -569,13 +569,14 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
                 dispatch_global_event(9, stats_str.as_bytes());
             }
 
-            // Check if we're in a new epoch (midnight UTC) and should send telemetry
+            // Check if we're in a new epoch (noon UTC) and should send telemetry
             let now = chrono::Utc::now();
-            let epoch_id = now.format("%Y_%m_%d").to_string();
+            let shifted = now - chrono::Duration::hours(12);
+            let epoch_id = shifted.format("%Y_%m_%d").to_string();
             let hour = now.format("%H").to_string().parse::<u32>().unwrap_or(25);
             let minute = now.format("%M").to_string().parse::<u32>().unwrap_or(60);
             
-            if epoch_id != last_epoch_sent && hour == 0 && minute < 1 {
+            if epoch_id != last_epoch_sent && hour == 12 && minute < 1 {
                 // Package and send telemetry to RBN
                 let intr_mint = solana_sdk::pubkey::Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf").unwrap();
                 let token_program = solana_sdk::pubkey::Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap();

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use tracing::{error, info, warn};
 
 /// 10-year emission schedule constants (from whitepaper).
@@ -32,6 +33,15 @@ pub fn current_emission_year() -> u32 {
     days_since_tge / 365
 }
 
+/// Computes the epoch index (days since TGE) for a given date string.
+pub fn epoch_index_from_date(date: &str) -> u64 {
+    let tge = chrono::NaiveDate::parse_from_str(TGE_DATE, "%Y-%m-%d")
+        .unwrap_or_else(|_| chrono::NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+    let epoch_date = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .unwrap_or(tge);
+    epoch_date.signed_duration_since(tge).num_days().max(0) as u64
+}
+
 /// A single node's telemetry snapshot for daily allocation computation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeTelemetryClaim {
@@ -43,6 +53,8 @@ pub struct NodeTelemetryClaim {
     pub allocation_multiplier: f32, // From BalanceGatingService tier
     pub proof_hash: String,         // SHA-256 of claim data
     pub timestamp: u64,
+    pub is_rbn: bool,               // Whether this node is an RBN operator
+    pub epoch_date: Option<String>, // Calendar date (e.g., "2026-07-07") — None = current epoch
 }
 
 /// Result of a daily allocation computation for a single node.
@@ -55,35 +67,145 @@ pub struct DailyAllocation {
     pub share_of_pool: f64,        // weighted_points / total_weighted_points
     pub intr_allocated: f64,       // share_of_pool * daily_emission
     pub tier_multiplier: f32,
+    pub pool_type: String,         // "user" or "rbn"
+}
+
+/// Late-arriving credit from a historical epoch, computed using that epoch's multiplier.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LateCredit {
+    pub peer_id: String,
+    pub sol_address: String,
+    pub epoch_index: u64,
+    pub intr_credit: f64,
+    pub pool_type: String,
+}
+
+/// Incremental delta log: epoch_number -> accumulated points for that epoch.
+/// Allows late-arriving telemetry to be slotted into the correct historical epoch.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DeltaLog {
+    /// epoch_index -> total weighted points received for that epoch
+    pub epoch_points: BTreeMap<u64, f64>,
+    /// epoch_index -> daily emission rate at that epoch (cached for late credit computation)
+    pub epoch_emissions: BTreeMap<u64, f64>,
+    /// Accumulated late credits to be processed in the next cycle
+    pub pending_late_credits: Vec<LateCredit>,
+}
+
+impl DeltaLog {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Records points for a given epoch. If the epoch is already closed (not the current one),
+    /// computes a late credit using the historical emission rate.
+    pub fn record_epoch_points(
+        &mut self,
+        epoch_index: u64,
+        points: f64,
+        current_epoch: u64,
+        claim: &NodeTelemetryClaim,
+        historical_emission: f64,
+        total_epoch_points: f64,
+    ) {
+        // Accumulate points for this epoch
+        let entry = self.epoch_points.entry(epoch_index).or_insert(0.0);
+        *entry += points;
+
+        // Cache the emission rate for this epoch if not already stored
+        self.epoch_emissions.entry(epoch_index).or_insert(historical_emission);
+
+        // If this is a late arrival (epoch is already closed), compute a late credit
+        if epoch_index < current_epoch && total_epoch_points > 0.0 && historical_emission > 0.0 {
+            let share = points / total_epoch_points;
+            let credit = share * historical_emission;
+
+            if credit > 0.0 {
+                info!(
+                    "[DeltaLog] Late credit computed: peer={}, epoch={}, points={:.1}, credit={:.4} INTR",
+                    claim.peer_id, epoch_index, points, credit
+                );
+                self.pending_late_credits.push(LateCredit {
+                    peer_id: claim.peer_id.clone(),
+                    sol_address: claim.sol_address.clone(),
+                    epoch_index,
+                    intr_credit: credit,
+                    pool_type: if claim.is_rbn { "rbn".to_string() } else { "user".to_string() },
+                });
+            }
+        }
+    }
+
+    /// Drains and returns all pending late credits.
+    pub fn drain_late_credits(&mut self) -> Vec<LateCredit> {
+        std::mem::take(&mut self.pending_late_credits)
+    }
 }
 
 /// Nightly ledger cron engine.
 /// Aggregates verified telemetry claims, computes proportional allocations
 /// against the 10-year decay emission schedule, and returns finalized allocations.
+///
+/// Supports incremental delta logging: late-arriving telemetry for closed epochs
+/// is converted to `LateCredit` adjustments processed in the next active cycle.
 pub struct LedgerCronEngine;
 
 impl LedgerCronEngine {
     /// Computes daily allocations for all nodes that submitted telemetry claims.
     ///
+    /// Splits claims into user and RBN pools:
+    /// - Standard users draw from the 16,438 INTR/day user pool
+    /// - RBN operators draw from the 8,219 INTR/day RBN pool
+    ///
     /// Algorithm:
-    /// 1. Calculate current daily emission pool using decay formula
-    /// 2. For each node: raw_points = relayed_bytes + (uptime_seconds * 100) + (active_containers * 1000)
-    /// 3. Apply tier multiplier: weighted_points = raw_points * allocation_multiplier
-    /// 4. Compute share: share = weighted_points / total_weighted_points
-    /// 5. Allocate: intr_allocated = share * daily_emission
+    /// 1. Split claims by is_rbn flag
+    /// 2. For each pool: compute raw_points, apply tier multipliers, allocate proportionally
+    /// 3. Merge results
     pub fn compute_daily_allocations(claims: &[NodeTelemetryClaim]) -> Vec<DailyAllocation> {
         if claims.is_empty() {
             return Vec::new();
         }
 
         let year = current_emission_year();
-        let daily_emission = compute_daily_emission(YEAR_1_DAILY_USER_POOL, year);
+        let user_emission = compute_daily_emission(YEAR_1_DAILY_USER_POOL, year);
+        let rbn_emission = compute_daily_emission(YEAR_1_DAILY_RBN_POOL, year);
 
         info!(
-            "[LedgerCron] Computing daily allocations: year={}, emission={:.4} INTR, nodes={}",
-            year, daily_emission, claims.len()
+            "[LedgerCron] Computing daily allocations: year={}, user_pool={:.4}, rbn_pool={:.4}, total_nodes={}",
+            year, user_emission, rbn_emission, claims.len()
         );
 
+        // Split claims by node type
+        let (rbn_claims, user_claims): (Vec<_>, Vec<_>) = claims.iter()
+            .partition(|c| c.is_rbn);
+
+        let mut allocations = Vec::with_capacity(claims.len());
+
+        // Allocate user pool
+        if !user_claims.is_empty() {
+            let user_allocs = Self::allocate_pool(&user_claims, user_emission, "user");
+            allocations.extend(user_allocs);
+        }
+
+        // Allocate RBN pool
+        if !rbn_claims.is_empty() {
+            let rbn_allocs = Self::allocate_pool(&rbn_claims, rbn_emission, "rbn");
+            allocations.extend(rbn_allocs);
+        }
+
+        let total_allocated: f64 = allocations.iter().map(|a| a.intr_allocated).sum();
+        info!(
+            "[LedgerCron] Allocations computed: {} nodes, {:.4} INTR total allocated (user: {:.4}, rbn: {:.4})",
+            allocations.len(), total_allocated,
+            allocations.iter().filter(|a| a.pool_type == "user").map(|a| a.intr_allocated).sum::<f64>(),
+            allocations.iter().filter(|a| a.pool_type == "rbn").map(|a| a.intr_allocated).sum::<f64>(),
+        );
+
+        allocations
+    }
+
+    /// Allocates from a specific pool (user or RBN) proportionally.
+    fn allocate_pool(claims: &[&NodeTelemetryClaim], daily_emission: f64, pool_type: &str) -> Vec<DailyAllocation> {
         // Step 1: Compute raw points for each node
         let raw_points: Vec<f64> = claims
             .iter()
@@ -105,12 +227,12 @@ impl LedgerCronEngine {
         let total_weighted: f64 = weighted_points.iter().sum();
 
         if total_weighted <= 0.0 {
-            warn!("[LedgerCron] Total weighted points is zero — no allocations computed");
+            warn!("[LedgerCron] Total weighted points is zero for {} pool — no allocations", pool_type);
             return Vec::new();
         }
 
         // Step 3: Compute proportional allocations
-        let allocations: Vec<DailyAllocation> = claims
+        claims
             .iter()
             .zip(raw_points.iter())
             .zip(weighted_points.iter())
@@ -126,24 +248,97 @@ impl LedgerCronEngine {
                     share_of_pool: share,
                     intr_allocated: allocated,
                     tier_multiplier: claim.allocation_multiplier,
+                    pool_type: pool_type.to_string(),
                 }
             })
-            .collect();
-
-        let total_allocated: f64 = allocations.iter().map(|a| a.intr_allocated).sum();
-        info!(
-            "[LedgerCron] Allocations computed: {} nodes, {:.4} INTR total allocated (pool: {:.4})",
-            allocations.len(), total_allocated, daily_emission
-        );
-
-        allocations
+            .collect()
     }
 
-    /// Computes the RBN infrastructure pool allocation for a given day.
-    /// RBNs receive a separate pool with the same decay schedule.
-    pub fn compute_rbn_daily_emission() -> f64 {
+    /// Processes incoming claims through the delta log system.
+    /// Active epoch claims go to the live allocation pool.
+    /// Historical epoch claims produce late credits using the historical emission rate.
+    pub fn process_claims_with_delta(
+        claims: &[NodeTelemetryClaim],
+        delta_log: &mut DeltaLog,
+        current_epoch_date: &str,
+    ) -> (Vec<DailyAllocation>, Vec<LateCredit>) {
+        let current_epoch = epoch_index_from_date(current_epoch_date);
         let year = current_emission_year();
-        compute_daily_emission(YEAR_1_DAILY_RBN_POOL, year)
+        let user_emission = compute_daily_emission(YEAR_1_DAILY_USER_POOL, year);
+        let rbn_emission = compute_daily_emission(YEAR_1_DAILY_RBN_POOL, year);
+
+        let mut active_claims: Vec<NodeTelemetryClaim> = Vec::new();
+        let mut late_claims: Vec<NodeTelemetryClaim> = Vec::new();
+
+        // Partition claims into active and late based on epoch_date
+        for claim in claims {
+            let claim_epoch = claim.epoch_date.as_deref()
+                .map(epoch_index_from_date)
+                .unwrap_or(current_epoch);
+            if claim_epoch >= current_epoch {
+                active_claims.push(claim.clone());
+            } else {
+                late_claims.push(claim.clone());
+            }
+        }
+
+        // Compute total points per epoch from delta log for late credit denominators
+        let epoch_totals: BTreeMap<u64, f64> = delta_log.epoch_points.clone();
+
+        // Register active claims in the delta log
+        for claim in &active_claims {
+            let raw_points = (claim.relayed_bytes as f64) / 1_048_576.0
+                + (claim.uptime_seconds as f64) / 3600.0
+                + (claim.active_containers as f64) * 10.0;
+            let weighted = raw_points * claim.allocation_multiplier as f64;
+            let emission = if claim.is_rbn { rbn_emission } else { user_emission };
+            let total = *epoch_totals.get(&current_epoch).unwrap_or(&0.0);
+
+            delta_log.record_epoch_points(
+                current_epoch,
+                weighted,
+                current_epoch,
+                claim,
+                emission,
+                total + weighted,
+            );
+        }
+
+        // Process late claims: compute historical emission and generate late credits
+        for claim in &late_claims {
+            let claim_epoch = claim.epoch_date.as_deref()
+                .map(epoch_index_from_date)
+                .unwrap_or(current_epoch);
+            let claim_year = (claim_epoch / 365) as u32;
+            let historical_emission = if claim.is_rbn {
+                compute_daily_emission(YEAR_1_DAILY_RBN_POOL, claim_year)
+            } else {
+                compute_daily_emission(YEAR_1_DAILY_USER_POOL, claim_year)
+            };
+
+            let raw_points = (claim.relayed_bytes as f64) / 1_048_576.0
+                + (claim.uptime_seconds as f64) / 3600.0
+                + (claim.active_containers as f64) * 10.0;
+            let weighted = raw_points * claim.allocation_multiplier as f64;
+            let total = *epoch_totals.get(&claim_epoch).unwrap_or(&weighted);
+
+            delta_log.record_epoch_points(
+                claim_epoch,
+                weighted,
+                current_epoch,
+                claim,
+                historical_emission,
+                total,
+            );
+        }
+
+        // Compute active allocations
+        let allocations = Self::compute_daily_allocations(&active_claims);
+
+        // Drain late credits that accumulated from historical epoch processing
+        let late_credits = delta_log.drain_late_credits();
+
+        (allocations, late_credits)
     }
 
     /// Executes the nightly allocation cycle: aggregates claims, computes allocations,
@@ -154,7 +349,7 @@ impl LedgerCronEngine {
         claims: &[NodeTelemetryClaim],
         storage: &crate::storage::StorageService,
     ) -> usize {
-        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let today = crate::economy::daily_rewards::economy_today();
 
         // Check if we already ran today
         if let Ok(existing) = storage.get_allocations_for_cycle(&today) {

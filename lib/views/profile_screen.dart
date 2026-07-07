@@ -29,6 +29,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _originalHandle = ''; // Immutable: handle from DB, never changes once set
   bool _hasExistingHandle = false;
   bool _isDisposing = false;
+  bool _isFetching = false;
+  String? _fetchStatus; // null, "found:i@handle", "not_found", "error:message"
   StreamSubscription? _networkSubscription;
   StreamSubscription? _economySubscription;
 
@@ -198,6 +200,90 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     });
+  }
+
+  /// Queries the mesh DHT for a handle tied to this peer ID.
+  /// If found, populates the handle field and saves to profile.
+  Future<void> _fetchIdFromMesh() async {
+    final client = IntrovertClient();
+    final peerId = client.getPeerId();
+    if (peerId == null || peerId.isEmpty) {
+      setState(() => _fetchStatus = 'error:No peer ID available');
+      return;
+    }
+
+    setState(() {
+      _isFetching = true;
+      _fetchStatus = null;
+    });
+
+    try {
+      // Listen for Event 37 (PeerHandleRestored) with timeout
+      final completer = Completer<String?>();
+      late StreamSubscription sub;
+      sub = client.networkStream.listen((event) {
+        if (event.type == 37) {
+          try {
+            final parts = utf8.decode(event.data).split('\x00');
+            if (parts.length >= 2 && parts[0] == peerId) {
+              if (!completer.isCompleted) completer.complete(parts[1]);
+            }
+          } catch (_) {}
+        }
+      });
+
+      // Trigger DHT lookup
+      client.lookupPeerHandle(peerId);
+
+      // Wait for response with 10s timeout
+      String? handle;
+      try {
+        handle = await completer.future.timeout(const Duration(seconds: 10));
+      } on TimeoutException {
+        handle = null;
+      } finally {
+        sub.cancel();
+      }
+
+      if (handle != null && handle.isNotEmpty) {
+        // Strip i@ prefix if present
+        String cleanHandle = handle;
+        if (cleanHandle.startsWith("i@")) cleanHandle = cleanHandle.substring(2);
+
+        setState(() {
+          _isFetching = false;
+          _fetchStatus = 'found:i@$cleanHandle';
+          _handleController.text = cleanHandle;
+          _hasExistingHandle = true;
+          _originalHandle = cleanHandle;
+        });
+
+        // Persist to profile
+        final profile = client.getProfile();
+        client.setProfile(
+          profile['name'] as String?,
+          'i@$cleanHandle',
+          profile['avatar'] as String?,
+          (profile['privacy'] as int?) ?? 1,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Handle restored from mesh: i@$cleanHandle')),
+          );
+        }
+      } else {
+        setState(() {
+          _isFetching = false;
+          _fetchStatus = 'not_found';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isFetching = false;
+        _fetchStatus = 'error:$e';
+      });
+    }
   }
 
   void _saveProfile() async {
@@ -403,6 +489,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Handle is permanently locked to your identity. Immutable on-chain.',
                 style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.6), fontSize: 10, fontStyle: FontStyle.italic),
               ),
+            ],
+            // Fetch ID from Mesh button — shown when no handle is set
+            if (!_isClaimed && !_hasExistingHandle) ...[
+              SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isFetching ? null : _fetchIdFromMesh,
+                  icon: _isFetching
+                      ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent))
+                      : Icon(Icons.wifi_find_rounded, size: 16),
+                  label: Text(_isFetching ? 'FETCHING...' : 'FETCH ID FROM MESH'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.current.accent,
+                    side: BorderSide(color: AppTheme.current.accent.withValues(alpha: 0.4)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              if (_fetchStatus != null) ...[
+                SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _fetchStatus!.startsWith('found:')
+                        ? Colors.greenAccent.withValues(alpha: 0.08)
+                        : _fetchStatus == 'not_found'
+                            ? Colors.amberAccent.withValues(alpha: 0.08)
+                            : Colors.redAccent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _fetchStatus!.startsWith('found:')
+                          ? Colors.greenAccent.withValues(alpha: 0.3)
+                          : _fetchStatus == 'not_found'
+                              ? Colors.amberAccent.withValues(alpha: 0.3)
+                              : Colors.redAccent.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _fetchStatus!.startsWith('found:')
+                            ? Icons.check_circle_rounded
+                            : _fetchStatus == 'not_found'
+                                ? Icons.search_off_rounded
+                                : Icons.error_outline_rounded,
+                        size: 16,
+                        color: _fetchStatus!.startsWith('found:')
+                            ? Colors.greenAccent
+                            : _fetchStatus == 'not_found'
+                                ? Colors.amberAccent
+                                : Colors.redAccent,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _fetchStatus!.startsWith('found:')
+                              ? 'ID found: ${_fetchStatus!.substring(6)}'
+                              : _fetchStatus == 'not_found'
+                                  ? 'No ID found for this peer ID on the mesh'
+                                  : 'Error: ${_fetchStatus!.substring(6)}',
+                          style: TextStyle(
+                            color: _fetchStatus!.startsWith('found:')
+                                ? Colors.greenAccent
+                                : _fetchStatus == 'not_found'
+                                    ? Colors.amberAccent
+                                    : Colors.redAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
             if (!_isClaimed && !_hasExistingHandle && _handleController.text.isNotEmpty) ...[
               SizedBox(height: 12),

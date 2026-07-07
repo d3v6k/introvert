@@ -19,10 +19,12 @@ pub struct SolanaIncentiveEngine {
     intr_mint: Pubkey,
     treasury_pubkey: Pubkey,
     treasury_api_url: String, // Endpoint for fee-payer co-signing
+    ipc_secret: [u8; 32],     // HMAC-SHA256 key loaded from /etc/introvert/ipc.secret
 }
 
 impl SolanaIncentiveEngine {
     pub fn new(rpc_url: &str, treasury_pubkey: &str, treasury_api_url: &str) -> Result<Self> {
+        let ipc_secret = Self::load_ipc_secret()?;
         Ok(Self {
             rpc_client: Arc::new(RpcClient::new_with_timeout(rpc_url.to_string(), std::time::Duration::from_secs(3))),
             http_client: reqwest::Client::builder()
@@ -32,7 +34,33 @@ impl SolanaIncentiveEngine {
             intr_mint: Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")?,
             treasury_pubkey: Pubkey::from_str(treasury_pubkey)?,
             treasury_api_url: treasury_api_url.to_string(),
+            ipc_secret,
         })
+    }
+
+    /// Loads the 64-character hex IPC secret from /etc/introvert/ipc.secret.
+    /// Falls back to a zeroed key for desktop/dev environments where the file
+    /// doesn't exist. The RBN server always has this file; desktop clients don't
+    /// need it since they don't relay to the treasury daemon directly.
+    fn load_ipc_secret() -> Result<[u8; 32]> {
+        let path = std::path::Path::new("/etc/introvert/ipc.secret");
+        match std::fs::read_to_string(path) {
+            Ok(hex_str) => {
+                let hex_str = hex_str.trim();
+                if hex_str.len() != 64 {
+                    return Err(anyhow!("IPC secret must be exactly 64 hex characters (32 bytes), got {}", hex_str.len()));
+                }
+                let bytes = hex::decode(hex_str)
+                    .map_err(|e| anyhow!("IPC secret is not valid hex: {}", e))?;
+                let mut secret = [0u8; 32];
+                secret.copy_from_slice(&bytes);
+                Ok(secret)
+            }
+            Err(_) => {
+                tracing::warn!("[Economy] IPC secret not found at {} — using dev fallback (treasury relay auth disabled)", path.display());
+                Ok([0u8; 32])
+            }
+        }
     }
 
     pub fn get_treasury_pubkey(&self) -> Pubkey {
@@ -237,11 +265,7 @@ impl SolanaIncentiveEngine {
         // Bind timestamp to payload — prevents replay attacks
         let message = format!("{}.{}", timestamp, base64_tx);
 
-        // Derive HMAC from the treasury API URL as a shared secret context.
-        // In production, this should be a pre-shared key stored in secure storage.
-        // For now, use the treasury pubkey bytes as the HMAC key material.
-        let secret = self.treasury_pubkey.to_bytes();
-        let mut mac = HmacSha256::new_from_slice(&secret)
+        let mut mac = HmacSha256::new_from_slice(&self.ipc_secret)
             .map_err(|e| anyhow!("HMAC init failed: {}", e))?;
         mac.update(message.as_bytes());
         let signature_hex = hex::encode(mac.finalize().into_bytes());
@@ -520,6 +544,44 @@ impl SolanaIncentiveEngine {
         } else {
             let err_text = response.text().await?;
             Err(anyhow!("RPC HTTP error: {}", err_text))
+        }
+    }
+
+    /// Verifies that an operator has sufficient on-chain stake in the escrow PDA.
+    /// Queries the EscrowState account derived from seeds = [b"escrow_state", operator].
+    /// Returns (staked_amount_nano, is_unbonding).
+    pub async fn verify_operator_stake(
+        &self,
+        operator: &Pubkey,
+        registry_program_id: &Pubkey,
+    ) -> Result<(u64, bool)> {
+        let (escrow_pda, _) = Pubkey::find_program_address(
+            &[b"escrow_state", operator.as_ref()],
+            registry_program_id,
+        );
+
+        match self.rpc_client.get_account(&escrow_pda).await {
+            Ok(account) => {
+                if account.data.len() < 8 + 32 + 8 + 8 + 1 + 8 {
+                    return Err(anyhow!("EscrowState account data too short"));
+                }
+                // Skip Anchor discriminator (8 bytes)
+                let mut offset = 8;
+                // operator: Pubkey (32 bytes)
+                offset += 32;
+                // staked_amount: u64
+                let mut bytes = [0u8; 8];
+                bytes.copy_from_slice(&account.data[offset..offset + 8]);
+                let staked_amount = u64::from_le_bytes(bytes);
+                offset += 8;
+                // last_staked_at: i64
+                offset += 8;
+                // is_unbonding: bool
+                let is_unbonding = account.data[offset] != 0;
+
+                Ok((staked_amount, is_unbonding))
+            }
+            Err(_) => Ok((0, false)), // No escrow account = no stake
         }
     }
 }

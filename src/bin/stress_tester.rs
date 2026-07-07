@@ -66,6 +66,7 @@ async fn run_virtual_node(index: usize) -> anyhow::Result<()> {
             "11111111111111111111111111111111",
             "11111111111111111111111111111111"
         )?),
+        daily_reward_engine: None,
         local_static_secret: static_secret,
         session_encryption_key: [0u8; 32],
         enable_mdns: false,

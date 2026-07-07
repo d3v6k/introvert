@@ -1897,6 +1897,16 @@ impl IntroClawService {
             // 5. Storage cleanup if critical
             self.run_storage_quota_check();
 
+            // 6. Connection state cycling — keep reconnection attempts alive in background.
+            //    Without this, the node stays disconnected until the user manually returns to the app.
+            if ctx.connected_peers.is_empty() {
+                if let Some(strategy) = self.conn_cycler.evaluate(ctx) {
+                    self.activity_log.log("conn_cycler", &format!(
+                        "Idle reconnection: {:?}", strategy), "action");
+                    actions.connection_strategy = Some(strategy);
+                }
+            }
+
             self.activity_log.log("tick", &format!("Tick #{} idle maintenance complete", self.tick_count), "success");
             return actions;
         }

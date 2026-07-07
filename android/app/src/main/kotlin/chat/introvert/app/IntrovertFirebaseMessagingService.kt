@@ -76,6 +76,12 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
         // Always wake the foreground service to fetch messages
         wakeForegroundService()
 
+        // Signal Flutter to fetch pending messages from RBN mailbox.
+        // The foreground service will pick this up and invoke onWakeup on the MethodChannel.
+        val prefs = getSharedPreferences("introvert_fcm", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("pending_wakeup", true).apply()
+        Log.d(TAG, "Set pending_wakeup flag for mailbox fetch")
+
         // FOREGROUND: Skip native notification. Dart plays sound only.
         if (isAppInForeground) {
             Log.d(TAG, "App in foreground — skipping native notification, Dart handles sound")

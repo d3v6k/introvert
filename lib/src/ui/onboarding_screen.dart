@@ -117,6 +117,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             recoveredHandle = handleStatus['handle'] as String;
           }
         } catch (_) {}
+        
+        // Trigger mesh DHT lookup for handle tied to this peer ID.
+        // Result arrives asynchronously as Event 37 — handled by main_shell.dart
+        // which persists across navigation and will update the profile automatically.
+        try {
+          _client.lookupPeerHandle(peerId);
+        } catch (_) {}
       }
       
       widget.onComplete(seed, avatarName);
@@ -334,7 +341,7 @@ class _RecoveryDialogState extends State<_RecoveryDialog> {
             ),
             SizedBox(height: 12),
             Text(
-              "Your peer ID and i@ handle (if registered) will be shown after recovery.",
+              "Your peer ID and i@ handle (if registered) will be restored automatically after login.",
               style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 11),
               textAlign: TextAlign.center,
             ),

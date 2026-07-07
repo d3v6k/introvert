@@ -55,7 +55,7 @@ impl RewardTracker {
                 last_claim_timestamp: 0,
             })),
             storage,
-            threshold: 10_000_000_000,
+            threshold: 100_000_000, // 100 MB — lowered from 10 GB for small network viability
             cooldown_secs: 300,
             start_time: std::time::Instant::now(),
             shared_metrics,
@@ -236,6 +236,34 @@ impl RewardTracker {
         let state = self.state.read();
         state.pending_daily_reward_nano_intr as f64 / 1_000_000_000.0
     }
+
+    /// Atomically drains pending daily rewards for on-chain claim.
+    /// Returns (nano_intr_amount, proof_bytes). Returns None if no rewards pending.
+    /// The proof is a JSON payload signed by the node, identifying this as a daily reward claim.
+    pub fn drain_daily_rewards_for_claim(&self, provider_pubkey: &str) -> Option<(u64, Vec<u8>)> {
+        let mut state = self.state.write();
+        let nano_intr = state.pending_daily_reward_nano_intr;
+        if nano_intr == 0 {
+            return None;
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let proof = serde_json::json!({
+            "claim_type": "daily_reward",
+            "provider_pubkey": provider_pubkey,
+            "amount_nano_intr": nano_intr,
+            "timestamp": now,
+        });
+
+        let proof_bytes = serde_json::to_vec(&proof).ok()?;
+        // Atomically clear the pending pool
+        state.pending_daily_reward_nano_intr = 0;
+        Some((nano_intr, proof_bytes))
+    }
 }
 
 
@@ -251,11 +279,8 @@ pub struct TelemetryData {
 impl RewardTracker {
     /// Packages current activity metrics into a TelemetryData for the RBN.
     pub fn package_telemetry(&self, peer_id: &str) -> TelemetryData {
-        let state = self.state.read();
-        let mut metrics = *self.shared_metrics.read();
-        // Overlay relay_bytes and uptime from RewardTracker (more accurate for these)
-        metrics[7] = state.outbound_relayed_bytes;
-        metrics[8] = state.uptime_seconds;
+        let metrics = *self.shared_metrics.read();
+        // Use daily-capped values from shared_metrics, not lifetime totals.
         TelemetryData {
             peer_id: peer_id.to_string(),
             metrics,
@@ -316,11 +341,10 @@ impl RewardTracker {
         use ed25519_dalek::Signer;
         use sha2::{Sha256, Digest};
         
-        let state = self.state.read();
-        let mut metrics = *self.shared_metrics.read();
-        // Overlay relay_bytes and uptime from RewardTracker (more accurate for these)
-        metrics[7] = state.outbound_relayed_bytes;
-        metrics[8] = state.uptime_seconds;
+        let metrics = *self.shared_metrics.read();
+        // Use daily-capped values from shared_metrics (written by DailyRewardEngine).
+        // Do NOT overlay with lifetime totals from RewardTracker — that would inflate
+        // relay bytes and uptime in the telemetry envelope.
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

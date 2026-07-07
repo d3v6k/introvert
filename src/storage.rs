@@ -1184,7 +1184,7 @@ impl StorageService {
     /// Records mailbox storage usage (bytes-seconds) for the current day.
     pub fn record_mailbox_storage(&self, bytes: u64) -> Result<()> {
         let conn = self.conn.lock();
-        let date = Utc::now().format("%Y-%m-%d").to_string();
+        let date = crate::economy::daily_rewards::economy_today();
         
         conn.execute(
             "INSERT INTO mailbox_stats (date, storage_bytes_seconds) 

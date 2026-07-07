@@ -70,6 +70,7 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         IntrovertFirebaseMessagingService.isAppInForeground = true
         forwardPendingFcmToken()
+        forwardPendingWakeup()
     }
 
     override fun onPause() {
@@ -91,6 +92,24 @@ class MainActivity : FlutterActivity() {
             .invokeMethod("onPushNotification", hashMapOf("fcm_token" to pendingToken))
 
         prefs.edit().remove("pending_fcm_token").apply()
+    }
+
+    /**
+     * Check for a pending wakeup flag (set by FCM service) and trigger mailbox fetch.
+     */
+    private fun forwardPendingWakeup() {
+        val prefs = getSharedPreferences("introvert_fcm", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("pending_wakeup", false)) return
+
+        prefs.edit().putBoolean("pending_wakeup", false).apply()
+        Log.d("IntrovertFCM", "Forwarding pending wakeup to Flutter")
+        try {
+            val flutterEngine = flutterEngine ?: return
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+                .invokeMethod("onWakeup", null)
+        } catch (e: Exception) {
+            Log.w("IntrovertFCM", "Failed to forward wakeup: ${e.message}")
+        }
     }
 
     /**
@@ -124,6 +143,12 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // Wire IntrovertService wakeup to Flutter MethodChannel
+        IntrovertService.onWakeupCallback = {
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+                .invokeMethod("onWakeup", null)
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->

@@ -18,6 +18,12 @@ class IntrovertService : Service() {
     private val NOTIFICATION_ID = 1001
     private var wakeLock: PowerManager.WakeLock? = null
 
+    companion object {
+        // Static callback set by MainActivity when Flutter engine is ready.
+        // Used to invoke MethodChannel calls from the service.
+        var onWakeupCallback: (() -> Unit)? = null
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -39,6 +45,18 @@ class IntrovertService : Service() {
             acquireWakeLock()
         } else {
             releaseWakeLock()
+        }
+
+        // Check for pending wakeup from FCM push — trigger mailbox fetch via Flutter
+        val prefs = getSharedPreferences("introvert_fcm", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("pending_wakeup", false)) {
+            prefs.edit().putBoolean("pending_wakeup", false).apply()
+            Log.d("IntrovertService", "Pending wakeup detected — invoking onWakeup callback")
+            try {
+                onWakeupCallback?.invoke()
+            } catch (e: Exception) {
+                Log.e("IntrovertService", "onWakeup callback failed: ${e.message}")
+            }
         }
 
         return START_STICKY

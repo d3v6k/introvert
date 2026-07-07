@@ -197,9 +197,9 @@ async fn main() -> anyhow::Result<()> {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
-                "https://api.devnet.solana.com",
-                "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
-                "https://api.introvert.network/claim",
+                "https://api.mainnet-beta.solana.com",
+                "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy",
+                "https://api.introvert.network/v1/treasury/claim",
             ) {
                 Ok(c) => c,
                 Err(e) => {
@@ -272,9 +272,9 @@ async fn main() -> anyhow::Result<()> {
             });
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
-                "https://api.devnet.solana.com",
-                "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
-                "https://api.introvert.network/claim",
+                "https://api.mainnet-beta.solana.com",
+                "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy",
+                "https://api.introvert.network/v1/treasury/claim",
             ) {
                 Ok(c) => std::sync::Arc::new(c),
                 Err(e) => {

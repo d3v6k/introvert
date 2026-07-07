@@ -48,6 +48,26 @@ pub const DAILY_REWARD_ESCROW: &str = "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4
 // Token Generation Event date — used to calculate emission year
 pub const TGE_DATE: &str = "2026-01-01";
 
+// Cycle transition hour (UTC). Cycles roll over at 12:00 UTC instead of midnight
+// so operators in US/EU timezones can monitor the transition live.
+const CYCLE_TRANSITION_HOUR_UTC: i64 = 12;
+
+/// Returns the current economy day string (e.g., "2026-07-07").
+/// Shifts by CYCLE_TRANSITION_HOUR_UTC so the cycle rolls over at noon UTC.
+pub fn economy_today() -> String {
+    let now = Utc::now();
+    let shifted = now - chrono::Duration::hours(CYCLE_TRANSITION_HOUR_UTC);
+    shifted.format("%Y-%m-%d").to_string()
+}
+
+/// Returns the current economy epoch ID for telemetry (e.g., "2026_07_07").
+/// Same shift as economy_today() but uses underscore format for telemetry protocol.
+pub fn economy_epoch_id() -> String {
+    let now = Utc::now();
+    let shifted = now - chrono::Duration::hours(CYCLE_TRANSITION_HOUR_UTC);
+    shifted.format("%Y_%m_%d").to_string()
+}
+
 // 10-year emission schedule: daily user pool caps ($INTR/day)
 // From the whitepaper: Year 1 = 16,438/day, 20% annual decay
 // Year N daily cap = 16438 * (0.8 ^ (N-1))
@@ -214,7 +234,7 @@ impl Default for AntiGamingConfig {
             require_foreground: true,
             grace_period_secs: 30,
             reject_self_messaging: true,
-            min_unique_peers: 2,
+            min_unique_peers: 1, // Lowered from 2: allows 2-peer networks to earn rewards
             max_messages_per_peer: 50,
         }
     }
@@ -410,6 +430,10 @@ struct DailyRewardState {
     is_edge_node: bool,
     prestige_tier: u8,
     active_containers_highwater: u32,
+    /// RBN-reported network-wide total points (from TelemetryAck).
+    /// When fresh (< 48h), overrides the static 100K ceiling entirely.
+    rbn_reported_total_points: f64,
+    last_rbn_estimate_timestamp: u64,
 }
 
 impl DailyRewardState {
@@ -427,6 +451,8 @@ impl DailyRewardState {
             is_edge_node: false,
             prestige_tier: 0,
             active_containers_highwater: 0,
+            rbn_reported_total_points: 0.0,
+            last_rbn_estimate_timestamp: 0,
         }
     }
 }
@@ -459,7 +485,7 @@ impl DailyRewardEngine {
         };
 
         // Resume any in-progress cycle from DB
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = economy_today();
         if let Ok(Some(cycle)) = engine.storage.load_daily_cycle(&today) {
             let mut state = engine.state.write();
             state.current_cycle = Some(cycle);
@@ -524,9 +550,15 @@ impl DailyRewardEngine {
             prev.total_points = social_capped + infra_points;
             prev.capped_points = prev.total_points;
 
+            // Compute unique peers and eligibility BEFORE reward formula
+            prev.unique_peers = state.unique_peers.len() as u32;
+            prev.is_eligible = prev.unique_peers >= anti.min_unique_peers && prev.capped_points > 0.0;
+
+            // Dynamic global estimate with RBN freshness bypass
+            let global_estimate = Self::compute_effective_global_estimate(&state, &weights);
+
             // CRITICAL: Use pool-isolated clearing
             let effective_pool = if is_rbn { self.get_rbn_daily_pool_cap() } else { self.get_daily_pool_cap() };
-            let global_estimate = state.global_points_estimate.max(1.0);
             let user_share = prev.total_points / global_estimate;
             let prestige_mult = match state.prestige_tier {
                 0 => 1.0,
@@ -541,9 +573,6 @@ impl DailyRewardEngine {
             // Deterministic rounding: truncate to 6 decimal places
             let raw_reward = user_share * effective_pool * prestige_mult;
             prev.intr_reward = (raw_reward * 1_000_000.0).trunc() / 1_000_000.0;
-
-            prev.unique_peers = state.unique_peers.len() as u32;
-            prev.is_eligible = prev.unique_peers >= anti.min_unique_peers && prev.capped_points > 0.0;
             prev.eligibility_reason = if !prev.is_eligible {
                 format!("unique_peers={} < min={}", prev.unique_peers, anti.min_unique_peers)
             } else {
@@ -786,6 +815,42 @@ impl DailyRewardEngine {
         state.global_points_estimate = estimate.max(1.0); // prevent division by zero
     }
 
+    /// Accepts an RBN-reported network-wide total from a TelemetryAck.
+    /// This value is cached and used to bypass the static 100K ceiling for 48 hours,
+    /// preventing reward dilution in small test clusters.
+    pub fn accept_rbn_estimate(&self, total_points: f64, timestamp: u64) {
+        let mut state = self.state.write();
+        if total_points > 0.0 {
+            state.rbn_reported_total_points = total_points;
+            state.last_rbn_estimate_timestamp = timestamp;
+            info!("[DailyRewards] RBN estimate accepted: {:.1} total points at {}", total_points, timestamp);
+        }
+    }
+
+    /// Computes the effective global points estimate, bypassing the static ceiling
+    /// when fresh RBN data is available (within 48 hours).
+    fn compute_effective_global_estimate(state: &DailyRewardState, weights: &ActivityWeights) -> f64 {
+        const RBN_ESTIMATE_FRESHNESS_SECS: u64 = 48 * 3600; // 48 hours
+
+        let now = Utc::now().timestamp() as u64;
+        let rbn_age = now.saturating_sub(state.last_rbn_estimate_timestamp);
+
+        // Dynamic estimate from observed peers (small-network floor)
+        let observed_network_size = (state.unique_peers.len() as f64) + 1.0;
+        let dynamic_estimate = observed_network_size * weights.daily_point_cap;
+
+        if rbn_age < RBN_ESTIMATE_FRESHNESS_SECS && state.rbn_reported_total_points > 0.0 {
+            // RBN data is fresh: use the larger of RBN-reported or dynamic
+            // This bypasses the static 100K ceiling entirely
+            let effective = state.rbn_reported_total_points.max(dynamic_estimate).max(1.0);
+            info!("[DailyRewards] Using fresh RBN estimate: {:.1} (age={}s, dynamic={:.1})", effective, rbn_age, dynamic_estimate);
+            effective
+        } else {
+            // No fresh RBN data: fall back to max(dynamic, static)
+            dynamic_estimate.max(state.global_points_estimate).max(1.0)
+        }
+    }
+
     /// Sets the RBN status for this node. RBN operators draw from the RBN pool.
     pub fn set_rbn_status(&self, is_rbn: bool) {
         let mut state = self.state.write();
@@ -805,25 +870,25 @@ impl DailyRewardEngine {
     }
 
     /// Returns the emission year (1-based) since TGE.
+    /// Uses the canonical `current_emission_year()` from ledger_cron (0-based) and adds 1.
     pub fn get_emission_year(&self) -> u32 {
-        let tge = NaiveDate::parse_from_str(TGE_DATE, "%Y-%m-%d").unwrap_or(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
-        let today = Utc::now().date_naive();
-        let days = today.signed_duration_since(tge).num_days().max(0);
-        ((days / 365) + 1) as u32
+        crate::economy::ledger_cron::current_emission_year() + 1
     }
 
     /// Returns the daily user pool cap for the current emission year.
     /// Formula: YEAR_1_DAILY_POOL * (ANNUAL_DECAY ^ (year - 1))
+    /// Uses 0-based exponent from ledger_cron::current_emission_year() directly.
     pub fn get_daily_pool_cap(&self) -> f64 {
-        let year = self.get_emission_year();
-        YEAR_1_DAILY_POOL * ANNUAL_DECAY.powi((year - 1) as i32)
+        let years_since_tge = crate::economy::ledger_cron::current_emission_year();
+        YEAR_1_DAILY_POOL * ANNUAL_DECAY.powi(years_since_tge as i32)
     }
 
     /// Returns the daily RBN pool cap for the current emission year.
-    /// Formula: YEAR_1_RBN_DAILY_POOL * (ANNUAL_DECAY ^ (year - 1))
+    /// Formula: YEAR_1_RBN_DAILY_POOL * (ANNUAL_DECAY ^ years_since_tge)
+    /// Uses 0-based exponent from ledger_cron::current_emission_year() directly.
     pub fn get_rbn_daily_pool_cap(&self) -> f64 {
-        let year = self.get_emission_year();
-        YEAR_1_RBN_DAILY_POOL * ANNUAL_DECAY.powi((year - 1) as i32)
+        let years_since_tge = crate::economy::ledger_cron::current_emission_year();
+        YEAR_1_RBN_DAILY_POOL * ANNUAL_DECAY.powi(years_since_tge as i32)
     }
 
     /// Calculates the user's current INTR earnings for today.
@@ -873,9 +938,9 @@ impl DailyRewardEngine {
         // CRITICAL: RBN operators draw from RBN pool, standard users from user pool
         let effective_pool = if is_rbn { rbn_daily_pool } else { daily_pool };
 
-        // Use dynamic global points estimate (updated from network data)
-        // In production, this should be split into pool-specific estimates
-        let global_estimate = state.global_points_estimate;
+        // Dynamic global estimate with RBN freshness bypass
+        let global_estimate = Self::compute_effective_global_estimate(&state, &weights);
+        let unique_peers = state.unique_peers.len() as u32;
 
         // User's share of the daily pool
         let user_share = if global_estimate > 0.0 {
@@ -901,8 +966,6 @@ impl DailyRewardEngine {
         let raw_earned = user_share * effective_pool * prestige_mult;
         let intr_earned_f64 = (raw_earned * 1_000_000.0).trunc() / 1_000_000.0;
         let intr_earned_nano: u64 = (intr_earned_f64 * 1_000_000_000.0) as u64;
-
-        let unique_peers = state.unique_peers.len() as u32;
 
         serde_json::json!({
             "intr_earned_today_nano": intr_earned_nano,

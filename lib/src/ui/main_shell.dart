@@ -265,22 +265,22 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
       // App is losing focus/backgrounding: enter idle mode
-      final bool needsStayAwake = _client.isAnchorModeEnabled() || !BackgroundSyncService.instance.pushAvailable;
-      AlertService.startBackgroundService(awake: needsStayAwake);
+      // Always acquire wake lock to prevent Doze mode from suspending the network loop.
+      // Without this, Android can freeze the Tokio runtime and the 15-second status check stops.
+      AlertService.startBackgroundService(awake: true);
       BackgroundSyncService.instance.enterIdleMode();
     } else if (state == AppLifecycleState.resumed) {
       // Return to foreground: exit idle mode
       AlertService.stopBackgroundService();
       BackgroundSyncService.instance.exitIdleMode();
       
-      // Pre-warm connections: trigger IntroClaw tick to refresh connections
-      Future.delayed(Duration(seconds: 1), () {
-        try {
-          final isMobile = _lastConnectivity == ConnectivityResult.mobile;
-          _client.triggerIntroClawTick(isMobileData: isMobile);
-          _chatsKey.currentState?._loadContacts();
-        } catch (_) {}
-      });
+      // Immediately trigger IntroClaw tick to refresh connections — no delay.
+      // The 1-second delay caused 30-90s of "Connecting"/"Offline" after resume.
+      try {
+        final isMobile = _lastConnectivity == ConnectivityResult.mobile;
+        _client.triggerIntroClawTick(isMobileData: isMobile);
+        _chatsKey.currentState?._loadContacts();
+      } catch (_) {}
     }
 
     if (state == AppLifecycleState.detached) {
@@ -554,6 +554,32 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           _client.acceptCall(peerId, 3); // media_type 3 = data channel only
         } catch (e) {
           debugPrint("Error auto-accepting file transfer WebRTC: $e");
+        }
+      } else if (event.type == 37) {
+        // Event 37: Peer Handle Restored from DHT (ph_<peer_id> → handle)
+        // If this is our own peer ID, persist the handle to our profile.
+        try {
+          final parts = utf8.decode(event.data).split('\x00');
+          if (parts.length >= 2) {
+            final targetPeerId = parts[0];
+            final handle = parts[1];
+            final myPeerId = _client.getPeerId();
+            if (targetPeerId == myPeerId && handle.isNotEmpty) {
+              debugPrint("✅ Handle restored from mesh: $handle");
+              final profile = _client.getProfile();
+              _client.setProfile(
+                profile['name'] as String?,
+                handle,
+                profile['avatar'] as String?,
+                (profile['privacy'] as int?) ?? 1,
+              );
+              if (mounted && !_isDisposing) {
+                setState(() {});
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint("Error handling Event 37 (handle restored): $e");
         }
       } else if (event.type == 10) {
         // Event 10: Local Node Status
