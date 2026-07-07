@@ -471,6 +471,14 @@ impl StorageService {
             )", []
         )?;
 
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS local_telemetry (
+                epoch_id TEXT PRIMARY KEY,
+                envelope_json TEXT NOT NULL,
+                is_synced INTEGER NOT NULL DEFAULT 0
+            )", []
+        );
+
         // Migrations: All ALTER TABLE ADD COLUMN failures are intentionally discarded
         // because they succeed on first run and fail with "duplicate column" on subsequent runs.
         let _ = conn.execute("ALTER TABLE profile ADD COLUMN handle TEXT", []);
@@ -2986,6 +2994,17 @@ impl StorageService {
         Ok(())
     }
 
+    /// Save a single activity type immediately (called on each record_activity).
+    /// Uses INSERT OR REPLACE on (cycle_date, activity_type) — idempotent.
+    pub fn save_single_activity(&self, date: &str, activity_type: u8, raw_count: u64, capped_count: u64) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO daily_activity_log (cycle_date, activity_type, raw_count, capped_count, points) VALUES (?1, ?2, ?3, ?4, 0.0)",
+            params![date, activity_type, raw_count as i64, capped_count as i64],
+        )?;
+        Ok(())
+    }
+
     pub fn load_daily_activities(&self, date: &str) -> Result<Vec<crate::economy::daily_rewards::DailyActivityCount>> {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
@@ -3203,6 +3222,42 @@ impl StorageService {
         let mut result = Vec::new();
         for row in rows {
             result.push(row?);
+        }
+        Ok(result)
+    }
+
+    /// Save local telemetry envelope JSON
+    pub fn save_local_telemetry(&self, epoch_id: &str, envelope_json: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO local_telemetry (epoch_id, envelope_json, is_synced) VALUES (?1, ?2, 0)",
+            params![epoch_id, envelope_json],
+        )?;
+        Ok(())
+    }
+
+    /// Mark local telemetry as synced
+    pub fn mark_local_telemetry_synced(&self, epoch_id: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE local_telemetry SET is_synced = 1 WHERE epoch_id = ?1",
+            params![epoch_id],
+        )?;
+        Ok(())
+    }
+
+    /// Fetch all unsynced local telemetry envelopes
+    pub fn fetch_unsynced_local_telemetry(&self) -> Result<Vec<(String, String)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT epoch_id, envelope_json FROM local_telemetry WHERE is_synced = 0"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+        let mut result = Vec::new();
+        for r in rows {
+            result.push(r?);
         }
         Ok(result)
     }

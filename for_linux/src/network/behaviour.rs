@@ -54,9 +54,9 @@ impl IntrovertBehaviour {
         
         let mut kademlia = kad::Behaviour::with_config(peer_id, MemoryStore::new(peer_id), kad_config);
         
-        // DEFAULT TO CLIENT MODE: Only RBNs/Anchors should be DHT servers.
-        // This prevents mobile devices from being hammered by global DHT queries.
-        kademlia.set_mode(Some(kad::Mode::Client));
+        // Set Kademlia mode: RBNs/relay servers must be in Server mode to answer queries,
+        // while client edge nodes default to Client mode to conserve resources.
+        kademlia.set_mode(Some(if enable_relay_server { kad::Mode::Server } else { kad::Mode::Client }));
         
         let rr_config = request_response::Config::default()
             .with_request_timeout(std::time::Duration::from_secs(20)); // 20s is enough for relay latency without causing long stalls

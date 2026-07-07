@@ -231,12 +231,19 @@ impl RewardTracker {
             String::new()
         };
 
-        // Build message to sign: epoch_id + metrics + timestamp
+        // Build message to sign: epoch_id || peer_id || solana_wallet || solana_ata ||
+        // metrics[0..13] || is_rbn || is_edge_node || prestige_tier || timestamp
         let mut message = Vec::new();
         message.extend_from_slice(epoch_id.as_bytes());
+        message.extend_from_slice(peer_id.as_bytes());
+        message.extend_from_slice(solana_wallet.as_bytes());
+        message.extend_from_slice(solana_ata.as_bytes());
         for m in &metrics {
             message.extend_from_slice(&m.to_le_bytes());
         }
+        message.push(is_rbn as u8);
+        message.push(is_edge_node as u8);
+        message.push(prestige_tier);
         message.extend_from_slice(&timestamp.to_le_bytes());
 
         // Sign with Ed25519

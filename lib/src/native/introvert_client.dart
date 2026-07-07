@@ -234,6 +234,9 @@ typedef IntrovertNetworkCancelFileTransferDart = FfiResult Function(Pointer<Utf8
 typedef IntrovertNetworkForceRefreshC = FfiResult Function();
 typedef IntrovertNetworkForceRefreshDart = FfiResult Function();
 
+typedef IntrovertSendManualTelemetryC = FfiResult Function();
+typedef IntrovertSendManualTelemetryDart = FfiResult Function();
+
 // --- Intro-Claw AI Engine Mode ---
 typedef IntroClawGetAiModeC = Int32 Function();
 typedef IntroClawGetAiModeDart = int Function();
@@ -637,6 +640,7 @@ class IntrovertClient {
   late IntrovertNetworkSendFileDart _sendFile;
   late IntrovertNetworkCancelFileTransferDart _cancelFileTransfer;
   late IntrovertNetworkForceRefreshDart _forceNetworkRefresh;
+  late IntrovertSendManualTelemetryDart _sendManualTelemetry;
   late IntrovertGroupCreateDart _groupCreate;
   late IntrovertGroupSendMessageDart _groupSendMessage;
   late IntrovertGroupGetAllDart _groupGetAll;
@@ -747,6 +751,9 @@ class IntrovertClient {
 
   final StreamController<Map<String, dynamic>> _swarmStatsStreamController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get swarmStatsStream => _swarmStatsStreamController.stream;
+
+  final StreamController<Map<String, dynamic>> _telemetryAckStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get telemetryAckStream => _telemetryAckStreamController.stream;
 
   // --- In-App Rust Debug Log Ring Buffer ---
   // Captures event-99 (Rust debug) messages so they can be saved/copied on-device
@@ -900,6 +907,16 @@ class IntrovertClient {
           if (!_swarmStatsStreamController.isClosed) _swarmStatsStreamController.add(json.decode(jsonStr) as Map<String, dynamic>);
         } catch (e) {
           debugPrint("❌ Error decoding swarm stats: $e");
+        } finally {
+          _freeBinary(dataPtr, dataLen);
+        }
+      } else if (eventType == 41) { // Telemetry Acknowledgment (separate from Event 40 = Message Reactions)
+        try {
+          final data = castedPtr.asTypedList(dataLen);
+          final jsonStr = utf8.decode(data);
+          if (!_telemetryAckStreamController.isClosed) _telemetryAckStreamController.add(json.decode(jsonStr) as Map<String, dynamic>);
+        } catch (e) {
+          debugPrint("❌ Error decoding telemetry ack: $e");
         } finally {
           _freeBinary(dataPtr, dataLen);
         }
@@ -1064,6 +1081,7 @@ class IntrovertClient {
       _sendFile = safeLookup('send_file', () => _dylib.lookupFunction<IntrovertNetworkSendFileC, IntrovertNetworkSendFileDart>('introvert_network_send_file'), (p, f, g) => FfiResult.dummy);
       _cancelFileTransfer = safeLookup('cancel_file', () => _dylib.lookupFunction<IntrovertNetworkCancelFileTransferC, IntrovertNetworkCancelFileTransferDart>('introvert_network_cancel_file_transfer'), (id) => FfiResult.dummy);
       _forceNetworkRefresh = safeLookup('force_refresh', () => _dylib.lookupFunction<IntrovertNetworkForceRefreshC, IntrovertNetworkForceRefreshDart>('introvert_network_force_refresh'), () => FfiResult.dummy);
+      _sendManualTelemetry = safeLookup('send_manual_telemetry', () => _dylib.lookupFunction<IntrovertSendManualTelemetryC, IntrovertSendManualTelemetryDart>('introvert_send_manual_telemetry'), () => FfiResult.dummy);
       _setConnectivityType = safeLookup('set_connectivity_type', () => _dylib.lookupFunction<IntrovertNetworkSetConnectivityTypeC, IntrovertNetworkSetConnectivityTypeDart>('introvert_network_set_connectivity_type'), (type) => FfiResult.dummy);
       _groupCreate = safeLookup('group_create', () => _dylib.lookupFunction<IntrovertGroupCreateC, IntrovertGroupCreateDart>('introvert_group_create'), (n, d, m) => FfiResult.dummy);
       _groupSendMessage = safeLookup('group_send', () => _dylib.lookupFunction<IntrovertGroupSendMessageC, IntrovertGroupSendMessageDart>('introvert_group_send_message'), (g, m, r) => FfiResult.dummy);
@@ -1174,6 +1192,13 @@ class IntrovertClient {
 
   void forceNetworkRefresh() {
     _forceNetworkRefresh();
+  }
+
+  /// Manually trigger telemetry send to RBN for the current epoch cycle.
+  /// Returns true if the command was dispatched successfully.
+  bool sendManualTelemetry() {
+    final result = _sendManualTelemetry();
+    return result.code == 0;
   }
 
   // Inform native layer of current connectivity type (0=unknown,1=wifi,2=mobile,3=ethernet,4=bluetooth)
@@ -1458,6 +1483,7 @@ class IntrovertClient {
     _transferStreamController.close();
     _economyStreamController.close();
     _swarmStatsStreamController.close();
+    _telemetryAckStreamController.close();
   }
 
   void driveAddFile(String name, String hash, String mime, int size, String path) {

@@ -303,7 +303,7 @@ pub extern "C" fn introvert_engine_start(
     };
 
     // Shared metrics bridge: DailyRewardEngine writes, RewardTracker reads for telemetry
-    let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 9]));
+    let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 13]));
 
     let reward_tracker = Arc::new(RewardTracker::new(Some(Arc::clone(&storage)), shared_metrics.clone()));
 
@@ -552,6 +552,11 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
                     let (v, m) = solana.fetch_node_tier_profile(&my_pubkey).await;
                     CACHED_DIAG_VISIBLE = v;
                     CACHED_ALLOC_MULT = m;
+
+                    // Persist activities every 5 minutes (10 ticks) to survive restarts
+                    if let Some(ref daily) = daily_engine {
+                        daily.persist_current_activities();
+                    }
                 }
             }
 
@@ -727,6 +732,23 @@ pub extern "C" fn introvert_network_force_refresh() -> FfiResult {
             let tx_clone = tx.clone();
             engine.runtime.spawn(async move {
                 let _ = tx_clone.send(NetworkCommand::ForceMeshRefresh).await;
+            });
+            return FfiResult::success();
+        }
+    }
+    FfiResult::error(-1, "Network not started")
+}
+
+/// Manually trigger telemetry send to RBN for the current epoch cycle.
+/// This packages the current activity metrics and sends them to the connected RBN.
+#[no_mangle]
+pub extern "C" fn introvert_send_manual_telemetry() -> FfiResult {
+    let engine_lock = ENGINE.read();
+    if let Some(engine) = engine_lock.as_ref() {
+        if let Some(ref tx) = *engine.network_tx.read() {
+            let tx_clone = tx.clone();
+            engine.runtime.spawn(async move {
+                let _ = tx_clone.send(NetworkCommand::SendManualTelemetry).await;
             });
             return FfiResult::success();
         }

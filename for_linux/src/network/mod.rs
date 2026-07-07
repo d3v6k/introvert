@@ -209,6 +209,28 @@ pub enum SignalingPayload {
         #[serde(default)]
         is_relay: bool,
     },
+    /// Client telemetry submission for reward processing
+    TelemetryEnvelope {
+        peer_id: String,
+        solana_wallet: String,
+        solana_ata: String,
+        epoch_id: String,
+        metrics: [u64; 13],
+        unique_peers: Vec<String>,
+        is_rbn: bool,
+        is_edge_node: bool,
+        prestige_tier: u8,
+        proof_hash: String,
+        client_signature: Vec<u8>,
+        timestamp: u64,
+    },
+    /// RBN acknowledgment that telemetry was received and processed
+    TelemetryAck {
+        peer_id: String,
+        epoch_id: String,
+        total_points: f64,
+        timestamp: u64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -402,7 +424,26 @@ pub struct NetworkService {
     /// Relay hints from FileChunkRequest: peer_id -> RBN peer_id they're behind
     /// Used to prioritize which RBN to dial when sending file chunks
     relay_hints: HashMap<PeerId, PeerId>,
+    /// Local node operator's Solana public key (derived from identity seed)
+    /// Used for lease validation — the node must have >= 100K INTR to operate
+    operator_pubkey: solana_sdk::pubkey::Pubkey,
+    /// Maps PeerId to their known solana_wallet (learned from telemetry or identify)
+    /// Used by the Passive Telemetry-Correlation Engine
+    peer_solana_wallets: HashMap<PeerId, String>,
+    /// Tracks when each PeerId last used relay bandwidth (FileChunk, circuit, etc.)
+    /// Used to detect tokenless forks that consume relay resources without authenticating
+    peer_relay_activity: HashMap<PeerId, Instant>,
+    /// Reference to the economy reward engine for telemetry correlation checks
+    reward_engine: Arc<crate::economy::daily_rewards::RbnDailyRewardEngine>,
 }
+
+/// Whether to actively block tokenless forks or just log them.
+/// false = Launch Phase (log only), true = Enforcement (block after 6 months)
+// TODO: Toggle ENFORCE_FORK_GUARD to true after 6 months to automatically activate the network blacklist
+const ENFORCE_FORK_GUARD: bool = false;
+
+/// Duration without authenticated telemetry before a wallet is flagged as a potential fork
+const FORK_DETECTION_THRESHOLD: Duration = Duration::from_secs(72 * 3600); // 72 hours
 
 #[derive(Debug, Clone)]
 struct PendingDiagnostic {
@@ -430,6 +471,8 @@ impl NetworkService {
         liveness_interval_secs: u64,
         downloads_dir: String,
         is_stress_test: bool,
+        operator_pubkey: solana_sdk::pubkey::Pubkey,
+        reward_engine: Arc<crate::economy::daily_rewards::RbnDailyRewardEngine>,
     ) -> anyhow::Result<Self> {
         let local_static_public = PublicKey::from(&local_static_secret);
         let local_peer_id = PeerId::from(keypair.public());
@@ -582,6 +625,10 @@ impl NetworkService {
             pending_manual_rbns: pending_manual_rbns.clone(),
             sync_in_progress: HashMap::new(),
             relay_hints: HashMap::new(),
+            operator_pubkey,
+            peer_solana_wallets: HashMap::new(),
+            peer_relay_activity: HashMap::new(),
+            reward_engine,
         };
 
         Ok(res)
@@ -664,6 +711,7 @@ impl NetworkService {
         let mut pull_retry_interval = tokio::time::interval(Duration::from_secs(4));
         let mut lease_interval = tokio::time::interval(Duration::from_secs(60 * 60));
         let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(10));
+        let mut fork_check_interval = tokio::time::interval(Duration::from_secs(6 * 3600)); // Every 6 hours
 
 
         let mut last_status = 0u8;
@@ -674,6 +722,35 @@ impl NetworkService {
                 _ = heartbeat_interval.tick() => {
                     let peers = self.swarm.connected_peers().count();
                     debug!("[Swarm Heartbeat] Connected peers: {}", peers);
+                }
+                _ = fork_check_interval.tick() => {
+                    // Passive Telemetry-Correlation Engine: Check for tokenless forks
+                    // that consume relay bandwidth without authenticating economy telemetry.
+                    let now = Instant::now();
+                    let stale_wallets: Vec<(PeerId, String)> = self.peer_solana_wallets.iter()
+                        .filter_map(|(peer_id, wallet)| {
+                            if let Some(last_activity) = self.peer_relay_activity.get(peer_id) {
+                                if now.duration_since(*last_activity) < FORK_DETECTION_THRESHOLD {
+                                    // This peer is actively using relay bandwidth
+                                    if !self.reward_engine.has_recent_telemetry(wallet, FORK_DETECTION_THRESHOLD) {
+                                        return Some((*peer_id, wallet.clone()));
+                                    }
+                                }
+                            }
+                            None
+                        })
+                        .collect();
+
+                    for (peer_id, wallet) in stale_wallets {
+                        if ENFORCE_FORK_GUARD {
+                            warn!("[ForkGuard] ENFORCING: Disconnecting tokenless fork {} (wallet: {})", peer_id, wallet);
+                            let _ = self.swarm.disconnect_peer_id(peer_id);
+                            self.peer_solana_wallets.remove(&peer_id);
+                            self.peer_relay_activity.remove(&peer_id);
+                        } else {
+                            info!("[ForkGuard] AUDIT-ONLY: Tokenless fork detected — {} (wallet: {}) has consumed relay bandwidth for >72h without authenticated telemetry. Traffic continues.", peer_id, wallet);
+                        }
+                    }
                 }
                 _ = fast_poll_interval.tick() => {
                     let has_active_incoming = self.incoming_transfers.values().any(|t| t.is_relayed);
@@ -796,10 +873,12 @@ impl NetworkService {
                 }
                 _ = status_check_interval.tick() => {
                     let connected_count = self.swarm.connected_peers().count();
+                    let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
+                    let has_confirmed_reservation = !self.relay_reservations.is_empty();
                     let current_status = if connected_count == 0 {
                         // Check if we have anchors but no peers
                         if self.discovered_anchors.is_empty() { 0u8 } else { 3u8 } // 0=Offline, 3=Syncing
-                    } else if self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit")) {
+                    } else if has_relay_listener || has_confirmed_reservation {
                         2u8 // Relay Ready
                     } else {
                         1u8 // Connected
@@ -830,7 +909,9 @@ impl NetworkService {
 
                         // VPN DETECTION: If reservations are empty but RBNs are connected,
                         // the VPN likely made reservations stale. Force-clear and re-dial.
-                        if self.relay_reservations.is_empty() {
+                        // BUT: if we have pending relay listeners (requested, not yet accepted),
+                        // don't force-disconnect — the reservation is still being established.
+                        if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
                             let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
                                 .filter(|(id, _)| self.swarm.is_connected(id))
                                 .map(|(id, _)| *id)
@@ -935,17 +1016,17 @@ impl NetworkService {
                 }
                 _ = lease_interval.tick() => {
                     let solana_client = Arc::clone(&self.solana_client);
-                    let local_pubkey = solana_client.get_treasury_pubkey();
+                    let local_pubkey = self.operator_pubkey;
                     if let Ok(balance) = solana_client.fetch_balance(&local_pubkey).await {
+                        let intr_balance = balance as f64 / 1_000_000_000.0;
                         if !self.reward_tracker.is_lease_valid(balance) {
-                            info!("[Economy] Identity Lease EXPIRED. Pruning node from mesh.");
-                            let local_peer_id = *self.swarm.local_peer_id();
-                            self.swarm.behaviour_mut().kademlia.remove_peer(&local_peer_id);
-                            let anchor_key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
-                            self.swarm.behaviour_mut().kademlia.stop_providing(&anchor_key);
-                            let _ = self.swarm.disconnect_peer_id(local_peer_id); 
-                            crate::dispatch_global_event(10, &[0]);
+                            // TODO: Re-enable strict lease pruning enforcement here after initial deployment phase
+                            info!("[Mesh] Operator lease check bypassed for bootstrap phase. Current balance: {:.2} INTR (under 100,000 INTR target).", intr_balance);
+                        } else {
+                            info!("[Mesh] Operator lease valid. Balance: {:.2} INTR.", intr_balance);
                         }
+                    } else {
+                        warn!("[Mesh] Failed to fetch operator balance for lease check.");
                     }
                 }
                 _ = republication_interval.tick() => {
@@ -1595,8 +1676,10 @@ impl NetworkService {
                                     }
                                 });
                             }
-                            libp2p::relay::client::Event::InboundCircuitEstablished { src_peer_id, .. } => {
+                             libp2p::relay::client::Event::InboundCircuitEstablished { src_peer_id, .. } => {
                                 debug!("[Relay] InboundCircuitEstablished from {}", src_peer_id);
+                                // Track relay activity for Passive Telemetry-Correlation Engine
+                                self.peer_relay_activity.insert(src_peer_id, Instant::now());
                                 // Trigger DCUtR hole-punch attempt for direct upgrade
                                 debug!("[DCUtR] Attempting direct upgrade for {}", src_peer_id);
                                 let _ = self.swarm.dial(src_peer_id);
@@ -2021,6 +2104,10 @@ impl NetworkService {
 
             SwarmEvent::ListenerError { listener_id, error, .. } => {
                 debug!("[Swarm] Listener error ({:?}): {:?}", listener_id, error);
+                if let Some(peer_id) = self.relay_listeners.remove(&listener_id) {
+                    info!("[Mesh] Relay listener error for {}. Clearing reservation record.", peer_id);
+                    self.relay_reservations.remove(&peer_id);
+                }
             }
             SwarmEvent::ListenerClosed { listener_id, reason, .. } => {
                 debug!("[Swarm] Listener closed ({:?}): {:?}", listener_id, reason);
@@ -2150,10 +2237,12 @@ impl NetworkService {
                // which wiped the RBN relay reservation and made us unreachable via relay.
                let is_rbn_or_anchor = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id)
                    || self.discovered_anchors.contains(&peer_id);
-               if is_rbn_or_anchor {
-                   self.relay_reservations.remove(&peer_id);
-                   info!("[Mesh] RBN/anchor {} disconnected. Cleared relay reservation.", peer_id);
-               }
+                if is_rbn_or_anchor {
+                    self.relay_reservations.remove(&peer_id);
+                    // Fix: Also clean relay_listeners to prevent stale listener false positives
+                    self.relay_listeners.retain(|_, rbn| rbn != &peer_id);
+                    info!("[Mesh] RBN/anchor {} disconnected. Cleared relay reservation and listeners.", peer_id);
+                }
                self.inflight_requests.remove(&peer_id);
 
                let pc = { let mut pcs = self.peer_connections.write(); pcs.remove(&peer_id) };
@@ -4250,6 +4339,9 @@ impl NetworkService {
                 crate::dispatch_global_event(2, &data);
             }
             SignalingPayload::FileChunkRequest { transfer_id, chunk_index, chunk_size, relay_hint } => {
+                // Track relay activity for Passive Telemetry-Correlation Engine
+                self.peer_relay_activity.insert(peer, Instant::now());
+
                 if let Some(ref hint) = relay_hint {
                     info!("[Mesh] Received chunk request for {} (index {}) from {} (relay_hint: {})", transfer_id, chunk_index, peer, &hint[..16.min(hint.len())]);
                     // Store relay hint for this peer to prioritize when sending chunks back
@@ -5276,7 +5368,12 @@ impl NetworkService {
                     let name = peer_identity.global_name.clone().unwrap_or_else(|| "Unknown".to_string());
                     let handle = peer_identity.handle.clone().unwrap_or_default();
                     let avatar = peer_identity.avatar_base64.clone();
-                    
+
+                    // Track wallet mapping for Passive Telemetry-Correlation Engine
+                    if let Ok(pid) = peer_id.parse::<PeerId>() {
+                        self.peer_solana_wallets.insert(pid, peer_identity.solana_address.clone());
+                    }
+
                     let storage = Arc::clone(&self.storage);
                     tokio::task::spawn_blocking(move || {
                         let _ = storage.upsert_sovereign_contact(&peer_identity, false, true);
@@ -5298,7 +5395,12 @@ impl NetworkService {
                 let peer_id = peer_identity.peer_id.clone();
                 let name = peer_identity.global_name.clone().unwrap_or_else(|| "Unknown".to_string());
                 let handle = peer_identity.handle.clone().unwrap_or_default();
-                
+
+                // Track wallet mapping for Passive Telemetry-Correlation Engine
+                if let Ok(pid) = peer_id.parse::<PeerId>() {
+                    self.peer_solana_wallets.insert(pid, peer_identity.solana_address.clone());
+                }
+
                 let storage = Arc::clone(&self.storage);
                 tokio::task::spawn_blocking(move || {
                     let _ = storage.upsert_sovereign_contact(&peer_identity, true, false);
@@ -5499,13 +5601,66 @@ impl NetworkService {
                 data.push(1); // 1 = typing started
                 crate::dispatch_global_event(39, &data);
             }
-            SignalingPayload::TypingStop { chat_id: _ } => {
+             SignalingPayload::TypingStop { chat_id: _ } => {
                 let peer_bytes = peer.to_string().into_bytes();
                 let mut data = peer_bytes;
                 data.push(0); // 0 = typing stopped
                 crate::dispatch_global_event(39, &data);
             }
-            _ => {}
+            SignalingPayload::TelemetryEnvelope {
+                peer_id,
+                solana_wallet,
+                solana_ata,
+                epoch_id,
+                metrics,
+                unique_peers,
+                is_rbn,
+                is_edge_node,
+                prestige_tier,
+                proof_hash,
+                client_signature,
+                timestamp,
+            } => {
+                info!("[Economy] ✅ Received TelemetryEnvelope from {} (peer {}, wallet {}) — ts={}", peer_id, peer, solana_wallet, timestamp);
+
+                let envelope = crate::economy::daily_rewards::TelemetryEnvelope {
+                    peer_id: peer_id.clone(),
+                    solana_wallet: solana_wallet.clone(),
+                    solana_ata: solana_ata.clone(),
+                    epoch_id: epoch_id.clone(),
+                    metrics,
+                    unique_peers: unique_peers.clone(),
+                    is_rbn,
+                    is_edge_node,
+                    prestige_tier,
+                    proof_hash: proof_hash.clone(),
+                    client_signature: client_signature.clone(),
+                    timestamp,
+                };
+
+                // Process telemetry in rewards engine
+                self.reward_engine.process_telemetry(envelope);
+
+                // Read the computed points from in-memory processed cycles
+                let mut total_points = 0.0;
+                if let Some(epoch_map) = self.reward_engine.processed_cycles.read().get(&epoch_id) {
+                    if let Some(cycle) = epoch_map.get(&solana_wallet) {
+                        total_points = cycle.total_points;
+                    }
+                }
+
+                let ack = SignalingPayload::TelemetryAck {
+                    peer_id: peer_id.clone(),
+                    epoch_id: epoch_id.clone(),
+                    total_points,
+                    timestamp: chrono::Utc::now().timestamp() as u64,
+                };
+                let _ = self.forward_to_mesh(peer, ack, false).await;
+                info!("[Economy] ✅ Sent TelemetryAck to {} (wallet {}) — confirmed {:.1} points for epoch {}", peer_id, solana_wallet, total_points, epoch_id);
+            }
+            other => {
+                debug!("[Mesh] Unhandled payload variant from {}: {:?}", peer, std::mem::discriminant(&other));
+            }
         }
     }
 

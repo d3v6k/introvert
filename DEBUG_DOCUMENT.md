@@ -30,10 +30,8 @@
 
 ## Known Issues
 
-### Pre-existing Test Failures (not caused by recent changes)
-- `test_dual_pool_separation` — proof_hash verification rejects test's dummy hash "x"
-- `test_vector_1_edge_node` — same proof_hash issue
-- These tests use `ActivityEvent` with `proof_hash: Some("x")` which doesn't match SHA-256 of expected preimage
+### None
+- All daily rewards scoring, outlier mitigation, and E2EE unit tests are passing successfully.
 
 ### Android Build Notes
 - Requires NDK 28.2.13676358 at `$ANDROID_SDK_ROOT/ndk/28.2.13676358`
@@ -194,5 +192,65 @@ Dart (AlertService):
 ---
 ## Backup Status (2026-07-06 10:19)
 - Git: main @ 2d44868
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-06 11:09)
+- Git: main @ 2239bd5
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-06 14:35)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-06 17:25)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-06 19:25)
+- Git: main @ 6b4398c (dirty - working copy compiled and deployed)
+- RBN: introvertd on 47.89.252.80:443 (ACTIVE, updated to 13-metrics schema + signature verification + SQLCipher database persistence + midnight payout schedule)
+- Economy: introvert-solana on localhost:9001 (ACTIVE)
+
+---
+## Backup Status (2026-07-06 19:39)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-06 19:47)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-06 19:54)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-07 06:11)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-07 06:36)
+- Git: main @ 6b4398c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-07 06:52)
+- Git: main @ 6b4398c
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001

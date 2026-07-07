@@ -2,6 +2,25 @@
 
 All notable changes to Introvert will be documented in this file.
 
+## [0.30.0] - 2026-07-06 — Signed Telemetry Pipeline, SQLite Persistence & Snappy Reconnection Ladder
+
+### Milestone
+**Fully aligned, signed, and validated client-to-RBN telemetry pipeline, database persistence for client telemetry, midnight UTC epoch close cron scheduler with automatic Solana treasury claims (HMAC-SHA256 IPC), and 15-second snappy connection recovery cycler integration.**
+
+### Added
+- **Cryptographic Telemetry Signing**: Added `package_signed_telemetry()` on client to sign telemetry metrics using Ed25519 with client's derived Solana keypair.
+- **RBN Telemetry Validation**: Added signature validation on the RBN server node (`process_telemetry`) to authenticate declarations before scoring.
+- **SQLite Telemetry Persistence**: Expanded RBN database schema with `client_telemetry` table and implemented `save_client_telemetry()` and `fetch_client_telemetry_for_epoch()` to securely store signed envelopes, surviving RBN daemon restarts.
+- **13-Metrics Schema Alignment**: Expanded client shared metrics from `[u64; 9]` to `[u64; 13]` to include `WebFocusedActiveTime`, `SandboxWebPacketData`, `WebViewMediaCallHook`, and `UniquePeerHandshakes` across client economy tracker, network types, and stress tester.
+- **Midnight UTC Scheduler**: Implemented tokio background loop on RBN to periodically check for midnight UTC, run `close_current_epoch()`, and generate claim payouts.
+- **Solana Treasury IPC Claims**: Implemented `send_claim_to_treasury()` on RBN to sign daily claim request payloads with HMAC-SHA256 using `/etc/introvert/ipc.secret` and write them to the local `introvert-solana` daemon on port 9001.
+
+### Fixed
+- **Snappy Peer Reconnection**: Integrated connection state cycler (`ConnectionStateCycler`) evaluation into the 15-second status loop. Disconnected clients now rotate connection strategies (Direct re-dial, WebTunnel fallback, VPN profiles) immediately, resolving the 5-minute stuck-in-connecting bug.
+- **Unit Test Outlier Preimages**: Fixed daily rewards and dual-pool separation unit tests by generating correct cryptographic proof hashes from preimage formats instead of using dummy strings.
+
+---
+
 ## [0.29.0] - 2026-07-06 — Recovery, Telemetry Pipeline, Anti-Gaming IQR, Drive Rebuild, VPN Fix & Notification Hardening
 
 ### Milestone

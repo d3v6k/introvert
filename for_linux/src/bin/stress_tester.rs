@@ -1,6 +1,7 @@
 use introvert::network::{NetworkService, NetworkCommand};
 use introvert::storage::StorageService;
 use libp2p::identity::Keypair;
+use solana_sdk::pubkey::Pubkey;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use std::time::Duration;
@@ -64,7 +65,7 @@ async fn run_virtual_node(index: usize) -> anyhow::Result<()> {
         rx,
         tx_clone,
         storage.clone(),
-        Arc::new(introvert::economy::RewardTracker::new(Some(storage))),
+        Arc::new(introvert::economy::RewardTracker::new(Some(storage.clone()))),
         // Use valid dummy Solana Pubkeys (32-byte base58)
         Arc::new(introvert::economy::solana::SolanaIncentiveEngine::new(
             "http://localhost:8899", 
@@ -81,6 +82,8 @@ async fn run_virtual_node(index: usize) -> anyhow::Result<()> {
         30, // Liveness
         "/tmp".to_string(),
         true, // IS_STRESS_TEST = true
+        solana_sdk::pubkey::Pubkey::default(), // Dummy operator pubkey for stress test
+        Arc::new(introvert::economy::daily_rewards::RbnDailyRewardEngine::new()), // Dummy reward engine
     ).await?;
 
     tokio::spawn(async move {

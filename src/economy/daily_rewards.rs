@@ -214,7 +214,7 @@ impl Default for AntiGamingConfig {
             require_foreground: true,
             grace_period_secs: 30,
             reject_self_messaging: true,
-            min_unique_peers: 3,
+            min_unique_peers: 2,
             max_messages_per_peer: 50,
         }
     }
@@ -439,11 +439,11 @@ pub struct DailyRewardEngine {
     weights: RwLock<ActivityWeights>,
     anti_gaming: RwLock<AntiGamingConfig>,
     /// Shared metrics array bridging to RewardTracker for telemetry
-    shared_metrics: Arc<parking_lot::RwLock<[u64; 9]>>,
+    shared_metrics: Arc<parking_lot::RwLock<[u64; 13]>>,
 }
 
 impl DailyRewardEngine {
-    pub fn new(storage: Arc<StorageService>, shared_metrics: Arc<parking_lot::RwLock<[u64; 9]>>) -> Self {
+    pub fn new(storage: Arc<StorageService>, shared_metrics: Arc<parking_lot::RwLock<[u64; 13]>>) -> Self {
         let (weights, anti_gaming) = storage
             .load_daily_reward_config()
             .ok()
@@ -464,6 +464,14 @@ impl DailyRewardEngine {
             let mut state = engine.state.write();
             state.current_cycle = Some(cycle);
             state.cycle_start_epoch = Utc::now().timestamp() as u64;
+
+            // Restore per_type_counts from persisted activity log so points survive restarts
+            if let Ok(activities) = engine.storage.load_daily_activities(&today) {
+                for act in &activities {
+                    state.per_type_counts.insert(act.activity_type as u8, act.raw_count);
+                    state.per_type_capped.insert(act.activity_type as u8, act.capped_count);
+                }
+            }
         }
 
         engine
@@ -704,6 +712,9 @@ impl DailyRewardEngine {
         } else {
             Self::get_cap_static(&event.activity_type, &weights)
         };
+
+        // Get cycle date before mutable borrow of state
+        let cycle_date = state.current_cycle.as_ref().map(|c| c.cycle_date.clone());
         
         // Update raw count
         let raw = state.per_type_counts.entry(at_u8).or_insert(0);
@@ -716,9 +727,15 @@ impl DailyRewardEngine {
 
         // Update shared metrics bridge for telemetry pipeline
         let idx = at_u8 as usize;
-        if idx < 9 {
+        if idx < 13 {
             let mut metrics = self.shared_metrics.write();
             metrics[idx] = *capped;
+        }
+
+        // Persist activity to DB immediately so points survive app restart
+        // Uses INSERT OR REPLACE on (cycle_date, activity_type) — idempotent
+        if let Some(ref date) = cycle_date {
+            let _ = self.storage.save_single_activity(date, at_u8, current_raw, *capped);
         }
 
         true
@@ -736,6 +753,17 @@ impl DailyRewardEngine {
         match self.storage.get_recent_daily_cycles(days) {
             Ok(cycles) => serde_json::to_string(&cycles).unwrap_or_else(|_| "[]".to_string()),
             Err(_) => "[]".to_string(),
+        }
+    }
+
+    /// Persist current cycle activities to storage so they survive app restarts.
+    /// Called periodically from the economy monitoring loop.
+    pub fn persist_current_activities(&self) {
+        let state = self.state.read();
+        if let Some(ref cycle) = state.current_cycle {
+            let weights = self.weights.read();
+            let activities = Self::score_activities_static(&state, &weights);
+            let _ = self.storage.save_daily_activities(&cycle.cycle_date, &activities);
         }
     }
 
@@ -1065,13 +1093,14 @@ impl DailyRewardEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha2::Digest;
     use crate::storage::StorageService;
     use std::sync::Arc;
 
     #[test]
     fn test_vector_1_edge_node() {
         let storage = Arc::new(StorageService::new_ephemeral().unwrap());
-        let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 9]));
+        let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 13]));
         let engine = DailyRewardEngine::new(storage, shared_metrics);
         {
             let mut state = engine.state.write();
@@ -1088,7 +1117,11 @@ mod tests {
         engine.record_activity(ActivityEvent { activity_type: ActivityType::FileTransferSent, peer_id: Some("p1".into()), value: 3, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: None, active_web_containers: 0 });
         engine.record_activity(ActivityEvent { activity_type: ActivityType::FileTransferRecv, peer_id: Some("p1".into()), value: 8, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: None, active_web_containers: 0 });
         engine.record_activity(ActivityEvent { activity_type: ActivityType::CallDurationSecs, peer_id: Some("p1".into()), value: 1800, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: None, active_web_containers: 0 });
-        engine.record_activity(ActivityEvent { activity_type: ActivityType::RelayBytes, peer_id: Some("p2".into()), value: 5120, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: Some("abc".into()), active_web_containers: 0 });
+        let preimage = format!("{:?}:{}:{}", ActivityType::RelayBytes, 5120, "p2");
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(preimage.as_bytes());
+        let relay_proof = Some(hex::encode(hasher.finalize()));
+        engine.record_activity(ActivityEvent { activity_type: ActivityType::RelayBytes, peer_id: Some("p2".into()), value: 5120, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: relay_proof, active_web_containers: 0 });
         engine.record_activity(ActivityEvent { activity_type: ActivityType::UptimeSeconds, peer_id: None, value: 86400, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: None, active_web_containers: 0 });
 
         let state = engine.state.read();
@@ -1117,7 +1150,7 @@ mod tests {
     #[test]
     fn test_vector_2_rbn_node() {
         let storage = Arc::new(StorageService::new_ephemeral().unwrap());
-        let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 9]));
+        let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 13]));
         let engine = DailyRewardEngine::new(storage, shared_metrics);
         {
             let mut state = engine.state.write();
@@ -1174,7 +1207,7 @@ mod tests {
     #[test]
     fn test_dual_pool_separation() {
         let storage = Arc::new(StorageService::new_ephemeral().unwrap());
-        let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 9]));
+        let shared_metrics = Arc::new(parking_lot::RwLock::new([0u64; 13]));
         let engine = DailyRewardEngine::new(storage, shared_metrics);
         {
             let mut state = engine.state.write();
@@ -1182,7 +1215,11 @@ mod tests {
             state.global_points_estimate = 100_000.0;
             state.cycle_start_epoch = 0;
         }
-        engine.record_activity(ActivityEvent { activity_type: ActivityType::RelayBytes, peer_id: Some("p1".into()), value: 500_000, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: Some("x".into()), active_web_containers: 0 });
+        let preimage = format!("{:?}:{}:{}", ActivityType::RelayBytes, 500_000, "p1");
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(preimage.as_bytes());
+        let relay_proof = Some(hex::encode(hasher.finalize()));
+        engine.record_activity(ActivityEvent { activity_type: ActivityType::RelayBytes, peer_id: Some("p1".into()), value: 500_000, is_foreground: true, message_len: None, is_self: false, is_rbn: false, proof_hash: relay_proof, active_web_containers: 0 });
         engine.record_activity(ActivityEvent { activity_type: ActivityType::MessageSent, peer_id: Some("p2".into()), value: 100, is_foreground: true, message_len: Some(10), is_self: false, is_rbn: false, proof_hash: None, active_web_containers: 0 });
 
         let state = engine.state.read();

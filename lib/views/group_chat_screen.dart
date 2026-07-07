@@ -1085,6 +1085,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     if (_selectedMsg == null) return '';
     if (_selectedMsg is List && _selectedMsg.length > 2) return _selectedMsg[2]?.toString() ?? '';
     if (_selectedMsg is FileTransferProgress) return _selectedMsg.filename;
+    if (_selectedMsg is ImageGroupProgress) return "${_selectedMsg.images.length} photos";
     return '';
   }
 
@@ -1092,7 +1093,27 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     if (_selectedMsg == null) return null;
     if (_selectedMsg is List && _selectedMsg.length > 4) return _selectedMsg[4]?.toString();
     if (_selectedMsg is FileTransferProgress) return _selectedMsg.transferId;
+    if (_selectedMsg is ImageGroupProgress) return _selectedMsg.images.first.transferId;
     return null;
+  }
+
+  List<String> _getTargetMessageIds(String msgId) {
+    for (var msg in _messages) {
+      if (msg is ImageGroupProgress) {
+        if (msg.images.any((img) => img.transferId == msgId)) {
+          return msg.images.map((img) => img.transferId).toList();
+        }
+      } else if (msg is FileTransferProgress) {
+        if (msg.transferId == msgId) {
+          return [msgId];
+        }
+      } else if (msg is List && msg.length > 4) {
+        if (msg[4]?.toString() == msgId) {
+          return [msgId];
+        }
+      }
+    }
+    return [msgId];
   }
 
   PreferredSizeWidget _buildSelectionToolbar() {
@@ -1252,6 +1273,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       isMe = msg.isOutgoing;
       senderId = msg.peerId;
       ts = msg.startDateTime;
+    } else if (msg is ImageGroupProgress) {
+      content = "${msg.images.length} photos";
+      msgId = msg.images.first.transferId;
+      isMe = msg.images.first.peerId == _client.localPeerId;
+      senderId = msg.images.first.peerId;
+      ts = msg.images.first.startDateTime;
     }
 
     final contacts = _client.getContacts();
@@ -1274,7 +1301,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 ...["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => 
                   GestureDetector(
                     onTap: () {
-                    if (msgId != null) _client.sendReaction(widget.groupId, msgId, emoji, true);
+                      for (var id in _getTargetMessageIds(msgId!)) {
+                        _client.sendReaction(widget.groupId, id, emoji, true);
+                      }
                       Navigator.pop(context);
                       _loadMessages();
                     },
@@ -1441,7 +1470,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 textInputAction: TextInputAction.done,
                 onSubmitted: (value) {
                   if (value.trim().isNotEmpty) {
-                    _client.sendReaction(widget.groupId, msgId, value.trim(), true);
+                    for (var id in _getTargetMessageIds(msgId)) {
+                      _client.sendReaction(widget.groupId, id, value.trim(), true);
+                    }
                     Navigator.pop(ctx);
                     _loadMessages();
                   }
@@ -1457,7 +1488,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 children: ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯"].map((emoji) =>
                   GestureDetector(
                     onTap: () {
-                      _client.sendReaction(widget.groupId, msgId, emoji, true);
+                      for (var id in _getTargetMessageIds(msgId)) {
+                        _client.sendReaction(widget.groupId, id, emoji, true);
+                      }
                       Navigator.pop(ctx);
                       _loadMessages();
                     },
@@ -1492,12 +1525,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, mainAxisSpacing: 12, crossAxisSpacing: 12),
               itemCount: 80,
               itemBuilder: (context, index) {
-                final List<String> emojis = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😇", "😉", "😊", "😋", "😎", "😍", "😘", "😗", "😙", "😚", "☺️", "🙂", "🤗", "🤩", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "😴", "😌", "😛", "😜", "😝", "🤤", "😒", "😓", "😔", "👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "🤝", "🔥", "💡", "🛡️", "🔑", "🔐", "🔒", "🌐", "💎", "💻", "🧠", "⚡", "🌟", "🎉", "❤️", "💔", "✨", "✅", "❌", "⚠️", "🚀"];
+                final List<String> emojis = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😇", "😉", "😊", "😋", "😎", "😍", "😘", "😗", "😙", "😚", "☺️", "🙂", "🤗", "🤩", "🤔", "🤨", "😐", "😑", "😶", "🙄", "😏", "😣", "😥", "😮", "🤐", "😯", "😪", "😫", "😴", "😌", "😛", "😜", "😝", "🤤", "🤤", "😒", "😓", "😔", "👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "🤝", "🔥", "💡", "🛡️", "🔑", "🔐", "🔒", "🌐", "💎", "💻", "🧠", "⚡", "🌟", "🎉", "❤️", "💔", "✨", "✅", "❌", "⚠️", "🚀"];
                 if (index >= emojis.length) return SizedBox.shrink();
                 final emoji = emojis[index];
                 return GestureDetector(
                   onTap: () {
-                    _client.sendReaction(widget.groupId, msgId, emoji, true);
+                    for (var id in _getTargetMessageIds(msgId)) {
+                      _client.sendReaction(widget.groupId, id, emoji, true);
+                    }
                     Navigator.pop(context);
                     _loadMessages();
                   },

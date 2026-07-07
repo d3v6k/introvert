@@ -219,6 +219,26 @@ impl StorageService {
                 group_id TEXT PRIMARY KEY,
                 deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS processed_telemetry (
+                epoch_id TEXT NOT NULL,
+                solana_wallet TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                PRIMARY KEY (epoch_id, solana_wallet)
+            );
+            CREATE TABLE IF NOT EXISTS client_telemetry (
+                epoch_id TEXT NOT NULL,
+                solana_wallet TEXT NOT NULL,
+                peer_id TEXT NOT NULL,
+                payout_address TEXT NOT NULL,
+                metrics TEXT NOT NULL,
+                unique_peers TEXT NOT NULL,
+                is_rbn INTEGER NOT NULL,
+                is_edge_node INTEGER NOT NULL,
+                prestige_tier INTEGER NOT NULL,
+                signature BLOB NOT NULL,
+                timestamp INTEGER NOT NULL,
+                PRIMARY KEY (epoch_id, solana_wallet)
+            );
             CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER PRIMARY KEY);"
         )?;
 
@@ -961,6 +981,120 @@ impl StorageService {
             )?;
         }
         Ok(new_count)
+    }
+
+    /// Check if telemetry has already been processed for a given epoch and wallet.
+    /// Returns true if a matching row exists in processed_telemetry.
+    pub fn is_telemetry_processed(&self, epoch_id: &str, solana_wallet: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let count: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM processed_telemetry WHERE epoch_id = ?1 AND solana_wallet = ?2",
+            params![epoch_id, solana_wallet],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    /// Record that telemetry has been processed for a given epoch and wallet.
+    pub fn mark_telemetry_processed(&self, epoch_id: &str, solana_wallet: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR IGNORE INTO processed_telemetry (epoch_id, solana_wallet, timestamp) VALUES (?1, ?2, ?3)",
+            params![epoch_id, solana_wallet, chrono::Utc::now().timestamp()],
+        )?;
+        Ok(())
+    }
+
+    /// Save the complete client telemetry envelope to the database.
+    pub fn save_client_telemetry(
+        &self,
+        epoch_id: &str,
+        solana_wallet: &str,
+        peer_id: &str,
+        payout_address: &str,
+        metrics: &[u64; 13],
+        unique_peers: &[String],
+        is_rbn: bool,
+        is_edge_node: bool,
+        prestige_tier: u8,
+        signature: &[u8],
+        timestamp: u64,
+    ) -> Result<()> {
+        let conn = self.conn.lock();
+        let metrics_json = serde_json::to_string(metrics).unwrap_or_default();
+        let unique_peers_json = serde_json::to_string(unique_peers).unwrap_or_default();
+        conn.execute(
+            "INSERT OR REPLACE INTO client_telemetry (
+                epoch_id, solana_wallet, peer_id, payout_address, metrics, unique_peers,
+                is_rbn, is_edge_node, prestige_tier, signature, timestamp
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                epoch_id,
+                solana_wallet,
+                peer_id,
+                payout_address,
+                metrics_json,
+                unique_peers_json,
+                is_rbn as i32,
+                is_edge_node as i32,
+                prestige_tier as i32,
+                signature,
+                timestamp as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Fetch all client telemetry envelopes saved for a given epoch.
+    pub fn fetch_client_telemetry_for_epoch(&self, epoch_id: &str) -> Result<Vec<crate::economy::daily_rewards::TelemetryEnvelope>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT peer_id, solana_wallet, payout_address, metrics, unique_peers, is_rbn, is_edge_node, prestige_tier, signature, timestamp \
+             FROM client_telemetry WHERE epoch_id = ?1"
+        )?;
+        let rows = stmt.query_map(params![epoch_id], |row| {
+            let peer_id: String = row.get(0)?;
+            let solana_wallet: String = row.get(1)?;
+            let payout_address: String = row.get(2)?;
+            let metrics_json: String = row.get(3)?;
+            let unique_peers_json: String = row.get(4)?;
+            let is_rbn_val: i32 = row.get(5)?;
+            let is_edge_node_val: i32 = row.get(6)?;
+            let prestige_tier_val: i32 = row.get(7)?;
+            let signature: Vec<u8> = row.get(8)?;
+            let timestamp_val: i64 = row.get(9)?;
+
+            let metrics_vec: Vec<u64> = serde_json::from_str(&metrics_json).unwrap_or_default();
+            let mut metrics = [0u64; 13];
+            for (i, v) in metrics_vec.iter().enumerate().take(13) {
+                metrics[i] = *v;
+            }
+
+            let unique_peers: Vec<String> = serde_json::from_str(&unique_peers_json).unwrap_or_default();
+
+            Ok(crate::economy::daily_rewards::TelemetryEnvelope {
+                peer_id,
+                solana_wallet,
+                solana_ata: payout_address,
+                epoch_id: epoch_id.to_string(),
+                metrics,
+                unique_peers,
+                is_rbn: is_rbn_val != 0,
+                is_edge_node: is_edge_node_val != 0,
+                prestige_tier: prestige_tier_val as u8,
+                proof_hash: String::new(),
+                client_signature: signature,
+                timestamp: timestamp_val as u64,
+            })
+        })?;
+
+        let mut results = Vec::new();
+        for r in rows {
+            if let Ok(env) = r {
+                results.push(env);
+            }
+        }
+        Ok(results)
     }
 
     /// Fetch sent messages stuck at status=0 (Sent) older than `age_secs` seconds.

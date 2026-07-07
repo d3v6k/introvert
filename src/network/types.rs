@@ -187,7 +187,16 @@ pub enum SignalingPayload {
     /// Client telemetry submission for reward processing
     TelemetryEnvelope {
         peer_id: String,
-        metrics: [u64; 9], // 0=MsgSent,1=MsgRcvd,2=GrpMsg,3=GrpReact,4=FileSend,5=FileRecv,6=CallSecs,7=RelayBytes,8=Uptime
+        solana_wallet: String,
+        solana_ata: String,
+        epoch_id: String,
+        metrics: [u64; 13],
+        unique_peers: Vec<String>,
+        is_rbn: bool,
+        is_edge_node: bool,
+        prestige_tier: u8,
+        proof_hash: String,
+        client_signature: Vec<u8>,
         timestamp: u64,
     },
     /// RBN acknowledgment that telemetry was received and processed
@@ -307,6 +316,7 @@ pub enum NetworkCommand {
     SubscribeGossipsub { group_id: String },
     ForceMeshRefresh,
     ActivateTunnel,
+    SendManualTelemetry,
     RegisterSeeder { peer_id: PeerId, transfer_id: String, file_path: String, file_hash: String, chunk_size: u32, total_chunks: u32, group_id: Option<String> },
     UnregisterSeeder { transfer_id: String },
     FindProviders { file_hash: String },

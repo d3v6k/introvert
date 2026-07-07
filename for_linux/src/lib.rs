@@ -82,6 +82,7 @@ pub struct Engine {
     pub is_anchor_mode: RwLock<bool>,
     pub is_tunnel_mode: RwLock<bool>,
     pub downloads_dir: String,
+    pub reward_engine: Arc<crate::economy::daily_rewards::RbnDailyRewardEngine>,
 }
 
 pub static ENGINE: Lazy<RwLock<Option<Engine>>> = Lazy::new(|| RwLock::new(None));
@@ -274,6 +275,9 @@ pub extern "C" fn introvert_engine_start(
     let is_anchor_mode = storage.is_anchor_mode_enabled();
     let is_tunnel_mode = storage.is_tunnel_mode_enabled();
 
+    // Initialize RBN Daily Reward Engine for telemetry correlation and fork detection
+    let reward_engine = Arc::new(crate::economy::daily_rewards::RbnDailyRewardEngine::with_storage(storage.clone()));
+
     *engine_lock = Some(Engine {
         runtime,
         identity,
@@ -286,6 +290,7 @@ pub extern "C" fn introvert_engine_start(
         is_anchor_mode: RwLock::new(is_anchor_mode),
         is_tunnel_mode: RwLock::new(is_tunnel_mode),
         downloads_dir,
+        reward_engine,
     });
 
     FfiResult::success()
@@ -327,6 +332,7 @@ pub extern "C" fn introvert_network_start_production(
     let storage = Arc::clone(&engine.storage);
     let reward_tracker = Arc::clone(&engine.reward_tracker);
     let solana_client = Arc::clone(&engine.solana_client);
+    let reward_engine = Arc::clone(&engine.reward_engine);
     let (tx, rx) = mpsc::channel(1_000);
     let tx_clone = tx.clone();
 
@@ -343,6 +349,12 @@ pub extern "C" fn introvert_network_start_production(
     }
 
     let downloads_dir = engine.downloads_dir.clone();
+
+    // Derive operator Solana pubkey from identity seed for lease validation
+    let operator_pubkey = match NodeIdentity::derive_solana_keypair(engine.identity.seed) {
+        Ok(signing_key) => solana_sdk::pubkey::Pubkey::new_from_array(signing_key.verifying_key().to_bytes()),
+        Err(_) => return FfiResult::error(-15, "Operator Solana key derivation failed"),
+    };
 
     engine.runtime.spawn(async move {
         dispatch_debug_log("Starting NetworkService initialization...");
@@ -364,6 +376,8 @@ pub extern "C" fn introvert_network_start_production(
             liveness_interval_secs,
             downloads_dir,
             false, // is_stress_test
+            operator_pubkey,
+            reward_engine,
         ).await {
             Ok(service) => {
                 dispatch_debug_log("NetworkService initialized. Running swarm...");
@@ -376,7 +390,101 @@ pub extern "C" fn introvert_network_start_production(
             }
         }
     });
+
+    if enable_relay_server {
+        let reward_engine_payout = Arc::clone(&engine.reward_engine);
+        engine.runtime.spawn(async move {
+            use chrono::Timelike;
+            info!("[RbnRewards] Spawning midnight epoch payout background task...");
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            let mut last_processed_epoch = String::new();
+            
+            loop {
+                interval.tick().await;
+                
+                let now = chrono::Utc::now();
+                let hour = now.hour();
+                let minute = now.minute();
+                
+                // Trigger daily at 00:00 UTC
+                if hour == 0 && minute == 0 {
+                    // Grace Period: Close the epoch from 2 days ago (giving 24 hours for offline clients to sync)
+                    let prev_day = now - chrono::Duration::days(2);
+                    let epoch_id = prev_day.format("%Y_%m_%d").to_string();
+                    
+                    if epoch_id != last_processed_epoch {
+                        info!("[RbnRewards] 🕒 Midnight UTC reached. Closing epoch: {}", epoch_id);
+                        
+                        // 1. Close epoch
+                        let claims = reward_engine_payout.close_current_epoch(&epoch_id);
+                        info!("[RbnRewards] Closed epoch {} with {} claims", epoch_id, claims.len());
+                        
+                        // 2. Load IPC secret from /etc/introvert/ipc.secret
+                        let ipc_secret = match std::fs::read_to_string("/etc/introvert/ipc.secret") {
+                            Ok(sec) => sec.trim().to_string(),
+                            Err(e) => {
+                                error!("[RbnRewards] Failed to read IPC secret from /etc/introvert/ipc.secret: {:?}", e);
+                                continue;
+                            }
+                        };
+                        
+                        // 3. Send claims to treasury daemon via IPC (localhost:9001)
+                        for claim in claims {
+                            info!("[RbnRewards] Sending claim to treasury: {} -> {:.4} INTR", claim.peer_id, claim.token_amount);
+                            if let Err(e) = send_claim_to_treasury(&claim, &ipc_secret).await {
+                                error!("[RbnRewards] Failed to send claim to treasury for peer {}: {:?}", claim.peer_id, e);
+                            } else {
+                                info!("[RbnRewards] Claim successfully dispatched to treasury for peer {}", claim.peer_id);
+                            }
+                        }
+                        
+                        last_processed_epoch = epoch_id;
+                    }
+                }
+            }
+        });
+    }
+
     FfiResult::success()
+}
+
+async fn send_claim_to_treasury(claim: &crate::economy::daily_rewards::ClaimRequest, secret: &str) -> anyhow::Result<()> {
+    use tokio::net::TcpStream;
+    use tokio::io::AsyncWriteExt;
+    use hkdf::hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    type HmacSha256 = Hmac<Sha256>;
+
+    // Construct signature preimage matching the schema expected by introvert-solana
+    let payload_without_sig = format!(
+        r#"{{"claim_type":"{}","peer_id":"{}","payout_address":"{}","token_amount":{},"epoch_id":"{}"}}"#,
+        claim.claim_type, claim.peer_id, claim.payout_address, claim.token_amount, claim.epoch_id
+    );
+
+    // Generate HMAC-SHA256 signature using the IPC secret
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|e| anyhow::anyhow!("HMAC initialization failed: {}", e))?;
+    mac.update(payload_without_sig.as_bytes());
+    let signature = hex::encode(mac.finalize().into_bytes());
+
+    // Construct final JSON line
+    let ipc_msg = serde_json::json!({
+        "claim_type": claim.claim_type,
+        "peer_id": claim.peer_id,
+        "payout_address": claim.payout_address,
+        "token_amount": claim.token_amount,
+        "epoch_id": claim.epoch_id,
+        "signature": signature,
+    });
+    
+    let ipc_msg_str = format!("{}\n", ipc_msg.to_string());
+
+    // Connect to introvert-solana on port 9001
+    let mut stream = TcpStream::connect("127.0.0.1:9001").await?;
+    stream.write_all(ipc_msg_str.as_bytes()).await?;
+    stream.flush().await?;
+
+    Ok(())
 }
 
 /// Starts real-time economy monitoring and pushes updates to Flutter via Event Type 9.

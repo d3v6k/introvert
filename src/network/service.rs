@@ -83,6 +83,8 @@ pub struct NetworkService {
     pub(crate) relay_hints: HashMap<PeerId, PeerId>,
     /// Last time telemetry was sent to RBN (for cooldown tracking)
     pub(crate) last_telemetry_sent: Instant,
+    /// Consecutive status-check ticks with zero connected peers (for resilience ladder)
+    pub(crate) consecutive_zero_peers_ticks: u32,
 }
 
 #[derive(Debug, Clone)]

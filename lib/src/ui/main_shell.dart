@@ -226,8 +226,19 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     });
   }
 
+  // IntroClaw notification rate limiter: max 1 notification every 3 minutes
+  DateTime _lastClawNotificationTime = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _clawNotificationCooldown = Duration(minutes: 3);
+
   void _showClawNetworkAlert(String title, String message, Color color) {
     if (!mounted) return;
+    final now = DateTime.now();
+    if (now.difference(_lastClawNotificationTime) < _clawNotificationCooldown) {
+      // Rate limited — log to debug but don't show UI notification
+      debugPrint("[IntroClaw] Notification suppressed (rate limited): $message");
+      return;
+    }
+    _lastClawNotificationTime = now;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -1154,51 +1165,6 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
               errorBuilder: (context, error, stackTrace) => Image.asset('assets/images/logo.png', height: 20),
-            ),
-            SizedBox(width: 8),
-            // INTR Balance + Daily Earnings
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.08 : 0.04),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 0.15 : 0.08)),
-                    ),
-                    child: Text(
-                      '${_intrBalance} pts',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.current.accent.withValues(alpha: _intrBalance > 0 ? 1.0 : 0.4),
-                        letterSpacing: 0.5,
-                        shadows: _intrBalance > 0 ? [
-                          Shadow(color: AppTheme.current.accent.withValues(alpha: 0.6), blurRadius: 6),
-                          Shadow(color: AppTheme.current.accent.withValues(alpha: 0.3), blurRadius: 12),
-                        ] : [],
-                      ),
-                    ),
-                  ),
-                  if (_dailyPointsEarned > 0)
-                    Padding(
-                      padding: EdgeInsets.only(top: 2, left: 2),
-                      child: Text(
-                        '+${_dailyPointsEarned.toStringAsFixed(1)} pts today',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.greenAccent.withValues(alpha: 0.8),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
             ),
             Spacer(),
             // Network status dot + label
@@ -3151,6 +3117,13 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     super.dispose();
   }
 
+  String _getBuildNumber() {
+    // Read from pubspec.yaml version field (format: "x.y.z+build")
+    const version = String.fromEnvironment('VERSION', defaultValue: '0.29.0');
+    const build = String.fromEnvironment('BUILD_NUMBER', defaultValue: '1');
+    return '$version+$build';
+  }
+
   void _showRbnManagerDialog() {
     final mainShellState = context.findAncestorStateOfType<_MainShellState>();
     if (mainShellState == null) return;
@@ -3840,6 +3813,37 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                   height: 48,
                   filterQuality: FilterQuality.high,
                   color: AppTheme.current.bg.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            // Introvert logo (double width of Fano icon)
+            Center(
+              child: Image.asset(
+                AppTheme.current.bg.computeLuminance() > 0.5
+                    ? 'assets/images/logo_black.png'
+                    : 'assets/images/logo_white.png',
+                width: 96,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+            SizedBox(height: 8),
+            // Build number with GitHub link
+            Center(
+              child: GestureDetector(
+                onTap: () async {
+                  const url = 'https://github.com/d3v6k/introvert/releases';
+                  // ignore: deprecated_member_use
+                  await launch(url);
+                },
+                child: Text(
+                  'Build ${_getBuildNumber()}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.current.accent.withValues(alpha: 0.7),
+                    decoration: TextDecoration.underline,
+                    decorationColor: AppTheme.current.accent.withValues(alpha: 0.5),
+                  ),
                 ),
               ),
             ),

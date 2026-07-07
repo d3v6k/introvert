@@ -1619,6 +1619,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_selectedMsg == null) return '';
     if (_selectedMsg is MessageModel) return _selectedMsg.content;
     if (_selectedMsg is FileTransferProgress) return _selectedMsg.filename;
+    if (_selectedMsg is ImageGroupProgress) return "${_selectedMsg.images.length} photos";
     return '';
   }
 
@@ -1626,7 +1627,27 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_selectedMsg == null) return null;
     if (_selectedMsg is MessageModel) return _selectedMsg.msgId;
     if (_selectedMsg is FileTransferProgress) return _selectedMsg.transferId;
+    if (_selectedMsg is ImageGroupProgress) return _selectedMsg.images.first.transferId;
     return null;
+  }
+
+  List<String> _getTargetMessageIds(String msgId) {
+    for (var msg in _messages) {
+      if (msg is ImageGroupProgress) {
+        if (msg.images.any((img) => img.transferId == msgId)) {
+          return msg.images.map((img) => img.transferId).toList();
+        }
+      } else if (msg is FileTransferProgress) {
+        if (msg.transferId == msgId) {
+          return [msgId];
+        }
+      } else if (msg is MessageModel) {
+        if (msg.msgId == msgId) {
+          return [msgId];
+        }
+      }
+    }
+    return [msgId];
   }
 
   PreferredSizeWidget _buildSelectionToolbar() {
@@ -1771,6 +1792,11 @@ class _ChatScreenState extends State<ChatScreen> {
       msgId = msg.transferId;
       isMe = msg.isOutgoing;
       ts = msg.startDateTime;
+    } else if (msg is ImageGroupProgress) {
+      content = "${msg.images.length} photos";
+      msgId = msg.images.first.transferId;
+      isMe = msg.images.first.isOutgoing;
+      ts = msg.images.first.startDateTime;
     }
 
     if (msgId == null) return;
@@ -1791,12 +1817,13 @@ class _ChatScreenState extends State<ChatScreen> {
               ...["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => 
                 GestureDetector(
                   onTap: () {
-                    _client.sendReaction(widget.peerId, msgId!, emoji, false);
+                    for (var id in _getTargetMessageIds(msgId!)) {
+                      _client.sendReaction(widget.peerId, id, emoji, false);
+                    }
                     Navigator.pop(context);
                     _loadMessages();
                   },
                   child: Text(emoji, style: const TextStyle(fontSize: 24)),
-
                 )
               ).toList(),
               GestureDetector(
@@ -1959,7 +1986,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 textInputAction: TextInputAction.done,
                 onSubmitted: (value) {
                   if (value.trim().isNotEmpty) {
-                    _client.sendReaction(widget.peerId, msgId, value.trim(), false);
+                    for (var id in _getTargetMessageIds(msgId)) {
+                      _client.sendReaction(widget.peerId, id, value.trim(), false);
+                    }
                     Navigator.pop(ctx);
                     _loadMessages();
                   }
@@ -1975,7 +2004,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: ["👍", "❤️", "😂", "😮", "😢", "🙏", "🔥", "🎉", "👏", "💯"].map((emoji) =>
                   GestureDetector(
                     onTap: () {
-                      _client.sendReaction(widget.peerId, msgId, emoji, false);
+                      for (var id in _getTargetMessageIds(msgId)) {
+                        _client.sendReaction(widget.peerId, id, emoji, false);
+                      }
                       Navigator.pop(ctx);
                       _loadMessages();
                     },
@@ -2015,7 +2046,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 final emoji = emojis[index];
                 return GestureDetector(
                   onTap: () {
-                    _client.sendReaction(widget.peerId, msgId, emoji, false);
+                    for (var id in _getTargetMessageIds(msgId)) {
+                      _client.sendReaction(widget.peerId, id, emoji, false);
+                    }
                     Navigator.pop(context);
                     _loadMessages();
                   },
@@ -2270,7 +2303,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _loadMessages();
         }
       } else if (event.type == 40) {
-        if (mounted) setState(() {});
+        if (mounted) _loadMessages();
       } else if (event.type == 25) {
         if (!mounted || event.data.isEmpty) return;
         try {

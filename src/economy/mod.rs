@@ -34,11 +34,11 @@ pub struct RewardTracker {
     cooldown_secs: u64,
     start_time: std::time::Instant,
     /// Shared metrics bridge: DailyRewardEngine writes, RewardTracker reads for telemetry
-    pub shared_metrics: Arc<RwLock<[u64; 9]>>,
+    pub shared_metrics: Arc<RwLock<[u64; 13]>>,
 }
 
 impl RewardTracker {
-    pub fn new(storage: Option<Arc<StorageService>>, shared_metrics: Arc<RwLock<[u64; 9]>>) -> Self {
+    pub fn new(storage: Option<Arc<StorageService>>, shared_metrics: Arc<RwLock<[u64; 13]>>) -> Self {
         let initial_bytes = if let Some(ref s) = storage {
             s.get_total_relayed_from_db().unwrap_or(0)
         } else {
@@ -244,7 +244,7 @@ impl RewardTracker {
 #[derive(Debug, Clone)]
 pub struct TelemetryData {
     pub peer_id: String,
-    pub metrics: [u64; 9],
+    pub metrics: [u64; 13],
     pub timestamp: u64,
 }
 
@@ -268,6 +268,114 @@ impl RewardTracker {
 }
 impl Default for RewardTracker {
     fn default() -> Self {
-        Self::new(None, Arc::new(RwLock::new([0u64; 9])))
+        Self::new(None, Arc::new(RwLock::new([0u64; 13])))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TelemetryEnvelope {
+    pub peer_id: String,          // libp2p network identity
+    pub solana_wallet: String,    // Client's Solana Public Key
+    pub solana_ata: String,       // Pre-derived Associated Token Account for $INTR
+    pub epoch_id: String,         // Calendar identifier (e.g., "2026_07_03")
+    pub metrics: [u64; 13],       // The 13 activity metrics tracked natively
+    pub unique_peers: Vec<String>,
+    pub is_rbn: bool,
+    pub is_edge_node: bool,
+    pub prestige_tier: u8,
+    pub proof_hash: String,       // SHA-256 proving valid relay work
+    pub client_signature: Vec<u8>, // Ed25519 signature of entire payload
+    pub timestamp: u64,
+}
+
+pub fn derive_ata(wallet: &str, mint: &str) -> Option<String> {
+    use std::str::FromStr;
+    let owner = solana_sdk::pubkey::Pubkey::from_str(wallet).ok()?;
+    let mint_pubkey = solana_sdk::pubkey::Pubkey::from_str(mint).ok()?;
+    let token_program = solana_sdk::pubkey::Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").ok()?;
+    let ata_program = solana_sdk::pubkey::Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").ok()?;
+    let (ata, _) = solana_sdk::pubkey::Pubkey::find_program_address(
+        &[owner.as_ref(), token_program.as_ref(), mint_pubkey.as_ref()],
+        &ata_program,
+    );
+    Some(ata.to_string())
+}
+
+impl RewardTracker {
+    pub fn package_signed_telemetry(
+        &self,
+        peer_id: &str,
+        solana_wallet: &str,
+        solana_ata: &str,
+        epoch_id: &str,
+        signing_key: &ed25519_dalek::SigningKey,
+        is_rbn: bool,
+        is_edge_node: bool,
+        prestige_tier: u8,
+    ) -> TelemetryEnvelope {
+        use ed25519_dalek::Signer;
+        use sha2::{Sha256, Digest};
+        
+        let state = self.state.read();
+        let mut metrics = *self.shared_metrics.read();
+        // Overlay relay_bytes and uptime from RewardTracker (more accurate for these)
+        metrics[7] = state.outbound_relayed_bytes;
+        metrics[8] = state.uptime_seconds;
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // Calculate proof hash for relay bytes verification
+        let proof_hash = if !is_rbn && metrics[7] > 0 {
+            let preimage = format!("RelayBytes:{}:{}", metrics[7], peer_id);
+            let mut hasher = Sha256::new();
+            hasher.update(preimage.as_bytes());
+            hex::encode(hasher.finalize())
+        } else {
+            String::new()
+        };
+
+        // Fetch unique peers from database
+        let mut unique_peers = Vec::new();
+        if let Some(ref s) = self.storage {
+            if let Ok(contacts) = s.get_all_contacts() {
+                unique_peers = contacts.iter().map(|c| c.peer_id.clone()).collect();
+            }
+        }
+
+        // Build message to sign: epoch_id || peer_id || solana_wallet || solana_ata ||
+        // metrics[0..13] || is_rbn || is_edge_node || prestige_tier || timestamp
+        let mut message = Vec::new();
+        message.extend_from_slice(epoch_id.as_bytes());
+        message.extend_from_slice(peer_id.as_bytes());
+        message.extend_from_slice(solana_wallet.as_bytes());
+        message.extend_from_slice(solana_ata.as_bytes());
+        for m in &metrics {
+            message.extend_from_slice(&m.to_le_bytes());
+        }
+        message.push(is_rbn as u8);
+        message.push(is_edge_node as u8);
+        message.push(prestige_tier);
+        message.extend_from_slice(&timestamp.to_le_bytes());
+
+        // Sign with Ed25519
+        let signature = signing_key.sign(&message);
+
+        TelemetryEnvelope {
+            peer_id: peer_id.to_string(),
+            solana_wallet: solana_wallet.to_string(),
+            solana_ata: solana_ata.to_string(),
+            epoch_id: epoch_id.to_string(),
+            metrics,
+            unique_peers,
+            is_rbn,
+            is_edge_node,
+            prestige_tier,
+            proof_hash,
+            client_signature: signature.to_bytes().to_vec(),
+            timestamp,
+        }
     }
 }

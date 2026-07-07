@@ -52,7 +52,6 @@ fi
 echo -e "${BLUE}🛡️  Step 5/6: Deploying binary, config, and service file to RBN ($RBN_IP) [Password required]...${NC}"
 if scp "$LOCAL_BIN" "${RBN_USER}@${RBN_IP}:${RBN_BIN_PATH}" && \
    ssh "${RBN_USER}@${RBN_IP}" "mkdir -p /opt/introvert/config" && \
-   scp firebase/introvert-p2p-firebase-adminsdk-fbsvc-f5d0473246.json "${RBN_USER}@${RBN_IP}:/opt/introvert/config/firebase-service-account.json" && \
    scp for_linux/introvertd.service "${RBN_USER}@${RBN_IP}:/etc/systemd/system/introvertd.service"; then
     echo -e "${GREEN}✅ Binary, Firebase config, and service file uploaded successfully.${NC}"
 else

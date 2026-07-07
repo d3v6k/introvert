@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../theme/app_theme.dart';
+import '../../native/introvert_client.dart';
 
 class RewardsHUD extends StatelessWidget {
   final int relayedBytes;
@@ -66,14 +68,54 @@ class NodeDashboard extends StatefulWidget {
 
 class _NodeDashboardState extends State<NodeDashboard> {
   bool _noticeExpanded = false;
+  bool _declaringPoints = false;
+  String _declareStatus = '';
+  StreamSubscription? _telemetryAckSub;
+  StreamSubscription? _economySub;
+  Map<String, dynamic> _liveEconomyStats = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _liveEconomyStats = widget.economyStats;
+    // Listen to economy stream directly for real-time point updates
+    _economySub = IntrovertClient().economyStream.listen((stats) {
+      if (mounted) {
+        setState(() {
+          _liveEconomyStats = stats;
+        });
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(NodeDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update from parent if stream hasn't fired yet
+    if (oldWidget.economyStats != widget.economyStats) {
+      _liveEconomyStats = widget.economyStats;
+    }
+  }
+
+  @override
+  void dispose() {
+    _telemetryAckSub?.cancel();
+    _economySub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final intrBalance = (widget.economyStats['intr_balance'] ?? 0) / 1000000000.0;
-    final solBalance = (widget.economyStats['sol_balance'] ?? 0) / 1000000000.0;
-    final usdcBalance = (widget.economyStats['usdc_balance'] ?? 0) / 1000000.0;
-    final pendingPoints = (widget.economyStats['pending_rewards'] ?? 0) / 1000000000.0;
-    final solAddress = widget.economyStats['sol_address'] ?? 'Connecting...';
+    final intrBalance = (_liveEconomyStats['intr_balance'] ?? 0) / 1000000000.0;
+    final solBalance = (_liveEconomyStats['sol_balance'] ?? 0) / 1000000000.0;
+    final usdcBalance = (_liveEconomyStats['usdc_balance'] ?? 0) / 1000000.0;
+    final solAddress = _liveEconomyStats['sol_address'] ?? 'Connecting...';
+
+    // Use real-time daily_earnings from DailyRewardEngine (updated every 30s)
+    final dailyEarnings = _liveEconomyStats['daily_earnings'];
+    final double socialPoints = (dailyEarnings is Map) ? ((dailyEarnings['social_points'] as num?)?.toDouble() ?? 0.0) : 0.0;
+    final double infraPoints = (dailyEarnings is Map) ? ((dailyEarnings['infra_points'] as num?)?.toDouble() ?? 0.0) : 0.0;
+    final double totalPoints = socialPoints + infraPoints;
 
     return Padding(
       padding: EdgeInsets.all(16.0),
@@ -147,8 +189,37 @@ class _NodeDashboardState extends State<NodeDashboard> {
           SizedBox(height: 16),
 
           // Asset Balances
+          Row(
+            children: [
+              Text(
+                "ASSET BALANCES",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.current.text.withValues(alpha: 0.7),
+                  letterSpacing: 1.0,
+                ),
+              ),
+              SizedBox(width: 8),
+              Text(
+                "(pull down to refresh)",
+                style: TextStyle(
+                  fontSize: 9,
+                  color: AppTheme.current.mutedText.withValues(alpha: 0.5),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          _buildBalanceRow('INTR', intrBalance, 4),
+          _buildBalanceRow('SOL', solBalance, 4),
+          _buildBalanceRow('USDC', usdcBalance, 2),
+          SizedBox(height: 12),
+
+          // Points Earned (real-time from DailyRewardEngine)
           Text(
-            "ASSET BALANCES",
+            "POINTS EARNED (THIS CYCLE)",
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
@@ -157,13 +228,43 @@ class _NodeDashboardState extends State<NodeDashboard> {
             ),
           ),
           SizedBox(height: 8),
-          _buildBalanceRow('INTR', intrBalance, 4),
-          _buildBalanceRow('SOL', solBalance, 4),
-          _buildBalanceRow('USDC', usdcBalance, 2),
+          _buildStatRow("Social Points", "${socialPoints.toStringAsFixed(1)} pts"),
+          _buildStatRow("Infrastructure Points", "${infraPoints.toStringAsFixed(1)} pts"),
+          _buildStatRow("Total Points", "${totalPoints.toStringAsFixed(1)} pts"),
           SizedBox(height: 12),
 
-          // Points Earned
-          _buildStatRow("Points Earned (This Cycle)", "${pendingPoints.toStringAsFixed(1)} pts"),
+          // Declare Points to Mesh button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _declaringPoints ? null : _declarePointsToMesh,
+              icon: _declaringPoints
+                  ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent))
+                  : Icon(Icons.upload_outlined, size: 16, color: AppTheme.current.accent),
+              label: Text(
+                _declaringPoints ? 'Declaring...' : 'Declare Points to Mesh',
+                style: TextStyle(fontSize: 12, color: AppTheme.current.accent),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppTheme.current.accent.withValues(alpha: 0.3)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          if (_declareStatus.isNotEmpty) ...[
+            SizedBox(height: 6),
+            Text(
+              _declareStatus,
+              style: TextStyle(
+                fontSize: 10,
+                color: _declareStatus.contains('Failed') || _declareStatus.contains('no RBN')
+                    ? Colors.orangeAccent
+                    : Colors.greenAccent,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
           SizedBox(height: 16),
 
           // Sovereign Distribution Notice — expandable
@@ -171,6 +272,58 @@ class _NodeDashboardState extends State<NodeDashboard> {
         ],
       ),
     );
+  }
+
+  Future<void> _declarePointsToMesh() async {
+    setState(() {
+      _declaringPoints = true;
+      _declareStatus = 'Sending telemetry to mesh...';
+    });
+
+    // Cancel any previous subscription
+    _telemetryAckSub?.cancel();
+
+    try {
+      final success = IntrovertClient().sendManualTelemetry();
+      if (!success) {
+        setState(() {
+          _declareStatus = 'Failed: no RBN connected. Connect to mesh first.';
+          _declaringPoints = false;
+        });
+        return;
+      }
+
+      // Listen for TelemetryAck from RBN (Event 40)
+      _telemetryAckSub = IntrovertClient().telemetryAckStream.listen((ack) {
+        if (!mounted) return;
+        final epochId = ack['epoch_id'] ?? 'unknown';
+        setState(() {
+          _declaringPoints = false;
+          _declareStatus = 'RBN confirmed receipt for epoch $epochId. INTR distributed at epoch close.';
+        });
+        _telemetryAckSub?.cancel();
+        // Clear status after 10 seconds
+        Future.delayed(Duration(seconds: 10), () {
+          if (mounted) setState(() => _declareStatus = '');
+        });
+      });
+
+      // Timeout after 15 seconds if no ack received
+      Future.delayed(Duration(seconds: 15), () {
+        if (mounted && _declaringPoints) {
+          setState(() {
+            _declaringPoints = false;
+            _declareStatus = 'No RBN confirmation received. Telemetry may not have reached the network.';
+          });
+          _telemetryAckSub?.cancel();
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _declaringPoints = false;
+        _declareStatus = 'Failed: $e';
+      });
+    }
   }
 
   Widget _buildBalanceRow(String symbol, double amount, int decimals) {

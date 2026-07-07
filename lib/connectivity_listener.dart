@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'src/native/introvert_client.dart';
 
 /// Listens for connectivity changes and informs the native Intro‑Claw.
+/// Notifications are handled by main_shell.dart with rate limiting.
 class ConnectivityListener extends StatefulWidget {
   final Widget child;
   const ConnectivityListener({required this.child, Key? key}) : super(key: key);
@@ -24,25 +25,11 @@ class _ConnectivityListenerState extends State<ConnectivityListener> {
       final result = hasVpn 
           ? ConnectivityResult.vpn 
           : (results.isNotEmpty ? results.first : ConnectivityResult.none);
+      // Inform native layer — no UI notifications here (handled by main_shell with rate limiting)
       client.setConnectivityType(result);
       if (result == ConnectivityResult.none) {
-        // Discreet user notification.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Network issue detected… Intro‑Claw resolving'),
-            duration: Duration(seconds: 4),
-          ),
-        );
-        // Attempt to restart networking.
+        // Attempt to restart networking silently.
         client.startNetwork();
-      } else if (result == ConnectivityResult.vpn) {
-        // Discreet user notification for VPN adaptation.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('VPN connection detected… Intro‑Claw adapting to tunnel‑only mode'),
-            duration: Duration(seconds: 4),
-          ),
-        );
       }
     });
   }

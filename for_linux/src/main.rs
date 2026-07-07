@@ -70,7 +70,7 @@ extern "C" fn daemon_network_callback(event_type: i32, data_ptr: *const u8, data
         3 => println!("[Network] WebRTC Channel Open"),
         4 => println!("[Network] WebRTC Data Received ({} bytes)", data_len),
         8 => {
-            let status = data_slice.first().cloned().unwrap_or(2);
+            let status = data_slice.last().cloned().unwrap_or(2);
             let status_text = match status {
                 0 => "DIRECT",
                 1 => "RELAYED",
@@ -99,6 +99,7 @@ extern "C" fn daemon_network_callback(event_type: i32, data_ptr: *const u8, data
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
     let mut args = Args::parse();
 
     // Handle --data-dir legacy support

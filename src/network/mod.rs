@@ -234,6 +234,7 @@ impl NetworkService {
             sync_in_progress: HashMap::new(),
             relay_hints: HashMap::new(),
             last_telemetry_sent: Instant::now() - Duration::from_secs(600), // allow first send after 10min
+            consecutive_zero_peers_ticks: 0,
         };
 
         // Sync to global RBN bootstrap list
@@ -356,6 +357,7 @@ impl NetworkService {
 
         let mut last_status = 0u8;
         let mut last_fast_mailbox_fetch = Instant::now() - Duration::from_secs(60);
+        self.consecutive_zero_peers_ticks = 0; // Reset on start
         let mut mobile_mailbox_skip = false;
 
         loop {
@@ -518,6 +520,7 @@ impl NetworkService {
                 _ = status_check_interval.tick() => {
                     let connected_count = self.swarm.connected_peers().count();
                     let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
+                    let has_confirmed_reservation = !self.relay_reservations.is_empty();
 
                     // --- ACCURATE STATUS DISPATCH ---
                     // status=0: OFFLINE — no connections at all
@@ -527,7 +530,7 @@ impl NetworkService {
                     // status=4: CONNECTING — RBN connected but relay not yet established
                     let current_status: u8 = if connected_count == 0 {
                         0 // OFFLINE — no connections
-                    } else if has_relay_listener {
+                    } else if has_relay_listener || has_confirmed_reservation {
                         1 // ONLINE — reachable via relay
                     } else {
                         4 // CONNECTING — connected to RBN but relay pending
@@ -539,6 +542,117 @@ impl NetworkService {
                         crate::dispatch_debug_log(&format!("[Status] Status change: {} (peers={}, relay_listener={})", current_status, connected_count, has_relay_listener));
                     }
 
+                    // Reset zero-peers counter when we have connections
+
+
+                    if connected_count > 0 {
+
+
+                        self.consecutive_zero_peers_ticks = 0;
+
+
+                    }
+
+
+
+                    // Retrospectively sync any unsynced past telemetry envelopes
+
+
+                    if let Ok(unsynced) = self.storage.fetch_unsynced_local_telemetry() {
+
+
+                        if !unsynced.is_empty() {
+
+
+                            let connected_rbns: Vec<PeerId> = self.bootstrap_nodes.iter()
+
+
+                                .map(|(id, _)| *id)
+
+
+                                .filter(|id| self.swarm.is_connected(id))
+
+
+                                .collect();
+
+
+                            if !connected_rbns.is_empty() {
+
+
+                                for (epoch_id, envelope_json) in unsynced {
+
+
+                                    if let Ok(envelope) = serde_json::from_str::<crate::economy::TelemetryEnvelope>(&envelope_json) {
+
+
+                                        let payload = SignalingPayload::TelemetryEnvelope {
+
+
+                                            peer_id: envelope.peer_id,
+
+
+                                            solana_wallet: envelope.solana_wallet,
+
+
+                                            solana_ata: envelope.solana_ata,
+
+
+                                            epoch_id: envelope.epoch_id,
+
+
+                                            metrics: envelope.metrics,
+
+
+                                            unique_peers: envelope.unique_peers,
+
+
+                                            is_rbn: envelope.is_rbn,
+
+
+                                            is_edge_node: envelope.is_edge_node,
+
+
+                                            prestige_tier: envelope.prestige_tier,
+
+
+                                            proof_hash: envelope.proof_hash,
+
+
+                                            client_signature: envelope.client_signature,
+
+
+                                            timestamp: envelope.timestamp,
+
+
+                                        };
+
+
+                                        for rbn_id in &connected_rbns {
+
+
+                                            let _ = self.forward_to_mesh(*rbn_id, payload.clone(), false).await;
+
+
+                                            info!("[Economy] Retrospectively sync telemetry for epoch {} to RBN {}", epoch_id, rbn_id);
+
+
+                                        }
+
+
+                                    }
+
+
+                                }
+
+
+                            }
+
+
+                        }
+
+
+                    }
+
                     // --- PROGRESSIVE RECONNECT LADDER ---
                     // This is the core resilience engine. It runs every 2 minutes and
                     // escalates through connection strategies from fastest to most basic.
@@ -547,8 +661,56 @@ impl NetworkService {
                     //   Step 2: If no peers — re-dial all bootstrap nodes (TCP + QUIC)
                     //   Step 3: If no peers after step 2 — activate WebSocket tunnel
                     //   Step 4: If nothing works — report OFFLINE clearly
+                    //
+                    // When IntroClaw is active, steps 2-4 are managed by IntroClaw's
+                    // ConnectionStateCycler which intelligently cycles through strategies
+                    // and uses VPN passthrough only as a last resort.
 
                     if connected_count == 0 {
+                        self.consecutive_zero_peers_ticks += 1;
+
+                        // If IntroClaw is active, evaluate its intelligent connection cycler on the 15-second tick
+                        // to ensure quick recovery (e.g. within 30s) instead of waiting for the 5-minute tick.
+                        if self.intro_claw.is_active() {
+                            crate::dispatch_debug_log(&format!(
+                                "[Resilience] No peers — IntroClaw active, evaluating ConnCycler (tick={})",
+                                self.consecutive_zero_peers_ticks));
+                            
+                            let mdns_peers: Vec<String> = self.mdns_peers.iter()
+                                .map(|p| p.to_string())
+                                .collect();
+                            let active_hashes: Vec<String> = self.incoming_transfers.keys().cloned().collect();
+                            
+                            let ctx = crate::intro_claw::ClawTickContext {
+                                battery_pct: 100,
+                                is_background: false,
+                                connected_peers: Vec::new(),
+                                mdns_discovered: mdns_peers,
+                                active_transfer_hashes: active_hashes,
+                                is_mobile_data: self.intro_claw.is_on_mobile_data(),
+                                network_type: if self.intro_claw.is_on_mobile_data() { "cellular".into() } else { "wifi".into() },
+                                connectivity_type: self.connectivity_type,
+                                tunnel_active: self.tunnel_active,
+                                consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
+                                has_relay_reservation: !self.relay_reservations.is_empty(),
+                            };
+
+                            if let Some(strategy) = self.intro_claw.evaluate_connection_strategy(&ctx) {
+                                info!("[Resilience] IntroClaw ConnectionStateCycler triggered connection strategy: {:?}", strategy);
+                                let actions = crate::intro_claw::ClawActions {
+                                    heal_peers: Vec::new(),
+                                    prefetch_files: Vec::new(),
+                                    retry_dead_letters: Vec::new(),
+                                    upgrade_connections: Vec::new(),
+                                    pre_establish_relays: Vec::new(),
+                                    force_mesh_refresh: matches!(strategy, crate::intro_claw::ConnectionStrategy::ForceRefresh),
+                                    cache_files_for_offline: Vec::new(),
+                                    serve_cached_chunks: Vec::new(),
+                                    connection_strategy: Some(strategy),
+                                };
+                                self.execute_claw_actions(actions).await;
+                            }
+                        } else {
                         // Step 2: No connections at all — re-dial ALL bootstrap addresses
                         let network_type = if self.intro_claw.is_on_mobile_data() { "CELLULAR" } else { "WIFI" };
                         warn!("[Resilience] OFFLINE: No peers connected on {}. Re-dialing all bootstrap addresses...", network_type);
@@ -563,8 +725,11 @@ impl NetworkService {
                         }
                         let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
 
-                        // Step 3: If tunnel not already active, escalate to WebSocket tunnel
-                        if !self.tunnel_active {
+                        // Step 3: Only activate tunnel after sustained disconnect (4 ticks = 60s)
+                        // This prevents false tunnel activation during brief connection gaps.
+                        let had_recent_relay = self.relay_reservations.len() > 0
+                            || self.tunnel_started_at.map(|t| t.elapsed() < Duration::from_secs(120)).unwrap_or(false);
+                        if !self.tunnel_active && !had_recent_relay && self.consecutive_zero_peers_ticks >= 4 {
                             warn!("[Resilience] Step 3: No direct path — escalating to WebSocket tunnel");
                             crate::dispatch_debug_log("[Resilience] Step 3: Activating WebSocket tunnel fallback");
                             let tx = self.command_tx.clone();
@@ -577,8 +742,8 @@ impl NetworkService {
                             // reconnect attempts, the VPN is likely blocking WebSocket connections.
                             // Force-reset the tunnel and re-activate it.
                             let tunnel_age = self.tunnel_started_at.map(|t| t.elapsed()).unwrap_or(Duration::from_secs(0));
-                            if tunnel_age > Duration::from_secs(60) {
-                                warn!("[Resilience] Tunnel active for {}s with 0 peers — VPN likely blocking. Force-resetting tunnel.", tunnel_age.as_secs());
+                            if tunnel_age > Duration::from_secs(120) {
+                                warn!("[Resilience] Tunnel active for {}s with 0 peers — likely blocking. Force-resetting tunnel.", tunnel_age.as_secs());
                                 crate::dispatch_debug_log(&format!("[Resilience] VPN interference: tunnel stale ({}s). Force-resetting.", tunnel_age.as_secs()));
                                 // Reset tunnel state
                                 self.tunnel_active = false;
@@ -601,7 +766,10 @@ impl NetworkService {
                             warn!("[Resilience] Step 4: All bootstrap addresses failed. OFFLINE.");
                             crate::dispatch_debug_log("[Resilience] Step 4: All strategies exhausted — OFFLINE");
                         }
+                        } // end else (!intro_claw.is_active())
                     } else if !has_relay_listener {
+                        // Peers connected but no relay — reset zero-peers counter
+                        self.consecutive_zero_peers_ticks = 0;
                         // Step 1: Connected to peers but no relay reservation.
                         // First ensure we're connected to at least one RBN, then request reservation.
                         warn!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count);
@@ -646,7 +814,9 @@ impl NetworkService {
 
                         // VPN DETECTION: If reservations are empty but RBNs are connected,
                         // the VPN likely made reservations stale. Force-clear and re-dial.
-                        if self.relay_reservations.is_empty() {
+                        // BUT: if we have pending relay listeners (requested, not yet accepted),
+                        // don't force-disconnect — the reservation is still being established.
+                        if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
                             let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
                                 .filter(|(id, _)| self.swarm.is_connected(id))
                                 .map(|(id, _)| *id)
@@ -775,19 +945,79 @@ impl NetworkService {
                     let now = Instant::now();
                     if now.duration_since(self.last_telemetry_sent) > Duration::from_secs(300) {
                         let local_peer_id = self.swarm.local_peer_id().to_string();
-                        let envelope = self.reward_tracker.package_telemetry(&local_peer_id);
-                        let telemetry_payload = SignalingPayload::TelemetryEnvelope {
-                            peer_id: envelope.peer_id,
-                            metrics: envelope.metrics,
-                            timestamp: envelope.timestamp,
-                        };
-                        let bootstrap_clone = self.bootstrap_nodes.clone();
-                        for (rbn_id, _) in &bootstrap_clone {
-                            if self.swarm.is_connected(rbn_id) {
-                                let _ = self.forward_to_mesh(*rbn_id, telemetry_payload.clone(), false).await;
-                                self.last_telemetry_sent = now;
-                                debug!("[Economy] Telemetry submitted to RBN {}", rbn_id);
-                                break;
+
+                        let mut seed = [0u8; 32];
+                        let mut engine_found = false;
+                        if let Some(engine) = crate::ENGINE.read().as_ref() {
+                            seed = engine.identity.seed;
+                            engine_found = true;
+                        }
+
+                        if engine_found {
+                            if let Ok(signing_key) = crate::identity::NodeIdentity::derive_solana_keypair(seed) {
+                                let sol_pubkey = solana_sdk::pubkey::Pubkey::new_from_array(signing_key.verifying_key().to_bytes());
+                                let solana_wallet = sol_pubkey.to_string();
+                                let solana_ata = crate::economy::derive_ata(&solana_wallet, "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")
+                                    .unwrap_or_else(|| solana_wallet.clone());
+                                let epoch_id = chrono::Utc::now().format("%Y_%m_%d").to_string();
+
+                                let mut prestige_tier = 0u8;
+                                if let Ok(Some((_, _, _, _, tier))) = self.storage.get_profile() {
+                                    prestige_tier = tier as u8;
+                                }
+
+                                let envelope = self.reward_tracker.package_signed_telemetry(
+                                    &local_peer_id,
+                                    &solana_wallet,
+                                    &solana_ata,
+                                    &epoch_id,
+                                    &signing_key,
+                                    false,
+                                    true,
+                                    prestige_tier,
+                                );
+
+
+
+                                if let Ok(envelope_json) = serde_json::to_string(&envelope) {
+
+
+                                    if let Err(e) = self.storage.save_local_telemetry(&epoch_id, &envelope_json) {
+
+
+                                        warn!("[Economy] Failed to save local telemetry: {:?}", e);
+
+
+                                    }
+
+
+                                }
+
+
+
+                                let telemetry_payload = SignalingPayload::TelemetryEnvelope {
+                                    peer_id: envelope.peer_id,
+                                    solana_wallet: envelope.solana_wallet,
+                                    solana_ata: envelope.solana_ata,
+                                    epoch_id: envelope.epoch_id,
+                                    metrics: envelope.metrics,
+                                    unique_peers: envelope.unique_peers,
+                                    is_rbn: envelope.is_rbn,
+                                    is_edge_node: envelope.is_edge_node,
+                                    prestige_tier: envelope.prestige_tier,
+                                    proof_hash: envelope.proof_hash,
+                                    client_signature: envelope.client_signature,
+                                    timestamp: envelope.timestamp,
+                                };
+                                let bootstrap_clone = self.bootstrap_nodes.clone();
+                                for (rbn_id, _) in &bootstrap_clone {
+                                    if self.swarm.is_connected(rbn_id) {
+                                        let _ = self.forward_to_mesh(*rbn_id, telemetry_payload.clone(), false).await;
+                                        self.last_telemetry_sent = now;
+                                        debug!("[Economy] Telemetry submitted to RBN {}", rbn_id);
+                                        break;
+                                    }
+                                }
                             }
                         }
                     }
@@ -907,6 +1137,10 @@ impl NetworkService {
                             active_transfer_hashes: active_hashes,
                             is_mobile_data: self.intro_claw.is_on_mobile_data(),
                             network_type: if self.intro_claw.is_on_mobile_data() { "cellular".into() } else { "wifi".into() },
+                            connectivity_type: self.connectivity_type,
+                            tunnel_active: self.tunnel_active,
+                            consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
+                            has_relay_reservation: !self.relay_reservations.is_empty(),
                         };
                         let actions = self.intro_claw.tick(&ctx);
                         self.execute_claw_actions(actions).await;
@@ -1537,9 +1771,11 @@ impl NetworkService {
                     }
                     IntrovertBehaviourEvent::RelayClient(event) => {
                         match event {
-                            libp2p::relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
+                             libp2p::relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
                                 info!("✅ Relay reservation ACCEPTED by {}. Renewal: {}", relay_peer_id, renewal);
                                 crate::dispatch_debug_log(&format!("[Relay] ✅ ReservationReqAccepted via {} (renewal={})", relay_peer_id, renewal));
+                                // Mark reservation as confirmed (not just requested)
+                                self.relay_reservations.insert(relay_peer_id);
                                 // Re-register our addresses in Kademlia so peers can discover our relay path
                                 let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
                                 // Also add the relay address to Kademlia explicitly for faster discovery
@@ -2182,6 +2418,10 @@ impl NetworkService {
 
             SwarmEvent::ListenerError { listener_id, error, .. } => {
                 info!("[Swarm] Listener error ({:?}): {:?}", listener_id, error);
+                if let Some(peer_id) = self.relay_listeners.remove(&listener_id) {
+                    info!("[Mesh] Relay listener error for {}. Clearing reservation record.", peer_id);
+                    self.relay_reservations.remove(&peer_id);
+                }
             }
             SwarmEvent::ListenerClosed { listener_id, reason, .. } => {
                 info!("[Swarm] Listener closed ({:?}): {:?}", listener_id, reason);
@@ -2366,8 +2606,11 @@ impl NetworkService {
                 let is_rbn_or_anchor = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id)
                     || self.discovered_anchors.contains(&peer_id);
                 if is_rbn_or_anchor {
-                    self.relay_reservations.remove(&peer_id);
-                    info!("[Mesh] RBN/anchor {} disconnected. Cleared relay reservation.", peer_id);
+                    // Don't clear relay_reservations here — the relay circuit may still be
+                    // working through a tunnel or alternate path. ListenerClosed will clear it
+                    // when the relay listener actually closes.
+                    self.relay_listeners.retain(|_, rbn| rbn != &peer_id);
+                    info!("[Mesh] RBN/anchor {} disconnected. Cleared relay listeners (reservation kept).", peer_id);
                 }
                 self.inflight_requests.remove(&peer_id);
                 self.pending_requester_static_keys.remove(&peer_id.to_string());
@@ -3071,9 +3314,9 @@ impl NetworkService {
                     let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
                 }
 
-                // Dispatch global event 12 with the new connectivity type
-                let payload = [connectivity_type];
-                crate::dispatch_global_event(12, &payload);
+                // Dispatch global event (Removed to avoid collision with File Transfer Progress Event 12)
+                // let payload = [connectivity_type];
+                // crate::dispatch_global_event(12, &payload);
             },
             NetworkCommand::AddGroupMember { group_id, peer_id } => {
                 info!("[Mesh] Adding member {} to group {}", peer_id, group_id);
@@ -3981,6 +4224,101 @@ impl NetworkService {
                     info!("[Network] WebSocket tunnel already active");
                 }
             }
+            NetworkCommand::SendManualTelemetry => {
+                info!("[Economy] Manual telemetry declaration triggered by user");
+                let local_peer_id = self.swarm.local_peer_id().to_string();
+
+                let mut seed = [0u8; 32];
+                let mut engine_found = false;
+                if let Some(engine) = crate::ENGINE.read().as_ref() {
+                    seed = engine.identity.seed;
+                    engine_found = true;
+                }
+
+                if !engine_found {
+                    error!("[Economy] Engine state not initialized. Cannot send telemetry.");
+                    return Ok(());
+                }
+
+                let signing_key = match crate::identity::NodeIdentity::derive_solana_keypair(seed) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        error!("[Economy] Failed to derive Solana keypair: {}", e);
+                        return Ok(());
+                    }
+                };
+
+                let sol_pubkey = solana_sdk::pubkey::Pubkey::new_from_array(signing_key.verifying_key().to_bytes());
+                let solana_wallet = sol_pubkey.to_string();
+                let solana_ata = crate::economy::derive_ata(&solana_wallet, "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")
+                    .unwrap_or_else(|| solana_wallet.clone());
+                let epoch_id = chrono::Utc::now().format("%Y_%m_%d").to_string();
+
+                let mut prestige_tier = 0u8;
+                if let Ok(Some((_, _, _, _, tier))) = self.storage.get_profile() {
+                    prestige_tier = tier as u8;
+                }
+
+                let envelope = self.reward_tracker.package_signed_telemetry(
+                    &local_peer_id,
+                    &solana_wallet,
+                    &solana_ata,
+                    &epoch_id,
+                    &signing_key,
+                    false,
+                    true,
+                    prestige_tier,
+                );
+
+
+
+                if let Ok(envelope_json) = serde_json::to_string(&envelope) {
+
+
+                    if let Err(e) = self.storage.save_local_telemetry(&epoch_id, &envelope_json) {
+
+
+                        warn!("[Economy] Failed to save local telemetry: {:?}", e);
+
+
+                    }
+
+
+                }
+
+
+
+                let telemetry_payload = SignalingPayload::TelemetryEnvelope {
+                    peer_id: envelope.peer_id,
+                    solana_wallet: envelope.solana_wallet,
+                    solana_ata: envelope.solana_ata,
+                    epoch_id: envelope.epoch_id,
+                    metrics: envelope.metrics,
+                    unique_peers: envelope.unique_peers,
+                    is_rbn: envelope.is_rbn,
+                    is_edge_node: envelope.is_edge_node,
+                    prestige_tier: envelope.prestige_tier,
+                    proof_hash: envelope.proof_hash,
+                    client_signature: envelope.client_signature,
+                    timestamp: envelope.timestamp,
+                };
+
+                let mut sent = false;
+                let bootstrap_clone = self.bootstrap_nodes.clone();
+                for (rbn_id, _) in &bootstrap_clone {
+                    if self.swarm.is_connected(rbn_id) {
+                        let _ = self.forward_to_mesh(*rbn_id, telemetry_payload.clone(), false).await;
+                        self.last_telemetry_sent = Instant::now();
+                        info!("[Economy] Manual telemetry sent to RBN {}", rbn_id);
+                        sent = true;
+                        break;
+                    }
+                }
+                if !sent {
+                    warn!("[Economy] Manual telemetry failed — no RBN connected");
+                    crate::dispatch_debug_log("[Economy] Manual telemetry failed: no RBN connected. Connect to mesh first.");
+                }
+            }
             NetworkCommand::InitiateWebRtc { peer_id, media_type } => {
                 let (pc, mut dc_rx) = MediaManager::create_peer_connection(true, Arc::clone(&self.reward_tracker), peer_id, self.command_tx.clone()).await?;
                 let dc_store = Arc::clone(&self.data_channels);
@@ -4452,6 +4790,10 @@ impl NetworkService {
                     active_transfer_hashes: active_hashes,
                     is_mobile_data,
                     network_type,
+                    connectivity_type: self.connectivity_type,
+                    tunnel_active: self.tunnel_active,
+                    consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
+                    has_relay_reservation: !self.relay_reservations.is_empty(),
                 };
                 let actions = self.intro_claw.tick(&ctx);
                 self.execute_claw_actions(actions).await;
@@ -6718,6 +7060,26 @@ impl NetworkService {
                     self.pending_claims.remove(&handle);
                 }
             }
+            SignalingPayload::TelemetryAck { peer_id, epoch_id, total_points, timestamp } => {
+
+                info!("[Economy] TelemetryAck received from RBN: peer={}, epoch={}, points={:.1}", peer_id, epoch_id, total_points);
+
+                if let Err(e) = self.storage.mark_local_telemetry_synced(&epoch_id) {
+
+                    warn!("[Economy] Failed to mark local telemetry synced: {:?}", e);
+
+                }
+                // Dispatch to Flutter as Event 40 (Telemetry Acknowledgment)
+                let ack_json = serde_json::json!({
+                    "peer_id": peer_id,
+                    "epoch_id": epoch_id,
+                    "total_points": total_points,
+                    "timestamp": timestamp,
+                });
+                if let Ok(json_str) = serde_json::to_string(&ack_json) {
+                    crate::dispatch_global_event(41, json_str.as_bytes());
+                }
+            }
             _ => {}
         }
     }
@@ -6956,7 +7318,8 @@ impl NetworkService {
         info!("[IntroClaw] Executing {} actions",
             actions.heal_peers.len() + actions.prefetch_files.len() +
             actions.retry_dead_letters.len() + actions.upgrade_connections.len() +
-            actions.pre_establish_relays.len() + if actions.force_mesh_refresh { 1 } else { 0 });
+            actions.pre_establish_relays.len() + if actions.force_mesh_refresh { 1 } else { 0 } +
+            if actions.connection_strategy.is_some() { 1 } else { 0 });
 
         // 0. Force mesh refresh if network isolation detected
         if actions.force_mesh_refresh {
@@ -6965,6 +7328,105 @@ impl NetworkService {
             tokio::spawn(async move {
                 let _ = tx.send(NetworkCommand::ForceMeshRefresh).await;
             });
+        }
+
+        // 0b. Handle intelligent connection strategy from IntroClaw cycler
+        if let Some(strategy) = &actions.connection_strategy {
+            use crate::intro_claw::ConnectionStrategy;
+            match strategy {
+                ConnectionStrategy::DirectBootstrap => {
+                    info!("[IntroClaw/ConnCycler] Executing direct bootstrap re-dial");
+                    crate::dispatch_debug_log("[IntroClaw/ConnCycler] Retrying direct TCP/QUIC bootstrap");
+                    let mut any_dialed = false;
+                    for (peer_id, addr) in &self.bootstrap_nodes {
+                        crate::dispatch_debug_log(&format!("[IntroClaw/ConnCycler] Dialing bootstrap: {}", addr));
+                        if self.swarm.dial(addr.clone()).is_ok() {
+                            any_dialed = true;
+                        }
+                        let _ = self.swarm.behaviour_mut().kademlia.add_address(peer_id, addr.clone());
+                    }
+                    let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
+                    if !any_dialed {
+                        warn!("[IntroClaw/ConnCycler] All bootstrap dials failed");
+                    }
+                }
+                ConnectionStrategy::TunnelWithConfig(config) => {
+                    info!("[IntroClaw/ConnCycler] Executing tunnel with config: {}", config.description);
+                    crate::dispatch_debug_log(&format!("[IntroClaw/ConnCycler] Trying VPN config: {}", config.description));
+
+                    // Reset existing tunnel if active
+                    if self.tunnel_active {
+                        self.tunnel_active = false;
+                        self._tunnel_handle = None;
+                        self.bootstrap_nodes.retain(|(_, addr)| !addr.to_string().contains("127.0.0.1"));
+                    }
+
+                    // Select tunnel URL based on config
+                    let tunnel_url = if config.use_plaintext {
+                        crate::network::types::RBN_WS_URL_PLAIN.to_string()
+                    } else {
+                        crate::network::types::RBN_WS_URL.to_string()
+                    };
+
+                    // Activate tunnel with the specified config
+                    match tunnel::start_tunnel_client(0, tunnel_url.clone()).await {
+                        Ok((port, handle)) => {
+                            self.tunnel_active = true;
+                            self.tunnel_started_at = Some(Instant::now());
+                            self._tunnel_handle = Some(handle);
+                            let tunnel_addr: Multiaddr = match format!("/ip4/127.0.0.1/tcp/{}", port).parse() {
+                                Ok(addr) => addr,
+                                Err(e) => {
+                                    warn!("[IntroClaw/ConnCycler] Failed to parse tunnel address: {:?}", e);
+                                    return;
+                                }
+                            };
+                            let rbn_peer_id: PeerId = match types::RBN_PEER_ID.parse() {
+                                Ok(id) => id,
+                                Err(e) => {
+                                    warn!("[IntroClaw/ConnCycler] Failed to parse RBN peer ID: {:?}", e);
+                                    return;
+                                }
+                            };
+
+                            if config.isolate_to_tunnel {
+                                // VPN: Isolate bootstrap to tunnel ONLY
+                                self.bootstrap_nodes.clear();
+                                self.bootstrap_nodes.push((rbn_peer_id, tunnel_addr.clone()));
+                                info!("[IntroClaw/ConnCycler] Isolated bootstrap to tunnel loopback only");
+                            } else {
+                                // Non-isolated: keep direct bootstrap alongside tunnel
+                                self.bootstrap_nodes.push((rbn_peer_id, tunnel_addr.clone()));
+                                info!("[IntroClaw/ConnCycler] Added tunnel alongside direct bootstrap");
+                            }
+
+                            self.swarm.behaviour_mut().kademlia.add_address(&rbn_peer_id, tunnel_addr.clone());
+                            let _ = self.swarm.dial(tunnel_addr);
+                            let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
+                            info!("[IntroClaw/ConnCycler] Tunnel active on local port {} ({})", port, config.description);
+                            crate::dispatch_debug_log(&format!("[IntroClaw/ConnCycler] Tunnel activated on port {} — {}", port, config.description));
+                        }
+                        Err(e) => {
+                            warn!("[IntroClaw/ConnCycler] Tunnel activation failed: {:?}", e);
+                            crate::dispatch_debug_log(&format!("[IntroClaw/ConnCycler] Tunnel FAILED: {}", e));
+                            self.tunnel_active = false;
+                            self.tunnel_started_at = None;
+                        }
+                    }
+                }
+                ConnectionStrategy::ForceRefresh => {
+                    info!("[IntroClaw/ConnCycler] All strategies failed — forcing mesh refresh");
+                    crate::dispatch_debug_log("[IntroClaw/ConnCycler] Forcing mesh refresh (hard reset)");
+                    let tx = self.command_tx.clone();
+                    tokio::spawn(async move {
+                        let _ = tx.send(NetworkCommand::ForceMeshRefresh).await;
+                    });
+                }
+                ConnectionStrategy::ReportOffline => {
+                    warn!("[IntroClaw/ConnCycler] All connection strategies exhausted — OFFLINE");
+                    crate::dispatch_debug_log("[IntroClaw/ConnCycler] All strategies exhausted — OFFLINE");
+                }
+            }
         }
 
         // 1. Heal unreachable peers

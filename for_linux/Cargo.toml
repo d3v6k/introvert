@@ -57,10 +57,11 @@ async-compat = "0.2.5"
 tokio-tungstenite = "0.28.0"
 futures-util = "0.3"
 jsonwebtoken = "9"
+tracing-subscriber = "0.3"
 
 [dev-dependencies]
 tempfile = "3.10"
-tracing-subscriber = "0.3"
+
 
 [lib]
 name = "introvert"

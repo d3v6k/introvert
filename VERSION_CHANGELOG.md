@@ -26,6 +26,7 @@ _Stable version history with key changes. Updated at every stable backup._
 | **v49 (0.21.2)** | **2026-07-01** | **Cross-Network Delivery & Mailbox Integrity** | **Relay reservation full multiaddr fix** (MissingRelayAddr). **Mailbox replication to ALL verified RBNs**. **`verified_rbns` filter** (bootstrap nodes only). **`OutboundCircuitEstablished` flush** with rate limiter clear. **TransitFileChunk removed** — chunks via normal relay circuit. **64KB relay chunks restored** (was 256KB). **Relay dial simplified** (one RBN, early break). | **Caption dialog thumbnails** (Cancel/Send). **Status 3 clock icon** (In Mailbox). **Double thumbnail fix** (removed `_addSendingPlaceholder`). **Stale FileTransferComplete guard**. | **`MailboxStored` ACK** from anchor to sender. **`store_message_if_new`** (INSERT OR IGNORE) for sync. **File messages excluded from sync**. **Chat sync no longer overwrites** existing messages. **Retry undelivered messages** (60s threshold). | **Known issue**: cross-network file chunks need live relay circuit (no mailbox fallback). See DEBUG_DOCUMENT.md. |
 | **v50 (0.21.3)** | **2026-07-01** | **Delivery Fixes & System Hardening** | **`dial_relay_path` parameterized** (`for_file_chunk: bool`). **ALL RBNs for file chunks** (no early break). **Persistent file chunk queue** (`pending_file_chunks` SQLite table). **Relay hint optimization** (prioritize hinted RBN). **VPN stale reservation detection** (force-clear and re-dial). **DCUtR on InboundCircuitEstablished** (hole-punch attempt). **Gemini: Relay reservation three-tier fallback** (bootstrap_nodes → anchor_mappings → filtered listen_addrs; fixes VPC private IP leak). | **Gemini: File transfer bubble** — thumbnail suppression scoped to `_buildThumbnailWidget()` only; transfer card with progress/status/cancel always shown to receiver. | **`update_message_status_if_higher`** (monotonic transitions). **`sync_in_progress` timeout** (60s cleanup). **[FILE]: filter in sync** (defense in depth). **for_linux sender authorization** (ChatSyncResponse). **for_linux relay reservation fix** (RBN-only cleanup). | **Status downgrade protection** (all ACK handlers). **Data loss prevention** (defer chunk removal to FileTransferComplete). **sync_in_progress lockout fix** (remove on unauthorized). |
 | **v54 (0.28.0)** | **2026-07-04** | **VPN Resilience & Session Optimization** | **VPN Adaptive Pathing**: Isolate bootstrap nodes list to ONLY the tunnel loopback address (`127.0.0.1`) when VPN (type 5) is active, preventing dead dials to public RBNs from clogging the queue. **Solana Registry Bypass**: Disabled on-chain Solana registry queries entirely for Mainnet, falling back strictly to the hardcoded Alibaba RBN node (`47.89.252.80`). **Queue Congestion Prevention**: Removed redundant carpet-bombing dial loops from `forward_to_mesh`'s fallback block. **Blacklist Cooldown Bypass**: Clears RBN blacklists on network switch, manual refresh, and tunnel activation to prevent stale blocks; removes connected RBNs from blacklist immediately. **LAN Node Removal**: Cleaned Thinkpad RBN (`192.168.1.81`) from default configuration. | **Active Chat Session Prioritization**: Flutter UI dynamically propagates chat session state (`setActiveChat` / `setActiveGroupMembers`); Rust engine bypasses cooldowns, aggressively punches direct holes (DCUtR) for relayed partners, and proactively heals offline targets on every tick. **Chat Screen Offline Sync**: Updates chat status to Offline when local node goes offline. **App Launch Warm-Up**: `onAppLaunch()` executes initial warm-up connection pass. | Monotonic status upgrades and RBN blacklisting protect mesh integrity. | No changes |
+| **v56 (0.30.0)** | **2026-07-06** | **Sovereign Economy & Snappy Mesh** | **Connection State Cycler 15s Status Check Integration**: Evaluates ConnectionStateCycler on the 15-second status loop when IntroClaw is active instead of waiting for 5-minute ticks, achieving rapid (15–30s) connection drop recovery on all devices. | No changes | **Cryptographic Telemetry Authentication**: Telemetry envelopes signed with client-derived Ed25519 Solana keys and validated at the RBN libp2p entry point. Persistent storage of Raw Envelopes in encrypted SQLCipher database to survive restarts. | **Stage 1-3 Rewards Pipeline Implementation**: 13-metrics schema alignment between client and RBN. SQLite telemetry persistence and recovery. Midnight UTC cron task to trigger epoch clearing, calculate rewards with IQR outlier mitigation, sign with HMAC-SHA256, and dispatch claims to Solana daemon on port 9001. |
 | **v55 (0.29.0)** | **2026-07-06** | **Recovery, Drive, VPN & Notifications** | **VPN Tunnel Fix**: `ws://` port 80 fallback when VPN detected (bypasses TLS blocking). **VPN Bootstrap Isolation**: Tunnel-only on VPN. **VPN Relay Fix**: Removed `relay_reservations.clear()`. **ListenerClosed Fix**: Full multiaddr. **In-flight Limits**: relay=4/direct=8. **Anchor Relay Strategy**. **Undelivered Retry**. **Telemetry Pipeline**: 30-min interval. **9-Field Bridge**. | **Drive Rebuild**: 612-line folder manager with grouping, minimized view, Introvert Explained, list/grid toggle, multi-select, batch ops, breadcrumb, storage bar. **Messenger tabs** (6 web messengers). **FIFA themes**. **Notification Hardening**: 3-min cooldown (native + Dart), foreground suppression, sound-only when app open. **android libc++_shared.so** bundled. | **FFI**: 134 exports, 0 mismatches. **Drive FFI**: `drive_add_file_with_folder`, `drive_update_folder`. **Storage**: `folder` column, `drive_folders` table. **Backup**: `dd_mm_yy_time` naming. **Economy daemon** restored. | **IQR Anti-Gaming Filter**. **Deployed** to Alibaba RBN. **Full recovery** from GitHub source + v54 networking. |
 | v53 (0.23.0) | 2026-07-03 | Beta Stability | **FCM push fix** (`message_type`→`msg_type`). **Connection limit** 102→204. **Step 1 reconnect** (dials disconnected RBNs). **Group ACK** (>=1 not >=total). | **Messenger WebView** — login CSS fix, scroll fix. **CAMERA permission**. **Firebase key** regenerated. | Beta stability release. Cross-network verified. |
 | **v51 (0.21.4)** | **2026-07-01** | **Cross-Network Success & Sync Integrity** | **CROSS-NETWORK FILE TRANSFERS WORKING** on VPN and mobile data. **Chat list sorting fixed** — uses `MAX(timestamp)` instead of `MAX(id)` for chronological ordering. **Mailbox drain dedup** — `message_exists()` check + `[FILE]:` filter + cleared-chat timestamp guard. **Cleared chat protection** — `cleared_chats` table tracks clear timestamps; `should_skip_mailbox_message()` prevents re-delivery of pre-clear messages. **Proactive mailbox drain** on chat clear via `ClearMailboxForPeer` command. | **File transfer timestamps** — `FileTransferBubble` now displays HH:MM below status text. **Create/Join Group dialogs fixed** — uses parent widget context instead of invalidated bottom sheet context. | **`cleared_chats` table** — prevents mailbox from re-delivering old messages after chat clear. **`message_exists()`** — O(1) dedup check for mailbox-drained messages. **`cleanup_cleared_chats()`** — prunes entries older than 7 days. | **Stable release** — cross-network file transfers verified working on VPN and mobile data. |
@@ -87,4 +88,40 @@ _Stable version history with key changes. Updated at every stable backup._
 
 ## Backup 06_07_26_1019 (2026-07-06 10:19)
 - Git: main @ 2d44868
+- Machine: devs-Mac-mini.local
+
+## Backup 06_07_26_1109 (2026-07-06 11:09)
+- Git: main @ 2239bd5
+- Machine: devs-Mac-mini.local
+
+## Backup 06_07_26_1435 (2026-07-06 14:35)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 06_07_26_1725 (2026-07-06 17:25)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 06_07_26_1939 (2026-07-06 19:39)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 06_07_26_1947 (2026-07-06 19:47)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 06_07_26_1954 (2026-07-06 19:54)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 07_07_26_0611 (2026-07-07 06:11)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 07_07_26_0636 (2026-07-07 06:36)
+- Git: main @ 6b4398c
+- Machine: devs-Mac-mini.local
+
+## Backup 07_07_26_0652 (2026-07-07 06:52)
+- Git: main @ 6b4398c
 - Machine: devs-Mac-mini.local

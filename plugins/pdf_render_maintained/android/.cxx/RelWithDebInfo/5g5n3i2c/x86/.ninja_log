@@ -1,7 +1,3 @@
 # ninja log v5
-0	31	1780641346449169935	CMakeFiles/bbhelper.dir/c++/directBufferAndroid.cpp.o	5ab382cf7fc1c79c
-31	64	1780641346481624840	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/RelWithDebInfo/5g5n3i2c/obj/x86/libbbhelper.so	b4a1aac75cc875a
-1	49	1780647988181650848	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/RelWithDebInfo/5g5n3i2c/obj/x86/libbbhelper.so	b4a1aac75cc875a
-1	50	1780651483444058138	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/RelWithDebInfo/5g5n3i2c/obj/x86/libbbhelper.so	b4a1aac75cc875a
-1	51	1780672526323105148	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/RelWithDebInfo/5g5n3i2c/obj/x86/libbbhelper.so	b4a1aac75cc875a
-0	47	1781840342411160782	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/RelWithDebInfo/5g5n3i2c/obj/x86/libbbhelper.so	b4a1aac75cc875a
+0	31	1783318490795569765	CMakeFiles/bbhelper.dir/c++/directBufferAndroid.cpp.o	5ab382cf7fc1c79c
+32	65	1783318490829095830	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/RelWithDebInfo/5g5n3i2c/obj/x86/libbbhelper.so	b4a1aac75cc875a

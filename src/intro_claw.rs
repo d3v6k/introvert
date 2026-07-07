@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use std::collections::{HashMap, VecDeque, HashSet};
-use std::time::{SystemTime, Duration};
+use std::time::{SystemTime, Duration, Instant};
 use parking_lot::RwLock;
 use libp2p::PeerId;
 use tracing::{error, info, warn};
@@ -89,6 +89,14 @@ pub struct ClawTickContext {
     pub active_transfer_hashes: Vec<String>,
     pub is_mobile_data: bool,
     pub network_type: String,
+    /// Current connectivity type: 0=unknown, 1=wifi, 2=mobile, 3=ethernet, 4=bluetooth, 5=VPN
+    pub connectivity_type: u8,
+    /// Whether the WebSocket tunnel is currently active
+    pub tunnel_active: bool,
+    /// Number of consecutive status-check ticks with zero peers
+    pub consecutive_zero_peers_ticks: u32,
+    /// Whether a relay reservation is active
+    pub has_relay_reservation: bool,
 }
 
 /// Actions that IntroClaw wants the NetworkService to execute
@@ -103,6 +111,92 @@ pub struct ClawActions {
     // Node mode specific actions
     pub cache_files_for_offline: Vec<(String, String)>, // (file_hash, peer_id) to cache for offline peers
     pub serve_cached_chunks: Vec<(String, String)>,     // (transfer_id, peer_id) to serve cached chunks
+    // Connection strategy actions (IntroClaw intelligent cycling)
+    pub connection_strategy: Option<ConnectionStrategy>,
+}
+
+/// Connection strategy that IntroClaw recommends based on intelligent state cycling
+#[derive(Debug, Clone)]
+pub enum ConnectionStrategy {
+    /// Try direct TCP/QUIC to bootstrap nodes (Step 1)
+    DirectBootstrap,
+    /// Try WebSocket tunnel with specific configuration
+    TunnelWithConfig(VpnConfig),
+    /// Force full mesh refresh (hard reset)
+    ForceRefresh,
+    /// Report offline — all strategies exhausted
+    ReportOffline,
+}
+
+/// VPN tunnel configuration variants to try when behind VPN
+#[derive(Debug, Clone)]
+pub struct VpnConfig {
+    /// Use plaintext ws:// (port 80) vs encrypted wss:// (port 443)
+    pub use_plaintext: bool,
+    /// Connection timeout in seconds
+    pub connect_timeout_secs: u64,
+    /// Whether to isolate bootstrap to tunnel only
+    pub isolate_to_tunnel: bool,
+    /// Buffer size for the tunnel (bytes)
+    pub buffer_size: usize,
+    /// Description for logging
+    pub description: String,
+}
+
+impl VpnConfig {
+    /// Generate all VPN configuration permutations to try, ordered by likelihood of success
+    pub fn all_configs() -> Vec<VpnConfig> {
+        vec![
+            // Config 1: Plaintext WS on port 80 (most likely to bypass VPN)
+            VpnConfig {
+                use_plaintext: true,
+                connect_timeout_secs: 10,
+                isolate_to_tunnel: true,
+                buffer_size: 16384,
+                description: "WS/plaintext port 80, 10s timeout".into(),
+            },
+            // Config 2: Plaintext WS with longer timeout
+            VpnConfig {
+                use_plaintext: true,
+                connect_timeout_secs: 30,
+                isolate_to_tunnel: true,
+                buffer_size: 16384,
+                description: "WS/plaintext port 80, 30s timeout".into(),
+            },
+            // Config 3: WSS/TLS on port 443 (standard)
+            VpnConfig {
+                use_plaintext: false,
+                connect_timeout_secs: 10,
+                isolate_to_tunnel: true,
+                buffer_size: 16384,
+                description: "WSS/TLS port 443, 10s timeout".into(),
+            },
+            // Config 4: WSS/TLS with longer timeout
+            VpnConfig {
+                use_plaintext: false,
+                connect_timeout_secs: 30,
+                isolate_to_tunnel: true,
+                buffer_size: 16384,
+                description: "WSS/TLS port 443, 30s timeout".into(),
+            },
+            // Config 5: Plaintext with larger buffer
+            VpnConfig {
+                use_plaintext: true,
+                connect_timeout_secs: 15,
+                isolate_to_tunnel: true,
+                buffer_size: 32768,
+                description: "WS/plaintext port 80, 32KB buffer".into(),
+            },
+            // Config 6: Non-isolated tunnel (keep direct bootstrap alongside)
+            VpnConfig {
+                use_plaintext: true,
+                connect_timeout_secs: 10,
+                isolate_to_tunnel: false,
+                buffer_size: 16384,
+                description: "WS/plaintext port 80, non-isolated (direct+tunnel)".into(),
+            },
+        ]
+    }
 }
 
 impl ClawActions {
@@ -115,6 +209,7 @@ impl ClawActions {
             && !self.force_mesh_refresh
             && self.cache_files_for_offline.is_empty()
             && self.serve_cached_chunks.is_empty()
+            && self.connection_strategy.is_none()
     }
 }
 
@@ -153,6 +248,9 @@ pub struct IntroClawService {
     node_file_cacher: NodeFileProactiveCacher,
     node_dead_letter_processor: NodeDeadLetterProcessor,
     node_bandwidth_manager: NodeBandwidthManager,
+
+    // Connection state cycling
+    conn_cycler: ConnectionStateCycler,
 
     // Activity log
     activity_log: ActivityLog,
@@ -218,6 +316,215 @@ impl BatteryThrottler {
         if self.should_emergency_throttle() { 16 }
         else if self.should_throttle() { 32 }
         else { 1024 }
+    }
+}
+
+// ============================================================
+// Sub-module: Intelligent Connection State Cycler
+// ============================================================
+// Cycles through connection strategies in priority order:
+//   1. Direct TCP/QUIC bootstrap (fastest)
+//   2. Direct bootstrap with re-dial (retry)
+//   3. WebSocket tunnel (NAT traversal)
+//   4. VPN-optimized tunnel configurations (last resort)
+// VPN passthrough is ONLY used when all direct strategies fail.
+// When in VPN mode, cycles through multiple config permutations.
+
+const STRATEGY_DWELL_SECS: u64 = 30;  // How long to wait before escalating
+const VPN_CONFIG_DWELL_SECS: u64 = 20; // How long to try each VPN config
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConnectionPhase {
+    /// Try direct TCP/QUIC to bootstrap nodes
+    DirectBootstrap,
+    /// Retry direct with forced re-dial
+    DirectRetry,
+    /// Activate WebSocket tunnel (standard config)
+    TunnelStandard,
+    /// Try VPN-specific tunnel configurations
+    VpnConfigCycle,
+    /// All strategies exhausted
+    Exhausted,
+}
+
+pub struct ConnectionStateCycler {
+    current_phase: ConnectionPhase,
+    phase_started_at: Instant,
+    /// Index into VpnConfig::all_configs() when in VpnConfigCycle phase
+    vpn_config_index: usize,
+    /// Track which configs have been tried and their results
+    vpn_config_results: Vec<(String, bool)>, // (description, success)
+    /// Total cycles completed (for telemetry)
+    total_cycles: u32,
+    /// Last time we saw a successful connection
+    last_success_at: Option<Instant>,
+    /// Whether we're on a VPN (detected externally)
+    is_vpn: bool,
+}
+
+impl ConnectionStateCycler {
+    pub fn new() -> Self {
+        Self {
+            current_phase: ConnectionPhase::DirectBootstrap,
+            phase_started_at: Instant::now(),
+            vpn_config_index: 0,
+            vpn_config_results: Vec::new(),
+            total_cycles: 0,
+            last_success_at: None,
+            is_vpn: false,
+        }
+    }
+
+    /// Update VPN status from external detection
+    pub fn set_vpn(&mut self, is_vpn: bool) {
+        if self.is_vpn != is_vpn {
+            self.is_vpn = is_vpn;
+            info!("[IntroClaw/ConnCycler] VPN status changed: {}", is_vpn);
+            // Reset to beginning when VPN status changes
+            self.reset_to_phase(ConnectionPhase::DirectBootstrap);
+        }
+    }
+
+    /// Called when a connection succeeds — resets cycle
+    pub fn on_connection_success(&mut self) {
+        self.last_success_at = Some(Instant::now());
+        self.total_cycles = 0;
+        self.vpn_config_results.clear();
+        self.vpn_config_index = 0;
+        self.current_phase = ConnectionPhase::DirectBootstrap;
+        self.phase_started_at = Instant::now();
+    }
+
+    /// Called when all peers disconnect — may trigger cycling
+    pub fn on_all_peers_lost(&mut self) {
+        if self.current_phase == ConnectionPhase::DirectBootstrap {
+            // Don't immediately escalate — let the dwell time handle it
+            return;
+        }
+    }
+
+    fn reset_to_phase(&mut self, phase: ConnectionPhase) {
+        self.current_phase = phase;
+        self.phase_started_at = Instant::now();
+    }
+
+    /// Determine the next connection strategy based on current state.
+    /// Returns None if the current strategy should continue (not yet timed out).
+    /// Returns Some(strategy) if it's time to escalate.
+    pub fn evaluate(&mut self, ctx: &ClawTickContext) -> Option<ConnectionStrategy> {
+        // If we have peers connected, no action needed
+        if !ctx.connected_peers.is_empty() {
+            return None;
+        }
+
+        let elapsed = self.phase_started_at.elapsed();
+
+        match &self.current_phase {
+            ConnectionPhase::DirectBootstrap => {
+                if elapsed >= Duration::from_secs(STRATEGY_DWELL_SECS) {
+                    info!("[IntroClaw/ConnCycler] Direct bootstrap failed after {}s — escalating to retry", elapsed.as_secs());
+                    self.reset_to_phase(ConnectionPhase::DirectRetry);
+                    Some(ConnectionStrategy::DirectBootstrap)
+                } else {
+                    None // Still waiting for direct to work
+                }
+            }
+            ConnectionPhase::DirectRetry => {
+                if elapsed >= Duration::from_secs(STRATEGY_DWELL_SECS) {
+                    info!("[IntroClaw/ConnCycler] Direct retry failed after {}s — escalating to tunnel", elapsed.as_secs());
+                    self.reset_to_phase(ConnectionPhase::TunnelStandard);
+                    Some(ConnectionStrategy::DirectBootstrap) // One more try before tunnel
+                } else {
+                    None
+                }
+            }
+            ConnectionPhase::TunnelStandard => {
+                if elapsed >= Duration::from_secs(STRATEGY_DWELL_SECS) {
+                    if self.is_vpn {
+                        // VPN detected — start cycling VPN configs
+                        info!("[IntroClaw/ConnCycler] Standard tunnel failed behind VPN — starting VPN config cycle");
+                        self.reset_to_phase(ConnectionPhase::VpnConfigCycle);
+                        self.vpn_config_index = 0;
+                        let configs = VpnConfig::all_configs();
+                        if let Some(config) = configs.first() {
+                            return Some(ConnectionStrategy::TunnelWithConfig(config.clone()));
+                        }
+                    }
+                    // Not on VPN or no configs — force refresh
+                    info!("[IntroClaw/ConnCycler] Tunnel failed — forcing mesh refresh");
+                    self.reset_to_phase(ConnectionPhase::Exhausted);
+                    Some(ConnectionStrategy::ForceRefresh)
+                } else {
+                    None
+                }
+            }
+            ConnectionPhase::VpnConfigCycle => {
+                if elapsed >= Duration::from_secs(VPN_CONFIG_DWELL_SECS) {
+                    // Record result of current config
+                    let configs = VpnConfig::all_configs();
+                    if self.vpn_config_index < configs.len() {
+                        let desc = configs[self.vpn_config_index].description.clone();
+                        self.vpn_config_results.push((desc, false)); // false = didn't connect
+                    }
+
+                    self.vpn_config_index += 1;
+                    self.phase_started_at = Instant::now();
+
+                    if self.vpn_config_index < configs.len() {
+                        let config = configs[self.vpn_config_index].clone();
+                        info!("[IntroClaw/ConnCycler] VPN config {} failed — trying next: {}",
+                            self.vpn_config_index, config.description);
+                        Some(ConnectionStrategy::TunnelWithConfig(config))
+                    } else {
+                        // All VPN configs exhausted
+                        warn!("[IntroClaw/ConnCycler] All VPN configurations exhausted");
+                        self.total_cycles += 1;
+                        self.reset_to_phase(ConnectionPhase::Exhausted);
+                        Some(ConnectionStrategy::ReportOffline)
+                    }
+                } else {
+                    None // Still trying current VPN config
+                }
+            }
+            ConnectionPhase::Exhausted => {
+                // Wait longer before restarting the cycle
+                if elapsed >= Duration::from_secs(60) {
+                    info!("[IntroClaw/ConnCycler] Restarting connection cycle (cycle #{})", self.total_cycles + 1);
+                    self.reset_to_phase(ConnectionPhase::DirectBootstrap);
+                    self.vpn_config_index = 0;
+                    Some(ConnectionStrategy::DirectBootstrap)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Get current status for diagnostics
+    pub fn get_status(&self) -> String {
+        let vpn_results = if !self.vpn_config_results.is_empty() {
+            let tried: Vec<&str> = self.vpn_config_results.iter().map(|(d, _)| d.as_str()).collect();
+            format!(" | VPN configs tried: [{}]", tried.join(", "))
+        } else {
+            String::new()
+        };
+        format!(
+            "Phase={:?} | dwell={}s | cycle={} | vpn={}{}",
+            self.current_phase,
+            self.phase_started_at.elapsed().as_secs(),
+            self.total_cycles,
+            self.is_vpn,
+            vpn_results
+        )
+    }
+
+    /// Get the recommended VPN config for the current index (for NetworkService to apply)
+    pub fn current_vpn_config(&self) -> Option<VpnConfig> {
+        if self.current_phase == ConnectionPhase::VpnConfigCycle {
+            VpnConfig::all_configs().get(self.vpn_config_index).cloned()
+        } else {
+            None
+        }
     }
 }
 
@@ -1398,6 +1705,7 @@ impl IntroClawService {
             node_file_cacher: NodeFileProactiveCacher::new(),
             node_dead_letter_processor: NodeDeadLetterProcessor::new(),
             node_bandwidth_manager: NodeBandwidthManager::new(),
+            conn_cycler: ConnectionStateCycler::new(),
             activity_log: ActivityLog::new(),
             tick_count: 0,
             is_mobile_data: false,
@@ -1421,6 +1729,18 @@ impl IntroClawService {
         self.is_active
     }
 
+    pub fn evaluate_connection_strategy(&mut self, ctx: &ClawTickContext) -> Option<ConnectionStrategy> {
+        if !self.is_active { return None; }
+        
+        self.conn_cycler.set_vpn(ctx.connectivity_type == 5);
+        if !ctx.connected_peers.is_empty() {
+            self.conn_cycler.on_connection_success();
+            return None;
+        }
+
+        self.conn_cycler.evaluate(ctx)
+    }
+
     pub fn set_node_mode(&mut self, enabled: bool) {
         self.is_node_mode = enabled;
         if enabled {
@@ -1434,6 +1754,11 @@ impl IntroClawService {
 
     pub fn is_node_mode(&self) -> bool {
         self.is_node_mode
+    }
+
+    /// Get connection cycler status for diagnostics
+    pub fn get_conn_cycler_status(&self) -> String {
+        self.conn_cycler.get_status()
     }
 
     // --- Node bandwidth management public API ---
@@ -1515,9 +1840,18 @@ impl IntroClawService {
             force_mesh_refresh: false,
             cache_files_for_offline: Vec::new(),
             serve_cached_chunks: Vec::new(),
+            connection_strategy: None,
         };
 
         if !self.is_active { return actions; }
+
+        // Update connection cycler with current VPN status
+        self.conn_cycler.set_vpn(ctx.connectivity_type == 5);
+
+        // Track connection success for cycler
+        if !ctx.connected_peers.is_empty() {
+            self.conn_cycler.on_connection_success();
+        }
 
         self.tick_count += 1;
         self.is_mobile_data = ctx.is_mobile_data;
@@ -1696,19 +2030,47 @@ impl IntroClawService {
             self.run_node_mode_optimizations(ctx, &mut actions);
         }
 
-        // 19. Network resilience check — if isolated, trigger mesh refresh
-        if ctx.connected_peers.len() < 2 && !ctx.is_background {
+        // 19. Intelligent connection state cycling — IntroClaw manages strategy escalation
+        if ctx.connected_peers.is_empty() {
+            if let Some(strategy) = self.conn_cycler.evaluate(ctx) {
+                match &strategy {
+                    ConnectionStrategy::DirectBootstrap => {
+                        self.activity_log.log("conn_cycler", "Escalating: retrying direct TCP/QUIC bootstrap", "action");
+                    }
+                    ConnectionStrategy::TunnelWithConfig(config) => {
+                        self.activity_log.log("conn_cycler", &format!(
+                            "Escalating: trying VPN config — {}", config.description), "action");
+                    }
+                    ConnectionStrategy::ForceRefresh => {
+                        self.activity_log.log("conn_cycler", "All direct strategies failed — forcing mesh refresh", "warn");
+                    }
+                    ConnectionStrategy::ReportOffline => {
+                        self.activity_log.log("conn_cycler", "All strategies exhausted — reporting OFFLINE", "warn");
+                    }
+                }
+                actions.connection_strategy = Some(strategy);
+            }
+        }
+
+        // 20. Network resilience check — if isolated, trigger mesh refresh (only if cycler didn't already handle it)
+        if ctx.connected_peers.len() < 2 && !ctx.is_background && actions.connection_strategy.is_none() {
             self.activity_log.log("network", &format!(
                 "Network isolation detected ({} peers). Triggering mesh refresh for connectivity recovery.",
                 ctx.connected_peers.len()), "warn");
             actions.force_mesh_refresh = true;
         }
 
-        self.activity_log.log("tick", &format!("Tick #{} complete — {} actions queued (node_mode={})", self.tick_count,
-            actions.heal_peers.len() + actions.prefetch_files.len() + actions.retry_dead_letters.len() +
+        let action_count = actions.heal_peers.len() + actions.prefetch_files.len() + actions.retry_dead_letters.len() +
             actions.upgrade_connections.len() + actions.pre_establish_relays.len() +
-            actions.cache_files_for_offline.len() + actions.serve_cached_chunks.len(),
-            self.is_node_mode), "success");
+            actions.cache_files_for_offline.len() + actions.serve_cached_chunks.len() +
+            if actions.connection_strategy.is_some() { 1 } else { 0 };
+        let cycler_info = if ctx.connected_peers.is_empty() {
+            format!(" | cycler=[{}]", self.conn_cycler.get_status())
+        } else {
+            String::new()
+        };
+        self.activity_log.log("tick", &format!("Tick #{} complete — {} actions queued (node_mode={}{})",
+            self.tick_count, action_count, self.is_node_mode, cycler_info), "success");
 
         actions
     }
@@ -2204,6 +2566,7 @@ impl IntroClawService {
             force_mesh_refresh: true, // Force a fresh routing check on launch
             cache_files_for_offline: Vec::new(),
             serve_cached_chunks: Vec::new(),
+            connection_strategy: None,
         };
 
         // Pre-warm top contacts on launch
