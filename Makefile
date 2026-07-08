@@ -1,16 +1,17 @@
 # Introvert Native Build System
 
-.PHONY: help mac android ios clean all bk
+.PHONY: help mac macos-dmg android ios clean all bk
 
 help:
 	@echo "Introvert Build System"
 	@echo "Usage:"
-	@echo "  make mac      - Build native library for macOS"
-	@echo "  make android  - Build native libraries for Android (arm64 and x64)"
-	@echo "  make ios      - Build native static libraries for iOS"
-	@echo "  make all      - Build for all platforms"
-	@echo "  make bk       - Comprehensive backup to external SSD"
-	@echo "  make clean    - Remove build artifacts"
+	@echo "  make mac          - Build native library for macOS"
+	@echo "  make macos-dmg    - Build macOS app and create DMG installer"
+	@echo "  make android      - Build native libraries for Android (arm64 and x64)"
+	@echo "  make ios          - Build native static libraries for iOS"
+	@echo "  make all          - Build for all platforms"
+	@echo "  make bk           - Comprehensive backup to external SSD"
+	@echo "  make clean        - Remove build artifacts"
 
 mac:
 	@echo "🍏 Building macOS Native Core..."
@@ -19,6 +20,11 @@ mac:
 	@mkdir -p macos/Flutter/ephemeral
 	@cp target/release/libintrovert.dylib macos/Flutter/ephemeral/libintrovert.dylib
 	@echo "✅ macOS build complete. Artifact moved to project root and macos/Flutter/ephemeral/"
+
+macos-dmg:
+	@echo "💿 Building macOS DMG..."
+	@chmod +x scripts/build_macos_dmg.sh
+	@./scripts/build_macos_dmg.sh
 
 android:
 	@echo "🤖 Building Android Native Core..."

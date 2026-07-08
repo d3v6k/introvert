@@ -439,10 +439,10 @@ class _FileTransferBubbleState extends State<FileTransferBubble> {
       return "transfer failed";
     }
     if (progress.isWaitingForDownload) {
-      return "tap to pull from mesh";
+      return "tap to pull from Introvert mesh swarm";
     }
     if (progress.mimeType == 'SWARM_WAIT') {
-      return "searching mesh swarm...";
+      return "searching Introvert mesh swarm...";
     }
 
     if (isVerified) {

@@ -95,6 +95,9 @@ typedef IntrovertWebRtcSendNativeSignalDart = FfiResult Function(Pointer<Utf8> p
 typedef IntrovertAddAddressC = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> address);
 typedef IntrovertAddAddressDart = FfiResult Function(Pointer<Utf8> peerId, Pointer<Utf8> address);
 
+typedef IntrovertInspectMediaC = FfiResult Function(Pointer<Uint8> bytes, Size length, Pointer<Utf8> mimeType);
+typedef IntrovertInspectMediaDart = FfiResult Function(Pointer<Uint8> bytes, int length, Pointer<Utf8> mimeType);
+
 typedef IntrovertClaimRewardsAsyncC = FfiResult Function(Pointer<NativeFunction<NativeRewardCallback>> callback);
 typedef IntrovertClaimRewardsAsyncDart = FfiResult Function(Pointer<NativeFunction<NativeRewardCallback>> callback);
 
@@ -603,6 +606,7 @@ class IntrovertClient {
   late IntrovertNetworkInitiateWebRtcDart _networkInitiateWebRtc;
   late IntrovertWebRtcSendNativeSignalDart _sendNativeSignal;
   late IntrovertAddAddressDart _addAddress;
+  late IntrovertInspectMediaDart _inspectMedia;
   late IntrovertClaimRewardsAsyncDart _claimRewardsAsync;
   late IntrovertStoreMessageAsyncDart _storeMessageAsync;
   late IntrovertStorageGetMessagesDart _getMessages;
@@ -1096,6 +1100,7 @@ class IntrovertClient {
       _getProfile = safeLookup('get_profile', () => _dylib.lookupFunction<IntrovertStorageGetProfileC, IntrovertStorageGetProfileDart>('introvert_storage_get_profile'), () => FfiResult.dummy);
       _setProfile = safeLookup('set_profile', () => _dylib.lookupFunction<IntrovertStorageSetProfileC, IntrovertStorageSetProfileDart>('introvert_storage_set_profile'), (n, h, a, p) => FfiResult.dummy);
       _sendFile = safeLookup('send_file', () => _dylib.lookupFunction<IntrovertNetworkSendFileC, IntrovertNetworkSendFileDart>('introvert_network_send_file'), (p, f, g) => FfiResult.dummy);
+      _inspectMedia = safeLookup('inspect_media', () => _dylib.lookupFunction<IntrovertInspectMediaC, IntrovertInspectMediaDart>('introvert_inspect_media'), (b, l, m) => FfiResult.dummy);
       _cancelFileTransfer = safeLookup('cancel_file', () => _dylib.lookupFunction<IntrovertNetworkCancelFileTransferC, IntrovertNetworkCancelFileTransferDart>('introvert_network_cancel_file_transfer'), (id) => FfiResult.dummy);
       _forceNetworkRefresh = safeLookup('force_refresh', () => _dylib.lookupFunction<IntrovertNetworkForceRefreshC, IntrovertNetworkForceRefreshDart>('introvert_network_force_refresh'), () => FfiResult.dummy);
       _sendManualTelemetry = safeLookup('send_manual_telemetry', () => _dylib.lookupFunction<IntrovertSendManualTelemetryC, IntrovertSendManualTelemetryDart>('introvert_send_manual_telemetry'), () => FfiResult.dummy);
@@ -2399,6 +2404,8 @@ class IntrovertClient {
   }
 
   void freeBinary(Pointer<Uint8> ptr, int len) => _freeBinary(ptr, len);
+
+  IntrovertInspectMediaDart? getInspectMediaFunction() => _inspectMedia;
 
   String computeFileHash(String filePath) {
     return using((Arena arena) {

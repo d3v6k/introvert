@@ -28,6 +28,7 @@ firebase-service-account.json
 # === Server-side / Infrastructure (NEVER in FOSS) ===
 for_linux/
 introvert-daemon/
+introvert-token/
 deploy_rbn.sh
 deploy_local_rbn.sh
 deploy_anchor.sh
@@ -40,6 +41,7 @@ target/
 build/
 .dart_tool/
 .gradle/
+plugins/**/.cxx/
 *.dylib
 *.so
 *.a
@@ -78,6 +80,7 @@ Docs/Economy/ECONOMY_DEEP_DIVE.md
 Docs/Economy/DAILY_REWARDS_SYSTEM.md
 Docs/SECURITY_AUDIT_GUIDE.md
 Docs/Operations/RBN_DASHBOARD_ACCESS_GUIDE.md
+Docs/TOKEN_ADDRESS_DIRECTORY.md
 firebase/
 mac seed.rtf
 releases/

@@ -198,7 +198,7 @@ async fn main() -> anyhow::Result<()> {
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
                 "https://api.mainnet-beta.solana.com",
-                "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy",
+                "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm",
                 "https://api.introvert.network/v1/treasury/claim",
             ) {
                 Ok(c) => c,
@@ -245,7 +245,7 @@ async fn main() -> anyhow::Result<()> {
                     info!("[SolanaRegistry] On-chain registration status/signature: {}", sig);
                 }
                 Err(e) => {
-                    error!("[SolanaRegistry] On-chain registration FAILED: {}. Ensure wallet has SOL on devnet.", e);
+                    error!("[SolanaRegistry] On-chain registration FAILED: {}. Ensure wallet has SOL on mainnet.", e);
                 }
             }
         });
@@ -273,7 +273,7 @@ async fn main() -> anyhow::Result<()> {
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
                 "https://api.mainnet-beta.solana.com",
-                "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy",
+                "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm",
                 "https://api.introvert.network/v1/treasury/claim",
             ) {
                 Ok(c) => std::sync::Arc::new(c),
@@ -407,7 +407,7 @@ async fn start_dashboard_server(
 
                 let uptime = start_time.elapsed().as_secs();
 
-                // Fetch registered RBN list from Solana devnet
+                // Fetch registered RBN list from Solana mainnet
                 let registry_list = solana_client.fetch_registered_rbn_details("RBNRegXy4vQszN2Cg8gqf91mYyL24p8cT32d1mY1111").await.unwrap_or_default();
                 let registry_json = registry_list.iter().map(|entry| {
                     json!({

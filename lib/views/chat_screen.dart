@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import '../src/native/introvert_client.dart';
+import 'package:provider/provider.dart';import '../src/ui/media/upload_controller.dart';
 import '../src/ui/widgets/file_transfer_bubble.dart';
 import '../src/ui/widgets/image_stack_bubble.dart';
 import '../src/ui/widgets/note_bubble.dart';
@@ -2582,11 +2583,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (result != null && result.files.single.path != null) {
       final path = result.files.single.path!;
       final caption = await _showCaptionDialog([path]);
-      if (caption == null) return; // User cancelled
-      _client.sendFile(widget.peerId, path);
-      if (caption.isNotEmpty) {
-        _client.sendMessage(widget.peerId, caption);
-      }
+      if (caption == null) return;
+      await context.read<UploadController>().inspectAndSend(
+        peerId: widget.peerId, filePath: path, context: context,
+      );
+      if (caption.isNotEmpty) _client.sendMessage(widget.peerId, caption);
     }
   }
 

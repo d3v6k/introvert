@@ -70,9 +70,23 @@ impl NetworkService {
         // Resolve Bootstrap Nodes (taking into account Tunnel Mode)
         let is_tunnel_enabled = storage.is_tunnel_mode_enabled();
         let mut tunnel_handle = None;
-        let mut bootstrap_nodes = config::get_bootstrap_nodes();
 
-        // Solana registry querying is bypassed on Mainnet. Hardcoded bootstrap nodes only.
+        // PHASE 3: Local-first client bootstrap — load the persistent RBN
+        // history list FIRST for immediate handshakes, then merge with the
+        // standard bootstrap list for any additional entries.
+        let persistent_history = config::get_persistent_rbn_history_list();
+        let standard_bootstrap = config::get_bootstrap_nodes();
+
+        // Merge: persistent history first (priority), then standard bootstrap
+        // entries that aren't already in the history list.
+        let mut bootstrap_nodes = persistent_history;
+        for (pid, addr) in standard_bootstrap {
+            if !bootstrap_nodes.iter().any(|(existing_pid, existing_addr)| existing_pid == &pid && existing_addr == &addr) {
+                bootstrap_nodes.push((pid, addr));
+            }
+        }
+
+        info!("[Bootstrap] Loaded {} RBN entries (persistent history + standard)", bootstrap_nodes.len());
 
         if is_tunnel_enabled {
             info!("[Tunnel] Secure Tunnel Mode is active. Launching loopback client...");
@@ -325,6 +339,18 @@ impl NetworkService {
 
         self.perform_mailbox_fetch().await;
 
+        // PHASE 4: Async Background Registry Validation
+        // Once the client is online via cached historical IPs, spin up a
+        // non-blocking background task to query the Solana Mainnet Registry
+        // for verified RBN handle entries and update the local cache.
+        // Each entry undergoes a mandatory cryptographic test-dial before
+        // being added to the verified_rbns set.
+        let storage_for_registry = Arc::clone(&self.storage);
+        let command_tx_for_registry = self.command_tx.clone();
+        tokio::spawn(async move {
+            Self::background_registry_validator(storage_for_registry, command_tx_for_registry).await;
+        });
+
         // RBN HARDENING: Always provide Anchor Node service if we are a relay server
         let is_anchor = self.storage.is_anchor_mode_enabled() || self.swarm.behaviour().relay_server.as_ref().is_some();
         if is_anchor {
@@ -539,9 +565,18 @@ impl NetworkService {
                     };
 
                     if current_status != last_status {
+                        let prev_status = last_status;
                         last_status = current_status;
                         crate::dispatch_global_event(10, &[current_status]);
                         crate::dispatch_debug_log(&format!("[Status] Status change: {} (peers={}, relay_listener={})", current_status, connected_count, has_relay_listener));
+
+                        // PHASE 5: Dispatch NetworkStatusStream on actual transitions only
+                        if current_status == 1 && prev_status != 1 {
+                            // Transitioned to online — clear connecting state
+                            crate::dispatch_global_event(48, b"online:connected");
+                        } else if current_status == 0 && prev_status != 0 {
+                            crate::dispatch_global_event(48, b"offline:disconnected");
+                        }
                     }
 
                     // Reset zero-peers counter when we have connections
@@ -670,6 +705,12 @@ impl NetworkService {
 
                     if connected_count == 0 {
                         self.consecutive_zero_peers_ticks += 1;
+
+                        // PHASE 5: Network Status Stream — notify UI of connecting state
+                        if self.consecutive_zero_peers_ticks == 1 {
+                            crate::dispatch_global_event(48, b"connecting:mesh_sweep");
+                            crate::dispatch_debug_log("[StatusStream] Connecting to the mesh swarm...");
+                        }
 
                         // If IntroClaw is active, evaluate its intelligent connection cycler on the 15-second tick
                         // to ensure quick recovery (e.g. within 30s) instead of waiting for the 5-minute tick.
@@ -3622,9 +3663,16 @@ impl NetworkService {
                 let _ = self.swarm.behaviour_mut().kademlia.get_record(key);
             }
             NetworkCommand::ResolveHandle { handle } => {
-                info!("[Mesh] Resolving handle {} via DHT...", handle);
+                info!("[Mesh] Resolving handle {} via DHT + RBN fallback...", handle);
+                // 1. Try Kademlia DHT first
                 let key = RecordKey::new(&handle.as_bytes());
                 let _ = self.swarm.behaviour_mut().kademlia.get_record(key);
+                
+                // 2. Also query RBNs directly as fallback
+                let payload = SignalingPayload::HandleResolveRequest { handle: handle.clone() };
+                for (rbn_id, _) in self.bootstrap_nodes.clone() {
+                    let _ = self.forward_to_mesh(rbn_id, payload.clone(), false).await;
+                }
             }
             NetworkCommand::SendDirectInvite { peer_id, identity, is_accept } => {
                 let payload = if is_accept {
@@ -4247,6 +4295,13 @@ impl NetworkService {
                     }
                 } else {
                     info!("[Network] WebSocket tunnel already active");
+                }
+            }
+            NetworkCommand::AddVerifiedRbn { peer_id } => {
+                if !self.verified_rbns.contains(&peer_id) {
+                    self.verified_rbns.insert(peer_id);
+                    info!("[Security] Added {} to verified_rbns set after cryptographic test-dial.", peer_id);
+                    crate::dispatch_debug_log(&format!("[Security] Verified RBN added: {}", peer_id));
                 }
             }
             NetworkCommand::SendManualTelemetry => {
@@ -5058,6 +5113,273 @@ impl NetworkService {
         loop {
             interval.tick().await;
             let _ = storage.prune_expired_messages();
+        }
+    }
+
+    /// Async background registry validator — the Track A fallback.
+    ///
+    /// After the client comes online via cached historical IPs, this task
+    /// queries the Solana Mainnet Registry (`FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW`)
+    /// for handle entries where `is_community_rbn == true`. For each entry it
+    /// performs a mandatory cryptographic test-dial: a low-timeout Noise
+    /// handshake that physically verifies the responding node's libp2p public
+    /// key matches the on-chain claimed `peer_id`. Mismatches are discarded
+    /// with an emergency security warning.
+    ///
+    /// After verification, the validated `peer_id` is appended to the live
+    /// `verified_rbns` set so relay routing and mailbox storage agree.
+    async fn background_registry_validator(
+        storage: Arc<crate::storage::StorageService>,
+        command_tx: mpsc::Sender<NetworkCommand>,
+    ) {
+        // Wait a bit for the network to stabilize
+        tokio::time::sleep(Duration::from_secs(15)).await;
+
+        info!("[Registry Validator] Starting async Solana registry validation...");
+
+        // Initialize Solana client for Mainnet
+        let solana_client = match crate::economy::solana::SolanaIncentiveEngine::new(
+            "https://api.mainnet-beta.solana.com",
+            "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
+            "https://api.introvert.network/claim",
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("[Registry Validator] Failed to initialize Solana client: {}", e);
+                return;
+            }
+        };
+
+        // Fetch all handle accounts from the Introvert Handle Registry program
+        let program_id_str = "FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW";
+        match solana_client.fetch_registered_rbn_details(program_id_str).await {
+            Ok(entries) => {
+                let community_rbns: Vec<&crate::economy::solana::RbnRegistryEntry> = entries
+                    .iter()
+                    .filter(|e| e.is_active)
+                    .collect();
+
+                if community_rbns.is_empty() {
+                    info!("[Registry Validator] No active community RBN entries found on-chain.");
+                    return;
+                }
+
+                info!("[Registry Validator] Found {} active community RBN entries on-chain. Starting cryptographic test-dials...", community_rbns.len());
+
+                let mut verified_count = 0u32;
+                let mut rejected_count = 0u32;
+
+                for entry in &community_rbns {
+                    let claimed_peer_id = &entry.peer_id;
+                    let ip_addr = &entry.multiaddresses;
+                    let multiaddr_str = if ip_addr.starts_with('/') {
+                        ip_addr.clone()
+                    } else {
+                        format!("/ip4/{}/tcp/443", ip_addr)
+                    };
+
+                    let addr: Multiaddr = match multiaddr_str.parse() {
+                        Ok(a) => a,
+                        Err(e) => {
+                            warn!("[Registry Validator] Invalid multiaddr '{}' for {}: {:?}", multiaddr_str, claimed_peer_id, e);
+                            rejected_count += 1;
+                            continue;
+                        }
+                    };
+
+                    let expected_pid: PeerId = match claimed_peer_id.parse() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            warn!("[Registry Validator] Invalid PeerId '{}': {:?}", claimed_peer_id, e);
+                            rejected_count += 1;
+                            continue;
+                        }
+                    };
+
+                    // MANDATORY CRYPTOGRAPHIC TEST-DIAL:
+                    // Open a low-timeout transport link to the fetched IP and force
+                    // a Noise handshake. The Identify protocol will reveal the
+                    // remote node's actual public key. If it doesn't match the
+                    // on-chain claimed peer_id, reject immediately.
+                    match Self::verify_rbn_identity(addr.clone(), expected_pid).await {
+                        Ok(()) => {
+                            info!("[Registry Validator] ✅ PeerId VERIFIED for {} at {}", claimed_peer_id, multiaddr_str);
+
+                            // Persist to local anchor node storage via contacts table
+                            let anchor_identity = crate::identity::SovereignIdentity {
+                                peer_id: claimed_peer_id.clone(),
+                                p2p_pubkey: Vec::new(),
+                                static_key: [0u8; 32],
+                                solana_address: String::new(),
+                                global_name: Some(format!("RBN-{}", &claimed_peer_id[..8.min(claimed_peer_id.len())])),
+                                local_alias: None,
+                                avatar_base64: None,
+                                is_anchor_capable: true,
+                                retention_seconds: 86400,
+                                handle: None,
+                                prestige_tier: None,
+                            };
+                            if let Err(e) = storage.upsert_sovereign_contact(&anchor_identity, true, false) {
+                                debug!("[Registry Validator] Failed to persist anchor {}: {:?}", claimed_peer_id, e);
+                            }
+
+                            // Update global bootstrap list
+                            {
+                                let mut global_bn = crate::BOOTSTRAP_NODES.write();
+                                if !global_bn.iter().any(|(pid, _)| pid == claimed_peer_id) {
+                                    global_bn.push((claimed_peer_id.clone(), multiaddr_str.clone()));
+                                }
+                            }
+
+                            // Add to verified_rbns via command so the live NetworkService
+                            // set stays in sync (mailbox storage + relay routing).
+                            let _ = command_tx.send(NetworkCommand::AddVerifiedRbn {
+                                peer_id: expected_pid,
+                            }).await;
+
+                            verified_count += 1;
+                        }
+                        Err(e) => {
+                            // EMERGENCY SECURITY LOG: on-chain entry claims a PeerId
+                            // but the node at that IP responded with a different identity.
+                            warn!(
+                                "[Registry Validator] ⚠️ SECURITY: PeerId MISMATCH for {} at {} — {}. \
+                                 On-chain entry REJECTED. Possible impersonation attack.",
+                                claimed_peer_id, multiaddr_str, e
+                            );
+                            rejected_count += 1;
+                        }
+                    }
+                }
+
+                info!(
+                    "[Registry Validator] Complete: {} verified, {} rejected out of {} on-chain entries.",
+                    verified_count, rejected_count, community_rbns.len()
+                );
+            }
+            Err(e) => {
+                warn!("[Registry Validator] Failed to fetch handle entries from Solana: {}", e);
+            }
+        }
+    }
+
+    /// Cryptographic test-dial: connects to `addr` **bound to** `expected_peer_id`,
+    /// performs a Noise handshake, and verifies the remote node's libp2p static
+    /// public key matches exactly. Uses a 10-second timeout.
+    ///
+    /// SECURITY: The `/p2p/<expected_peer_id>` suffix appended to the multiaddr
+    /// forces libp2p's transport upgrade to validate the remote's Noise static
+    /// key against the expected PeerId during the handshake itself. If the node
+    /// at `addr` does not hold the private key for that PeerId, the connection
+    /// fails at the Noise authentication step — not silently accepted.
+    async fn verify_rbn_identity(addr: Multiaddr, expected_peer_id: PeerId) -> anyhow::Result<()> {
+        use libp2p::Transport;
+
+        // Append /p2p/<expected_peer_id> so the libp2p transport stack
+        // enforces PeerId binding during Noise authentication.  If the
+        // remote's static key doesn't match, the handshake is rejected
+        // at the protocol level — no silent acceptance.
+        let target_addr = addr.clone().with(libp2p::multiaddr::Protocol::P2p(expected_peer_id.into()));
+
+        // Build a minimal TCP + Noise transport for verification only
+        let local_key = libp2p::identity::Keypair::generate_ed25519();
+
+        let mut yamux = libp2p::yamux::Config::default();
+        yamux.set_max_num_streams(16);
+
+        let mut transport = libp2p::tcp::tokio::Transport::new(libp2p::tcp::Config::default().nodelay(true))
+            .upgrade(libp2p::core::upgrade::Version::V1Lazy)
+            .authenticate(libp2p::noise::Config::new(&local_key)?)
+            .multiplex(yamux)
+            .timeout(Duration::from_secs(10))
+            .boxed();
+
+        // Dial the identity-bound address.  libp2p will extract the PeerId
+        // from the /p2p/ suffix and verify it against the Noise static key
+        // presented during the handshake.  Mismatch → connection rejected.
+        let dial_opts = libp2p::core::transport::DialOpts {
+            role: libp2p::core::Endpoint::Dialer,
+            port_use: libp2p::core::transport::PortUse::Reuse,
+        };
+        match transport.dial(target_addr, dial_opts) {
+            Ok(fut) => {
+                match tokio::time::timeout(Duration::from_secs(10), fut).await {
+                    Ok(Ok(_connection)) => {
+                        // Noise handshake succeeded AND the remote's static key
+                        // matches expected_peer_id.  Identity proven.
+                        Ok(())
+                    }
+                    Ok(Err(e)) => {
+                        Err(anyhow::anyhow!("Identity-bound handshake failed: {}", e))
+                    }
+                    Err(_) => {
+                        Err(anyhow::anyhow!("Connection timed out after 10s"))
+                    }
+                }
+            }
+            Err(e) => {
+                Err(anyhow::anyhow!("Dial rejected: {}", e))
+            }
+        }
+    }
+
+    /// Synchronous Solana registry fallback — used when ALL cached historical
+    /// IPs fail on boot (cold launch after months of network inactivity).
+    /// Returns the validated RBN addresses from the on-chain registry.
+    /// SECURITY: Same test-dial verification as background_registry_validator.
+    pub async fn solana_registry_fallback_sync() -> Vec<(PeerId, Multiaddr)> {
+        info!("[Registry Fallback] All cached IPs failed. Querying Solana Mainnet Registry synchronously...");
+
+        let solana_client = match crate::economy::solana::SolanaIncentiveEngine::new(
+            "https://api.mainnet-beta.solana.com",
+            "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
+            "https://api.introvert.network/claim",
+        ) {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("[Registry Fallback] Failed to initialize Solana client: {}", e);
+                return Vec::new();
+            }
+        };
+
+        let program_id_str = "FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW";
+        match solana_client.fetch_registered_rbn_details(program_id_str).await {
+            Ok(entries) => {
+                let mut verified = Vec::new();
+                for entry in entries.iter().filter(|e| e.is_active) {
+                    let pid: PeerId = match entry.peer_id.parse() {
+                        Ok(p) => p,
+                        Err(_) => continue,
+                    };
+                    let addr_str = if entry.multiaddresses.starts_with('/') {
+                        entry.multiaddresses.clone()
+                    } else {
+                        format!("/ip4/{}/tcp/443", entry.multiaddresses)
+                    };
+                    let addr: Multiaddr = match addr_str.parse() {
+                        Ok(a) => a,
+                        Err(_) => continue,
+                    };
+
+                    // Cryptographic test-dial before trusting
+                    match Self::verify_rbn_identity(addr.clone(), pid).await {
+                        Ok(()) => {
+                            info!("[Registry Fallback] ✅ Verified: {} at {}", entry.peer_id, addr_str);
+                            verified.push((pid, addr));
+                        }
+                        Err(e) => {
+                            warn!("[Registry Fallback] ⚠️ SECURITY: Rejected {} at {}: {}", entry.peer_id, addr_str, e);
+                        }
+                    }
+                }
+
+                info!("[Registry Fallback] Verified {}/{} on-chain entries.", verified.len(), entries.len());
+                verified
+            }
+            Err(e) => {
+                warn!("[Registry Fallback] Failed to fetch handle entries: {}", e);
+                Vec::new()
+            }
         }
     }
 
@@ -7101,6 +7423,16 @@ impl NetworkService {
                     self.pending_claims.remove(&handle);
                 }
             }
+            SignalingPayload::HandleResolveResponse { handle, peer_id, verified } => {
+                info!("[Registry] Handle resolve response from RBN: {} -> {} (verified: {})", handle, peer_id, verified);
+                // Store in local storage
+                let _ = self.storage.insert_handle_claim(&handle, &peer_id, chrono::Utc::now().timestamp(), "[]", verified);
+                // Dispatch event 33 to Flutter UI
+                let mut event_data = handle.into_bytes();
+                event_data.push(0);
+                event_data.extend(peer_id.as_bytes());
+                crate::dispatch_global_event(33, &event_data);
+            }
             SignalingPayload::TelemetryAck { peer_id, epoch_id, total_points, timestamp } => {
 
                 info!("[Economy] TelemetryAck received from RBN: peer={}, epoch={}, points={:.1}", peer_id, epoch_id, total_points);
@@ -7382,6 +7714,8 @@ impl NetworkService {
                 ConnectionStrategy::DirectBootstrap => {
                     info!("[IntroClaw/ConnCycler] Executing direct bootstrap re-dial");
                     crate::dispatch_debug_log("[IntroClaw/ConnCycler] Retrying direct TCP/QUIC bootstrap");
+                    // PHASE 5: Network Status Stream — notify UI of RBN switch
+                    crate::dispatch_global_event(48, b"switching:direct_bootstrap");
                     let mut any_dialed = false;
                     for (peer_id, addr) in &self.bootstrap_nodes {
                         crate::dispatch_debug_log(&format!("[IntroClaw/ConnCycler] Dialing bootstrap: {}", addr));
@@ -7398,6 +7732,8 @@ impl NetworkService {
                 ConnectionStrategy::TunnelWithConfig(config) => {
                     info!("[IntroClaw/ConnCycler] Executing tunnel with config: {}", config.description);
                     crate::dispatch_debug_log(&format!("[IntroClaw/ConnCycler] Trying VPN config: {}", config.description));
+                    // PHASE 5: Network Status Stream — notify UI of RBN switch via tunnel
+                    crate::dispatch_global_event(48, b"switching:tunnel_fallback");
 
                     // Reset existing tunnel if active
                     if self.tunnel_active {

@@ -15,6 +15,7 @@ import 'src/ui/onboarding_screen.dart';
 import 'src/ui/terms_screen.dart';
 import 'src/repository/sync_repository.dart';
 import 'theme/app_theme.dart';
+import 'src/domain/safety/i_safety_service.dart';import 'src/infrastructure/safety/native_hash_bridge.dart';import 'src/ui/media/upload_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,7 @@ void main() async {
             ChangeNotifierProvider(create: (_) => SyncStateNotifier(syncRepository)),
             Provider<IntrovertClient>.value(value: client),
             Provider<IdentityManager>.value(value: idManager),
+            Provider<ISafetyService>(create: (_) => NativeHashBridge(client)),            Provider<UploadController>(              create: (ctx) => UploadController(                client: client,                safetyService: ctx.read<ISafetyService>(),              ),            ),
           ],
           child: const IntrovertApp(),
         ),

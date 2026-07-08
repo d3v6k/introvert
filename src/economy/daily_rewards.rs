@@ -50,10 +50,10 @@ pub const TGE_DATE: &str = "2026-01-01";
 
 // Cycle transition hour (UTC). Cycles roll over at 12:00 UTC instead of midnight
 // so operators in US/EU timezones can monitor the transition live.
-const CYCLE_TRANSITION_HOUR_UTC: i64 = 12;
+const CYCLE_TRANSITION_HOUR_UTC: i64 = 0;
 
 /// Returns the current economy day string (e.g., "2026-07-07").
-/// Shifts by CYCLE_TRANSITION_HOUR_UTC so the cycle rolls over at noon UTC.
+/// Shifts by CYCLE_TRANSITION_HOUR_UTC so the cycle rolls over at midnight UTC.
 pub fn economy_today() -> String {
     let now = Utc::now();
     let shifted = now - chrono::Duration::hours(CYCLE_TRANSITION_HOUR_UTC);

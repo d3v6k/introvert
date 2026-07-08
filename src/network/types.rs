@@ -127,6 +127,14 @@ pub enum SignalingPayload {
         rbn_pubkey: Vec<u8>,
         rbn_signature: Vec<u8>,
     },
+    HandleResolveRequest {
+        handle: String,
+    },
+    HandleResolveResponse {
+        handle: String,
+        peer_id: String,
+        verified: bool,
+    },
     IdentifySleepState {
         device_type: String,
         push_token: String,
@@ -316,6 +324,9 @@ pub enum NetworkCommand {
     SubscribeGossipsub { group_id: String },
     ForceMeshRefresh,
     ActivateTunnel,
+    /// Add a peer to the verified_rbns set after cryptographic test-dial
+    /// confirms the on-chain PeerId matches the node at the claimed IP.
+    AddVerifiedRbn { peer_id: PeerId },
     SendManualTelemetry,
     RegisterSeeder { peer_id: PeerId, transfer_id: String, file_path: String, file_hash: String, chunk_size: u32, total_chunks: u32, group_id: Option<String> },
     UnregisterSeeder { transfer_id: String },

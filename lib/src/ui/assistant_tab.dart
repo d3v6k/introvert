@@ -416,7 +416,7 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
             ),
             SizedBox(height: 10),
             Text(
-              'Intro-Claw is an AI intelligent agent working under the hood, handling networking, engine optimisation, and mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
+              'Intro-Claw is an AI intelligent agent working under the hood, handling networking, engine optimisation, and Introvert mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
               style: TextStyle(
                 fontSize: 11,
                 color: AppTheme.current.text,

@@ -6,15 +6,17 @@ skip-lint = false
 
 [programs.localnet]
 introvert_registry = "RBNRegXy4vQszN2Cg8gqf91mYyL24p8cT32d1mY1111"
+introvert_handle_registry = "FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW"
 
-[programs.devnet]
+[programs.mainnet]
 introvert_registry = "RBNRegXy4vQszN2Cg8gqf91mYyL24p8cT32d1mY1111"
+introvert_handle_registry = "FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW"
 
 [registry]
-url = "https://anchor.projectserum.com"
+url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "mainnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

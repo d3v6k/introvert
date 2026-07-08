@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import '../src/native/introvert_client.dart';
+import 'package:provider/provider.dart';import '../src/ui/media/upload_controller.dart';
 import '../src/ui/widgets/file_transfer_bubble.dart';
 import '../src/ui/widgets/image_stack_bubble.dart';
 import '../src/ui/widgets/note_bubble.dart';
@@ -2205,24 +2206,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             path = await _convertHeicToJpeg(path);
             filename = filename.replaceAll(RegExp(r'\.(heic|heif)$', caseSensitive: false), '.jpg');
           }
-          final file = File(path);
-          final size = await file.length();
-          if (!mounted) return;
-          final fileHash = _client.computeFileHash(path);
-          final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
-          _client.registerSeeder(transferId, path, fileHash, size, widget.groupId);
-          final manifest = "[FILE]:${json.encode({
-            "transfer_id": transferId,
-            "sender_peer_id": _client.localPeerId,
-            "filename": filename,
-            "mime_type": "image/jpeg",
-            "total_size": size,
-            "file_hash": fileHash,
-            "is_relayed": true,
-            "group_id": widget.groupId,
-          })}";
-          _client.sendGroupMessage(widget.groupId, manifest);
-          _addSendingPlaceholder(transferId, filename, 'image/jpeg', path);
+          await context.read<UploadController>().inspectAndSendGroup(
+            groupId: widget.groupId, filePath: path, filename: filename,
+            mimeType: 'image/jpeg', context: context,
+          );
+          _addSendingPlaceholder('tmp_filename', filename, 'image/jpeg', path);
         }
         _loadMessages();
       }
@@ -2249,24 +2237,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     try {
       final pickedFile = await ImagePicker().pickVideo(source: ImageSource.gallery);
       if (pickedFile != null) {
-        final file = File(pickedFile.path);
-        final size = await file.length();
-        if (!mounted) return;
-        final fileHash = _client.computeFileHash(pickedFile.path);
-        final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
-        _client.registerSeeder(transferId, pickedFile.path, fileHash, size, widget.groupId);
-        final manifest = "[FILE]:${json.encode({
-          "transfer_id": transferId,
-          "sender_peer_id": _client.localPeerId,
-          "filename": pickedFile.name,
-          "mime_type": "video/mp4",
-          "total_size": size,
-          "file_hash": fileHash,
-          "is_relayed": true,
-          "group_id": widget.groupId,
-        })}";
-        _client.sendGroupMessage(widget.groupId, manifest);
-        _addSendingPlaceholder(transferId, pickedFile.name, 'video/mp4', pickedFile.path);
+        await context.read<UploadController>().inspectAndSendGroup(
+          groupId: widget.groupId, filePath: pickedFile.path,
+          filename: pickedFile.name, mimeType: 'video/mp4', context: context,
+        );
+        _addSendingPlaceholder('tmp_video', pickedFile.name, 'video/mp4', pickedFile.path);
         _loadMessages();
       }
     } catch (_) {}
@@ -2277,24 +2252,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       final result = await FilePicker.platform.pickFiles(type: FileType.any);
       if (result != null && result.files.single.path != null) {
         final path = result.files.single.path!;
-        final file = File(path);
-        final size = await file.length();
-        if (!mounted) return;
-        final fileHash = _client.computeFileHash(path);
-        final transferId = "gft_${fileHash}_${DateTime.now().millisecondsSinceEpoch}";
-        _client.registerSeeder(transferId, path, fileHash, size, widget.groupId);
-        final manifest = "[FILE]:${json.encode({
-          "transfer_id": transferId,
-          "sender_peer_id": _client.localPeerId,
-          "filename": result.files.single.name,
-          "mime_type": "application/octet-stream",
-          "total_size": size,
-          "file_hash": fileHash,
-          "is_relayed": true,
-          "group_id": widget.groupId,
-        })}";
-        _client.sendGroupMessage(widget.groupId, manifest);
-        _addSendingPlaceholder(transferId, result.files.single.name, 'application/octet-stream', path);
+        await context.read<UploadController>().inspectAndSendGroup(
+          groupId: widget.groupId, filePath: path,
+          filename: result.files.single.name, mimeType: 'application/octet-stream', context: context,
+        );
+        _addSendingPlaceholder('tmp_file', result.files.single.name, 'application/octet-stream', path);
         _loadMessages();
       }
     } catch (_) {}

@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "programs/introvert_registry"
+    "programs/introvert_registry",
+    "programs/introvert_handle_registry"
 ]
 
 [profile.release]

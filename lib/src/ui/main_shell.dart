@@ -19,6 +19,7 @@ import '../services/webrtc_call_service.dart';
 import '../services/group_call_service.dart';
 import '../services/background_sync_service.dart';
 import 'widgets/network_optimization_button.dart';
+import 'widgets/connection_request_overlay.dart';
 import 'widgets/whatsapp_icon.dart';
 import '../../views/chat_screen.dart';
 import '../../views/group_chat_screen.dart';
@@ -100,6 +101,62 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void _onRbnFailed(String ip, String reason) {
     if (rbnFailedCallback != null) {
       rbnFailedCallback!(ip, reason);
+    }
+  }
+
+  /// PHASE 5: Network Status Stream — maps IntroClaw internal states to UI notifications.
+  /// Event 48 payloads: "connecting:mesh_sweep", "switching:direct_bootstrap",
+  ///                    "switching:tunnel_fallback", "online:connected"
+  void _onNetworkStatusStream(String status) {
+    debugPrint('[StatusStream] $status');
+
+    if (status == 'connecting:mesh_sweep') {
+      // Initial connection sweep — show persistent "connecting" state
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connecting to Introvert mesh swarm...'),
+            duration: Duration(seconds: 30),
+            backgroundColor: Colors.blueGrey,
+          ),
+        );
+      }
+    } else if (status == 'online:connected') {
+      // Successfully connected to the mesh — dismiss connecting toast, show success
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Connected to Introvert mesh swarm'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else if (status == 'offline:disconnected') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Disconnected from Introvert mesh swarm'),
+            duration: Duration(seconds: 3),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } else if (status.startsWith('switching:')) {
+      // RBN switch detected — show toast notification
+      final reason = status == 'switching:direct_bootstrap'
+          ? 'Retrying direct bootstrap nodes'
+          : 'Switching via tunnel fallback';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Switching RBN nodes for better connectivity. $reason'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.orangeAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -538,6 +595,16 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         } catch (e) {
           debugPrint("Error handling Event 47: $e");
         }
+      } else if (event.type == 48) {
+        // Event 48: Network Status Stream — IntroClaw state transitions
+        // Payloads: "connecting:mesh_sweep", "switching:direct_bootstrap",
+        //           "switching:tunnel_fallback", "online:connected"
+        try {
+          final status = utf8.decode(event.data);
+          _onNetworkStatusStream(status);
+        } catch (e) {
+          debugPrint("Error handling Event 48: $e");
+        }
       } else if (event.type == 14) {
         // Event Code 14: Incoming Call Offer
         try {
@@ -680,63 +747,31 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _activeConnectionRequestPeerIds.add(peerId);
       if (_isDisposing || !mounted) return;
       final parentContext = context;
-      final bg = AppTheme.current.bg;
-      final text = AppTheme.current.text;
-      final accent = AppTheme.current.accent;
-      final mutedText = AppTheme.current.mutedText;
       showDialog(
         context: parentContext,
         barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: bg,
-          title: Text("Connection Request", style: TextStyle(color: text, fontSize: 16)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SovereignAvatar(
-                radius: 60,
-                prestigeTier: _getContactTier(peerId),
-                avatar: avatar != null && avatar.isNotEmpty
-                    ? MemoryImage(_decodeAvatar(avatar))
-                    : null,
-              ),
-              SizedBox(height: 16),
-              Text(name, style: TextStyle(color: text, fontWeight: FontWeight.bold, fontSize: 18)),
-              Text(handle, style: TextStyle(color: mutedText, fontSize: 12)),
-              SizedBox(height: 12),
-              Text(
-                "wants to connect with you via the Sovereign Mesh.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: mutedText.withValues(alpha: 0.7), fontSize: 13),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text("DECLINE", style: TextStyle(color: mutedText.withValues(alpha: 0.7))),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  IntrovertClient().sendDirectInvite(peerId);
-                } catch (e) {
-                  debugPrint("⚠️ sendDirectInvite failed: $e");
-                }
-                Navigator.pop(dialogContext);
-                if (mounted) {
-                  ScaffoldMessenger.of(parentContext).showSnackBar(
-                    SnackBar(content: Text("Connection accepted from $name")),
-                  );
-                }
-                // Wait for the SQLite write to fully settle (similar to group invite acceptance)
-                await Future.delayed(const Duration(milliseconds: 600));
-                _chatsKey.currentState?._loadContacts();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: accent, foregroundColor: Colors.black),
-              child: Text("ACCEPT"),
-            ),
-          ],
+        builder: (dialogContext) => ConnectionRequestOverlay(
+          peerId: peerId,
+          name: name,
+          handle: handle,
+          avatarBase64: avatar,
+          prestigeTier: _getContactTier(peerId),
+          onDecline: () => Navigator.pop(dialogContext),
+          onAccept: () async {
+            try {
+              IntrovertClient().sendDirectInvite(peerId);
+            } catch (e) {
+              debugPrint("⚠️ sendDirectInvite failed: $e");
+            }
+            Navigator.pop(dialogContext);
+            if (mounted) {
+              ScaffoldMessenger.of(parentContext).showSnackBar(
+                SnackBar(content: Text("Connection accepted from $name")),
+              );
+            }
+            await Future.delayed(const Duration(milliseconds: 600));
+            _chatsKey.currentState?._loadContacts();
+          },
         ),
       ).then((_) {
         _activeConnectionRequestPeerIds.remove(peerId);
@@ -1499,7 +1534,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                   child: Icon(Icons.radar_rounded, color: Colors.orangeAccent, size: 18),
                 ),
                 title: Text('Network Tune', style: TextStyle(color: AppTheme.current.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                subtitle: Text('Scan mesh topology & connection quality', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
+                subtitle: Text('Scan Introvert mesh swarm topology & connection quality', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _runClawRecon();
@@ -2188,7 +2223,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                 child: ListTile(
                   leading: Icon(Icons.group_add_outlined, color: AppTheme.current.accent),
                   title: Text("Create Sovereign Group", style: TextStyle(color: AppTheme.current.text)),
-                  subtitle: Text("Start an encrypted mesh group chat", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
+                  subtitle: Text("Start an encrypted group chat on the Introvert mesh swarm", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
                   onTap: () async {
                     Navigator.pop(context);
                     await Future.delayed(const Duration(milliseconds: 300));
@@ -2201,7 +2236,7 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
                 child: ListTile(
                   leading: Icon(Icons.vpn_key_outlined, color: AppTheme.current.accent),
                   title: Text("Join Sovereign Group", style: TextStyle(color: AppTheme.current.text)),
-                  subtitle: Text("Join a mesh using an invite code", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
+                  subtitle: Text("Join the Introvert mesh swarm using an invite code", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 11)),
                   onTap: () async {
                     Navigator.pop(context);
                     await Future.delayed(const Duration(milliseconds: 300));
@@ -3682,7 +3717,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                                     color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold,
                                   )),
                                   SizedBox(height: 2),
-                                  Text('Anchor nodes earn additional \$INTR tokens for contributing to the mesh. Exact reward rates will be published soon.', style: TextStyle(
+                                  Text('Anchor nodes earn additional \$INTR tokens for contributing to the Introvert mesh swarm. Exact reward rates will be published soon.', style: TextStyle(
                                     color: AppTheme.current.mutedText, fontSize: 10, height: 1.3,
                                   )),
                                 ],
@@ -3727,7 +3762,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                               ],
                             ),
                             SizedBox(height: 6),
-                            Text('Anchor mode keeps your device awake and actively participating in the mesh. This consumes significantly more battery than regular mode.', style: TextStyle(
+                            Text('Anchor mode keeps your device awake and actively participating in the Introvert mesh swarm. This consumes significantly more battery than regular mode.', style: TextStyle(
                               color: AppTheme.current.mutedText, fontSize: 10, height: 1.4,
                             )),
                             SizedBox(height: 6),
@@ -3981,7 +4016,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ListTile(
                   leading: Icon(Icons.signal_cellular_alt_rounded, color: AppTheme.current.accent, size: 20),
                   title: Text('Optimise Network Connection', style: TextStyle(fontSize: 13)),
-                  subtitle: Text('Refresh all P2P connections to improve mesh performance.', style: TextStyle(fontSize: 12)),
+                  subtitle: Text('Refresh all P2P connections to improve Introvert mesh swarm performance.', style: TextStyle(fontSize: 12)),
                   trailing: NetworkOptimizationButton(color: AppTheme.current.accent),
                   dense: true,
                 ),
@@ -3999,7 +4034,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ListTile(
                   leading: Icon(Icons.hub_rounded, color: AppTheme.current.accent, size: 20),
                   title: Text('Live Swarm Statistics', style: TextStyle(fontSize: 13)),
-                  subtitle: Text('Real-time analytics of the global P2P mesh network.', style: TextStyle(fontSize: 12)),
+                  subtitle: Text('Real-time analytics of the global Introvert mesh swarm.', style: TextStyle(fontSize: 12)),
                   trailing: Container(
                     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -4141,7 +4176,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ListTile(
                   leading: Icon(Icons.save_alt_rounded, color: AppTheme.current.accent, size: 20),
                   title: Text('Save Network Log to File', style: TextStyle(fontSize: 13)),
-                  subtitle: Text('Saves Rust relay/mesh debug events to Downloads', style: TextStyle(fontSize: 11)),
+                  subtitle: Text('Saves Rust relay/mesh swarm debug events to Downloads', style: TextStyle(fontSize: 11)),
                   dense: true,
                   onTap: _saveNetworkDebugLog,
                 ),
@@ -5102,7 +5137,7 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
                       SizedBox(height: 16),
                       // Intro-Claw Description
                       Text(
-                        'Intro-Claw is an AI intelligent agent working under the hood, handling networking, engine optimisation, and mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
+                        'Intro-Claw is an AI intelligent agent working under the hood, handling networking, engine optimisation, and Introvert mesh swarm interactions. All operations run 100% on-device in a sandboxed environment — zero data leaked, zero external calls.',
                         style: TextStyle(
                           color: AppTheme.current.mutedText,
                           fontSize: 11,
@@ -5248,7 +5283,7 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
                         color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold,
                       )),
                       SizedBox(height: 4),
-                      Text('All 17 modules run automatically on their schedules. The mesh stays optimized, files pre-fetch, connections are monitored, and storage stays clean.', style: TextStyle(
+                      Text('All 17 modules run automatically on their schedules. The Introvert mesh swarm stays optimized, files pre-fetch, connections are monitored, and storage stays clean.', style: TextStyle(
                         color: AppTheme.current.mutedText, fontSize: 10, height: 1.4,
                       )),
                     ],
@@ -5791,7 +5826,7 @@ class _ResolveHandleDialogState extends State<_ResolveHandleDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Enter a handle (e.g. i@d3v6k) to resolve it via the global mesh.",
+              Text("Enter a handle (e.g. i@d3v6k) to resolve it via the Introvert mesh swarm.",
                   style: TextStyle(color: mutedText.withValues(alpha: 0.7), fontSize: 12)),
               SizedBox(height: 16),
               TextField(
@@ -6148,7 +6183,7 @@ class _JoinGroupDialogState extends State<_JoinGroupDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Enter the passphrase or mesh invitation key sent by the group admin to join.", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 12)),
+          Text("Enter the passphrase or Introvert mesh swarm invitation key sent by the group admin to join.", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.7), fontSize: 12)),
           SizedBox(height: 16),
           TextField(
             controller: _codeController,

@@ -11,6 +11,7 @@ pub mod network;
 pub mod media;
 pub mod intro_claw;
 pub mod embedding;
+pub mod safety;
 
 use std::sync::Arc;
 use std::ffi::{CStr, CString};
@@ -310,7 +311,7 @@ pub extern "C" fn introvert_engine_start(
     // Initialize Solana Incentive Engine with Mainnet settings as per Blueprint v4.0
     let solana_client = match SolanaIncentiveEngine::new(
         "https://api.mainnet-beta.solana.com",
-        "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy", // Treasury from Blueprint v4.0
+        "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm", // Production Treasury (Alibaba hot wallet)
         "https://api.introvert.network/v1/treasury/claim" // Production Treasury Relay
     ) {
         Ok(c) => Arc::new(c),
@@ -5405,4 +5406,33 @@ pub extern "C" fn introvert_disclaimer_set_accepted(
         },
         Err(e) => FfiResult::error(-4, &format!("Storage init failed: {}", e)),
     }
+}
+
+/// Inspects media payload BEFORE encryption. Returns JSON: {hash_hex, verdict, confidence, timestamp}.
+#[no_mangle]
+pub extern "C" fn introvert_inspect_media(
+    bytes_ptr: *const u8,
+    length: usize,
+    mime_type_ptr: *const c_char,
+) -> FfiResult {
+    if bytes_ptr.is_null() || mime_type_ptr.is_null() {
+        return FfiResult::error(-11, "Null pointer");
+    }
+    if length == 0 {
+        return FfiResult::error(-12, "Empty payload");
+    }
+
+    let bytes = unsafe { std::slice::from_raw_parts(bytes_ptr, length) };
+    let mime = unsafe { CStr::from_ptr(mime_type_ptr).to_string_lossy().into_owned() };
+
+    let (hash_hex, verdict, confidence) = safety::inspect_media(bytes, &mime);
+
+    let result = json!({
+        "hash_hex": hash_hex,
+        "verdict": verdict,
+        "confidence": confidence,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+    });
+
+    FfiResult::binary(result.to_string().into_bytes())
 }
