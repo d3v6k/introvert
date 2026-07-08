@@ -40,6 +40,7 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         createNotificationChannels()
         requestNotificationPermission()
+        requestBatteryOptimizationExemption()
         handlePushIntent(intent)
         
         try {
@@ -393,6 +394,29 @@ class MainActivity : FlutterActivity() {
     }
 
     // ─── Permissions ──────────────────────────────────────────────────────────
+
+    /**
+     * Request exemption from battery optimization (Doze mode) so the foreground service
+     * and FCM wake-ups are not throttled when the screen is off.
+     * This is critical for P2P mesh connectivity — without it, Android can freeze
+     * the Tokio runtime and the 15-second status check stops.
+     */
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = android.net.Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                    Log.d("MainActivity", "Requested battery optimization exemption")
+                } catch (e: Exception) {
+                    Log.w("MainActivity", "Could not request battery optimization exemption: ${e.message}")
+                }
+            }
+        }
+    }
 
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

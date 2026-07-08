@@ -86,6 +86,10 @@ pub struct NetworkService {
     pub(crate) last_telemetry_sent: Instant,
     /// Consecutive status-check ticks with zero connected peers (for resilience ladder)
     pub(crate) consecutive_zero_peers_ticks: u32,
+    /// Last time a relay reservation was attempted (rate-limit to prevent flooding)
+    pub(crate) last_relay_reservation_attempt: Instant,
+    /// Per-RBN push token registration timestamps (rate-limit to prevent flooding on Identify)
+    pub(crate) last_token_registration: HashMap<PeerId, Instant>,
 }
 
 #[derive(Debug, Clone)]

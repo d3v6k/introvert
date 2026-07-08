@@ -624,8 +624,6 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               (_pullRequestedAt[tid]?.isBefore(DateTime.now().subtract(_pullRetryTimeout)) ?? false)
             );
 
-            debugPrint("[FilePull] tid=$tid isOutgoing=$isOutgoing exists=$exists alreadyRequested=${_pullRequested.contains(tid)} shouldPull=$shouldPull");
-
             if (shouldPull) {
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                 _pullRequested.add(tid);

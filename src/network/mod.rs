@@ -251,6 +251,8 @@ impl NetworkService {
             relay_hints: HashMap::new(),
             last_telemetry_sent: Instant::now() - Duration::from_secs(600), // allow first send after 10min
             consecutive_zero_peers_ticks: 0,
+            last_relay_reservation_attempt: Instant::now() - Duration::from_secs(60), // allow first attempt immediately
+            last_token_registration: HashMap::new(),
         };
 
         // Sync to global RBN bootstrap list
@@ -546,6 +548,20 @@ impl NetworkService {
                     }
                 }
                 _ = status_check_interval.tick() => {
+                    // STALE TRANSFER CLEANUP: Remove incoming_transfers that haven't been
+                    // updated in 5 minutes. Without this, a stuck transfer keeps
+                    // has_pending_transfers permanently true, flooding the fast reconnect loop.
+                    let stale_threshold = Duration::from_secs(300);
+                    let stale_ids: Vec<String> = self.incoming_transfers.iter()
+                        .filter(|(_, t)| t.last_update.elapsed() > stale_threshold)
+                        .map(|(id, _)| id.clone())
+                        .collect();
+                    for id in &stale_ids {
+                        warn!("[Resilience] Cleaning up stale transfer: {} (no update in >5min)", id);
+                        crate::dispatch_debug_log(&format!("[Resilience] Cleaning up stale transfer: {} (no update in >5min)", id));
+                        self.incoming_transfers.remove(id);
+                    }
+
                     let connected_count = self.swarm.connected_peers().count();
                     let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
                     let has_confirmed_reservation = !self.relay_reservations.is_empty();
@@ -814,63 +830,70 @@ impl NetworkService {
                         // Peers connected but no relay — reset zero-peers counter
                         self.consecutive_zero_peers_ticks = 0;
                         // Step 1: Connected to peers but no relay reservation.
-                        // First ensure we're connected to at least one RBN, then request reservation.
-                        warn!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count);
-                        crate::dispatch_debug_log(&format!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count));
+                        // Rate-limited to every 30s to prevent flooding when relay reservation
+                        // keeps failing (e.g. VPN blocking, RBN overloaded).
+                        let since_last_attempt = self.last_relay_reservation_attempt.elapsed();
+                        if since_last_attempt < Duration::from_secs(30) {
+                            debug!("[Resilience] Step 1: relay attempt throttled ({}s since last, need 30s)", since_last_attempt.as_secs());
+                        } else {
+                            self.last_relay_reservation_attempt = Instant::now();
+                            warn!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count);
+                            crate::dispatch_debug_log(&format!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count));
 
-                        // Dial any disconnected RBNs first
-                        let mut any_rbn_connected = false;
-                        for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
-                            if !self.swarm.is_connected(rbn_id) {
-                                crate::dispatch_debug_log(&format!("[Resilience] Dialing RBN: {}", rbn_addr));
-                                let _ = self.swarm.dial(rbn_addr.clone());
-                                let _ = self.swarm.behaviour_mut().kademlia.add_address(rbn_id, rbn_addr.clone());
-                            } else {
-                                any_rbn_connected = true;
-                            }
-                        }
-
-                        // Request relay reservations from connected RBNs
-                        for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
-                            if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
-                                let mut relay_addr = rbn_addr.clone();
-                                if !relay_addr.to_string().contains(&rbn_id.to_string()) {
-                                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
-                                }
-                                relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
-                                match self.swarm.listen_on(relay_addr.clone()) {
-                                    Ok(id) => {
-                                        self.relay_reservations.insert(*rbn_id);
-                                        self.relay_listeners.insert(id, *rbn_id);
-                                        crate::dispatch_debug_log(&format!("[Resilience] Relay reservation re-requested from {}", rbn_id));
-                                    }
-                                    Err(e) => {
-                                        crate::dispatch_debug_log(&format!("[Resilience] Relay reservation failed: {:?}", e));
-                                    }
+                            // Dial any disconnected RBNs first
+                            let mut any_rbn_connected = false;
+                            for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
+                                if !self.swarm.is_connected(rbn_id) {
+                                    crate::dispatch_debug_log(&format!("[Resilience] Dialing RBN: {}", rbn_addr));
+                                    let _ = self.swarm.dial(rbn_addr.clone());
+                                    let _ = self.swarm.behaviour_mut().kademlia.add_address(rbn_id, rbn_addr.clone());
+                                } else {
+                                    any_rbn_connected = true;
                                 }
                             }
-                        }
 
-                        if !any_rbn_connected {
-                            crate::dispatch_debug_log("[Resilience] No RBNs reachable — will retry in 30s");
-                        }
-
-                        // VPN DETECTION: If reservations are empty but RBNs are connected,
-                        // the VPN likely made reservations stale. Force-clear and re-dial.
-                        // BUT: if we have pending relay listeners (requested, not yet accepted),
-                        // don't force-disconnect — the reservation is still being established.
-                        if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
-                            let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
-                                .filter(|(id, _)| self.swarm.is_connected(id))
-                                .map(|(id, _)| *id)
-                                .collect();
-                            if !rbn_connected.is_empty() {
-                                warn!("[VPN] Stale relay reservation detected — re-establishing connections to {} RBNs", rbn_connected.len());
-                                crate::dispatch_debug_log(&format!("[VPN] Stale reservation: {} RBNs connected but 0 reservations. Force re-dial.", rbn_connected.len()));
-                                for rbn_id in &rbn_connected {
-                                    let _ = self.swarm.disconnect_peer_id(*rbn_id);
+                            // Request relay reservations from connected RBNs
+                            for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
+                                if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
+                                    let mut relay_addr = rbn_addr.clone();
+                                    if !relay_addr.to_string().contains(&rbn_id.to_string()) {
+                                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
+                                    }
+                                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+                                    match self.swarm.listen_on(relay_addr.clone()) {
+                                        Ok(id) => {
+                                            self.relay_reservations.insert(*rbn_id);
+                                            self.relay_listeners.insert(id, *rbn_id);
+                                            crate::dispatch_debug_log(&format!("[Resilience] Relay reservation re-requested from {}", rbn_id));
+                                        }
+                                        Err(e) => {
+                                            crate::dispatch_debug_log(&format!("[Resilience] Relay reservation failed: {:?}", e));
+                                        }
+                                    }
                                 }
-                                // Re-dial will happen on next tick via Step 2 (connected_count == 0)
+                            }
+
+                            if !any_rbn_connected {
+                                crate::dispatch_debug_log("[Resilience] No RBNs reachable — will retry in 30s");
+                            }
+
+                            // VPN DETECTION: If reservations are empty but RBNs are connected,
+                            // the VPN likely made reservations stale. Force-clear and re-dial.
+                            // BUT: if we have pending relay listeners (requested, not yet accepted),
+                            // don't force-disconnect — the reservation is still being established.
+                            if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
+                                let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
+                                    .filter(|(id, _)| self.swarm.is_connected(id))
+                                    .map(|(id, _)| *id)
+                                    .collect();
+                                if !rbn_connected.is_empty() {
+                                    warn!("[VPN] Stale relay reservation detected — re-establishing connections to {} RBNs", rbn_connected.len());
+                                    crate::dispatch_debug_log(&format!("[VPN] Stale reservation: {} RBNs connected but 0 reservations. Force re-dial.", rbn_connected.len()));
+                                    for rbn_id in &rbn_connected {
+                                        let _ = self.swarm.disconnect_peer_id(*rbn_id);
+                                    }
+                                    // Re-dial will happen on next tick via Step 2 (connected_count == 0)
+                                }
                             }
                         }
                     }
@@ -910,13 +933,16 @@ impl NetworkService {
                 _ = fast_reconnect_interval.tick() => {
                     // Conditional aggressive reconnect: only fires when file transfers are
                     // waiting and no relay listener is active. Settles down once connected.
+                    // Throttled to 30s to prevent log flooding — the 5s interval was
+                    // producing 100+ identical log lines per minute.
                     let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
                     if !has_relay_listener {
                         let has_pending_transfers = !self.incoming_transfers.is_empty()
                             || !self.active_seeders.is_empty()
                             || !self.pending_messages.is_empty();
 
-                        if has_pending_transfers {
+                        if has_pending_transfers && self.last_relay_reservation_attempt.elapsed() >= Duration::from_secs(30) {
+                            self.last_relay_reservation_attempt = Instant::now();
                             let connected_count = self.swarm.connected_peers().count();
                             crate::dispatch_debug_log(&format!(
                                 "[Resilience] Fast reconnect: transfers waiting, no relay (peers={}, incoming={}, seeders={}, pending={})",
@@ -1645,8 +1671,28 @@ impl NetworkService {
                         debug!("Identify received from {}: Protocols={:?}", peer_id, info.protocols);
 
                         // Auto-register push token on Identify with RBN bootstrap nodes
+                        // Rate-limited: max once per RBN per 5 minutes to prevent log/connection flooding
                         let is_bootstrap = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id);
                         if is_bootstrap {
+                            let should_register = match self.last_token_registration.get(&peer_id) {
+                                Some(last) => last.elapsed() >= Duration::from_secs(300),
+                                None => true,
+                            };
+                            if !should_register {
+                                debug!("[Mesh] Push token registration throttled for RBN {} (last registered {}s ago)", peer_id, self.last_token_registration[&peer_id].elapsed().as_secs());
+                            } else {
+                            // Mark registration attempt NOW — but only if token exists in DB.
+                            // If token is missing (race: FCM token not yet saved), we DON'T mark,
+                            // so the next Identify event will retry immediately.
+                            let storage_check = Arc::clone(&self.storage);
+                            let my_peer_id_check = self.swarm.local_peer_id().to_string();
+                            let has_token = storage_check.get_push_token(&my_peer_id_check)
+                                .ok()
+                                .flatten()
+                                .is_some();
+                            if has_token {
+                                self.last_token_registration.insert(peer_id, Instant::now());
+                            }
                             let storage = Arc::clone(&self.storage);
                             let my_peer_id = self.swarm.local_peer_id().to_string();
                             let tx = self.command_tx.clone();
@@ -1666,7 +1712,8 @@ impl NetworkService {
                                     }
                                 }
                             });
-                        }
+                            } // end else (should_register)
+                        } // end is_bootstrap
 
                         if self.mesh_active_peers.insert(peer_id) {
                             crate::ACTIVE_PEER_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
