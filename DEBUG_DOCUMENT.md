@@ -8,9 +8,8 @@
 ## Current System State
 
 ### RBN Server
-- **introvertd**: ACTIVE (PID 56478) — relay server fix deployed, no more relay loop
-- **introvert-solana**: ACTIVE — treasury/IPC daemon with unified credential management
-- **IPC Secret**: Both daemons reading from `/etc/introvert/ipc.secret` (chmod 600)
+- **RBN daemon**: ACTIVE — relay server operational
+- **Economy daemon**: ACTIVE — unified credential management
 - **Firebase**: Service account loaded, FCM push working
 - **APNs**: Not configured (iOS push disabled)
 - **Connected Peers**: 3 (Android, Mac, iOS) — all connected at TCP level
@@ -35,7 +34,7 @@
 #### 1. Payout Pipeline Fixes
 - **Epoch ID Off-by-One Bug**: Fixed `for_linux/src/lib.rs:412` — changed `hours(0)` (no-op) to `days(1)` so midnight UTC correctly closes previous day's epoch
 - **Startup Catch-up Mechanism**: Added code to automatically close yesterday's epoch on daemon restart if past 00:05 UTC
-- **IPC Secret Mismatch**: Updated `introvert-daemon/introvert-solana/src/main.rs` to read HMAC secret from `/etc/introvert/ipc.secret` instead of hardcoded constant
+- **IPC Secret Mismatch**: Updated economy daemon to read HMAC secret from secure file instead of hardcoded constant
 - **Constant-Time HMAC**: Replaced `expected == signature` with `subtle::ConstantTimeEq` to prevent timing attacks
 - **Verified**: Epoch 2026_07_08 closed with 3 claims, 16,438 INTR distributed successfully on Solana Mainnet
 
@@ -140,8 +139,8 @@ Updated `SwarmEvent::ConnectionClosed` to check if we are completely disconnecte
 
 ### Three Daemons
 1. **Client** (`libintrovert.dylib` / `.so`) — Flutter+Rust P2P mesh client
-2. **RBN** (`introvertd`) — Relay Backbone Node (relay server for all clients)
-3. **Economy** (`introvert-solana`) — Treasury/IPC daemon
+2. **RBN** — Relay Backbone Node (relay server for all clients)
+3. **Economy** — Treasury/IPC daemon
 
 ### Telemetry Pipeline
 ```
@@ -194,35 +193,35 @@ Non-VPN:
 ---
 ## Backup Status (2026-07-09 05:23)
 - Git: main @ a6f18dd
-- RBN: introvertd on 47.89.252.80:443
-- Economy: introvert-solana on localhost:9001
+- RBN: introvertd operational
+- Economy: daemon operational
 
 ---
 ## Backup Status (2026-07-09 05:48)
 - Git: main @ a6f18dd
-- RBN: introvertd on 47.89.252.80:443
-- Economy: introvert-solana on localhost:9001
+- RBN: introvertd operational
+- Economy: daemon operational
 
 ---
 ## Backup Status (2026-07-09 06:06)
 - Git: main @ 95cf389
-- RBN: introvertd on 47.89.252.80:443
-- Economy: introvert-solana on localhost:9001
+- RBN: introvertd operational
+- Economy: daemon operational
 
 ---
 ## Backup Status (2026-07-09 06:14)
 - Git: main @ 24b75ab
-- RBN: introvertd on 47.89.252.80:443
-- Economy: introvert-solana on localhost:9001
+- RBN: introvertd operational
+- Economy: daemon operational
 
 ---
 ## Backup Status (2026-07-09 17:09)
 - Git: main @ 9bbb2ac
-- RBN: introvertd on 47.89.252.80:443
-- Economy: introvert-solana on localhost:9001
+- RBN: introvertd operational
+- Economy: daemon operational
 
 ---
 ## Backup Status (2026-07-09 17:10)
 - Git: main @ 9bbb2ac
-- RBN: introvertd on 47.89.252.80:443
-- Economy: introvert-solana on localhost:9001
+- RBN: introvertd operational
+- Economy: daemon operational
