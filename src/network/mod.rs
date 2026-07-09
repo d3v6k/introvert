@@ -3173,6 +3173,10 @@ impl NetworkService {
 
 
         let mut anchor_ids = Vec::new();
+        // Include configured RBNs (bootstrap nodes) as eligible anchors for mailbox storage
+        for (rbn_id, _) in &self.bootstrap_nodes {
+            if !anchor_ids.contains(rbn_id) { anchor_ids.push(*rbn_id); }
+        }
         if let Ok(verified_anchors) = self.storage.fetch_all_anchor_nodes() {
             for node in verified_anchors {
                 if let Ok(pid) = node.peer_id.parse::<PeerId>() { anchor_ids.push(pid); }
@@ -3297,6 +3301,10 @@ impl NetworkService {
 
     async fn perform_mailbox_fetch(&mut self) {
         let mut anchor_ids = Vec::new();
+        // Include configured RBNs (bootstrap nodes) as eligible anchors for mailbox fetch
+        for (rbn_id, _) in &self.bootstrap_nodes {
+            if !anchor_ids.contains(rbn_id) { anchor_ids.push(*rbn_id); }
+        }
         if let Ok(verified_anchors) = self.storage.fetch_all_anchor_nodes() {
             for node in verified_anchors { if let Ok(pid) = node.peer_id.parse::<PeerId>() { anchor_ids.push(pid); } }
         }

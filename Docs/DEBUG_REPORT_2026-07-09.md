@@ -32,6 +32,16 @@ Diagnosed and resolved the critical client-side issue where devices get stuck on
 - Chunks and requests are now properly buffered in RAM/DB, and when the circuit connection becomes active, they are flushed directly to the target peer's ID.
 **Status:** Fixed and verified.
 
+### 3. Android RBN Mailbox Exclusion & Message Stuck on VPN
+**Problem:** Android client on VPN or mobile data cannot send/receive group or standard messages. Dials to target peers fail, and the messages get permanently stuck in the client's `pending_messages` queue until the client is switched to the same local network as the receiver.
+**Root Cause:**
+- **RBN Mailbox Exclusion:** In both `forward_to_mesh` (outbound mailbox store) and `perform_mailbox_fetch` (inbound mailbox drain), the list of target mailbox/anchor nodes was fetched from database contacts (`is_anchor_capable = 1`) and `self.discovered_anchors`. It completely excluded the hardcoded/configured bootstrap RBNs (which are the only nodes guaranteed to be always-on and running the Mailbox protocol).
+- **OutboundFailure Fallback:** If a mailbox store failed, the payload was re-queued in `pending_messages` for the target recipient instead of the mailbox seeder, bypassing mailbox retries entirely if the target peer was offline.
+**Fix:**
+- Updated both `forward_to_mesh` and `perform_mailbox_fetch` in `src/network/mod.rs` to push the configured bootstrap RBNs from `self.bootstrap_nodes` into the eligible `anchor_ids` list.
+- This ensures that when target peers are offline, the client successfully stores messages in the RBN's mailbox, and also drains the RBN's mailbox periodically every 30 seconds.
+**Status:** Fixed and verified.
+
 ## Pending Work
 
 ### 1. Anchor Handle Registry Deployment

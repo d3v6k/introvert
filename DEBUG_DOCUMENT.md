@@ -55,9 +55,28 @@
 
 | Device | Peer ID | TCP Connected | Relay Status | Issue |
 |--------|---------|---------------|--------------|-------|
-| Android | `12D3KooWQM5mi5...` | Yes | **Recovered** | Resolved RBN file chunk routing drop |
+| Android | `12D3KooWQM5mi5...` | Yes | **Recovered** | Resolved RBN mailbox exclusion & routing drop |
 | Mac | `12D3KooWCSejiZ1...` | Yes | Relay working | Chunk requests flowing |
 | iOS | `12D3KooWN6Hu1A...` | Yes | **Recovered** | Resolved client-side reservation desync |
+
+### Android VPN/Mobile Mailbox Routing Issue (Resolved)
+
+**Timeline:**
+- Android client is on mobile data or VPN (using a WebSocket tunnel fallback on port 80).
+- The user attempts to send a group message (GroupAction payload) to the Mac or iOS client.
+- Direct P2P dialing to the recipient fails. The client successfully connects to the RBN and registers a relay reservation, but is not directly connected to the target peer.
+- The message is sent to the mailbox of the RBN.
+- If the RBN mailbox store request fails due to connection reset or timeout, the `OutboundFailure` handler catches it. It attempts to re-queue the message to `pending_messages` of the final recipient.
+- However, since there is no periodic retry for `pending_messages` that re-checks the mailbox storage fallback (it only drains when a circuit is established), and because the RBN was excluded from the mailbox client list, the message remains permanently stuck in `pending_messages` and never gets sent.
+- The minute the user switches to the same network as the other devices, a direct or local circuit connection is established, triggering `InboundCircuitEstablished` which flushes the stuck messages from the local `pending_messages` queue.
+
+**Root Cause:**
+1. **RBN Mailbox Exclusion:** In both `forward_to_mesh` and `perform_mailbox_fetch`, the list of target mailbox nodes (`anchor_ids`) was constructed purely from database contacts with `is_anchor_capable = 1` and `self.discovered_anchors`. It completely excluded the hardcoded/configured bootstrap RBNs. Thus, the client never attempted to store messages on or drain mailboxes from the RBN.
+2. **Mailbox Store Request Failure Recovery:** If a `MailboxStore` request fails, `OutboundFailure` re-queues the message to `pending_messages` for the target recipient, which is only flushed on direct/relay circuit connection events, bypassing mailbox retries entirely if the target peer remains offline.
+
+**Resolution:**
+1. Updated both `forward_to_mesh` and `perform_mailbox_fetch` in `src/network/mod.rs` to explicitly push the configured bootstrap RBNs from `self.bootstrap_nodes` into the `anchor_ids` list. This ensures the client stores messages on and drains mailboxes from RBNs as verified anchor nodes.
+2. Verified that the periodically running 30-second loop successfully drains `pending_messages` and retries `forward_to_mesh` which will attempt to re-store the message on the RBN mailbox if the direct connection remains offline.
 
 ### Android Mobile Data/VPN File Transfer Issue (Resolved)
 
@@ -187,5 +206,11 @@ Non-VPN:
 ---
 ## Backup Status (2026-07-09 06:06)
 - Git: main @ 95cf389
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-09 06:14)
+- Git: main @ 24b75ab
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001
