@@ -20,7 +20,6 @@ pub struct RewardProof {
 
 struct EconomyState {
     outbound_relayed_bytes: u64,
-    mailbox_storage_bytes_seconds: u64,
     uptime_seconds: u64,
     pending_per_consumer: HashMap<String, u64>,
     pending_daily_reward_nano_intr: u64,  // Daily rewards tracked in nano-INTR (1 INTR = 1,000,000,000 nano-INTR, matching Solana 9-decimal SPL)
@@ -48,7 +47,6 @@ impl RewardTracker {
         Self {
             state: Arc::new(RwLock::new(EconomyState {
                 outbound_relayed_bytes: initial_bytes,
-                mailbox_storage_bytes_seconds: 0,
                 uptime_seconds: 0,
                 pending_per_consumer: HashMap::new(),
                 pending_daily_reward_nano_intr: 0,
@@ -76,18 +74,7 @@ impl RewardTracker {
         }
     }
 
-    /// Records mailbox storage usage. Anchor nodes earn yield based on bytes * seconds.
-    pub fn record_mailbox_storage(&self, bytes: u64, seconds: u64) {
-        let product = bytes.saturating_mul(seconds);
-        let mut state = self.state.write();
-        state.mailbox_storage_bytes_seconds = state.mailbox_storage_bytes_seconds.saturating_add(product);
-        
-        if let Some(ref s) = self.storage {
-            if let Err(e) = s.record_mailbox_storage(product) {
-                tracing::error!("[Economy] Failed to record mailbox storage: {}", e);
-            }
-        }
-    }
+
 
     /// Updates uptime. Nodes with > 99% uptime receive 'Availability Yield' multiplier.
     pub fn update_uptime(&self) {

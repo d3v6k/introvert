@@ -49,9 +49,6 @@ class GlassmorphicBubble extends StatelessWidget {
     } else if (status == 2) {
       icon = Icons.done_all_rounded; // Double Blue (Read)
       color = AppTheme.current.accent;
-    } else if (status == 3) {
-      icon = Icons.schedule_rounded; // Clock (In Mailbox — awaiting recipient)
-      color = AppTheme.current.mutedText.withValues(alpha: 0.5);
     }
 
     return Icon(icon, size: 10, color: color);

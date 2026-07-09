@@ -68,3 +68,15 @@
 *   **Target File:** `src/lib.rs`
 *   **Status:** ✅ FIXED (2026-07-07)
 *   **Changes:** Replaced unsafe static mutables with proper mutable variables in economy monitoring.
+
+---
+
+## 🔴 Critical Priorities (Sovereign P2P Outbox Architecture)
+
+### [TODO-11] Implement Sovereign P2P Outbox and Swarm Seeding Architecture
+*   **Target Files:**
+    - `src/storage.rs` (Outbox schema migration, SQLite helper queries)
+    - `src/network/mod.rs` (Mailbox deprecation, Presence triggers, Outbox flushing, Hybrid manifests, P2P handshake)
+    - `src/network/types.rs` (Add FileTransferProposal, Accept, Verify, and CompleteAck variants)
+*   **Status:** 🟡 IN PROGRESS
+*   **Goal:** Replace persistent RBN mailboxes with edge-side outboxes, presence-driven delivery, two-way P2P file handshakes, and group swarm seeding.

@@ -166,10 +166,6 @@ class _IntrovertAppState extends State<IntrovertApp> {
       client.onAppLaunch();
       
       AlertService.tryRegisterPendingToken();
-      try {
-        client.fetchMailbox();
-      } catch (_) {}
-      
       debugPrint("🚀 Introvert Engine Started Successfully!");
       
       try {
@@ -245,9 +241,6 @@ class _IntrovertAppState extends State<IntrovertApp> {
       client.startNetwork();
       client.onAppLaunch();
       AlertService.tryRegisterPendingToken();
-      try {
-        client.fetchMailbox();
-      } catch (_) {}
       
       // Save Avatar Name (privacy_mode=1: allow unknown users to connect by default)
       client.setProfile(avatarName, null, null, 1);

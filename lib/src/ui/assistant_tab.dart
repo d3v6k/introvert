@@ -201,10 +201,8 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
       '[00:05] ✓ Anchor nodes available for message relay',
       '[00:06] Attempting WebSocket tunnel fallback...',
       '[00:06] ✓ Connection strategy evaluated',
-      '[00:07] Storing messages in persistent mailbox...',
-      '[00:07] ✓ Pending messages queued for offline peers',
-      '[00:08] Compiling heal report...',
-      '[00:08] ✓ Heal cycle complete — strategies exhausted',
+      '[00:07] Compiling heal report...',
+      '[00:07] ✓ Heal cycle complete — strategies exhausted',
     ];
 
     _showTerminalOverlay('INTRO-CLAW HEAL', []);
@@ -234,11 +232,7 @@ class _AssistantTabState extends State<AssistantTab> with AutomaticKeepAliveClie
             "1. Direct libp2p dial to each offline peer\n"
             "2. Relay circuit v2 via RBN backbone\n"
             "3. Anchor node routing (if anchors available)\n"
-            "4. WebSocket tunnel fallback\n"
-            "5. Persistent mailbox storage for later retrieval\n\n"
-            "Messages for unreachable peers have been stored in the "
-            "anchor node mailbox. When the peer reconnects, it will "
-            "automatically retrieve pending messages.";
+            "4. WebSocket tunnel fallback";
       }
 
       if (mounted) {

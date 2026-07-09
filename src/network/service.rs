@@ -74,7 +74,7 @@ pub struct NetworkService {
     pub(crate) last_ack_flush: Instant,
     pub(crate) rbn_latencies: Arc<RwLock<HashMap<PeerId, u128>>>,
     pub(crate) pending_manual_rbns: Arc<RwLock<HashMap<Multiaddr, String>>>,
-    /// Verified RBNs trusted for persistent mailbox storage.
+    /// Verified RBNs trusted for relay routing.
     /// Populated from bootstrap_nodes (hardcoded) and future Solana registry.
     pub(crate) verified_rbns: HashSet<PeerId>,
     /// Chat syncs currently in progress (chat_id -> timestamp when sync started)
@@ -90,6 +90,11 @@ pub struct NetworkService {
     pub(crate) last_relay_reservation_attempt: Instant,
     /// Per-RBN push token registration timestamps (rate-limit to prevent flooding on Identify)
     pub(crate) last_token_registration: HashMap<PeerId, Instant>,
+    /// Tracks the duration since pending_messages became non-empty
+    pub(crate) pending_since: Option<Instant>,
+    /// Tracks recently flushed message IDs per peer to prevent duplicate sends on circuit reconnect.
+    /// Entries older than 60s are pruned on each flush cycle.
+    pub(crate) recently_flushed: HashMap<PeerId, (Instant, HashSet<String>)>,
 }
 
 #[derive(Debug, Clone)]

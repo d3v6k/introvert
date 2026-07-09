@@ -82,9 +82,12 @@ pub enum SecureMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MailboxMessage {
-    pub sender_id: String,
-    pub payload: Vec<u8>,
+pub struct FileTransferMetadata {
+    pub transfer_id: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub file_hash: String,
+    pub total_size: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,11 +96,25 @@ pub enum SignalingPayload {
     Standard(String),
     WebRtc(WebRtcSignal),
     Secure(SecureMessage),
-    MailboxStore { recipient_id: String, payload: Vec<u8>, #[serde(default)] original_msg_id: Option<String> },
-    MailboxDrain,
-    MailboxDrained(Vec<MailboxMessage>),
+    FileTransferProposal {
+        batch_id: String,
+        files_metadata: Vec<FileTransferMetadata>,
+        #[serde(default)]
+        group_id: Option<String>,
+    },
+    FileTransferAccept {
+        batch_id: String,
+        accept: bool,
+    },
+    FileTransferVerify {
+        batch_id: String,
+        file_hashes: std::collections::HashMap<String, String>,
+    },
+    FileTransferCompleteAck {
+        batch_id: String,
+        verified: bool,
+    },
     Acknowledgement { msg_id: String, status: u8 },
-    MailboxStored { recipient_id: String, original_msg_id: String },
     Handshake(SovereignIdentity),
     Offer(WebRtcSignal),
     Answer(WebRtcSignal),
@@ -293,7 +310,6 @@ pub enum NetworkCommand {
     RejectWebRtc { peer_id: PeerId },
     AddAddress { peer_id: PeerId, address: Multiaddr },
     EstablishSecureSession { peer_id: PeerId },
-    FetchMailbox,
     UpdateAnchorStatus { enabled: bool },
     SendFile { peer_id: PeerId, file_path: String, group_id: Option<String>, transfer_id: Option<String> },
     SendFileFinalize { peer_id: PeerId, file_path: String, has_dc_already: bool, group_id: Option<String>, transfer_id: Option<String> },
@@ -331,8 +347,6 @@ pub enum NetworkCommand {
     RegisterSeeder { peer_id: PeerId, transfer_id: String, file_path: String, file_hash: String, chunk_size: u32, total_chunks: u32, group_id: Option<String> },
     UnregisterSeeder { transfer_id: String },
     FindProviders { file_hash: String },
-    StoreInMailbox { peer_id: PeerId, payload: SignalingPayload },
-    ClearMailboxForPeer { peer_id: PeerId },
     LookupPeerHandle { peer_id: String },
     CancelFileTransfer { transfer_id: String },
     RecheckConnection { peer_id: PeerId },

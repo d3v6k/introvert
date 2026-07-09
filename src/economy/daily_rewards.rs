@@ -1229,7 +1229,7 @@ mod tests {
         engine.record_activity(ActivityEvent { activity_type: ActivityType::RelayBytes, peer_id: Some("p2".into()), value: 10_485_760, is_foreground: true, message_len: None, is_self: false, is_rbn: true, proof_hash: None, active_web_containers: 0 });
         engine.record_activity(ActivityEvent { activity_type: ActivityType::UptimeSeconds, peer_id: None, value: 86400, is_foreground: true, message_len: None, is_self: false, is_rbn: true, proof_hash: None, active_web_containers: 0 });
 
-        // Simulate 500 unique client peer handshakes (bootstrap DHT / mailbox fetches)
+        // Simulate 500 unique client peer handshakes (bootstrap DHT)
         // 3 peers already registered above (p1, g1, p2); inject 497 more
         {
             let mut state = engine.state.write();

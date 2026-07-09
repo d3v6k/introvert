@@ -14,7 +14,7 @@ pub struct SovereignIdentity {
     pub global_name: Option<String>,
     pub local_alias: Option<String>,
     pub avatar_base64: Option<String>,
-    pub is_anchor_capable: bool, // Node supports mailbox storage
+    pub is_anchor_capable: bool, // Node supports relay/anchor services
     pub retention_seconds: u32,
     pub handle: Option<String>,
     pub prestige_tier: Option<u8>, // 0=Citizen, 1=Sentinel, 2=Silver, 3=Gold, 4=Platinum, 5=Catalyst, 6=Pulsar

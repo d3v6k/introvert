@@ -274,8 +274,6 @@ pub struct IntroClawService {
 
 const BATTERY_LOW_THRESHOLD: i32 = 20;
 const BATTERY_CRITICAL_THRESHOLD: i32 = 10;
-const NORMAL_MAILBOX_INTERVAL: u64 = 120;
-const THROTTLED_MAILBOX_INTERVAL: u64 = 600;
 const THROTTLED_HEARTBEAT_INTERVAL: u64 = 120;
 const THROTTLED_CONTACT_REFRESH: u64 = 600;
 
@@ -296,12 +294,6 @@ impl BatteryThrottler {
 
     pub fn should_emergency_throttle(&self) -> bool {
         self.current_battery_pct <= BATTERY_CRITICAL_THRESHOLD
-    }
-
-    pub fn get_recommended_mailbox_interval(&self) -> u64 {
-        if self.should_emergency_throttle() { THROTTLED_MAILBOX_INTERVAL * 2 }
-        else if self.should_throttle() { THROTTLED_MAILBOX_INTERVAL }
-        else { NORMAL_MAILBOX_INTERVAL }
     }
 
     pub fn get_recommended_heartbeat_interval(&self) -> u64 {
@@ -2165,10 +2157,7 @@ impl IntroClawService {
         let _ = self.storage.prune_expired_crypto_sessions(CRYPTO_SESSION_MAX_AGE_SECS);
         let _ = self.storage.prune_old_mesh_chunks();
 
-        // 7-day TTL sweeps — prunes stale cleared_chats and reward_log telemetry
-        if let Err(e) = self.storage.cleanup_cleared_chats() {
-            error!("[IntroClaw] Failed to prune cleared_chats: {:?}", e);
-        }
+        // 7-day TTL sweeps — prunes stale reward_log telemetry
         if let Err(e) = self.storage.cleanup_expired_reward_logs() {
             error!("[IntroClaw] Failed to prune reward_log: {:?}", e);
         }
@@ -2633,10 +2622,6 @@ impl IntroClawService {
 
     pub fn should_batch(&self) -> bool {
         self.battery_throttler.should_throttle()
-    }
-
-    pub fn get_battery_mailbox_interval(&self) -> u64 {
-        self.battery_throttler.get_recommended_mailbox_interval()
     }
 
     pub fn get_battery_heartbeat_interval(&self) -> u64 {
@@ -3372,14 +3357,6 @@ pub fn build_heal_plan(
             detail: "Tunnel already active — peer reachable via WebSocket relay".to_string(),
         });
     }
-
-    // Strategy 5: Mailbox fallback
-    plan.push(HealAttempt {
-        strategy: "STRATEGY_5_MAILBOX".to_string(),
-        target: peer_id.to_string(),
-        success: false,
-        detail: "Store message in persistent mailbox on connected anchor for later retrieval".to_string(),
-    });
 
     plan
 }
