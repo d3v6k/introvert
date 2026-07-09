@@ -54,3 +54,14 @@
 - **Master Authority:** `UUN1zBzL5g2TNGtHCVtJPUZNmMKfFrW8odwLPb4jFxk` — +0.05 SOL (Swarm Marshal)
 - **Escrow Vault:** `9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy` — passive PDA, no funding
 - **INTR Mint:** `EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf`
+
+## File Transfer & Relay Routing Rules
+
+### 1. Relay Reservation Lifetime & Desync Prevention
+- **Rule:** When the RBN or anchor connection drops completely, always clear the RBN from `self.relay_reservations` and `self.relay_listeners` immediately in the `ConnectionClosed` handler.
+- **Why:** Bypassing this cleanup leaves ghost entries in `self.relay_reservations`. Upon reconnection, the client will skip requesting a new reservation, leaving it stuck forever in status `4` (CONNECTING).
+
+### 2. Point-to-Point Chunk Routing
+- **Rule:** File chunk signaling payloads (`SignalingPayload::FileChunk` and `SignalingPayload::FileChunkRequest`) must NEVER be sent to the RBN peer ID (`rbn_id`).
+- **Why:** Standard RBNs run as transport-level circuit relays and do not run application-layer routing for file transfers. Since file chunk payloads lack a target peer ID wrapper field, the RBN cannot forward them and will drop them silently.
+- **Routing:** Chunks/requests must always be buffered in RAM/DB until `is_connected(&recipient_id)` is true, and then sent directly to the destination peer's PeerId over the circuit connection. Do not use bypass routing blocks that send to `rbn_id`.
