@@ -1,17 +1,19 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-09 00:30 UTC
-**Git:** main @ a569a76
+**Last Updated:** 2026-07-09 01:00 UTC
+**Git:** main @ 581d045
 
 ---
 
 ## Current System State
 
 ### RBN Server
-- **introvertd**: ACTIVE — libp2p, WebSocket tunnel, dashboard
+- **introvertd**: ACTIVE (PID 56478) — relay server fix deployed, no more relay loop
 - **introvert-solana**: ACTIVE — treasury/IPC daemon with unified credential management
+- **IPC Secret**: Both daemons reading from `/etc/introvert/ipc.secret` (chmod 600)
 - **Firebase**: Service account loaded, FCM push working
 - **APNs**: Not configured (iOS push disabled)
+- **Connected Peers**: 3 (Android, Mac, iOS) — all connected at TCP level
 
 ### Client Build
 - **macOS**: `make mac` — builds `libintrovert.dylib`
@@ -26,26 +28,73 @@
 
 ---
 
-## Known Issues
+## Session Summary (2026-07-09)
 
-### None Critical
-- All daily rewards scoring, outlier mitigation, and E2EE unit tests are passing successfully.
-- Epoch close pipeline verified working with successful payouts on 2026-07-09.
+### What Was Done
 
-### Recently Fixed (2026-07-09)
-- **Epoch ID Calculation**: Midnight UTC epoch close now correctly identifies the previous day's epoch.
-- **Inter-Process Authentication**: Unified credential management across all daemon processes.
-- **Cryptographic Verification**: Enhanced constant-time comparison for inter-process authentication.
-- **Epoch Recovery**: Added startup catch-up mechanism for missed midnight closes.
+#### 1. Payout Pipeline Fixes
+- **Epoch ID Off-by-One Bug**: Fixed `for_linux/src/lib.rs:412` — changed `hours(0)` (no-op) to `days(1)` so midnight UTC correctly closes previous day's epoch
+- **Startup Catch-up Mechanism**: Added code to automatically close yesterday's epoch on daemon restart if past 00:05 UTC
+- **IPC Secret Mismatch**: Updated `introvert-daemon/introvert-solana/src/main.rs` to read HMAC secret from `/etc/introvert/ipc.secret` instead of hardcoded constant
+- **Constant-Time HMAC**: Replaced `expected == signature` with `subtle::ConstantTimeEq` to prevent timing attacks
+- **Verified**: Epoch 2026_07_08 closed with 3 claims, 16,438 INTR distributed successfully on Solana Mainnet
 
-### Android Build Notes
-- Requires NDK 28.2.13676358 at `$ANDROID_SDK_ROOT/ndk/28.2.13676358`
-- `libc++_shared.so` must be bundled alongside `libintrovert.so`
-- `google-services.json` must be at `android/app/google-services.json`
+#### 2. RBN Relay Server Fix
+- **Root Cause**: RBN's status check loop was requesting relay reservations from bootstrap nodes every 15 seconds, but the RBN IS the bootstrap node. This caused an infinite loop trying to listen on its own relay address.
+- **Fix**: Added `is_relay_server` check to skip proactive reservation check for relay servers/anchor nodes (`for_linux/src/network/mod.rs:904-922`)
+- **Impact**: RBN now properly provides relay reservations to clients instead of trying to request them from itself
 
-### macOS Build Notes
-- `libintrovert.dylib` must be copied to `macos/Flutter/ephemeral/`
-- Secure storage entitlement `-34018` warning is non-blocking (falls back to SharedPreferences)
+#### 3. Documentation Sanitization
+- Removed all server IPs, local machine references, and specific security details from GitHub docs
+- Removed `deploy_rbn.sh`, `for_linux/`, `introvert-daemon/` from GitHub tracking
+- Updated CHANGELOG, TODO, ECONOMY_AUDIT, RECTIFICATION_PLAN, SESSION_SYNOPSIS, HANDLE_REGISTRY_DEPLOYMENT, TOKEN_ADDRESS_DIRECTORY, DEBUG_REPORT, DEBUG_DOCUMENT
+
+---
+
+### Current Device Status
+
+| Device | Peer ID | TCP Connected | Relay Status | Issue |
+|--------|---------|---------------|--------------|-------|
+| Android | `12D3KooWQM5mi5...` | Yes | Relay working | Chunk requests flowing |
+| Mac | `12D3KooWCSejiZ1...` | Yes | Relay working | Chunk requests flowing |
+| iOS | `12D3KooWN6Hu1A...` | Yes | **Stuck** | Lost relay at 04:08 UTC, in reconnect loop |
+
+### iOS Device Issue
+
+**Timeline:**
+- 21:49 UTC (Jul 8) — iOS connects fine, gets relay circuits, status=1
+- 04:08 UTC (Jul 9) — iOS loses relay, enters fast reconnect loop (30s interval)
+- 04:08-04:53 UTC — Stuck in "transfers waiting, no relay" with periodic brief OutboundCircuitEstablished
+- 00:50 UTC — RBN fix deployed, relay server working again
+- 00:56 UTC — iOS connected to RBN at TCP level, RBN sending payloads to it
+
+**Root Cause:**
+The RBN restarts at 00:13 and 00:17 UTC (during payout pipeline work) broke the relay server. The RBN entered a "No active relay listeners" loop and couldn't provide relay reservations. When the iOS device's relay reservation expired (~45 min renewal), it couldn't re-establish because the RBN was broken.
+
+**Current State:**
+- iOS device is connected to RBN at TCP level (confirmed via netstat)
+- RBN is sending payloads to iOS device (confirmed via logs)
+- iOS device is still in "transfers waiting, no relay" loop on client side
+- Client needs to re-request relay reservation — should happen on next resilience tick
+
+**Expected Resolution:**
+The iOS device should automatically recover on its next resilience cycle (every 30s). The RBN is now fixed and properly providing relay reservations. The client just needs to re-request one.
+
+---
+
+## Pending Work
+
+### Immediate
+- **Monitor iOS device recovery** — should auto-recover within 30s now that RBN is fixed
+- **Verify relay circuit establishment** — check for ReservationReqAccepted in iOS logs
+
+### Short-term
+- **Client-side resilience improvement** — when relay reservation is lost, client should immediately re-request instead of waiting for next resilience tick
+- **RBN restart safety** — add graceful relay reservation preservation across RBN restarts
+
+### Medium-term
+- **Anchor Handle Registry deployment** — needs 1.51 SOL for deployer wallet
+- **Client balance display** — app shows 0 INTR despite on-chain balances
 
 ---
 
@@ -53,7 +102,7 @@
 
 ### Three Daemons
 1. **Client** (`libintrovert.dylib` / `.so`) — Flutter+Rust P2P mesh client
-2. **RBN** (`introvertd`) — Relay Backbone Node
+2. **RBN** (`introvertd`) — Relay Backbone Node (relay server for all clients)
 3. **Economy** (`introvert-solana`) — Treasury/IPC daemon
 
 ### Telemetry Pipeline
