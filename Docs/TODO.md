@@ -1,7 +1,7 @@
 # Introvert Token Economy & Infrastructure TODO List
 
 **Date Created:** 2026-07-06  
-**Last Updated:** 2026-07-07  
+**Last Updated:** 2026-07-09  
 **Scope:** Security Audit outstanding findings and alignment cleanup.
 
 ---
@@ -46,8 +46,8 @@
 
 ### [TODO-6] Secure Constant-Time IPC HMAC Verification (Audit Finding M4)
 *   **Target File:** `introvert-daemon/introvert-solana/src/main.rs`
-*   **Context:** Uses standard string equality `expected == signature` which is vulnerable to timing attacks.
-*   **Goal:** Update to a constant-time comparison helper utilizing `subtle::ConstantTimeEq` or `hmac::verify`.
+*   **Status:** ✅ FIXED (2026-07-09)
+*   **Changes:** Added `subtle` crate dependency. Replaced `expected == signature` with `expected.as_bytes().ct_eq(signature.as_bytes()).into()` for constant-time comparison. Also fixed IPC secret loading to read from `/etc/introvert/ipc.secret` instead of hardcoded constant.
 
 ### [TODO-7] HMAC Shared Secret Hardening (Audit Finding C2)
 *   **Target File:** `src/economy/solana.rs`

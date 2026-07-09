@@ -186,6 +186,8 @@ pub enum SignalingPayload {
     GroupAction(SignedGroupAction),
     GroupManifest { group_id: String, name: String, description: String, members: Vec<GroupMemberMetadata>, secret: [u8; 32] },
     GroupJoinRejected { group_id: String, group_name: String, reason: String },
+    HandleResolveRequest { handle: String },
+    HandleResolveResponse { handle: String, peer_id: String, verified: bool },
     RequestHandshake,
     ProfileRequest,
     ProfileResponse {
@@ -649,6 +651,16 @@ impl NetworkService {
         tokio::spawn(async move {
             Self::start_message_pruning(pruner_storage).await;
         });
+
+        // PHASE 2: Proactive IP Monitor Worker (6-hr pulse / 1-hr check)
+        // Runs only if this node is an anchor/RBN (relay server enabled)
+        if self.storage.is_anchor_mode_enabled() || self.swarm.behaviour().relay_server.as_ref().is_some() {
+            let storage_for_ip_monitor = Arc::clone(&self.storage);
+            let local_peer_id_str = self.swarm.local_peer_id().to_string();
+            tokio::spawn(async move {
+                Self::proactive_ip_monitor_worker(storage_for_ip_monitor, local_peer_id_str).await;
+            });
+        }
 
         let local_peer_id = *self.swarm.local_peer_id();
         let pubkey_record = Record {
@@ -4045,6 +4057,190 @@ impl NetworkService {
         }
     }
 
+    /// Proactive IP Monitor Worker — the 6-hour pulse / 1-hour check loop.
+    ///
+    /// Runs as a background task on anchor/RBN nodes. Every 60 minutes it
+    /// resolves the node's current public WAN IP via an external endpoint,
+    /// compares it to the last-known cached value, and:
+    ///   - On IP change: immediately calls `update_rbn_routing` on-chain to
+    ///     keep the mesh directory accurate with near-zero downtime.
+    ///   - On no change: enforces a 6-hour maximum heartbeat interval by
+    ///     refreshing the on-chain entry to guarantee directory permanence.
+    ///
+    /// Uses the treasury keypair at `~/.config/introvert/treasury-authority.json`
+    /// for signing the on-chain transactions.
+    async fn proactive_ip_monitor_worker(storage: Arc<crate::storage::StorageService>, local_peer_id: String) {
+        const IP_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 60);       // 1 hour
+        const FORCE_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(6 * 3600); // 6 hours
+
+        // Configurable IP resolver endpoints with sequential failover
+        const IP_RESOLVER_ENDPOINTS: &[&str] = &[
+            "https://api.ipify.org",
+            "https://ifconfig.me/ip",
+            "https://icanhazip.com",
+        ];
+
+        let mut check_interval = tokio::time::interval(IP_CHECK_INTERVAL);
+        // Skip the first tick (fires immediately)
+        check_interval.tick().await;
+
+        let mut last_known_ip: Option<String> = None;
+        let mut last_heartbeat = Instant::now() - FORCE_HEARTBEAT_INTERVAL; // Force first heartbeat
+
+        info!("[IP Monitor] Proactive IP monitor worker started (1h check / 6h heartbeat)");
+
+        loop {
+            check_interval.tick().await;
+
+            // 1. Resolve current public WAN IP with sequential failover
+            let mut current_ip: Option<String> = None;
+            for endpoint in IP_RESOLVER_ENDPOINTS {
+                match reqwest::get(*endpoint).await {
+                    Ok(resp) => match resp.text().await {
+                        Ok(text) => {
+                            let trimmed = text.trim().to_string();
+                            if !trimmed.is_empty() {
+                                current_ip = Some(trimmed);
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            warn!("[IP Monitor] Failed to read IP from {}: {}", endpoint, e);
+                        }
+                    },
+                    Err(e) => {
+                        warn!("[IP Monitor] Failed to reach {}: {}. Trying next...", endpoint, e);
+                    }
+                }
+            }
+
+            let Some(ip) = current_ip else {
+                continue;
+            };
+
+            // 2. Detect IP deviation
+            let ip_changed = match &last_known_ip {
+                Some(cached) => cached != &ip,
+                None => true, // First run — treat as change
+            };
+
+            // 3. Determine if we need to publish on-chain
+            let force_heartbeat = last_heartbeat.elapsed() >= FORCE_HEARTBEAT_INTERVAL;
+            let should_publish = ip_changed || force_heartbeat;
+
+            if should_publish {
+                let reason = if ip_changed {
+                    format!("IP changed: {:?} -> {}", last_known_ip, ip)
+                } else {
+                    "6-hour forced heartbeat".to_string()
+                };
+                info!("[IP Monitor] Publishing on-chain update. Reason: {}", reason);
+
+                // Load the treasury keypair for signing
+                match Self::load_treasury_keypair() {
+                    Ok(keypair) => {
+                        // Get the peer ID and construct the multiaddress
+                        let peer_id = local_peer_id.clone();
+                        let multiaddr = format!("/ip4/{}/tcp/443", ip);
+
+                        // Determine which handle to update (use the RBN handle or derive one)
+                        let handle = match storage.get_profile() {
+                            Ok(Some((_, Some(h), _, _, _))) if h.starts_with("i@") => h,
+                            _ => format!("i@rbn-{}", &peer_id[..8.min(peer_id.len())]),
+                        };
+
+                        // Configurable treasury API URL
+                        let treasury_url = std::env::var("INTROVERT_TREASURY_URL")
+                            .unwrap_or_else(|_| "https://api.introvert.network/claim".to_string());
+
+                        // Initialize Solana client
+                        match crate::economy::solana::SolanaIncentiveEngine::new(
+                            "https://api.mainnet-beta.solana.com",
+                            "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
+                            &treasury_url,
+                        ) {
+                            Ok(solana_client) => {
+                                // PREFLIGHT: Check treasury SOL balance before submitting
+                                let treasury_pubkey = solana_client.get_treasury_pubkey();
+                                let balance = solana_client.fetch_sol_balance(&treasury_pubkey).await.unwrap_or(0);
+                                if balance < 50_000_000 { // 0.05 SOL in lamports
+                                    warn!(
+                                        "[IP Monitor] CRITICAL WARNING: Treasury wallet balance is dangerously low ({} lamports = {:.4} SOL)! \
+                                         Heartbeat execution may fail. Fund the treasury immediately.",
+                                        balance, balance as f64 / 1_000_000_000.0
+                                    );
+                                }
+
+                                match solana_client.update_rbn_routing(&keypair, &handle, &multiaddr).await {
+                                    Ok(sig) => {
+                                        info!("[IP Monitor] On-chain RBN routing updated. Signature: {}", sig);
+                                        last_known_ip = Some(ip);
+                                        last_heartbeat = Instant::now();
+                                    }
+                                    Err(e) => {
+                                        warn!("[IP Monitor] Failed to update on-chain RBN routing: {}", e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!("[IP Monitor] Failed to initialize Solana client: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!("[IP Monitor] Failed to load treasury keypair: {}", e);
+                    }
+                }
+            } else {
+                debug!("[IP Monitor] IP unchanged ({}). Next heartbeat in {:?}.",
+                    ip, FORCE_HEARTBEAT_INTERVAL.saturating_sub(last_heartbeat.elapsed()));
+                // Update cached IP even if we didn't publish
+                last_known_ip = Some(ip);
+            }
+        }
+    }
+
+    /// Loads the treasury keypair from `~/.config/introvert/treasury-authority.json`.
+    /// The file contains a JSON array of 64 bytes (Solana CLI format).
+    fn load_treasury_keypair() -> anyhow::Result<solana_sdk::signature::Keypair> {
+        let home = std::env::var("HOME")
+            .map_err(|_| anyhow::anyhow!("$HOME not set — cannot resolve treasury keypair path"))?;
+        let path = format!("{}/.config/introvert/treasury-authority.json", home);
+
+        // SECURITY: Enforce strict file permissions before reading key material.
+        // Only the owner (user bit) may have any access. Group and other bits
+        // must be zero. On failure, refuse to load the keypair.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let metadata = std::fs::metadata(&path)
+                .map_err(|e| anyhow::anyhow!("Failed to stat treasury keypair at {}: {}", path, e))?;
+            let mode = metadata.permissions().mode();
+            // Check that NO group or other permission bits are set (mask 0o177).
+            // We only allow owner read/write (0o600) or owner read-only (0o400).
+            if mode & 0o177 != 0 {
+                anyhow::bail!(
+                    "CRITICAL SECURITY FAILURE: Treasury keypair file permissions are too open! \
+                     Found mode {:o}. Run: chmod 600 {}",
+                    mode, path
+                );
+            }
+        }
+
+        let data = std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("Failed to read treasury keypair at {}: {}", path, e))?;
+        let bytes: Vec<u8> = serde_json::from_str(&data)
+            .map_err(|e| anyhow::anyhow!("Invalid treasury keypair JSON: {}", e))?;
+        if bytes.len() < 32 {
+            return Err(anyhow::anyhow!("Treasury keypair must be at least 32 bytes, got {}", bytes.len()));
+        }
+        // Solana CLI JSON stores 64 bytes (32 secret + 32 public).
+        // Keypair::new_from_array takes a 32-byte seed.
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&bytes[..32]);
+        Ok(solana_sdk::signature::Keypair::new_from_array(seed))
+    }
+
     pub async fn handle_signaling_payload(&mut self, peer: PeerId, payload: SignalingPayload, is_webrtc: bool) {
         let mut queue = vec![(peer, payload, is_webrtc)];
         while let Some((p, pl, is_wtc)) = queue.pop() {
@@ -5484,14 +5680,36 @@ impl NetworkService {
                     if let Ok(sig) = self.local_keypair.sign(msg.as_bytes()) {
                          let pubkey = self.local_keypair.public().encode_protobuf();
                          let tx = self.command_tx.clone();
+                         let handle_clone = handle.clone();
+                         let peer_id_clone = peer_id.clone();
                          tokio::task::spawn(async move {
                              let _ = tx.send(NetworkCommand::BroadcastWitness { 
-                                 handle, 
-                                 peer_id, 
+                                 handle: handle_clone, 
+                                 peer_id: peer_id_clone, 
                                  timestamp, 
                                  pubkey,
                                  signature: sig 
                              }).await;
+                         });
+                         
+                         // NEW: Trigger on-chain registration via treasury daemon
+                         let handle_clone = handle.clone();
+                         let peer_id_clone = peer_id.clone();
+                         // Load IPC secret and send to treasury
+                         tokio::task::spawn(async move {
+                             match std::fs::read_to_string("/etc/introvert/ipc.secret") {
+                                 Ok(secret) => {
+                                     let claimant_pubkey = peer_id_clone.clone(); // PeerId used as claimant identifier
+                                     if let Err(e) = crate::send_handle_registration_to_treasury(
+                                         &handle_clone, &peer_id_clone, &claimant_pubkey, secret.trim()
+                                     ).await {
+                                         tracing::warn!("[Registry] Failed to send handle registration to treasury: {:?}", e);
+                                     }
+                                 }
+                                 Err(e) => {
+                                     tracing::warn!("[Registry] Failed to read IPC secret: {:?}", e);
+                                 }
+                             }
                          });
                     }
                 }
@@ -5587,7 +5805,29 @@ impl NetworkService {
                     self.pending_claims.remove(&handle);
                 }
             }
-            SignalingPayload::Heartbeat { timestamp } => {
+            
+            SignalingPayload::HandleResolveRequest { handle } => {
+                info!("[Registry] Received handle resolve request for {}", handle);
+                // Look up the handle in storage
+                match self.storage.get_handle_claim(&handle) {
+                    Ok(Some((peer_id, _timestamp, _signatures_json, verified))) => {
+                        let response = SignalingPayload::HandleResolveResponse {
+                            handle: handle.clone(),
+                            peer_id: peer_id.clone(),
+                            verified,
+                        };
+                        let _ = self.forward_to_mesh(peer, response, false).await;
+                    }
+                    Ok(None) => {
+                        info!("[Registry] Handle {} not found in storage", handle);
+                    }
+                    Err(e) => {
+                        warn!("[Registry] Failed to look up handle {}: {:?}", handle, e);
+                    }
+                }
+            }
+
+SignalingPayload::Heartbeat { timestamp } => {
                 info!("[Mesh] Received Heartbeat from {} (ts={})", peer, timestamp);
                 let storage = Arc::clone(&self.storage);
                 let peer_id_str = peer.to_string();

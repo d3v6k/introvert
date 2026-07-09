@@ -163,8 +163,17 @@ impl SolanaIncentiveEngine {
             "transaction": base64_tx,
         });
 
-        let response = self.http_client.post(&self.treasury_api_url)
-            .json(&payload)
+        let mut request = self.http_client.post(&self.treasury_api_url)
+            .json(&payload);
+
+        // Attach auth token if configured (closes anonymous endpoint exposure)
+        if let Ok(auth_token) = std::env::var("INTROVERT_TREASURY_AUTH") {
+            if !auth_token.is_empty() {
+                request = request.header("X-Introvert-Auth", auth_token);
+            }
+        }
+
+        let response = request
             .send()
             .await
             .map_err(|e| anyhow!("Relay request failed: {}", e))?;
@@ -352,6 +361,55 @@ impl SolanaIncentiveEngine {
         Ok(rbn_nodes)
     }
 
+    /// Calls `update_rbn_routing` on the Introvert Handle Registry Anchor program.
+    /// Updates the `ip_address` field for a handle entry on-chain.
+    pub async fn update_rbn_routing(
+        &self,
+        owner_keypair: &Keypair,
+        handle: &str,
+        new_ip_address: &str,
+    ) -> Result<String> {
+        let program_id = Pubkey::from_str("FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW")?;
+        let owner_pubkey = owner_keypair.pubkey();
+        let system_program = Pubkey::from_str("11111111111111111111111111111111")?;
+
+        // Derive the handle entry PDA: seeds = [b"handle", handle.as_bytes()]
+        let (handle_entry_pda, _) = Pubkey::find_program_address(
+            &[b"handle", handle.as_bytes()],
+            &program_id,
+        );
+
+        // Build instruction data: discriminator + borsh-serialized new_ip_address
+        let discriminator = anchor_discriminator("global", "update_rbn_routing");
+        let mut data = Vec::new();
+        data.extend_from_slice(&discriminator);
+        data.extend_from_slice(&borsh_serialize_string(new_ip_address));
+
+        let accounts = vec![
+            solana_sdk::instruction::AccountMeta::new(handle_entry_pda, false),
+            solana_sdk::instruction::AccountMeta::new(owner_pubkey, true),
+            solana_sdk::instruction::AccountMeta::new_readonly(system_program, false),
+        ];
+
+        let instruction = Instruction::new_with_bytes(program_id, &data, accounts);
+
+        let blockhash = self.rpc_client.get_latest_blockhash().await?;
+        let message = Message::new_with_blockhash(
+            &[instruction],
+            Some(&owner_pubkey),
+            &blockhash,
+        );
+
+        let mut tx = Transaction::new_unsigned(message);
+        tx.sign(&[owner_keypair], blockhash);
+
+        tracing::info!("[RBN Routing] Submitting update_rbn_routing for handle '{}' with ip_address='{}'", handle, new_ip_address);
+        let signature = self.send_transaction_raw(&tx).await?;
+        tracing::info!("[RBN Routing] Transaction successful! Signature: {}", signature);
+
+        Ok(signature)
+    }
+
     async fn send_transaction_raw(&self, tx: &Transaction) -> Result<String> {
         let serialized = bincode::serialize(tx)?;
         let base64_tx = general_purpose::STANDARD.encode(serialized);
@@ -369,8 +427,8 @@ impl SolanaIncentiveEngine {
             ]
         });
 
-        // Use devnet RPC URL directly to bypass client endpoint constraints
-        let rpc_url = "https://api.devnet.solana.com";
+        // Use mainnet RPC URL directly to bypass client endpoint constraints
+        let rpc_url = "https://api.mainnet-beta.solana.com";
 
         let response = self.http_client.post(rpc_url)
             .json(&payload)

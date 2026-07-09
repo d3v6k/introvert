@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use parking_lot::RwLock;
 use chrono::{Utc, NaiveDate};
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 use crate::storage::StorageService;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
@@ -393,6 +393,26 @@ impl RbnDailyRewardEngine {
             return None;
         }
 
+        // 1b. Wallet identity cross-check: verify peer_id hasn't claimed a different wallet
+        if let Some(ref storage) = self.storage {
+            match storage.get_wallet_for_peer(&packet.peer_id, &packet.epoch_id) {
+                Ok(Some(stored_wallet)) => {
+                    if stored_wallet != packet.solana_wallet {
+                        error!(
+                            "[Security] Wallet mismatch for Peer {}! Asserted: {}, Stored: {}",
+                            packet.peer_id, packet.solana_wallet, stored_wallet
+                        );
+                        return None;
+                    }
+                }
+                Ok(None) => {} // First telemetry from this peer, no prior mapping
+                Err(e) => {
+                    warn!("[RbnRewards] Wallet cross-check DB error: {:?}", e);
+                    // Continue — don't block on DB lookup failure
+                }
+            }
+        }
+
         // Record authenticated telemetry timestamp for fork-detection correlation
         self.last_telemetry_seen.write().insert(packet.solana_wallet.clone(), Instant::now());
 
@@ -590,6 +610,15 @@ impl RbnDailyRewardEngine {
     /// 6. Compute total capped global points = sum of all clamped scores
     /// 7. Distribute rewards proportionally: (Capped User Points / Total Capped Global Points) * Daily Pool Cap
     pub fn close_current_epoch(&self, epoch_id: &str) -> Vec<ClaimRequest> {
+        // TTL: Purge telemetry rows older than 48 hours to prevent legacy contamination
+        if let Some(ref storage) = self.storage {
+            match storage.purge_stale_telemetry() {
+                Ok(deleted) if deleted > 0 => info!("[RbnRewards] Purged {} stale telemetry rows (>48h old)", deleted),
+                Ok(_) => {},
+                Err(e) => warn!("[RbnRewards] Failed to purge stale telemetry: {:?}", e),
+            }
+        }
+
         let mut epoch_cycles = HashMap::new();
 
         // 1. Load client cycles from SQLite if storage is available
@@ -667,16 +696,16 @@ impl RbnDailyRewardEngine {
         }
 
         // Step 1: Collect all reporting edge scores (non-RBN only for IQR)
-        let mut edge_scores: Vec<(String, f64, String, String, u8)> = Vec::new(); // (peer_id, total_points, wallet, ata, prestige_tier)
-        for (peer_id, cycle) in epoch_cycles.iter() {
+        let mut edge_scores: Vec<(String, f64, String, String, u8)> = Vec::new(); // (solana_wallet, total_points, wallet, ata, prestige_tier)
+        for (solana_wallet, cycle) in epoch_cycles.iter() {
             if cycle.is_eligible && cycle.total_points > 0.0 {
-                // Derive the proper Associated Token Account from the wallet address
-                let ata = derive_ata(&cycle.payout_address, INTR_MINT)
+                // Derive the proper Associated Token Account from the WALLET address (not the client-submitted ATA)
+                let ata = derive_ata(solana_wallet, INTR_MINT)
                     .unwrap_or_else(|| cycle.payout_address.clone());
                 edge_scores.push((
-                    peer_id.clone(),
+                    solana_wallet.clone(),
                     cycle.total_points,
-                    cycle.payout_address.clone(),
+                    solana_wallet.clone(),
                     ata,
                     cycle.prestige_tier,
                 ));

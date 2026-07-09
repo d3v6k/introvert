@@ -1,7 +1,37 @@
-# Debug Report — 2026-07-08
+# Debug Report — 2026-07-08 (Updated 2026-07-09)
 
 ## Session Summary
 Implemented Media Ingestion Safety Module, fixed RBN rewards pipeline, added Klipy stickers/memes, created Anchor Handle Registry program, and deployed RBN infrastructure updates.
+
+## Additional Fixes (2026-07-09)
+
+### 6. Epoch ID Off-by-One Bug
+**Problem:** Midnight UTC close generated wrong epoch ID. `now - chrono::Duration::hours(0)` was a no-op, causing epoch `2026_07_09` to be closed instead of `2026_07_08`.
+**Fix:** Changed to `now - chrono::Duration::days(1)` in `for_linux/src/lib.rs:440`.
+**Status:** Fixed. Epoch `2026_07_08` closed successfully via startup catch-up mechanism.
+
+### 7. IPC Secret Mismatch (Recurring)
+**Problem:** Solana daemon binary on server still used hardcoded constant `0757c80d...` instead of reading from `/etc/introvert/ipc.secret`.
+**Fix:** Updated introvert-solana source to load secret from file via `load_ipc_secret()`. Recompiled and deployed.
+**Status:** Fixed. Both daemons confirmed reading from same file.
+
+### 8. HMAC Timing Attack Vulnerability
+**Problem:** IPC signature verification used standard string equality `expected == signature` which is vulnerable to timing attacks.
+**Fix:** Added `subtle` crate dependency. Replaced with `expected.as_bytes().ct_eq(signature.as_bytes()).into()` for constant-time comparison.
+**Status:** Fixed. Deployed to production.
+
+### 9. Missed Epoch Recovery
+**Problem:** If daemon restarts after midnight, the epoch close for the previous day is missed permanently.
+**Fix:** Added startup catch-up mechanism that attempts to close yesterday's epoch if past 00:05 UTC.
+**Status:** Fixed. Verified working — epoch `2026_07_08` recovered automatically on restart.
+
+### Verification
+- **Epoch 2026_07_08 Payout**: 3 claims, 16,438 INTR distributed successfully
+  - `mPiqKQ8L...`: 4,893.67 INTR (sig: `3LP4tY7e...`)
+  - `9fKYzZvg...`: 6,122.66 INTR (sig: `2TWnDuKX...`)
+  - `2ZzBY7wK...`: 5,421.68 INTR (sig: `3Dotf8NG...`)
+- **7/7 Unit Tests**: All passing
+- **Both Daemons**: Active and reading IPC secret from file
 
 ## Issues Resolved
 

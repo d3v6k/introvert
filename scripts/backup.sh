@@ -108,6 +108,10 @@ sync_dir "$PROJECT_DIR/for_linux" "$BACKUP_DIR/for_linux" "RBN daemon (for_linux
 sync_dir "$PROJECT_DIR/introvert-daemon" "$BACKUP_DIR/introvert-daemon" "Economy daemon (introvert-daemon/)" \
   --exclude='target/' --exclude='.DS_Store'
 
+# Swarm Marshal (token deployment)
+sync_dir "$PROJECT_DIR/introvert-token" "$BACKUP_DIR/introvert-token" "Swarm Marshal (introvert-token/)" \
+  --exclude='target/' --exclude='.DS_Store'
+
 # P2P crate
 sync_dir "$PROJECT_DIR/introvert-p2p" "$BACKUP_DIR/introvert-p2p" "P2P crate (introvert-p2p/)" \
   --exclude='target/' --exclude='.DS_Store'

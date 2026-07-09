@@ -237,7 +237,8 @@ impl StorageService {
                 prestige_tier INTEGER NOT NULL,
                 signature BLOB NOT NULL,
                 timestamp INTEGER NOT NULL,
-                PRIMARY KEY (epoch_id, solana_wallet)
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (epoch_id, peer_id)
             );
             CREATE TABLE IF NOT EXISTS _schema_version (version INTEGER PRIMARY KEY);"
         )?;
@@ -277,6 +278,8 @@ impl StorageService {
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN last_seen INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE profile ADD COLUMN prestige_tier INTEGER DEFAULT 0", []);
+        // Migration: add created_at to client_telemetry if missing
+        let _ = conn.execute("ALTER TABLE client_telemetry ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP", []);
 
         Ok(())
     }
@@ -1096,6 +1099,35 @@ impl StorageService {
         }
         Ok(results)
     }
+
+    /// Purge telemetry rows older than 48 hours to prevent legacy contamination.
+    pub fn purge_stale_telemetry(&self) -> Result<usize> {
+        let conn = self.conn.lock();
+        let cutoff = chrono::Utc::now().timestamp() - (48 * 3600);
+        let deleted = conn.execute(
+            "DELETE FROM client_telemetry WHERE timestamp < ?1",
+            params![cutoff],
+        )?;
+        Ok(deleted)
+    }
+
+    /// Look up the stored wallet for a given peer_id in the current or recent epoch.
+    /// Returns Some(wallet) if a mapping exists, None if this peer has no prior wallet.
+    pub fn get_wallet_for_peer(&self, peer_id: &str, epoch_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT solana_wallet FROM client_telemetry WHERE peer_id = ?1 ORDER BY ROWID DESC LIMIT 1"
+        )?;
+        let mut rows = stmt.query_map(params![peer_id], |row| {
+            row.get::<_, String>(0)
+        })?;
+        if let Some(Ok(wallet)) = rows.next() {
+            Ok(Some(wallet))
+        } else {
+            Ok(None)
+        }
+    }
+
 
     /// Fetch sent messages stuck at status=0 (Sent) older than `age_secs` seconds.
     /// Returns (msg_id, peer_id, content, reply_to) for retry.

@@ -2,6 +2,28 @@
 
 All notable changes to Introvert will be documented in this file.
 
+## [0.31.0] - 2026-07-09 — Payout Pipeline Hardening & Automated Epoch Recovery
+
+### Milestone
+**Full audit and hardening of the RBN reward distribution pipeline. Fixed critical epoch ID off-by-one bug, IPC secret mismatch between daemons, and HMAC timing vulnerability. Added startup catch-up mechanism for automated recovery from missed midnight epoch closes. First successful automated INTR distribution verified on Solana Mainnet.**
+
+### Added
+- **Startup Epoch Catch-up**: On daemon restart, if past 00:05 UTC, automatically attempts to close previous day's epoch as safety net for missed midnight closes.
+- **Constant-Time HMAC Comparison**: Replaced standard string equality with `subtle::ConstantTimeEq` in introvert-solana IPC signature verification to prevent timing attacks.
+- **IPC Secret File Loading**: introvert-solana daemon now reads HMAC secret from `/etc/introvert/ipc.secret` instead of using hardcoded constant.
+
+### Fixed
+- **Epoch ID Off-by-One Bug**: Fixed critical bug where midnight UTC close generated wrong epoch ID. Changed `now - chrono::Duration::hours(0)` (no-op) to `now - chrono::Duration::days(1)` so midnight correctly closes previous day's epoch.
+- **IPC Secret Mismatch**: Both daemons (introvertd and introvert-solana) now read from `/etc/introvert/ipc.secret`. Previously solana daemon used hardcoded constant that didn't match.
+- **Missing Telemetry for New Epochs**: Verified that client telemetry persists to SQLite and survives daemon restarts for proper epoch close processing.
+
+### Verified
+- **Epoch 2026_07_08 Payout**: 3 claims, 16,438 INTR distributed successfully on Solana Mainnet.
+- **7/7 Unit Tests Passing**: Basic scoring, double-claim rejection, IQR outlier mitigation, codec tests, wire size comparison.
+- **Automated Pipeline**: No manual intervention required for new clients joining the network.
+
+---
+
 ## [0.30.0] - 2026-07-06 — Signed Telemetry Pipeline, SQLite Persistence & Snappy Reconnection Ladder
 
 ### Milestone

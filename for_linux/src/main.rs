@@ -51,6 +51,10 @@ struct Args {
     /// Show derived Solana operator wallet key material and exit
     #[arg(long)]
     show_wallet: bool,
+
+    /// Dev mode: use in-memory SQLite (no persistent telemetry contamination between restarts)
+    #[arg(long, default_value_t = false)]
+    dev: bool,
 }
 
 // Global callback for the headless daemon
@@ -171,7 +175,13 @@ async fn main() -> anyhow::Result<()> {
     let seed_for_solana = seed_fixed.clone();
 
     // 2. Initialize Engine
-    let db_path_c = CString::new(args.db_path.clone())?;
+    let effective_db_path = if args.dev {
+        println!("[DevMode] Using in-memory SQLite — telemetry will not persist across restarts");
+        ":memory:".to_string()
+    } else {
+        args.db_path.clone()
+    };
+    let db_path_c = CString::new(effective_db_path)?;
     let res = introvert_engine_start(seed_fixed.as_ptr(), db_path_c.as_ptr());
     // Zeroize seed material after engine has consumed it
     seed_fixed.fill(0);
@@ -194,7 +204,7 @@ async fn main() -> anyhow::Result<()> {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
-                "https://api.devnet.solana.com",
+                "https://api.mainnet-beta.solana.com",
                 "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
                 "https://api.introvert.network/claim",
             ) {
@@ -269,7 +279,7 @@ async fn main() -> anyhow::Result<()> {
             });
 
             let solana_client = match introvert::economy::solana::SolanaIncentiveEngine::new(
-                "https://api.devnet.solana.com",
+                "https://api.mainnet-beta.solana.com",
                 "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf",
                 "https://api.introvert.network/claim",
             ) {

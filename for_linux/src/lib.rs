@@ -254,7 +254,7 @@ pub extern "C" fn introvert_engine_start(
     // Initialize Solana Incentive Engine with Mainnet settings as per Blueprint v4.0
     let solana_client = match SolanaIncentiveEngine::new(
         "https://api.mainnet-beta.solana.com",
-        "9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy", // Treasury from Blueprint v4.0
+        "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm", // Production Treasury (Alibaba hot wallet)
         "https://api.introvert.network/v1/treasury/claim" // Production Treasury Relay
     ) {
         Ok(c) => Arc::new(c),
@@ -398,27 +398,55 @@ pub extern "C" fn introvert_network_start_production(
             info!("[RbnRewards] Spawning midnight epoch payout background task...");
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             let mut last_processed_epoch = String::new();
-            
+
+            // Startup safety net: close previous day's epoch if we missed midnight
+            {
+                let now = chrono::Utc::now();
+                let yesterday = (now - chrono::Duration::days(1)).format("%Y_%m_%d").to_string();
+                let today = now.format("%Y_%m_%d").to_string();
+                // If we're past 00:05 UTC, yesterday's epoch should already be closed
+                // Try closing it as a catch-up mechanism
+                if now.hour() > 0 || (now.hour() == 0 && now.minute() >= 5) {
+                    info!("[RbnRewards] Startup catch-up: attempting to close yesterday's epoch: {}", yesterday);
+                    let claims = reward_engine_payout.close_current_epoch(&yesterday);
+                    if !claims.is_empty() {
+                        info!("[RbnRewards] Catch-up: closed epoch {} with {} claims", yesterday, claims.len());
+                        if let Ok(ipc_secret) = std::fs::read_to_string("/etc/introvert/ipc.secret") {
+                            let ipc_secret = ipc_secret.trim().to_string();
+                            for claim in &claims {
+                                info!("[RbnRewards] Catch-up: sending claim to treasury: {} -> {:.4} INTR", claim.peer_id, claim.token_amount);
+                                if let Err(e) = send_claim_to_treasury(claim, &ipc_secret).await {
+                                    error!("[RbnRewards] Catch-up: failed to send claim for peer {}: {:?}", claim.peer_id, e);
+                                }
+                            }
+                        }
+                    } else {
+                        info!("[RbnRewards] Catch-up: no claims for epoch {} (already closed or no data)", yesterday);
+                    }
+                    last_processed_epoch = yesterday;
+                }
+            }
+
             loop {
                 interval.tick().await;
-                
+
                 let now = chrono::Utc::now();
                 let hour = now.hour();
                 let minute = now.minute();
-                
-                // Trigger daily at 12:00 UTC (noon) — allows US/EU operators to monitor live
-                if hour == 12 && minute == 0 {
-                    // Grace Period: Close the epoch from 2 days ago (giving 24 hours for offline clients to sync)
-                    let prev_day = now - chrono::Duration::days(2);
-                    let epoch_id = prev_day.format("%Y_%m_%d").to_string();
-                    
+
+                // Trigger daily at 00:00 UTC (midnight) — epoch boundary
+                if hour == 0 && minute == 0 {
+                    // Close the previous day's epoch (midnight UTC boundary)
+                    let shifted = now - chrono::Duration::days(1);
+                    let epoch_id = shifted.format("%Y_%m_%d").to_string();
+
                     if epoch_id != last_processed_epoch {
-                        info!("[RbnRewards] 🕛 Noon UTC reached. Closing epoch: {}", epoch_id);
-                        
+                        info!("[RbnRewards] 🕛 Midnight UTC reached. Closing epoch: {}", epoch_id);
+
                         // 1. Close epoch
                         let claims = reward_engine_payout.close_current_epoch(&epoch_id);
                         info!("[RbnRewards] Closed epoch {} with {} claims", epoch_id, claims.len());
-                        
+
                         // 2. Load IPC secret from /etc/introvert/ipc.secret
                         let ipc_secret = match std::fs::read_to_string("/etc/introvert/ipc.secret") {
                             Ok(sec) => sec.trim().to_string(),
@@ -427,7 +455,7 @@ pub extern "C" fn introvert_network_start_production(
                                 continue;
                             }
                         };
-                        
+
                         // 3. Send claims to treasury daemon via IPC (localhost:9001)
                         for claim in claims {
                             info!("[RbnRewards] Sending claim to treasury: {} -> {:.4} INTR", claim.peer_id, claim.token_amount);
@@ -437,7 +465,7 @@ pub extern "C" fn introvert_network_start_production(
                                 info!("[RbnRewards] Claim successfully dispatched to treasury for peer {}", claim.peer_id);
                             }
                         }
-                        
+
                         last_processed_epoch = epoch_id;
                     }
                 }
@@ -484,6 +512,55 @@ async fn send_claim_to_treasury(claim: &crate::economy::daily_rewards::ClaimRequ
     stream.write_all(ipc_msg_str.as_bytes()).await?;
     stream.flush().await?;
 
+    Ok(())
+}
+
+/// Send handle registration to treasury daemon for on-chain storage
+async fn send_handle_registration_to_treasury(
+    handle: &str,
+    peer_id: &str,
+    claimant_pubkey: &str,
+    secret: &str,
+) -> anyhow::Result<()> {
+    use tokio::net::TcpStream;
+    use tokio::io::AsyncWriteExt;
+    use hkdf::hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    type HmacSha256 = Hmac<Sha256>;
+
+    let timestamp = chrono::Utc::now().timestamp();
+
+    // Construct signature preimage
+    let payload_without_sig = format!(
+        r#"{{"msg_type":"HandleRegistration","handle":"{}","peer_id":"{}","claimant_pubkey":"{}","timestamp":{}}}"#,
+        handle, peer_id, claimant_pubkey, timestamp
+    );
+
+    // Generate HMAC-SHA256 signature
+    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+        .map_err(|e| anyhow::anyhow!("HMAC initialization failed: {}", e))?;
+    mac.update(payload_without_sig.as_bytes());
+    let signature = hex::encode(mac.finalize().into_bytes());
+
+    // Construct final JSON line
+    let ipc_msg = serde_json::json!({
+        "msg_type": "HandleRegistration",
+        "handle": handle,
+        "peer_id": peer_id,
+        "claimant_pubkey": claimant_pubkey,
+        "timestamp": timestamp,
+        "signature": signature,
+    });
+
+    let ipc_msg_str = format!("{}
+", ipc_msg.to_string());
+
+    // Connect to introvert-solana on port 9001
+    let mut stream = TcpStream::connect("127.0.0.1:9001").await?;
+    stream.write_all(ipc_msg_str.as_bytes()).await?;
+    stream.flush().await?;
+
+    info!("[Registry] Sent handle registration to treasury: {} -> {}", handle, peer_id);
     Ok(())
 }
 
@@ -571,12 +648,12 @@ pub extern "C" fn introvert_economy_start_monitoring(callback: FfiNetworkCallbac
 
             // Check if we're in a new epoch (noon UTC) and should send telemetry
             let now = chrono::Utc::now();
-            let shifted = now - chrono::Duration::hours(12);
+            let shifted = now - chrono::Duration::hours(0);
             let epoch_id = shifted.format("%Y_%m_%d").to_string();
             let hour = now.format("%H").to_string().parse::<u32>().unwrap_or(25);
             let minute = now.format("%M").to_string().parse::<u32>().unwrap_or(60);
             
-            if epoch_id != last_epoch_sent && hour == 12 && minute < 1 {
+            if epoch_id != last_epoch_sent && hour == 0 && minute < 1 {
                 // Package and send telemetry to RBN
                 let intr_mint = solana_sdk::pubkey::Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf").unwrap();
                 let token_program = solana_sdk::pubkey::Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap();

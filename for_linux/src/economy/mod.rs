@@ -90,6 +90,39 @@ struct EconomyState {
     unique_peers: Vec<String>,
 }
 
+/// Persistent economy state snapshot written to disk after nonce increments.
+/// Survives daemon restarts and host reboots.
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct EconomyStateSnapshot {
+    proof_nonce: u64,
+    last_claim_timestamp: u64,
+}
+
+impl EconomyStateSnapshot {
+    fn load() -> Self {
+        let path = Self::path();
+        match std::fs::read_to_string(&path) {
+            Ok(data) => serde_json::from_str(&data).unwrap_or_default(),
+            Err(_) => Self::default(),
+        }
+    }
+
+    fn save(&self) {
+        let path = Self::path();
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string(self) {
+            let _ = std::fs::write(&path, json);
+        }
+    }
+
+    fn path() -> String {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+        format!("{}/.config/introvert/economy_state.json", home)
+    }
+}
+
 pub struct RewardTracker {
     state: Arc<RwLock<EconomyState>>,
     storage: Option<Arc<StorageService>>,
@@ -106,14 +139,17 @@ impl RewardTracker {
             0
         };
 
+        // Load persisted nonce from disk to survive restarts
+        let snapshot = EconomyStateSnapshot::load();
+
         Self {
             state: Arc::new(RwLock::new(EconomyState {
                 outbound_relayed_bytes: initial_bytes,
                 mailbox_storage_bytes_seconds: 0,
                 uptime_seconds: 0,
                 pending_per_consumer: HashMap::new(),
-                last_claim_timestamp: 0,
-                proof_nonce: 0,
+                last_claim_timestamp: snapshot.last_claim_timestamp,
+                proof_nonce: snapshot.proof_nonce,
                 metrics: ActivityMetrics::new(),
                 unique_peers: Vec::new(),
             })),
@@ -366,6 +402,11 @@ impl RewardTracker {
             let mut state_mut = self.state.write();
             state_mut.proof_nonce += 1;
             let nonce = state_mut.proof_nonce;
+            // Persist to disk immediately to survive daemon restarts
+            EconomyStateSnapshot {
+                proof_nonce: state_mut.proof_nonce,
+                last_claim_timestamp: state_mut.last_claim_timestamp,
+            }.save();
             drop(state_mut);
 
             let proof = RewardProof {
@@ -394,6 +435,11 @@ impl RewardTracker {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
+        // Persist to disk
+        EconomyStateSnapshot {
+            proof_nonce: state.proof_nonce,
+            last_claim_timestamp: state.last_claim_timestamp,
+        }.save();
     }
 
     pub fn get_total_relayed(&self) -> u64 {

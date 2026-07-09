@@ -1,8 +1,8 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-06 08:30 UTC
-**Git:** main @ f62bc59
-**Backup:** 06_07_26_0830
+**Last Updated:** 2026-07-09 00:30 UTC
+**Git:** main @ a569a76
+**Backup:** Pending (09_07_26_0030)
 
 ---
 
@@ -10,10 +10,12 @@
 
 ### RBN Server (47.89.252.80)
 - **introvertd**: ACTIVE on port 443 (libp2p), port 80 (WSS tunnel), port 8080 (dashboard)
-- **introvert-solana**: ACTIVE on localhost:9001 (treasury/IPC)
+- **introvert-solana**: ACTIVE on localhost:9001 (treasury/IPC) — now reads IPC secret from file
 - **PeerId**: `12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a`
 - **Firebase**: Service account loaded, FCM push working
 - **APNs**: Not configured (iOS push disabled)
+- **IPC Secret**: Both daemons reading from `/etc/introvert/ipc.secret` (chmod 600)
+- **Treasury Keypair**: `/root/.config/introvert/treasury-authority.json` (chmod 600)
 
 ### Client Build
 - **macOS**: `make mac` — builds `libintrovert.dylib` (41MB)
@@ -30,8 +32,15 @@
 
 ## Known Issues
 
-### None
+### None Critical
 - All daily rewards scoring, outlier mitigation, and E2EE unit tests are passing successfully.
+- Epoch close pipeline verified working with 3 successful payouts (16,438 INTR) on 2026-07-09.
+
+### Recently Fixed (2026-07-09)
+- **Epoch ID Off-by-One**: Midnight UTC was closing wrong epoch due to `hours(0)` no-op. Fixed with `days(1)`.
+- **IPC Secret Mismatch**: Solana daemon used hardcoded constant. Fixed to read from `/etc/introvert/ipc.secret`.
+- **HMAC Timing Attack**: Standard string equality replaced with `subtle::ConstantTimeEq`.
+- **Missed Epoch Recovery**: Added startup catch-up mechanism to automatically close previous day's epoch if midnight was missed.
 
 ### Android Build Notes
 - Requires NDK 28.2.13676358 at `$ANDROID_SDK_ROOT/ndk/28.2.13676358`
@@ -278,3 +287,10 @@ Dart (AlertService):
 - Git: main @ 9802c2a
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-09 00:30)
+- Git: main @ a569a76
+- RBN: introvertd on 47.89.252.80:443 (ACTIVE — epoch close fix deployed, catch-up mechanism active)
+- Economy: introvert-solana on localhost:9001 (ACTIVE — IPC secret from file, constant-time HMAC)
+- **Payout Pipeline**: Fully automated, 7/7 tests passing, 16,438 INTR distributed for epoch 2026_07_08

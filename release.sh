@@ -9,8 +9,8 @@ if [ ! -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
     exit 1
 fi
 
-if [ ! -f "Introvert-macOS.zip" ]; then
-    echo "❌ Error: Introvert-macOS.zip not found. Please compile the macOS build and compress it."
+if [ ! -f "Introvert-macOS.dmg" ]; then
+    echo "❌ Error: Introvert-macOS.dmg not found. Please run 'make macos-dmg' first."
     exit 1
 fi
 
@@ -40,7 +40,7 @@ EOF
 echo "📦 Creating GitHub Release v0.30.0..."
 gh release create v0.30.0 \
     build/app/outputs/flutter-apk/app-release.apk \
-    Introvert-macOS.zip \
+    Introvert-macOS.dmg \
     --title "v0.30.0 - Sovereign Economy & Snappy Mesh" \
     --notes-file release_notes.tmp
 
