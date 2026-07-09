@@ -39,6 +39,7 @@ dependencies:
   flutter_inappwebview: ^6.1.5
   flutter_markdown: ^0.7.7
   share_plus: ^10.0.0
+  geocoding: ^5.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,7 +1,7 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-09 17:09 UTC
-**Git:** main @ 9bbb2ac
+**Last Updated:** 2026-07-09 19:19 UTC
+**Git:** main @ e6d2240
 
 ---
 
@@ -225,3 +225,15 @@ Non-VPN:
 - Git: main @ 9bbb2ac
 - RBN: introvertd operational
 - Economy: daemon operational
+
+---
+## Backup Status (2026-07-09 19:19)
+- Git: main @ e6d2240
+- RBN: introvertd operational
+- Economy: daemon operational
+
+---
+## Backup Status (2026-07-09 19:20)
+- Git: main @ e6d2240
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001

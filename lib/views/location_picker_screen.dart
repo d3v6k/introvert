@@ -1,9 +1,8 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../theme/app_theme.dart';
 
 class LocationPickerScreen extends StatefulWidget {
@@ -50,9 +49,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (!init && mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Location services are disabled.')),
+            SnackBar(content: Text('Location services are disabled. Please enable them in system settings.')),
           );
         }
         return;
@@ -98,31 +97,23 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _isSearching = true;
       _showSearchResults = true;
     });
-    
-    final client = HttpClient();
+
     try {
-      final uri = Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5');
-      final request = await client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader, 'IntrovertApp/1.0.0 (contact: support@introvert.chat)');
-      final response = await request.close();
-      
-      if (response.statusCode == 200) {
-        final responseBody = await response.transform(utf8.decoder).join();
-        final List<dynamic> decoded = json.decode(responseBody);
-        setState(() {
-          _searchResults = decoded.map((e) => e as Map<String, dynamic>).toList();
-        });
-      } else {
-        debugPrint("Nominatim API error: ${response.statusCode}");
-      }
+      final geocoder = Geocoding();
+      final locations = await geocoder.locationFromAddress(query);
+      setState(() {
+        _searchResults = locations.map((loc) => <String, dynamic>{
+          'lat': loc.latitude.toString(),
+          'lon': loc.longitude.toString(),
+          'display_name': query,
+        }).toList();
+      });
     } catch (e) {
-      debugPrint("Error searching location: $e");
+      debugPrint("Geocoding error: $e");
+      setState(() { _searchResults = []; });
     } finally {
-      client.close();
       if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
+        setState(() { _isSearching = false; });
       }
     }
   }
