@@ -19,6 +19,19 @@ Diagnosed and resolved the critical client-side issue where devices get stuck on
 - This ensures that upon reconnecting, `ConnectionEstablished` successfully requests a new relay reservation, bringing the client immediately back to `Status=1` (ONLINE).
 **Status:** Fixed and verified.
 
+### 2. Android VPN/Mobile Data File Transfer Silent Drop
+**Problem:** Android client on VPN and mobile data receives file manifests but hangs at 0% when attempting to send or receive file chunks.
+**Root Cause:**
+- When attempting to route file chunk requests or chunk payloads via relay circuits, `forward_to_mesh` checks if `self.swarm.is_connected(&recipient_id)` is true.
+- If the circuit connection is in the process of establishing and the check returns `false`, the code hit a legacy "RELAY-AWARE ROUTING" block left over from when `TransitFileChunk` existed.
+- This block forwarded the raw `FileChunk` or `FileChunkRequest` directly to the relay RBN (`rbn_id`) instead of the recipient, and immediately returned `Ok(())`.
+- Since the RBN is a standard relay node and the payload lacks a destination/recipient `PeerId` field, the RBN dropped the payloads.
+- Because `forward_to_mesh` returned `Ok(())`, the payload was never buffered in RAM or database, leading to permanent silent drops.
+**Fix:**
+- Removed the legacy relay-routing block from `forward_to_mesh` in `src/network/mod.rs`.
+- Chunks and requests are now properly buffered in RAM/DB, and when the circuit connection becomes active, they are flushed directly to the target peer's ID.
+**Status:** Fixed and verified.
+
 ## Pending Work
 
 ### 1. Anchor Handle Registry Deployment

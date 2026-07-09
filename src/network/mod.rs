@@ -3136,19 +3136,6 @@ impl NetworkService {
         // CRITICAL: File data and requests must NEVER be stored in the persistent mailbox.
         // They are buffered in RAM (pending_messages) and flushed only upon circuit establishment.
         if matches!(payload, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
-            // RELAY-AWARE ROUTING: If the recipient is behind a known RBN and we have
-            // an active circuit to that RBN, send directly through the relay instead of
-            // buffering. This bypasses swarm.is_connected(&recipient_id) which returns
-            // false for relay-connected peers.
-            if let Some(&rbn_id) = self.relay_hints.get(&recipient_id) {
-                if self.swarm.is_connected(&rbn_id) {
-                    let request = SignalingRequest(payload.clone());
-                    self.swarm.behaviour_mut().request_response.send_request(&rbn_id, request);
-                    info!("[Mesh] Sent file payload to {} via relay RBN {}", recipient_str, rbn_id);
-                    return Ok(());
-                }
-            }
-
             // Check if any RBNs are connected
             let has_rbn = self.bootstrap_nodes.iter().any(|(id, _)| self.swarm.is_connected(id));
 

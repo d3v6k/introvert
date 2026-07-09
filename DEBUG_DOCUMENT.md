@@ -55,9 +55,27 @@
 
 | Device | Peer ID | TCP Connected | Relay Status | Issue |
 |--------|---------|---------------|--------------|-------|
-| Android | `12D3KooWQM5mi5...` | Yes | Relay working | Chunk requests flowing |
+| Android | `12D3KooWQM5mi5...` | Yes | **Recovered** | Resolved RBN file chunk routing drop |
 | Mac | `12D3KooWCSejiZ1...` | Yes | Relay working | Chunk requests flowing |
 | iOS | `12D3KooWN6Hu1A...` | Yes | **Recovered** | Resolved client-side reservation desync |
+
+### Android Mobile Data/VPN File Transfer Issue (Resolved)
+
+**Timeline:**
+- Android device on mobile data and VPN starts a file transfer (receives group manifest for a file shared from the Mac peer `12D3KooWCSejiZ1...`).
+- The user taps "Download", calling FFI `start_pull`.
+- Rust spawns `HandleIncomingPayload` with `FileTransfer` manifest.
+- Due to the relay connection (is_relayed=true), the receiver client must pull chunks via `FileChunkRequest`.
+- When forwarding `FileChunkRequest` (or the sender sending `FileChunk` payloads back), `forward_to_mesh` is invoked.
+- If the circuit connection to the peer is not registered yet as active in the swarm, `forward_to_mesh` hits a broken "RELAY-AWARE ROUTING" fallback block: it attempts to send the signaling payload to the RBN (`rbn_id`) instead of the recipient, and immediately returns `Ok(())`.
+- The RBN drops the request since it doesn't know who the final recipient is.
+- Because `forward_to_mesh` returns `Ok(())` (indicating success), the chunk/request is never buffered in RAM (`pending_messages`) or persisted to the DB, leading to a permanent drop. The file transfer hangs at 0%.
+
+**Root Cause:**
+A legacy fallback routing block in `forward_to_mesh` (lines 3139–3150) designed to route file chunks/requests via the RBN was left in place after the `TransitFileChunk` wrapper was removed. Because the `SignalingPayload::FileChunk` and `FileChunkRequest` enums lack a destination PeerId field, RBNs cannot route these payloads. Sending them to `rbn_id` instead of the destination `recipient_id` caused them to be dropped silently by the RBN.
+
+**Resolution:**
+Removed the buggy relay-aware routing block from `forward_to_mesh`. Now, when direct circuit connections are not yet fully established, the chunks/requests are correctly buffered in RAM and persisted to the SQLite DB, and then dialed via the relay circuit. Once the circuit connection is open, the outbound/inbound handlers flush the queue directly to the recipient's PeerId, restoring file transfer functionality across relay connections.
 
 ### iOS Device Issue (Resolved)
 
@@ -163,5 +181,11 @@ Non-VPN:
 ---
 ## Backup Status (2026-07-09 05:48)
 - Git: main @ a6f18dd
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-09 06:06)
+- Git: main @ 95cf389
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001
