@@ -2711,11 +2711,16 @@ impl NetworkService {
                 let is_rbn_or_anchor = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id)
                     || self.discovered_anchors.contains(&peer_id);
                 if is_rbn_or_anchor {
-                    // Don't clear relay_reservations here — the relay circuit may still be
-                    // working through a tunnel or alternate path. ListenerClosed will clear it
-                    // when the relay listener actually closes.
-                    self.relay_listeners.retain(|_, rbn| rbn != &peer_id);
-                    info!("[Mesh] RBN/anchor {} disconnected. Cleared relay listeners (reservation kept).", peer_id);
+                    // Only clear relay reservation and listeners if there are NO remaining connections to this RBN/anchor.
+                    // If we are still connected (e.g., via another connection), let SwarmEvent::ListenerClosed
+                    // handle the cleanup and auto-recovery of the reservation if the active listener closes.
+                    if !self.swarm.is_connected(&peer_id) {
+                        self.relay_reservations.remove(&peer_id);
+                        self.relay_listeners.retain(|_, rbn| rbn != &peer_id);
+                        info!("[Mesh] RBN/anchor {} disconnected (0 connections). Cleared relay reservation and listeners.", peer_id);
+                    } else {
+                        info!("[Mesh] RBN/anchor {} connection closed but still connected via other paths. Keeping reservation.", peer_id);
+                    }
                 }
                 self.inflight_requests.remove(&peer_id);
                 self.pending_requester_static_keys.remove(&peer_id.to_string());

@@ -130,9 +130,11 @@ done
 sync_dir "$PROJECT_DIR/assets" "$BACKUP_DIR/assets" "Assets"
 sync_dir "$PROJECT_DIR/scripts" "$BACKUP_DIR/scripts" "Scripts"
 sync_dir "$PROJECT_DIR/firebase" "$BACKUP_DIR/firebase" "Firebase config"
-sync_dir "$PROJECT_DIR/solana_program" "$BACKUP_DIR/solana_program" "Solana program"
+sync_dir "$PROJECT_DIR/solana_program" "$BACKUP_DIR/solana_program" "Solana program" \
+  --exclude='test-ledger/' --exclude='target/' --exclude='.DS_Store'
 sync_dir "$PROJECT_DIR/Docs" "$BACKUP_DIR/Docs" "Documentation"
-sync_dir "$PROJECT_DIR/plugins" "$BACKUP_DIR/plugins" "Plugins"
+sync_dir "$PROJECT_DIR/plugins" "$BACKUP_DIR/plugins" "Plugins" \
+  --exclude='build/' --exclude='.cxx/' --exclude='.DS_Store'
 
 # ── Root-level Dart files (flat structure compatibility) ─────────────────────
 for f in main.dart blueprint_ui.dart connectivity_listener.dart; do

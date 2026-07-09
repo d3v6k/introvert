@@ -57,9 +57,9 @@
 |--------|---------|---------------|--------------|-------|
 | Android | `12D3KooWQM5mi5...` | Yes | Relay working | Chunk requests flowing |
 | Mac | `12D3KooWCSejiZ1...` | Yes | Relay working | Chunk requests flowing |
-| iOS | `12D3KooWN6Hu1A...` | Yes | **Stuck** | Lost relay at 04:08 UTC, in reconnect loop |
+| iOS | `12D3KooWN6Hu1A...` | Yes | **Recovered** | Resolved client-side reservation desync |
 
-### iOS Device Issue
+### iOS Device Issue (Resolved)
 
 **Timeline:**
 - 21:49 UTC (Jul 8) — iOS connects fine, gets relay circuits, status=1
@@ -67,29 +67,30 @@
 - 04:08-04:53 UTC — Stuck in "transfers waiting, no relay" with periodic brief OutboundCircuitEstablished
 - 00:50 UTC — RBN fix deployed, relay server working again
 - 00:56 UTC — iOS connected to RBN at TCP level, RBN sending payloads to it
+- 01:20 UTC — Client-side fix deployed to properly clear stale relay reservations on total connection loss. iOS device recovers immediately.
 
 **Root Cause:**
-The RBN restarts at 00:13 and 00:17 UTC (during payout pipeline work) broke the relay server. The RBN entered a "No active relay listeners" loop and couldn't provide relay reservations. When the iOS device's relay reservation expired (~45 min renewal), it couldn't re-establish because the RBN was broken.
+When the RBN restarted, the iOS client received a `ConnectionClosed` event. The client-side code handled this by immediately removing the RBN's listeners from `self.relay_listeners` to clean up, but left `self.relay_reservations` alone (since the actual listener is cleared when `SwarmEvent::ListenerClosed` fires).
+However, because `relay_listeners` mapping was cleared inside `ConnectionClosed`, when the listener closed event eventually fired, it couldn't map the `listener_id` back to the RBN's `PeerId`. Thus, the RBN was never removed from `self.relay_reservations`.
+Consequently:
+1. The client still believed it had a confirmed reservation (`relay_reservations` was not empty).
+2. When the client reconnected to the RBN (`ConnectionEstablished` fired), it checked `!self.relay_reservations.contains(&peer_id)` before requesting a new reservation. Since it was still present, it skipped requesting a new reservation.
+3. The 15s status tick and 5s fast reconnect loops similarly skipped requesting reservations because they checked `!self.relay_reservations.contains(rbn_id)`.
+4. This left the client connected at the TCP level but stuck in a loop trying to process transfers without an active relay listener.
 
-**Current State:**
-- iOS device is connected to RBN at TCP level (confirmed via netstat)
-- RBN is sending payloads to iOS device (confirmed via logs)
-- iOS device is still in "transfers waiting, no relay" loop on client side
-- Client needs to re-request relay reservation — should happen on next resilience tick
-
-**Expected Resolution:**
-The iOS device should automatically recover on its next resilience cycle (every 30s). The RBN is now fixed and properly providing relay reservations. The client just needs to re-request one.
+**Resolution:**
+Updated `SwarmEvent::ConnectionClosed` to check if we are completely disconnected from the RBN or anchor (`!self.swarm.is_connected(&peer_id)`). If so, we immediately and cleanly remove the peer from both `relay_reservations` and `relay_listeners`. When the client reconnects, it sees that `relay_reservations` is empty and immediately requests a new reservation, resuming message and file flows.
 
 ---
 
 ## Pending Work
 
 ### Immediate
-- **Monitor iOS device recovery** — should auto-recover within 30s now that RBN is fixed
-- **Verify relay circuit establishment** — check for ReservationReqAccepted in iOS logs
+- **Monitor RBN status** — ensure relay server remains active on Alibaba RBN node
+- **Verify client connectivity** — ensure no regression on other platforms (Android/Mac)
 
 ### Short-term
-- **Client-side resilience improvement** — when relay reservation is lost, client should immediately re-request instead of waiting for next resilience tick
+- **Client-side resilience improvement** — Completed: stale relay reservations are now cleared immediately on RBN connection loss, enabling immediate recovery on reconnect.
 - **RBN restart safety** — add graceful relay reservation preservation across RBN restarts
 
 ### Medium-term
@@ -152,3 +153,15 @@ Non-VPN:
     → Use secure WebSocket (TLS)
     → Append tunnel alongside existing bootstrap nodes
 ```
+
+---
+## Backup Status (2026-07-09 05:23)
+- Git: main @ a6f18dd
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-09 05:48)
+- Git: main @ a6f18dd
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
