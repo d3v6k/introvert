@@ -97,6 +97,20 @@ pub struct ClawTickContext {
     pub consecutive_zero_peers_ticks: u32,
     /// Whether a relay reservation is active
     pub has_relay_reservation: bool,
+
+    // ---- Transfer intelligence fields (added for IntroClaw transfer awareness) ----
+
+    /// Peer IDs of seeders we are currently RECEIVING files from
+    pub active_seeder_peers: Vec<String>,
+    /// Peer IDs of receivers we are currently SENDING files to
+    pub active_receiver_peers: Vec<String>,
+    /// Stalled transfers: (transfer_id, seeder_peer_id, seconds_since_last_chunk)
+    /// A transfer is "stalled" when last_update.elapsed() > 8s with 0 chunks received
+    pub stalled_transfers: Vec<(String, String, u64)>,
+    /// Live throughput per seeder peer in bytes/sec (rolling average over last 10 chunks)
+    pub peer_throughput_bps: HashMap<String, f64>,
+    /// Whether an actual relay circuit is established (not just a reservation)
+    pub has_relay_circuit: bool,
 }
 
 /// Actions that IntroClaw wants the NetworkService to execute
@@ -199,6 +213,156 @@ impl VpnConfig {
     }
 }
 
+// ============================================================
+// Transfer Intelligence: Circuit Pre-Warmer
+// ============================================================
+// Proactively dials seeder peers via relay BEFORE the stall watchdog fires.
+// Without this, IntroClaw has no awareness of active transfer partners and
+// lets the 8s watchdog discover the stall before re-dialing. This module
+// cuts stall recovery latency from 8s to near-zero by keeping the circuit
+// alive to seeders at all times during a file transfer.
+
+const PREWARM_SEEDER_COOLDOWN_SECS: u64 = 10; // Re-dial at most every 10s per seeder
+const PREWARM_STALL_URGENCY_SECS: u64 = 3;   // Re-dial immediately if stalled >3s
+
+pub struct TransferCircuitPrewarmer {
+    /// Seeder peers last proactively dialed: peer_id -> last_dial_at
+    prewarmed_seeders: HashMap<String, Instant>,
+}
+
+impl TransferCircuitPrewarmer {
+    pub fn new() -> Self {
+        Self { prewarmed_seeders: HashMap::new() }
+    }
+
+    /// Returns peer IDs of seeder peers that need proactive relay dialing.
+    /// Adds stalled seeders unconditionally (bypassing cooldown) for urgency.
+    pub fn get_seeders_to_prewarm(
+        &mut self,
+        seeder_peers: &[String],
+        connected_peers: &[String],
+        stalled_transfers: &[(String, String, u64)],
+    ) -> Vec<String> {
+        let connected_set: HashSet<&String> = connected_peers.iter().collect();
+        let mut targets = Vec::new();
+
+        // Proactively pre-warm seeders that aren't connected yet
+        for peer in seeder_peers {
+            if connected_set.contains(peer) { continue; } // Already connected
+            let last_dial = self.prewarmed_seeders.get(peer)
+                .map(|t| t.elapsed().as_secs())
+                .unwrap_or(u64::MAX);
+            if last_dial >= PREWARM_SEEDER_COOLDOWN_SECS {
+                self.prewarmed_seeders.insert(peer.clone(), Instant::now());
+                targets.push(peer.clone());
+            }
+        }
+
+        // Urgent: bypass cooldown for stalled seeders
+        for (_, stalled_peer, stall_secs) in stalled_transfers {
+            if *stall_secs >= PREWARM_STALL_URGENCY_SECS
+                && !connected_set.contains(stalled_peer)
+                && !targets.contains(stalled_peer)
+            {
+                // Reset cooldown to allow immediate re-dial
+                self.prewarmed_seeders.insert(stalled_peer.clone(), Instant::now());
+                targets.push(stalled_peer.clone());
+            }
+        }
+
+        // Clean up stale entries (seeders no longer in any active transfer)
+        let all_seeder_set: HashSet<&String> = seeder_peers.iter().collect();
+        self.prewarmed_seeders.retain(|p, _| all_seeder_set.contains(p));
+
+        targets
+    }
+}
+
+// ============================================================
+// Transfer Intelligence: Relay Circuit Health Scorer
+// ============================================================
+// Tracks relay circuit drops over a rolling time window.
+// When the relay drops circuits frequently (e.g., every 13s), this module
+// detects the instability pattern and signals IntroClaw to trigger
+// ForceMeshRefresh or ConnectionStateCycler escalation.
+
+const RELAY_HEALTH_WINDOW_SECS: u64 = 120;    // Track drops over 2 minutes
+const RELAY_INSTABILITY_THRESHOLD: usize = 3; // 3 drops in window = unstable
+const RELAY_FORCE_REFRESH_THRESHOLD: usize = 6; // 6 drops = force mesh refresh
+
+#[derive(Debug, Clone)]
+pub struct RelayCircuitDrop {
+    pub relay_peer_id: String,
+    pub dropped_at: Instant,
+    pub circuit_age_secs: u64,
+}
+
+pub struct RelayCircuitHealthScorer {
+    drops: std::collections::VecDeque<RelayCircuitDrop>,
+    last_refresh_triggered_at: Option<Instant>,
+}
+
+impl RelayCircuitHealthScorer {
+    pub fn new() -> Self {
+        Self {
+            drops: std::collections::VecDeque::new(),
+            last_refresh_triggered_at: None,
+        }
+    }
+
+    /// Record a relay circuit drop. Call from ConnectionClosed when peer is an RBN.
+    pub fn record_drop(&mut self, relay_peer_id: &str, circuit_age_secs: u64) {
+        // Prune entries outside the window first
+        let cutoff = Instant::now().checked_sub(Duration::from_secs(RELAY_HEALTH_WINDOW_SECS))
+            .unwrap_or(Instant::now());
+        while self.drops.front().map(|d| d.dropped_at < cutoff).unwrap_or(false) {
+            self.drops.pop_front();
+        }
+        self.drops.push_back(RelayCircuitDrop {
+            relay_peer_id: relay_peer_id.to_string(),
+            dropped_at: Instant::now(),
+            circuit_age_secs,
+        });
+        warn!("[IntroClaw/RelayHealth] Circuit drop #{} for {} (age={}s) — {}/{} in {}s window",
+            self.drops.len(), &relay_peer_id[..16.min(relay_peer_id.len())],
+            circuit_age_secs, self.drops.len(), RELAY_INSTABILITY_THRESHOLD,
+            RELAY_HEALTH_WINDOW_SECS);
+    }
+
+    /// Returns true if the relay is showing instability patterns
+    pub fn is_unstable(&self, relay_peer_id: &str) -> bool {
+        let count = self.drops.iter()
+            .filter(|d| d.relay_peer_id == relay_peer_id)
+            .count();
+        count >= RELAY_INSTABILITY_THRESHOLD
+    }
+
+    /// Returns true if a ForceMeshRefresh should be triggered due to relay thrashing.
+    /// Rate-limited to at most once every 60s to prevent refresh storms.
+    pub fn should_force_refresh(&mut self) -> bool {
+        if self.drops.len() < RELAY_FORCE_REFRESH_THRESHOLD { return false; }
+        // Rate limit: don't fire again within 60s
+        if let Some(last) = self.last_refresh_triggered_at {
+            if last.elapsed().as_secs() < 60 { return false; }
+        }
+        self.last_refresh_triggered_at = Some(Instant::now());
+        warn!("[IntroClaw/RelayHealth] {} circuit drops in {}s window — triggering ForceMeshRefresh",
+            self.drops.len(), RELAY_HEALTH_WINDOW_SECS);
+        true
+    }
+
+    /// Average circuit lifetime before drop, for diagnostics
+    pub fn avg_circuit_age_secs(&self, relay_peer_id: &str) -> Option<u64> {
+        let relay_drops: Vec<_> = self.drops.iter()
+            .filter(|d| d.relay_peer_id == relay_peer_id)
+            .collect();
+        if relay_drops.is_empty() { return None; }
+        Some(relay_drops.iter().map(|d| d.circuit_age_secs).sum::<u64>() / relay_drops.len() as u64)
+    }
+
+    pub fn drop_count_in_window(&self) -> usize { self.drops.len() }
+}
+
 impl ClawActions {
     pub fn is_empty(&self) -> bool {
         self.heal_peers.is_empty()
@@ -251,6 +415,14 @@ pub struct IntroClawService {
 
     // Connection state cycling
     conn_cycler: ConnectionStateCycler,
+
+    // Transfer intelligence modules (added for relay file transfer stability)
+    /// Proactively dials seeder peers via relay to eliminate 8s stall latency
+    transfer_prewarmer: TransferCircuitPrewarmer,
+    /// Tracks relay circuit drops to detect RBN instability patterns
+    relay_health_scorer: RelayCircuitHealthScorer,
+    /// Per-transfer throughput rolling average for stall prediction: transfer_id -> (last_chunk_at, avg_inter_chunk_ms)
+    transfer_timing: HashMap<String, (Instant, u64)>,
 
     // Activity log
     activity_log: ActivityLog,
@@ -1663,6 +1835,20 @@ impl NodeBandwidthManager {
 // Core Orchestrator
 // ============================================================
 
+#[derive(Debug, Clone)]
+pub struct TransferPolicy {
+    /// Recommended chunk size in bytes
+    pub chunk_size: u32,
+    /// Recommended pipeline depth (parallel in-flight requests)
+    pub pipeline_depth: u32,
+    /// Milliseconds between chunk requests (pacing)
+    pub pacing_delay_ms: u64,
+    /// Whether to use push or pull mode
+    pub prefer_push: bool,
+    /// In-flight request limit
+    pub inflight_limit: u32,
+}
+
 impl IntroClawService {
     pub fn new(
         storage: Arc<StorageService>,
@@ -1698,6 +1884,9 @@ impl IntroClawService {
             node_dead_letter_processor: NodeDeadLetterProcessor::new(),
             node_bandwidth_manager: NodeBandwidthManager::new(),
             conn_cycler: ConnectionStateCycler::new(),
+            transfer_prewarmer: TransferCircuitPrewarmer::new(),
+            relay_health_scorer: RelayCircuitHealthScorer::new(),
+            transfer_timing: HashMap::new(),
             activity_log: ActivityLog::new(),
             tick_count: 0,
             is_mobile_data: false,
@@ -1820,6 +2009,123 @@ impl IntroClawService {
         info!("[IntroClaw] Transfer failure to {} (relayed={})", peer_id, was_relayed);
     }
 
+    // ---- Transfer Intelligence Public API ----
+
+    /// Get the most recent throughput observation for a peer (bytes/sec).
+    /// Returns 0.0 if no observations exist yet.
+    pub fn get_peer_throughput(&self, peer_id: &str) -> f64 {
+        if let Some(history) = self.adaptive_chunker.observations.get(peer_id) {
+            history.last().copied().unwrap_or(0.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Evaluates current metrics (bandwidth, battery, connectivity, voip status)
+    /// and returns the optimized chunk size, pipeline window, and pacing delay.
+    pub fn get_transfer_policy(&self, peer_id: &str, ctx: &ClawTickContext) -> TransferPolicy {
+        let throughput = ctx.peer_throughput_bps.get(peer_id).copied().unwrap_or(0.0);
+        let is_relayed = !ctx.connected_peers.contains(&peer_id.to_string()) || ctx.has_relay_circuit;
+        let call_active = self.voip_monitor.is_call_active();
+
+        // VoIP priority — collapse pipeline to prevent media contention
+        if call_active {
+            return TransferPolicy { chunk_size: 64*1024, pipeline_depth: 2, 
+                pacing_delay_ms: 100, prefer_push: false, inflight_limit: 2 };
+        }
+
+        // Battery-aware caps
+        if self.battery_throttler.should_emergency_throttle() {
+            return TransferPolicy { chunk_size: 64*1024, pipeline_depth: 2,
+                pacing_delay_ms: 200, prefer_push: false, inflight_limit: 2 };
+        }
+
+        match ctx.connectivity_type {
+            // WiFi / Ethernet — full speed
+            1 | 3 => {
+                let (chunk, depth, inflight) = if throughput > 5_000_000.0 {
+                    (512*1024, 16, 12) // >5MB/s: 512KB chunks, 16 pipeline
+                } else if throughput > 1_000_000.0 {
+                    (256*1024, 8, 8)   // >1MB/s: 256KB chunks, 8 pipeline
+                } else {
+                    (256*1024, 4, 4)   // slower: 256KB chunks
+                };
+                TransferPolicy { chunk_size: chunk, pipeline_depth: depth,
+                    pacing_delay_ms: if is_relayed { 20 } else { 5 },
+                    prefer_push: !is_relayed, inflight_limit: inflight }
+            }
+            // Cellular — conservative
+            2 => {
+                TransferPolicy { chunk_size: 128*1024, pipeline_depth: 4,
+                    pacing_delay_ms: 50, prefer_push: false, inflight_limit: 4 }
+            }
+            // VPN (5) — needs careful tuning (VPN often has MTU/fragmentation issues)
+            5 => {
+                TransferPolicy { chunk_size: 64*1024, pipeline_depth: 4,
+                    pacing_delay_ms: 30, prefer_push: false, inflight_limit: 4 }
+            }
+            // Unknown — safe defaults
+            _ => {
+                TransferPolicy { chunk_size: 256*1024, pipeline_depth: 8,
+                    pacing_delay_ms: 20, prefer_push: !is_relayed, inflight_limit: 8 }
+            }
+        }
+    }
+
+    /// Called from ConnectionClosed when an RBN/relay peer disconnects.
+    /// Feeds the relay circuit health scorer so IntroClaw can detect
+    /// relay instability (e.g., the 13s RBN circuit drop pattern) and
+    /// trigger ForceMeshRefresh when the pattern exceeds threshold.
+    ///
+    /// `circuit_established_at` should be the Instant when the last
+    /// OutboundCircuitEstablished was recorded for this relay.
+    pub fn record_relay_drop(&mut self, relay_peer_id: &str, circuit_age_secs: u64) {
+        self.relay_health_scorer.record_drop(relay_peer_id, circuit_age_secs);
+        self.activity_log.log(
+            "relay_health",
+            &format!("Circuit drop for relay {} (age={}s, total_in_window={})",
+                &relay_peer_id[..16.min(relay_peer_id.len())],
+                circuit_age_secs,
+                self.relay_health_scorer.drop_count_in_window()),
+            if self.relay_health_scorer.drop_count_in_window() >= 3 { "warn" } else { "info" },
+        );
+    }
+
+    /// Returns true if this relay peer has dropped its circuit frequently enough
+    /// to be considered unstable. Useful for diagnostic logging.
+    pub fn is_relay_unstable(&self, relay_peer_id: &str) -> bool {
+        self.relay_health_scorer.is_unstable(relay_peer_id)
+    }
+
+    /// Record a chunk arrival for stall prediction and throughput tracking.
+    /// Call this from handle_file_chunk() after each successfully decoded chunk.
+    /// `inter_chunk_ms` is the milliseconds since the previous chunk for this transfer.
+    pub fn record_chunk_timing(&mut self, transfer_id: &str, inter_chunk_ms: u64) {
+        let entry = self.transfer_timing.entry(transfer_id.to_string())
+            .or_insert((Instant::now(), inter_chunk_ms));
+        entry.0 = Instant::now(); // Update last_chunk_at
+        // Exponential moving average (α=0.2): weighted toward recent history
+        entry.1 = (entry.1 * 4 + inter_chunk_ms) / 5;
+    }
+
+    /// Returns true if a transfer appears stalled based on EMA inter-chunk timing.
+    /// Stall is detected when silence exceeds 5× the average inter-chunk interval
+    /// (minimum 3s). This fires ~5s earlier than the 8s stall watchdog.
+    pub fn is_transfer_likely_stalled(&self, transfer_id: &str) -> bool {
+        if let Some((last_chunk_at, avg_interval_ms)) = self.transfer_timing.get(transfer_id) {
+            let silence_ms = last_chunk_at.elapsed().as_millis() as u64;
+            let threshold_ms = (avg_interval_ms * 5).max(3000);
+            silence_ms > threshold_ms
+        } else {
+            false
+        }
+    }
+
+    /// Clean up timing state for a completed or cancelled transfer
+    pub fn remove_transfer_timing(&mut self, transfer_id: &str) {
+        self.transfer_timing.remove(transfer_id);
+    }
+
     /// Called every tick (5 minutes) from NetworkService
     /// Returns actions for the NetworkService to execute
     pub fn tick(&mut self, ctx: &ClawTickContext) -> ClawActions {
@@ -1847,6 +2153,23 @@ impl IntroClawService {
 
         self.tick_count += 1;
         self.is_mobile_data = ctx.is_mobile_data;
+
+        // ---- TRANSFER INTELLIGENCE: Step 0 — Relay Circuit Health Check ----
+        // Check if the relay's instability pattern warrants a ForceMeshRefresh.
+        // This runs BEFORE everything else so instability is caught immediately.
+        if self.relay_health_scorer.should_force_refresh() {
+            self.activity_log.log(
+                "relay_health",
+                &format!("Relay instability: {} drops in 120s window — triggering ForceMeshRefresh",
+                    self.relay_health_scorer.drop_count_in_window()),
+                "warn",
+            );
+            actions.force_mesh_refresh = true;
+            // Early return a targeted refresh without doing the full tick
+            // The full tick will run next cycle once the relay has stabilized
+            return actions;
+        }
+
         let is_idle = ctx.is_background && ctx.connected_peers.is_empty();
 
         // Auto-disable anchor mode when battery drops below 30%
@@ -1979,6 +2302,46 @@ impl IntroClawService {
         if !prewarm_targets.is_empty() {
             self.activity_log.log("prewarm", &format!("{} peers available for connection pre-warming", prewarm_targets.len()), "info");
             actions.pre_establish_relays.extend(prewarm_targets);
+        }
+
+        // 16.5. TRANSFER INTELLIGENCE: Transfer Circuit Pre-warming
+        // Proactively dial seeder peers via relay while transfers are active.
+        // This keeps relay circuits alive BEFORE the 8s stall watchdog fires,
+        // cutting stall recovery latency to near-zero.
+        if !ctx.active_seeder_peers.is_empty() || !ctx.stalled_transfers.is_empty() {
+            let prewarm = self.transfer_prewarmer.get_seeders_to_prewarm(
+                &ctx.active_seeder_peers,
+                &ctx.connected_peers,
+                &ctx.stalled_transfers,
+            );
+            if !prewarm.is_empty() {
+                self.activity_log.log(
+                    "transfer_prewarm",
+                    &format!("Pre-warming relay circuit to {} seeder peer(s) — {} stalled transfer(s)",
+                        prewarm.len(), ctx.stalled_transfers.len()),
+                    "action",
+                );
+                for peer in prewarm {
+                    if !actions.pre_establish_relays.contains(&peer) {
+                        actions.pre_establish_relays.push(peer);
+                    }
+                }
+            }
+
+            // For stalled transfers: also add seeder to heal_peers for more aggressive recovery
+            for (_, stalled_peer, stall_secs) in &ctx.stalled_transfers {
+                if *stall_secs >= 5 && !ctx.connected_peers.contains(stalled_peer) {
+                    if !actions.heal_peers.contains(stalled_peer) {
+                        self.activity_log.log(
+                            "transfer_stall",
+                            &format!("Transfer stalled {}s — aggressively healing seeder {}",
+                                stall_secs, &stalled_peer[..16.min(stalled_peer.len())]),
+                            "warn",
+                        );
+                        actions.heal_peers.push(stalled_peer.clone());
+                    }
+                }
+            }
         }
 
         // 17. Unstable peer detection — collect for pre-establishment
@@ -2153,17 +2516,41 @@ impl IntroClawService {
         if !self.db_pruner.should_prune() { return; }
         info!("[IntroClaw] Running database maintenance...");
 
+        // 1. Prune expired sessions and crypto sessions
         let _ = self.storage.prune_expired_sessions(SESSION_CACHE_MAX_AGE_SECS);
         let _ = self.storage.prune_expired_crypto_sessions(CRYPTO_SESSION_MAX_AGE_SECS);
+
+        // 2. Prune old mesh chunks
         let _ = self.storage.prune_old_mesh_chunks();
 
-        // 7-day TTL sweeps — prunes stale reward_log telemetry
+        // 3. Prune expired messages (per-contact retention)
+        if let Err(e) = self.storage.prune_expired_messages() {
+            error!("[IntroClaw] Failed to prune expired messages: {:?}", e);
+        }
+
+        // 4. Cleanup expired reward logs (7-day TTL)
         if let Err(e) = self.storage.cleanup_expired_reward_logs() {
             error!("[IntroClaw] Failed to prune reward_log: {:?}", e);
         }
 
+        // 5. Cleanup orphaned mesh chunks
+        let active_hashes = self.storage.get_active_drive_hashes();
+        if let Ok(cleaned) = self.storage.cleanup_orphaned_mesh_chunks(&active_hashes) {
+            if cleaned > 0 {
+                info!("[IntroClaw] Cleaned {} orphaned mesh chunks", cleaned);
+            }
+        }
+
+        // 6. Cleanup dead letters older than 7 days
+        if let Ok(count) = self.storage.cleanup_old_dead_letters() {
+            if count > 0 {
+                info!("[IntroClaw] Cleaned {} old dead letters", count);
+            }
+        }
+
         self.db_pruner.last_prune = std::time::Instant::now();
 
+        // 7. PRAGMA optimize (weekly)
         if self.db_pruner.should_optimize() {
             let _ = self.storage.run_pragma_optimize();
             self.db_pruner.last_pragma = std::time::Instant::now();
@@ -2589,7 +2976,32 @@ impl IntroClawService {
     }
 
     pub fn get_optimal_pipeline_depth(&self, peer_id: &str, is_direct_p2p: bool) -> u32 {
-        self.adaptive_chunker.get_optimal_pipeline_depth(peer_id, is_direct_p2p, self.is_mobile_data, self.voip_monitor.is_call_active())
+        let mut peer_throughput_bps = HashMap::new();
+        if let Some(history) = self.adaptive_chunker.observations.get(peer_id) {
+            if let Some(&last) = history.last() {
+                peer_throughput_bps.insert(peer_id.to_string(), last);
+            }
+        }
+        let ctx = ClawTickContext {
+            battery_pct: 100,
+            is_background: false,
+            connected_peers: if is_direct_p2p { vec![peer_id.to_string()] } else { Vec::new() },
+            mdns_discovered: Vec::new(),
+            active_transfer_hashes: Vec::new(),
+            is_mobile_data: self.is_mobile_data,
+            network_type: "".into(),
+            connectivity_type: if is_direct_p2p { 1 } else { 2 },
+            tunnel_active: false,
+            consecutive_zero_peers_ticks: 0,
+            has_relay_reservation: !is_direct_p2p,
+            active_seeder_peers: Vec::new(),
+            active_receiver_peers: Vec::new(),
+            stalled_transfers: Vec::new(),
+            peer_throughput_bps,
+            has_relay_circuit: !is_direct_p2p,
+        };
+        let policy = self.get_transfer_policy(peer_id, &ctx);
+        policy.pipeline_depth
     }
 
     pub fn is_on_mobile_data(&self) -> bool {
@@ -3144,7 +3556,7 @@ pub struct ReconContext {
     pub node_peer_id: String,
 }
 
-pub fn run_network_recon(ctx: &ReconContext, storage: &StorageService) -> String {
+pub fn run_network_recon(ctx: &ReconContext, _storage: &StorageService) -> String {
     let mut out = String::new();
 
     // ─── Header ──────────────────────────────────────────────────────
@@ -3295,10 +3707,10 @@ pub struct HealResult {
 
 pub fn build_heal_plan(
     peer_id: &str,
-    peer_alias: Option<&str>,
+    _peer_alias: Option<&str>,
     is_connected: bool,
-    is_relayed: bool,
-    has_direct_addr: bool,
+    _is_relayed: bool,
+    _has_direct_addr: bool,
     has_anchor: bool,
     tunnel_active: bool,
     connected_anchors: &[String],

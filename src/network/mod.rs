@@ -218,7 +218,6 @@ impl NetworkService {
             relay_reservations: HashSet::new(),
             relay_listeners: HashMap::new(),
             relay_dial_limiter: HashMap::new(),
-            last_file_chunk_dial: HashMap::new(),
             outbound_tracker: HashMap::new(),
             inflight_requests: HashMap::new(),
             liveness_interval_secs,
@@ -242,14 +241,10 @@ impl NetworkService {
                 shared_is_relayed_map,
             ),
             peer_supports_v2: HashSet::new(),
-            outbound_tracker_v2: HashMap::new(),
             heal_rate_limiter: HashMap::new(),
             pending_requester_static_keys: HashMap::new(),
-            introclaw_command_log: Vec::new(),
-            pending_acks: HashMap::new(),
             mdns_peers: HashSet::new(),
             seen_group_messages: HashSet::new(),
-            last_ack_flush: Instant::now(),
             rbn_latencies: rbn_latencies.clone(),
             pending_manual_rbns: pending_manual_rbns.clone(),
             verified_rbns: bootstrap_nodes.iter().map(|(id, _)| *id).collect(),
@@ -403,7 +398,7 @@ impl NetworkService {
                     // Periodic cache maintenance
                     let now = Instant::now();
                     self.heal_rate_limiter.retain(|_, t| now.duration_since(*t) < Duration::from_secs(60));
-                    if self.seen_group_messages.len() > 1000 {
+                    if self.seen_group_messages.len() > 10000 {
                         self.seen_group_messages.clear();
                     }
                 }
@@ -527,6 +522,8 @@ impl NetworkService {
                             // Intelligent Provider Selection: Prioritize connected direct peers over relayed/offline ones
                             let selected_providers = Self::select_best_providers_static(&self.swarm, &self.is_relayed_map, &providers);
 
+                            let tx_flush = self.command_tx.clone();
+                            let all_providers_clone = providers.clone();
                             tokio::spawn(async move {
                                 // Wait briefly for dial_relay_path to establish before firing requests
                                 tokio::time::sleep(Duration::from_millis(300)).await;
@@ -547,6 +544,24 @@ impl NetworkService {
                                         payload: req 
                                     }).await;
                                     tokio::time::sleep(Duration::from_millis(50)).await;
+                                }
+
+                                // FIX 4: After sending chunk requests they land in pending_messages
+                                // (because the seeder isn't connected yet when re-dial starts).
+                                // Schedule a 2s delayed re-flush so those requests flow even if no
+                                // new circuit event fires (e.g., OutboundCircuitEstablished already fired).
+                                tokio::time::sleep(Duration::from_millis(2000)).await;
+                                crate::dispatch_debug_log(&format!("[Mesh] Stall retry: delayed flush for {} provider(s) after re-dial", all_providers_clone.len()));
+                                for provider in all_providers_clone {
+                                    let _ = tx_flush.send(NetworkCommand::ForwardMeshSignaling {
+                                        peer_id: provider,
+                                        payload: SignalingPayload::FileChunkRequest {
+                                            transfer_id: tid_clone.clone(),
+                                            chunk_index: first_missing_idx,
+                                            chunk_size: Some(csize),
+                                            relay_hint: None,
+                                        },
+                                    }).await;
                                 }
                             });
                         }
@@ -591,7 +606,8 @@ impl NetworkService {
                         let t = self.incoming_transfers.get(id);
                         let chunks = t.map(|t| t.received_chunks.len()).unwrap_or(0);
                         warn!("[Resilience] Cleaning up stale transfer: {} ({} chunks received)", id, chunks);
-                        crate::dispatch_debug_log(&format!("[Resilience] Stale transfer evicted: {} ({} chunks received)", id, chunks));
+                        self.intro_claw.remove_transfer_timing(id);
+                        crate::ACTIVE_PULLS.lock().remove(id);
                         self.incoming_transfers.remove(id);
                     }
 
@@ -785,6 +801,12 @@ impl NetworkService {
                                 tunnel_active: self.tunnel_active,
                                 consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
                                 has_relay_reservation: !self.relay_reservations.is_empty(),
+                                // Transfer intelligence: minimal data for zero-peer path
+                                active_seeder_peers: Vec::new(),
+                                active_receiver_peers: Vec::new(),
+                                stalled_transfers: Vec::new(),
+                                peer_throughput_bps: std::collections::HashMap::new(),
+                                has_relay_circuit: !self.relay_listeners.is_empty(),
                             };
 
                             if let Some(strategy) = self.intro_claw.evaluate_connection_strategy(&ctx) {
@@ -834,7 +856,7 @@ impl NetworkService {
                             // reconnect attempts, the VPN is likely blocking WebSocket connections.
                             // Force-reset the tunnel and re-activate it.
                             let tunnel_age = self.tunnel_started_at.map(|t| t.elapsed()).unwrap_or(Duration::from_secs(0));
-                            if tunnel_age > Duration::from_secs(120) {
+                            if tunnel_age > Duration::from_secs(300) {
                                 warn!("[Resilience] Tunnel active for {}s with 0 peers — likely blocking. Force-resetting tunnel.", tunnel_age.as_secs());
                                 crate::dispatch_debug_log(&format!("[Resilience] VPN interference: tunnel stale ({}s). Force-resetting.", tunnel_age.as_secs()));
                                 // Reset tunnel state
@@ -1212,6 +1234,44 @@ impl NetworkService {
                         let mdns_peers: Vec<String> = self.mdns_peers.iter()
                             .map(|p| p.to_string())
                             .collect();
+
+                        // --- Transfer Intelligence Context ---
+                        // Build live transfer state for IntroClaw modules
+                        let now = std::time::Instant::now();
+
+                        // Seeder peers: unique peer IDs from all active incoming_transfers
+                        let active_seeder_peers: Vec<String> = self.incoming_transfers.values()
+                            .map(|t| t.peer_id.to_string())
+                            .collect::<std::collections::HashSet<_>>()
+                            .into_iter().collect();
+
+                        // Receiver peers: unique peer IDs from active seeders we are serving
+                        let active_receiver_peers: Vec<String> = self.active_seeders.values()
+                            .flat_map(|s| s.completions.iter().map(|p| p.to_string()))
+                            .collect::<std::collections::HashSet<_>>()
+                            .into_iter().collect();
+
+                        // Stalled transfers: last_update age > 8s with chunks missing
+                        let stalled_transfers: Vec<(String, String, u64)> = self.incoming_transfers.iter()
+                            .filter_map(|(tid, t)| {
+                                let stall_secs = t.last_update.elapsed().as_secs();
+                                let is_complete = t.received_chunks.len() as u32 >= t.total_chunks;
+                                if stall_secs >= 8 && !is_complete {
+                                    Some((tid.clone(), t.peer_id.to_string(), stall_secs))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        // Per-peer throughput from AdaptiveChunkSizer observations
+                        let peer_throughput_bps: std::collections::HashMap<String, f64> = active_seeder_peers.iter()
+                            .map(|pid| {
+                                let bps = self.intro_claw.get_peer_throughput(pid);
+                                (pid.clone(), bps)
+                            })
+                            .collect();
+
                         let ctx = crate::intro_claw::ClawTickContext {
                             battery_pct: 100, // Platform-specific in future
                             is_background: false,
@@ -1224,7 +1284,14 @@ impl NetworkService {
                             tunnel_active: self.tunnel_active,
                             consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
                             has_relay_reservation: !self.relay_reservations.is_empty(),
+                            // Transfer intelligence fields
+                            active_seeder_peers,
+                            active_receiver_peers,
+                            stalled_transfers,
+                            peer_throughput_bps,
+                            has_relay_circuit: !self.relay_listeners.is_empty(),
                         };
+                        let _ = now; // suppress unused warning if no elapsed calls needed
                         let actions = self.intro_claw.tick(&ctx);
                         self.execute_claw_actions(actions).await;
                     }
@@ -1334,6 +1401,10 @@ impl NetworkService {
         debug!("[DEBUG] handle_file_chunk: transfer_id={}, chunk_index={}/{}", transfer_id, chunk_index, total_chunks);
         if let Some(transfer) = self.incoming_transfers.get_mut(&transfer_id) {
             transfer.total_chunks = total_chunks;
+            let elapsed_ms = transfer.last_update.elapsed().as_millis() as u64;
+            if elapsed_ms > 0 && self.intro_claw.is_active() {
+                self.intro_claw.record_chunk_timing(&transfer_id, elapsed_ms);
+            }
             transfer.last_update = Instant::now();
             debug!("[DEBUG] Found transfer in incoming_transfers. Decoded chunks so far: {}", transfer.received_chunks.len());
             if let Ok(chunk_data) = general_purpose::STANDARD.decode(&data_base64) {
@@ -1355,6 +1426,7 @@ impl NetworkService {
                 let mut is_verified = false;
 
                 if is_complete {
+                    self.intro_claw.remove_transfer_timing(&transfer_id);
                     let mut full_data = Vec::new();
                     for i in 0..total_chunks { if let Some(chunk) = transfer.received_chunks.get(&i) { full_data.extend_from_slice(chunk); } }
                     
@@ -1579,7 +1651,10 @@ impl NetworkService {
                     }
                 }
                 // CRITICAL FIX: Always remove from incoming transfers when complete (success or fail) to prevent memory leak
-                if is_complete { self.incoming_transfers.remove(&transfer_id); }
+                if is_complete {
+                    crate::ACTIVE_PULLS.lock().remove(&transfer_id);
+                    self.incoming_transfers.remove(&transfer_id);
+                }
             } else {
                 debug!("[DEBUG] Failed to decode base64 for chunk {}", chunk_index);
             }
@@ -1900,26 +1975,51 @@ impl NetworkService {
                                 crate::dispatch_global_event(8, &data);
                                 crate::dispatch_global_event(10, &[2]);
 
-                                // FIX C: Flush any pending messages that were buffered while we had no relay
+                                // FIX 1: Flush only NON-chunk pending messages at ReservationReqAccepted.
+                                // File chunk requests (FileChunk + FileChunkRequest) must NOT be flushed here
+                                // because the relay circuit is NOT established yet — OutboundCircuitEstablished
+                                // fires ~13s later. Flushing chunks now consumes pending_messages entries
+                                // prematurely: forward_to_mesh re-buffers them (peer not connected), but
+                                // OutboundCircuitEstablished then sees pending_messages already empty and
+                                // skips the flush — leaving transfers stuck at 0% indefinitely.
+                                // Non-chunk messages (chat, acks, gossip) CAN flow once reservation is accepted.
                                 let pending_peers: Vec<PeerId> = self.pending_messages.keys().cloned().collect();
                                 if !pending_peers.is_empty() {
-                                    info!("[Relay] Flushing {} pending message queues after relay reservation", pending_peers.len());
-                                    crate::dispatch_debug_log(&format!("[Relay] Flushing pending queues for {} peers after reservation", pending_peers.len()));
+                                    info!("[Relay] Flushing non-chunk pending messages after relay reservation (chunks deferred to OutboundCircuitEstablished)");
+                                    crate::dispatch_debug_log(&format!("[Relay] Selective flush (non-chunks) for {} peers after reservation", pending_peers.len()));
                                     for pid in pending_peers {
                                         if let Some(payloads) = self.pending_messages.remove(&pid) {
-                                            // Dedup + priority
-                                            let mut filtered: Vec<_> = payloads.into_iter()
+                                            // Split into chunks (keep) and non-chunks (send now)
+                                            // Must extract first (release mutable borrow) before calling was_recently_flushed
+                                            let mut keep_chunks: Vec<SignalingPayload> = Vec::new();
+                                            let mut non_chunks: Vec<SignalingPayload> = Vec::new();
+                                            for p in payloads {
+                                                if matches!(p, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
+                                                    keep_chunks.push(p); // defer to OutboundCircuitEstablished
+                                                } else {
+                                                    non_chunks.push(p);
+                                                }
+                                            }
+                                            // Re-insert chunks so OutboundCircuitEstablished can flush them
+                                            if !keep_chunks.is_empty() {
+                                                self.pending_messages.insert(pid, keep_chunks);
+                                            }
+                                            // Filter recently-flushed from non-chunks and send
+                                            let non_chunks: Vec<_> = non_chunks.into_iter()
                                                 .filter(|p| !self.was_recently_flushed(&pid, p))
                                                 .collect();
-                                            filtered.sort_by_key(|p| Self::flush_priority(p));
-                                            for p in &filtered { self.mark_flushed(pid, p); }
-                                            let tx = self.command_tx.clone();
-                                            tokio::spawn(async move {
-                                                for payload in filtered {
-                                                    let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload }).await;
-                                                    tokio::time::sleep(Duration::from_millis(50)).await;
-                                                }
-                                            });
+                                            if !non_chunks.is_empty() {
+                                                let mut sorted = non_chunks;
+                                                sorted.sort_by_key(|p| Self::flush_priority(p));
+                                                for p in &sorted { self.mark_flushed(pid, p); }
+                                                let tx = self.command_tx.clone();
+                                                tokio::spawn(async move {
+                                                    for payload in sorted {
+                                                        let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload }).await;
+                                                        tokio::time::sleep(Duration::from_millis(50)).await;
+                                                    }
+                                                });
+                                            }
                                         }
                                     }
                                 }
@@ -1927,6 +2027,17 @@ impl NetworkService {
                             libp2p::relay::client::Event::OutboundCircuitEstablished { relay_peer_id, .. } => {
                                 info!("[Relay] 🔌 OutboundCircuitEstablished via {}", relay_peer_id);
                                 crate::dispatch_debug_log(&format!("[Relay] 🔌 OutboundCircuitEstablished via {}", relay_peer_id));
+
+                                // FIX 2: Bump last_update for ALL active incoming_transfers immediately.
+                                // OutboundCircuitEstablished means the relay is open — chunks are imminent.
+                                // Without this, the 60s zero-chunk stale eviction timer keeps running
+                                // from transfer creation time and can evict valid transfers.
+                                let relay_peer_str = relay_peer_id.to_string();
+                                for transfer in self.incoming_transfers.values_mut() {
+                                    // Bump for all active transfers — if relay is up, chunks can flow
+                                    transfer.last_update = Instant::now();
+                                    crate::dispatch_debug_log(&format!("[Relay] Bumped last_update for transfer {} (relay {} established)", transfer.file_hash, relay_peer_str));
+                                }
 
                                 // Clear dial rate limiter for all peers with pending messages.
                                 // Without this, dial_relay_path returns early (5s cooldown) and
@@ -1943,7 +2054,26 @@ impl NetworkService {
                                     self.dial_relay_path(*peer_id, false);
                                 }
 
-                                 // Flush pending messages after a short delay to let the dial complete.
+                                // Also dial seeder peers for active incoming transfers that aren't
+                                // in pending_messages yet (e.g. transfer waiting for circuit).
+                                let active_seeder_peers: Vec<PeerId> = self.incoming_transfers.values()
+                                    .flat_map(|t| t.providers.iter().cloned())
+                                    .filter(|p| !self.swarm.is_connected(p) && !pending_peers.contains(p))
+                                    .collect::<std::collections::HashSet<_>>()
+                                    .into_iter()
+                                    .collect();
+                                for seeder in &active_seeder_peers {
+                                    self.relay_dial_limiter.remove(seeder);
+                                    self.dial_relay_path(*seeder, true);
+                                }
+                                if !active_seeder_peers.is_empty() {
+                                    info!("[Relay] OutboundCircuit: proactively dialing {} seeder peer(s) for active transfers", active_seeder_peers.len());
+                                }
+
+                                 // Flush pending messages after a delay to let the dial complete.
+                                 // FIX 3: Increased from 1500ms to 2500ms — relay circuits take 1-3s
+                                 // to fully establish at both ends. The seeder peer may not appear
+                                 // in connected_peers() until the circuit sub-stream is registered.
                                  if !pending_peers.is_empty() {
                                      let tx = self.command_tx.clone();
                                      let peers_with_payloads: Vec<(PeerId, Vec<SignalingPayload>)> = pending_peers.iter()
@@ -1962,12 +2092,15 @@ impl NetworkService {
                                          })
                                          .collect();
                                      tokio::spawn(async move {
-                                         // 1500ms delay: gives is_connected() time to update after
-                                         // dial_relay_path completes. 500ms was too short — flush
-                                         // fired before connection registered, causing re-buffering.
-                                         tokio::time::sleep(Duration::from_millis(1500)).await;
+                                         // FIX 3: 2500ms delay (was 1500ms). Relay circuit establishment
+                                         // between two NAT-ed peers takes 1-3s. Insufficient delay caused
+                                         // flush to fire before is_connected() returned true, leading
+                                         // to re-buffering and double-consumption of pending_messages.
+                                         tokio::time::sleep(Duration::from_millis(2500)).await;
                                          for (peer_id, payloads) in peers_with_payloads {
-                                             info!("[Relay] Circuit ready — flushing {} queued payloads for {} (dedup: prioritized)", payloads.len(), peer_id);
+                                             if !payloads.is_empty() {
+                                                 info!("[Relay] Circuit ready — flushing {} queued payloads for {} (dedup: prioritized)", payloads.len(), peer_id);
+                                             }
                                              let mut batch_count = 0;
                                              for payload in payloads {
                                                  let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
@@ -2816,6 +2949,9 @@ impl NetworkService {
                 // Clean up WebRTC resources immediately on connection loss to prevent stale ghost channels
                 self.data_channels.write().remove(&peer_id);
                 self.anchor_mappings.remove(&peer_id);
+                self.recently_flushed.remove(&peer_id);
+                // Clean outbound_tracker entries for this peer
+                self.outbound_tracker.retain(|_, (pid, _)| pid != &peer_id);
                 // FIX: Only clear relay reservation when the RBN/anchor connection closes.
                 // Previously this cleared reservations for ALL peers, including non-RBN disconnects,
                 // which wiped the RBN relay reservation and made us unreachable via relay.
@@ -2826,6 +2962,21 @@ impl NetworkService {
                     // If we are still connected (e.g., via another connection), let SwarmEvent::ListenerClosed
                     // handle the cleanup and auto-recovery of the reservation if the active listener closes.
                     if !self.swarm.is_connected(&peer_id) {
+                        // --- RELAY HEALTH SCORING ---
+                        // Record the circuit drop for IntroClaw's relay instability detector.
+                        // We track when the circuit was established via relay_listeners, and compute
+                        // the age from the last OutboundCircuitEstablished event.
+                        if self.intro_claw.is_active() {
+                            // Estimate circuit age from relay_listeners if available.
+                            // relay_listeners: connection_id -> relay_peer_id
+                            // We don't have established_at here, so use 0 as a conservative estimate.
+                            // The scorer still tracks the DROP COUNT which is the key signal.
+                            self.intro_claw.record_relay_drop(&peer_id.to_string(), 0);
+                            if self.intro_claw.is_relay_unstable(&peer_id.to_string()) {
+                                warn!("[Mesh] RBN {} is UNSTABLE (frequent circuit drops) — IntroClaw may trigger ForceMeshRefresh on next tick",
+                                    peer_id);
+                            }
+                        }
                         self.relay_reservations.remove(&peer_id);
                         self.relay_listeners.retain(|_, rbn| rbn != &peer_id);
                         info!("[Mesh] RBN/anchor {} disconnected (0 connections). Cleared relay reservation and listeners.", peer_id);
@@ -2940,6 +3091,37 @@ impl NetworkService {
             _ => {}
         }
         Ok(())
+    }
+
+    fn get_current_transfer_policy(&self, peer_id: &PeerId) -> crate::intro_claw::TransferPolicy {
+        let peer_id_str = peer_id.to_string();
+        let mut peer_throughput_bps = std::collections::HashMap::new();
+        let throughput = self.intro_claw.get_peer_throughput(&peer_id_str);
+        if throughput > 0.0 {
+            peer_throughput_bps.insert(peer_id_str.clone(), throughput);
+        }
+        let ctx = crate::intro_claw::ClawTickContext {
+            battery_pct: 100, // conservative/placeholder
+            is_background: false,
+            connected_peers: self.swarm.connected_peers().map(|p| p.to_string()).collect(),
+            mdns_discovered: self.mdns_peers.iter().map(|p| p.to_string()).collect(),
+            active_transfer_hashes: self.incoming_transfers.keys().cloned().collect(),
+            is_mobile_data: self.intro_claw.is_on_mobile_data(),
+            network_type: if self.intro_claw.is_on_mobile_data() { "cellular".into() } else { "wifi".into() },
+            connectivity_type: self.connectivity_type,
+            tunnel_active: self.tunnel_active,
+            consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
+            has_relay_reservation: !self.relay_reservations.is_empty(),
+            active_seeder_peers: self.incoming_transfers.values().map(|t| t.peer_id.to_string()).collect(),
+            active_receiver_peers: self.active_seeders.values().flat_map(|s| s.completions.iter().map(|p| p.to_string())).collect(),
+            stalled_transfers: self.incoming_transfers.iter().filter_map(|(tid, t)| {
+                let stall_secs = t.last_update.elapsed().as_secs();
+                if stall_secs >= 8 { Some((tid.clone(), t.peer_id.to_string(), stall_secs)) } else { None }
+            }).collect(),
+            peer_throughput_bps,
+            has_relay_circuit: !self.relay_listeners.is_empty(),
+        };
+        self.intro_claw.get_transfer_policy(&peer_id_str, &ctx)
     }
 
     fn dial_relay_path(&mut self, recipient_id: PeerId, for_file_chunk: bool) {
@@ -3128,8 +3310,8 @@ impl NetworkService {
              return Ok(());
         }
 
-        let is_durable = matches!(payload, 
-            SignalingPayload::ChatMessage { .. } | 
+        let is_durable = matches!(payload,
+            SignalingPayload::ChatMessage { .. } |
             SignalingPayload::DeleteMessage { .. } |
             SignalingPayload::GroupInvite { .. } |
             SignalingPayload::GroupAction(_) |
@@ -3137,7 +3319,12 @@ impl NetworkService {
             SignalingPayload::EditMessage { .. } |
             SignalingPayload::SetRetention { .. } |
             SignalingPayload::FileTransferProposal { .. } |
-            SignalingPayload::FileTransferVerify { .. }
+            SignalingPayload::FileTransferVerify { .. } |
+            SignalingPayload::WebRtc(_) |
+            SignalingPayload::WebRtcNative(_) |
+            SignalingPayload::Offer(_) |
+            SignalingPayload::Answer(_) |
+            SignalingPayload::Candidate(_)
         );
 
         if is_durable {
@@ -3151,6 +3338,11 @@ impl NetworkService {
                 SignalingPayload::SetRetention { seconds } => format!("retention_{}", seconds),
                 SignalingPayload::FileTransferProposal { batch_id, .. } => format!("proposal_{}", batch_id),
                 SignalingPayload::FileTransferVerify { batch_id, .. } => format!("verify_{}", batch_id),
+                SignalingPayload::WebRtc(_) => format!("webrtc_{}_{}", recipient_str, chrono::Utc::now().timestamp_millis()),
+                SignalingPayload::WebRtcNative(_) => format!("webrtc_native_{}_{}", recipient_str, chrono::Utc::now().timestamp_millis()),
+                SignalingPayload::Offer(_) => format!("offer_{}_{}", recipient_str, chrono::Utc::now().timestamp_millis()),
+                SignalingPayload::Answer(_) => format!("answer_{}_{}", recipient_str, chrono::Utc::now().timestamp_millis()),
+                SignalingPayload::Candidate(_) => format!("candidate_{}_{}", recipient_str, chrono::Utc::now().timestamp_millis()),
                 _ => format!("msg_{}_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0), rand::random::<u32>()),
             };
             let group_id = match &payload {
@@ -3213,7 +3405,7 @@ impl NetworkService {
 
                 let inflight = self.inflight_requests.get(&recipient_id).cloned().unwrap_or(0);
                 // v43 baseline: relay=8, direct=12. Proven working for cross-network.
-                let limit = if is_relayed_conn { 4 } else { 8 }; // v54 baseline: proven working for cross-network
+                let limit = 8; // Unified in-flight limit — relay and direct both use 8
                 if inflight >= limit {
                     debug!("[Mesh] In-flight limit ({}) reached for {}. Buffering chunk.", limit, recipient_str);
                     self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
@@ -4039,6 +4231,8 @@ impl NetworkService {
                 // Remove from active seeders (outgoing transfers)
                 self.active_seeders.remove(&transfer_id);
                 // Remove from incoming transfers
+                self.intro_claw.remove_transfer_timing(&transfer_id);
+                crate::ACTIVE_PULLS.lock().remove(&transfer_id);
                 self.incoming_transfers.remove(&transfer_id);
                 // Notify UI of cancellation
                 let progress = FileTransferProgress {
@@ -4130,8 +4324,9 @@ impl NetworkService {
                     let t_id_for_broadcast = t_id.clone();
                     let relayed_map = self.is_relayed_map.clone();
                     let dc_store = self.data_channels.clone();
+                    let policy = self.get_current_transfer_policy(&peer_id);
                     tokio::spawn(async move {
-                        let _ = Self::process_outgoing_file(peer_id, file_path, false, relayed_map, dc_store, tx, storage, local_id, group_id, is_stress, Some(t_id_for_broadcast)).await;
+                        let _ = Self::process_outgoing_file(peer_id, file_path, policy, false, relayed_map, dc_store, tx, storage, local_id, group_id, is_stress, Some(t_id_for_broadcast)).await;
                     });
                     return Ok(());
                 }
@@ -4191,6 +4386,7 @@ impl NetworkService {
                 let is_stress = self.is_stress_test;
                 let relayed_map = self.is_relayed_map.clone();
                 let dc_store = self.data_channels.clone();
+                let policy = self.get_current_transfer_policy(&peer_id);
 
                 tokio::spawn(async move {
                     let is_relayed = if is_connected_now {
@@ -4199,7 +4395,7 @@ impl NetworkService {
                         false // Default to direct P2P — manifest will be retried if unreachable
                     };
 
-                    let _ = Self::process_outgoing_file(peer_id, file_path, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress, transfer_id).await;
+                    let _ = Self::process_outgoing_file(peer_id, file_path, policy, is_relayed, relayed_map, dc_store, tx, storage, local_peer_id, group_id, is_stress, transfer_id).await;
                 });
             }
             NetworkCommand::SendFileChunk { peer_id, payload, progress } => {
@@ -5008,6 +5204,40 @@ impl NetworkService {
             }
             NetworkCommand::IntroClawTick { battery_pct, is_background, connected_peers, mdns_discovered, is_mobile_data, network_type } => {
                 let active_hashes = self.storage.get_active_drive_hashes();
+
+                // Seeder peers: unique peer IDs from all active incoming_transfers
+                let active_seeder_peers: Vec<String> = self.incoming_transfers.values()
+                    .map(|t| t.peer_id.to_string())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter().collect();
+
+                // Receiver peers: unique peer IDs from active seeders we are serving
+                let active_receiver_peers: Vec<String> = self.active_seeders.values()
+                    .flat_map(|s| s.completions.iter().map(|p| p.to_string()))
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter().collect();
+
+                // Stalled transfers: last_update age > 8s with chunks missing
+                let stalled_transfers: Vec<(String, String, u64)> = self.incoming_transfers.iter()
+                    .filter_map(|(tid, t)| {
+                        let stall_secs = t.last_update.elapsed().as_secs();
+                        let is_complete = t.received_chunks.len() as u32 >= t.total_chunks;
+                        if stall_secs >= 8 && !is_complete {
+                            Some((tid.clone(), t.peer_id.to_string(), stall_secs))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                // Per-peer throughput from AdaptiveChunkSizer observations
+                let peer_throughput_bps: std::collections::HashMap<String, f64> = active_seeder_peers.iter()
+                    .map(|pid| {
+                        let bps = self.intro_claw.get_peer_throughput(pid);
+                        (pid.clone(), bps)
+                    })
+                    .collect();
+
                 let ctx = crate::intro_claw::ClawTickContext {
                     battery_pct,
                     is_background,
@@ -5020,6 +5250,11 @@ impl NetworkService {
                     tunnel_active: self.tunnel_active,
                     consecutive_zero_peers_ticks: self.consecutive_zero_peers_ticks,
                     has_relay_reservation: !self.relay_reservations.is_empty(),
+                    active_seeder_peers,
+                    active_receiver_peers,
+                    stalled_transfers,
+                    peer_throughput_bps,
+                    has_relay_circuit: !self.relay_listeners.is_empty(),
                 };
                 let actions = self.intro_claw.tick(&ctx);
                 self.execute_claw_actions(actions).await;
@@ -5094,8 +5329,8 @@ impl NetworkService {
                 // Execute real multi-strategy heal
                 let mut attempts = Vec::new();
                 let is_connected = self.mesh_active_peers.contains(&peer_id);
-                let is_relayed = self.is_relayed_map.read().get(&peer_id).cloned().unwrap_or(false);
-                let has_direct_addr = self.direct_conn_count.contains_key(&peer_id) || self.anchor_mappings.contains_key(&peer_id);
+                let _is_relayed = self.is_relayed_map.read().get(&peer_id).cloned().unwrap_or(false);
+                let _has_direct_addr = self.direct_conn_count.contains_key(&peer_id) || self.anchor_mappings.contains_key(&peer_id);
                 let has_anchor = !self.discovered_anchors.is_empty();
                 let connected_anchors: Vec<String> = self.discovered_anchors.iter().map(|a| a.to_string()).collect();
 
@@ -6054,7 +6289,7 @@ impl NetworkService {
                 // If tier doesn't match, update to verified tier
                 let solana_client = Arc::clone(&self.solana_client);
                 let storage_verify = Arc::clone(&self.storage);
-                let peer_id_verify = peer_id_str.clone();
+                let _peer_id_verify = peer_id_str.clone();
                 
                 tokio::task::spawn_blocking(move || {
                     // 1. Update contacts if they exist (accept profile data)
@@ -6348,7 +6583,36 @@ impl NetworkService {
             SignalingPayload::FileTransfer { transfer_id, filename, mime_type, file_hash, total_size, is_relayed, sender_peer_id, group_id } => {
                 info!("[Mesh] ⭐ FileTransfer manifest received: tid={}, file={}, size={}, is_relayed={}, sender={:?}, group={:?}",
                     transfer_id, filename, total_size, is_relayed, sender_peer_id, group_id);
-                // BUG 3 FIX: Use the actual sender's peer ID if provided, otherwise fallback to the anchor peer
+ 
+                 // Existing local drive check: if we already have this file in our local DB/disk, skip downloading
+                 if let Ok(Some(existing_file)) = self.storage.get_drive_file_by_hash(&file_hash) {
+                     info!("[Mesh] File {} with hash {} already exists in local drive. Deduping and notifying UI of completion.", existing_file.filename, file_hash);
+                     
+                     // Dispatch final completion event
+                     let progress = FileTransferProgress {
+                         transfer_id: transfer_id.clone(),
+                         peer_id: sender_peer_id.clone().unwrap_or_else(|| peer.to_string()),
+                         filename: filename.clone(),
+                         mime_type: mime_type.clone(),
+                         file_hash: file_hash.clone(),
+                         progress: 1.0,
+                         is_complete: true,
+                         is_verified: true,
+                         is_outgoing: false,
+                         local_path: Some(existing_file.local_path.clone()),
+                         start_time_ms: 0,
+                         speed_bps: 0.0,
+                         group_id: group_id.clone(),
+                         caption: None,
+                     };
+                     if let Ok(json_bytes) = serde_json::to_vec(&progress) {
+                         crate::dispatch_global_event(12, &json_bytes);
+                     }
+                     crate::ACTIVE_PULLS.lock().remove(&transfer_id);
+                     return;
+                 }
+ 
+                 // BUG 3 FIX: Use the actual sender's peer ID if provided, otherwise fallback to the anchor peer
                 let actual_seeder_peer = if let Some(sid) = &sender_peer_id {
                     sid.parse::<PeerId>().unwrap_or(peer)
                 } else {
@@ -6377,13 +6641,12 @@ impl NetworkService {
                 // cross-network receivers can't receive direct pushes — they must pull via relay.
                 let final_is_relayed = if is_direct_p2p { false } else { true };
 
-                // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay uses 64KB
-                // (v34 pattern — 64KB reliably traverses relay circuits without overwhelming RBNs)
-                let chunk_size = if final_is_relayed { 64 * 1024 } else { 256 * 1024 };
+                // ADAPTIVE CHUNKING: 256KB for both direct and relay — relay circuits handle it fine
+                let chunk_size = 256 * 1024;
                 let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
 
                 let initial_pipeline = self.intro_claw.get_optimal_pipeline_depth(&actual_seeder_peer.to_string(), is_direct_p2p);
-                let base_pacing = if is_direct_p2p { 10u64 } else { 50 };
+                let base_pacing = if is_direct_p2p { 10u64 } else { 20 };
                 let pacing_delay = if self.intro_claw.voip_is_active() {
                     250 // Phase 3.4: VoIP priority — massive backoff during active calls
                 } else if self.intro_claw.is_on_mobile_data() {
@@ -6739,7 +7002,7 @@ impl NetworkService {
                                     match self.storage.get_group(&signed_action.group_id) {
                                         Ok(Some(group_info)) => {
                                             let is_all_zeros = group_info.secret.iter().all(|&b| b == 0);
-                                            crate::dispatch_debug_log(&format!("handle_single_payload: Found group info for {}. secret is all zeros: {}. Hex prefix: {}", signed_action.group_id, is_all_zeros, hex::encode(&group_info.secret[0..4.min(group_info.secret.len())])));
+                                            crate::dispatch_debug_log(&format!("handle_single_payload: Found group info for {}. secret is all zeros: {}", signed_action.group_id, is_all_zeros));
                                             
                                             if is_all_zeros {
                                                 if let Ok(signer_pid) = signed_action.signer_peer_id.parse::<PeerId>() {
@@ -7574,6 +7837,7 @@ impl NetworkService {
     async fn process_outgoing_file(
         peer_id: PeerId,
         file_path: String,
+        policy: crate::intro_claw::TransferPolicy,
         is_relayed: bool,
         is_relayed_map: Arc<RwLock<HashMap<PeerId, bool>>>,
         data_channels: Arc<RwLock<HashMap<PeerId, Arc<webrtc::data_channel::RTCDataChannel>>>>,
@@ -7614,8 +7878,8 @@ impl NetworkService {
             format!("gft_{}_{}", file_hash, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
         });
         
-        // ADAPTIVE CHUNKING: Direct P2P uses 256KB chunks, Relay/Pull uses 64KB
-        let chunk_size = if is_relayed { 64 * 1024 } else { 256 * 1024 };
+        // ADAPTIVE CHUNKING: dynamic chunk_size decided by IntroClaw transfer policy
+        let chunk_size = policy.chunk_size;
         let total_chunks = (total_size as f32 / chunk_size as f32).ceil() as u32;
         
         let transfer_payload = SignalingPayload::FileTransfer { 
@@ -7678,6 +7942,15 @@ impl NetworkService {
         }
 
         // --- PULL MODEL: Register as an active seeder to serve chunk requests ---
+        // FIX 5: RegisterSeeder MUST be processed BEFORE the manifest is gossiped.
+        // Both commands go through the same mpsc channel and are processed sequentially,
+        // but the manifest gossip via BroadcastGroupMessage triggers Gossipsub which
+        // can deliver the manifest to nearby peers near-instantly. Those peers may
+        // immediately send FileChunkRequest back before RegisterSeeder is processed,
+        // causing the seeder handler to find no entry and silently drop the request.
+        //
+        // By yielding here (awaiting RegisterSeeder before sending the manifest),
+        // we ensure the event loop processes RegisterSeeder first.
         let _ = tx.send(NetworkCommand::RegisterSeeder {
             peer_id: local_peer_id,
             transfer_id: transfer_id.clone(),
@@ -7687,6 +7960,9 @@ impl NetworkService {
             total_chunks,
             group_id: group_id.clone(),
         }).await;
+        // Give the event loop time to process RegisterSeeder before we broadcast the manifest.
+        // This is especially important for group files where gossip delivers to all peers instantly.
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         let _ = tx.send(NetworkCommand::SendFileChunk { peer_id, payload: transfer_payload, progress: initial_progress.clone() }).await;
 
@@ -7699,13 +7975,10 @@ impl NetworkService {
             return Ok(());
         }
 
-        if is_relayed {
-            info!("✅ File transfer manifest sent for {}. (Relay mode - waiting for chunk requests).", filename);
-            return Ok(());
-        }
+        // Push model for both direct and relay — stall watchdog auto-recovers to pull if needed
         
-        // Extended delay for manifest to propagate and relay circuits to warm up
-        tokio::time::sleep(Duration::from_millis(if is_relayed { 2000 } else { 200 })).await;
+        // Brief delay for manifest to propagate and relay circuits to warm up
+        tokio::time::sleep(Duration::from_millis(if is_relayed { 500 } else { 200 })).await;
 
         // BUG 4 FIX: Read chunks from disk during push loop
         let mut file = std::fs::File::open(path)?;
@@ -7747,18 +8020,8 @@ impl NetworkService {
             // To avoid overloading the channel itself, we simply apply a pacing delay.
             let _ = tx.send(NetworkCommand::SendFileChunk { peer_id, payload: chunk_payload.clone(), progress: progress.clone() }).await;
             
-            // ADAPTIVE PACING: Direct P2P/WebRTC uses 20ms, Relay uses 250ms (checked dynamically)
-            let current_relayed = is_relayed_map.read().get(&peer_id).cloned().unwrap_or(is_relayed);
-            let has_webrtc = {
-                let dc_store_read = data_channels.read();
-                if let Some(dc) = dc_store_read.get(&peer_id) {
-                    dc.ready_state() == RTCDataChannelState::Open
-                } else {
-                    false
-                }
-            };
-            let is_direct = !current_relayed || has_webrtc;
-            tokio::time::sleep(Duration::from_millis(if is_direct { 20 } else { 250 })).await;
+            // ADAPTIVE PACING: pacing delay decided dynamically by IntroClaw transfer policy
+            tokio::time::sleep(Duration::from_millis(policy.pacing_delay_ms)).await;
         }
         
 
@@ -7923,7 +8186,8 @@ impl NetworkService {
             if let Ok(peer_id) = peer_id_str.parse::<PeerId>() {
                 if !self.swarm.is_connected(&peer_id) {
                     info!("[IntroClaw] Auto-healing peer: {}", peer_id_str);
-                    self.dial_relay_path(peer_id, false);
+                    let is_file_seeder = self.incoming_transfers.values().any(|t| t.peer_id == peer_id);
+                    self.dial_relay_path(peer_id, is_file_seeder);
                 }
             }
         }
@@ -7941,7 +8205,8 @@ impl NetworkService {
             if let Ok(peer_id) = peer_id_str.parse::<PeerId>() {
                 if !self.swarm.is_connected(&peer_id) {
                     info!("[IntroClaw] Pre-establishing relay for unstable peer: {}", peer_id_str);
-                    self.dial_relay_path(peer_id, false);
+                    let is_file_seeder = self.incoming_transfers.values().any(|t| t.peer_id == peer_id);
+                    self.dial_relay_path(peer_id, is_file_seeder);
                 }
             }
         }
@@ -7954,8 +8219,8 @@ impl NetworkService {
                     if let Some(start) = content.find("[FILE]:") {
                         let json_part = &content[start + 7..];
                         if let Ok(meta) = serde_json::from_str::<serde_json::Value>(json_part) {
-                            let transfer_id = meta["transfer_id"].as_str().unwrap_or("");
-                            let peer_id = meta["peer_id"].as_str().unwrap_or("");
+                            let _transfer_id = meta["transfer_id"].as_str().unwrap_or("");
+                            let _peer_id = meta["peer_id"].as_str().unwrap_or("");
                             let filename = meta["filename"].as_str().unwrap_or("unknown");
                             let mime_type = meta["mime_type"].as_str().unwrap_or("application/octet-stream");
                             let total_size = meta["total_size"].as_i64().unwrap_or(0);

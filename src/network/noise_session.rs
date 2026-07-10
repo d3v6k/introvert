@@ -63,7 +63,10 @@ impl NoiseSession {
         })
     }
 
-    /// Recovers a session from persisted state.
+    /// Recovers a session from persisted state by performing a fresh Noise IK handshake.
+    /// Note: This does NOT resume the transport state — it creates a new handshake.
+    /// This is intentional for the Noise IK pattern which requires identity-hiding.
+    /// The persisted state provides the remote public key for re-authentication.
     pub fn from_state(state: NoiseSessionState) -> Result<Self> {
         if let Some(remote_public) = &state.remote_public {
             Self::initiator(&state.local_private, remote_public)

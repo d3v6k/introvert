@@ -1,7 +1,7 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-09 19:19 UTC
-**Git:** main @ e6d2240
+**Last Updated:** 2026-07-10 12:05 UTC
+**Git:** main @ f476ae0 (with local performance tuning patches)
 
 ---
 
@@ -119,19 +119,103 @@ Updated `SwarmEvent::ConnectionClosed` to check if we are completely disconnecte
 
 ---
 
+## Session Summary (2026-07-10)
+
+### What Was Done
+
+#### 1. File Transfer Performance Tuning (Phase 1 — Applied)
+Relay transfers were bottlenecked at ~256 KB/s. Applied constant tuning to `src/network/mod.rs`:
+
+| Change | Line | Before | After |
+|--------|------|--------|-------|
+| Relay chunk size | ~L6390, ~L7626 | `64 * 1024` (relay) / `256 * 1024` (direct) | `256 * 1024` for both |
+| In-flight limit | ~L3224 | `if is_relayed_conn { 4 } else { 8 }` | `8` unified |
+| Push pacing | ~L7769 | `if is_direct { 20 } else { 250 }` | `if is_direct { 20 } else { 50 }` |
+| Initial delay | ~L7716 | `if is_relayed { 2000 } else { 200 }` | `if is_relayed { 500 } else { 200 }` |
+| Pull pacing | ~L6394 | `if is_direct_p2p { 10 } else { 50 }` | `if is_direct_p2p { 10 } else { 20 }` |
+
+**Expected impact:** ~20x relay push, ~8x relay pull. But these only help when the relay is stable.
+
+#### 2. Relay Push Model (Phase 2A — Applied)
+Removed the early return at `process_outgoing_file` L7710-7713 that forced relay connections into pull-only mode. Relay connections now push chunks like direct P2P. The stall watchdog auto-recovers to pull mode if push stalls.
+
+**Status:** Applied and compiled. Builds pass on all platforms (mac, android, ios).
+
+#### 3. Relay File Transfer Stall Fixes (Phase 2B — Applied 2026-07-10 12:20)
+
+Applied 5 targeted fixes to `src/network/mod.rs` to resolve file transfers stalling at 0% over relay:
+
+| Fix | Location | Change |
+|-----|----------|--------|
+| Fix 1: Selective flush at ReservationReqAccepted | L1918-1958 | Only flush non-chunk messages at reservation; FileChunk/FileChunkRequest stay in pending_messages for OutboundCircuitEstablished |
+| Fix 2: Bump last_update on OutboundCircuitEstablished | L1960-1974 | Reset 60s stale eviction clock for all active incoming_transfers when circuit established |
+| Fix 3: Extend OutboundCircuit flush delay | L1998 | 1500ms → 2500ms to allow circuit to fully register at both ends |
+| Fix 4: Stall watchdog delayed flush | L542-563 | After stall re-dial, schedule 2s delayed re-flush so requests flow without needing new circuit event |
+| Fix 5: Group file seeder ordering | L7695 | 10ms yield after RegisterSeeder before manifest gossip |
+
+**Root cause fixed:** `ReservationReqAccepted` was consuming `pending_messages` (including FileChunkRequests) before the circuit existed. When `OutboundCircuitEstablished` fired, `pending_messages` was empty — nothing to flush. Transfers stuck at 0% forever.
+
+
+### Current Issue: Relay Instability Prevents File Transfers (UNRESOLVED)
+
+**Severity:** Critical — file transfers do not complete across network boundaries
+
+**Observed behavior (device logs 2026-07-10 11:56-12:00):**
+1. Mac connects to RBN, gets `ReservationReqAccepted` + `OutboundCircuitEstablished`
+2. Within 13 seconds, relay drops (status=4, relay_listener=false)
+3. `start_pull` called for 6 iOS files while relay is DOWN → `FileChunkRequest` payloads buffered in `pending_messages`
+4. Relay reconnects at 11:57:31 (`ReservationReqAccepted`)
+5. Status=1 (ONLINE) at 11:57:44
+6. **ZERO file chunk activity after reconnection** — no `FileChunkRequest` or `FileChunk` logs
+7. Gossipsub `GroupAction` messages repeat every 15 seconds (file manifests re-gossiped)
+8. Transfers remain stuck at 0% indefinitely
+
+**Root Cause Analysis:**
+
+**Problem A — Flush Race Condition:**
+When `ReservationReqAccepted` fires, it immediately flushes `pending_messages` (L1898-1920). But the relay circuit isn't established yet — `OutboundCircuitEstablished` fires 13 seconds later. The `forward_to_mesh` call during the first flush finds `swarm.is_connected(&peer_id) == false` and re-buffers the payloads. When `OutboundCircuitEstablished` fires and tries to flush again, the payloads may have been consumed and re-buffered, creating a race condition.
+
+**Problem B — Stall Watchdog Not Firing:**
+The stall watchdog (L434-547) should detect transfers with 0 chunks after 8 seconds and re-request. But device logs show NO stall detection activity for any of the 10+ active transfers. Either:
+- The `IncomingTransfer` entries are not being created by `start_pull`
+- The transfers are being silently evicted before the watchdog fires
+- The watchdog loop is not iterating over the transfers
+
+**Problem C — Sender Not Registered as Seeder:**
+The iOS sender gossips file manifests via `GroupAction::Message`. The Mac receiver creates `IncomingTransfer` entries and sends `FileChunkRequest` to the iOS peer. But if the iOS peer never called `RegisterSeeder` for these transfer IDs (because it only gossiped the manifest, didn't do a direct push), the `FileChunkRequest` handler on iOS has nothing to serve.
+
+**Problem D — Relay Connection Unstable:**
+The relay drops within 13 seconds of establishment. This could be:
+- RBN server resource exhaustion
+- Network-level instability between Mac and RBN
+- libp2p relay circuit timeout configuration too aggressive
+
+**Pending Fixes:**
+1. ✅ **Flush reliability** — Fixed: `ReservationReqAccepted` now only flushes non-chunk messages. `FileChunk` + `FileChunkRequest` payloads are held in `pending_messages` until `OutboundCircuitEstablished` fires.
+2. ✅ **Stale eviction guard** — Fixed: `OutboundCircuitEstablished` now bumps `last_update` for ALL active incoming transfers, preventing 60s eviction of valid waiting transfers.
+3. ✅ **OutboundCircuit flush delay** — Fixed: Increased from 1500ms to 2500ms to give relay circuit time to fully establish at both ends.
+4. ✅ **Stall watchdog flush** — Fixed: After re-dialing seeder, schedules a 2s delayed flush so requests flow even without a new circuit event.
+5. ✅ **Proactive seeder dial on circuit** — Fixed: `OutboundCircuitEstablished` now proactively dials all seeder peers with active incoming transfers.
+6. ✅ **Group file seeder ordering** — Fixed: 10ms yield after `RegisterSeeder` before manifest gossip ensures seeder is registered before `FileChunkRequest` arrives.
+
+---
+
 ## Pending Work
 
-### Immediate
-- **Monitor RBN status** — ensure relay server remains active on Alibaba RBN node
-- **Verify client connectivity** — ensure no regression on other platforms (Android/Mac)
+### Immediate (Critical)
+- **Fix relay flush race condition** — Remove `ReservationReqAccepted` flush, rely on `OutboundCircuitEstablished` flush only
+- **Fix stall watchdog for zero-chunk transfers** — Add diagnostic logging, ensure watchdog fires for transfers created while relay is down
+- **Investigate RBN relay instability** — Check why relay circuit drops within seconds of establishment
 
 ### Short-term
-- **Client-side resilience improvement** — Completed: stale relay reservations are now cleared immediately on RBN connection loss, enabling immediate recovery on reconnect.
+- **Proactive relay dial on manifest receipt** — When receiver gets manifest from offline sender, dial relay immediately
+- **Verify performance tuning** — Test Phase 1/2A changes once relay is stable (expected ~20x relay push improvement)
 - **RBN restart safety** — add graceful relay reservation preservation across RBN restarts
 
 ### Medium-term
 - **Anchor Handle Registry deployment** — needs 1.51 SOL for deployer wallet
 - **Client balance display** — app shows 0 INTR despite on-chain balances
+- **Phase 3: Group transfer optimization** — shared file read, parallel DHT provider download
 
 ---
 
@@ -163,17 +247,39 @@ close_current_epoch(epoch_id)
     → Distribute proportionally from daily pool
 ```
 
-### Networking Relay Path
+### Networking Relay Path (v0.30.2+ — Mailbox Removed)
 ```
 forward_to_mesh(recipient, payload)
-    → WebRTC DataChannel (if open)
-    → Direct libp2p (if connected)
+    → Durable payloads saved to outbox (SQLite)
+    → WebRTC DataChannel (if open, skip FileChunk on direct)
+    → Direct libp2p (if connected, in-flight limit: 8)
+        → Binary codec v2.0.0 if peer supports it (~25% savings)
     → dial_relay_path():
         Strategy 1: Direct P2P dial
-        Strategy 2: Via RBN (latency-sorted)
+        Strategy 2: Via RBN (latency-sorted, ALL RBNs for file chunks)
         Strategy 3: Via connected anchor nodes
         Strategy 4: WebSocket tunnel fallback
-    → StoreInMailbox (if all fail)
+    → Buffer in pending_messages (RAM, 50/peer cap)
+    → Persist FileChunk to pending_file_chunks (SQLite, 24h TTL)
+```
+
+### File Transfer Flow (Current)
+```
+Sender:
+    process_outgoing_file()
+        → SHA-256 hash (streaming)
+        → RegisterSeeder (pull model)
+        → Send FileTransfer manifest
+        → Push chunks (256KB, 50ms pacing for relay)
+        → Stall watchdog auto-converts push→pull if stalled 8s
+
+Receiver:
+    FileTransfer manifest received
+        → Create IncomingTransfer entry
+        → Send initial pipeline of FileChunkRequest
+        → Pull pacing: 20ms between requests
+        → On completion: SHA-256 verify, atomic write
+        → Register as seeder (group transfers only)
 ```
 
 ### VPN Tunnel Strategy
@@ -235,5 +341,24 @@ Non-VPN:
 ---
 ## Backup Status (2026-07-09 19:20)
 - Git: main @ e6d2240
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-10 10:56)
+- Git: main @ f476ae0
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-10 12:05)
+- Git: main @ f476ae0 + local performance tuning patches
+- RBN: introvertd on 47.89.252.80:443 (UNSTABLE — relay drops within 13s)
+- Economy: introvert-solana on localhost:9001
+- File transfers: NOT WORKING over relay (see session summary above)
+
+---
+## Backup Status (2026-07-10 13:22)
+- Git: main @ f476ae0
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001

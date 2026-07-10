@@ -348,11 +348,15 @@ impl RewardTracker {
             String::new()
         };
 
-        // Fetch unique peers from database
+        // Fetch unique peers from database — anonymized via SHA-256 hash
         let mut unique_peers = Vec::new();
         if let Some(ref s) = self.storage {
             if let Ok(contacts) = s.get_all_contacts() {
-                unique_peers = contacts.iter().map(|c| c.peer_id.clone()).collect();
+                unique_peers = contacts.iter().map(|c| {
+                    let mut hasher = Sha256::new();
+                    hasher.update(c.peer_id.as_bytes());
+                    hex::encode(hasher.finalize())
+                }).collect();
             }
         }
 

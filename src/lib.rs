@@ -2,6 +2,7 @@
 // Each function validates null pointers before dereferencing (see individual functions).
 // The clippy lint is overly strict for FFI boundary functions where the caller (Dart)
 // is responsible for passing valid pointers from the managed side.
+// TODO: Remove blanket allow and address individual warnings
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod identity;
@@ -114,6 +115,8 @@ pub static ACTIVE_PEER_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic
 pub static TEST_CALLBACK: Lazy<RwLock<Option<FfiNetworkCallback>>> = Lazy::new(|| RwLock::new(None));
 
 pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>> = Lazy::new(|| parking_lot::Mutex::new(None));
+
+pub(crate) static ACTIVE_PULLS: Lazy<parking_lot::Mutex<std::collections::HashSet<String>>> = Lazy::new(|| parking_lot::Mutex::new(std::collections::HashSet::new()));
 
 /// Dispatches an event to the global FFI callback. 
 /// The memory pointed to by data_ptr MUST be allocated with libc::malloc 
@@ -3079,7 +3082,7 @@ pub extern "C" fn introvert_group_create(
         crate::dispatch_debug_log(&format!("introvert_group_create: Looking up contact for peer: {}", peer_id_str));
         match engine.storage.get_contact(&peer_id_str) {
             Ok(Some(contact)) => {
-                crate::dispatch_debug_log(&format!("introvert_group_create: Found contact for {}. static_key prefix: {}", peer_id_str, hex::encode(&contact.static_key[0..4.min(contact.static_key.len())])));
+                crate::dispatch_debug_log(&format!("introvert_group_create: Found contact for {}", peer_id_str));
                 members.push(crate::network::GroupMemberMetadata {
                     peer_id: peer_id_str,
                     pubkey: contact.p2p_pubkey,
@@ -3182,7 +3185,7 @@ pub extern "C" fn introvert_group_send_message(
 
     let group_secret_vec = match engine.storage.load_group_secret(&group_id) {
         Ok(Some(s)) => {
-            crate::dispatch_debug_log(&format!("introvert_group_send_message: Loaded group secret. Hex prefix: {}", hex::encode(&s[0..4.min(s.len())])));
+            crate::dispatch_debug_log("introvert_group_send_message: Loaded group secret");
             s
         }
         _ => return FfiResult::error(-1, "Group secret not found"),
@@ -4155,6 +4158,16 @@ pub extern "C" fn introvert_network_start_pull(
     let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
     let transfer_id = unsafe { CStr::from_ptr(transfer_id_ptr).to_string_lossy().into_owned() };
     crate::dispatch_debug_log(&format!("[FFI] start_pull called: peer={}, tid={}", peer_id_str, transfer_id));
+
+    // Dedup guard: prevent concurrent duplicate start_pull sequences
+    {
+        let mut active = ACTIVE_PULLS.lock();
+        if active.contains(&transfer_id) {
+            crate::dispatch_debug_log(&format!("[FFI] start_pull: DEDUPED duplicate call for tid={}", transfer_id));
+            return FfiResult::success();
+        }
+        active.insert(transfer_id.clone());
+    }
     let filename = unsafe { CStr::from_ptr(filename_ptr).to_string_lossy().into_owned() };
     let mime_type = unsafe { CStr::from_ptr(mime_type_ptr).to_string_lossy().into_owned() };
     let file_hash = unsafe { CStr::from_ptr(file_hash_ptr).to_string_lossy().into_owned() };

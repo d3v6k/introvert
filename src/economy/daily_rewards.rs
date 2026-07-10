@@ -29,12 +29,7 @@ const TRUSTED_RBN_PUBLIC_KEYS: &[[u8; 32]] = &[
     // Derived from the bootstrap PeerId 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
     [0x12, 0xd3, 0x4b, 0x0e, 0x4a, 0x6e, 0x8f, 0x2c, 0x1a, 0x5d, 0x7b, 0x9f, 0x3e, 0x8c, 0x2d, 0x6a,
      0x4b, 0x0e, 0x1f, 0x3a, 0x5c, 0x7d, 0x9e, 0x2b, 0x4a, 0x6c, 0x8d, 0x0f, 0x2e, 0x4a, 0x6b, 0x8c],
-    // Treasury multisig member 2
-    [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-    // Treasury multisig member 3
-    [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    // TODO: Add actual multisig member keys when available
 ];
 
 // Official escrow vault address — derived from the introvert-registry Anchor program
@@ -301,6 +296,10 @@ impl SignedRewardEnvelope {
             .as_secs();
         if now.saturating_sub(self.signed_at) > 86400 {
             return Err("Envelope timestamp is older than 24 hours".to_string());
+        }
+        // Reject future timestamps beyond 5-minute clock drift tolerance
+        if self.signed_at > now + 300 {
+            return Err("Envelope timestamp is too far in the future".to_string());
         }
 
         Ok(())
@@ -797,6 +796,11 @@ impl DailyRewardEngine {
     }
 
     pub fn update_weights(&self, new_weights: ActivityWeights) {
+        // Validate weights are within reasonable bounds to prevent extreme values
+        if new_weights.daily_point_cap > 100_000.0 || new_weights.daily_point_cap < 0.0 {
+            warn!("[Economy] Rejecting invalid daily_point_cap: {}", new_weights.daily_point_cap);
+            return;
+        }
         let mut weights = self.weights.write();
         *weights = new_weights.clone();
         let _ = self.storage.save_daily_reward_config(&new_weights, &self.anti_gaming.read());
