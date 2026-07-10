@@ -18,6 +18,8 @@ All notable changes to Introvert will be documented in this file.
 ### Fixed
 - **Relay Flush Race Condition**: Removed premature pending message flushes; scheduled post-dial delay flushes and secondary watchdog ticks.
 - **Zero-Chunk watchdog stall**: Enriched tick contexts with active transfers and seeder states to trigger pulls on startup.
+- **Infinite Watchdog Retry Loop**: Decoupled watchdog retries from stale eviction checks by adding a separate `last_retry` tracking field, allowing inactive/offline transfers to correctly age out and clean up from memory.
+- **Group Info Validation Guard**: Rejects and ignores incoming group file transfer manifests early if the group info is not present locally or if the secret key has not yet synced, avoiding memory leak buildup.
 
 ### Verified
 - macOS, Android, and iOS native cores fully compiled and build-packaged. यूनिट परीक्षण complete. unit tests passing. unit tests pass.
