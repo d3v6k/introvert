@@ -113,6 +113,20 @@ Applied file transfer performance tuning (Phase 1 + Phase 2A). Discovered that r
 
 ---
 
+## Session 3 Fixes (Implemented)
+
+### 7. Decoupled Watchdog Retry from Stale Eviction (Fix 7 — APPLIED)
+*   **Change:** Added `last_retry: Instant` to the `IncomingTransfer` struct. The watchdog retry check now queries `t.last_retry.elapsed() > watchdog_timeout` and updates `t.last_retry = Instant::now()`, leaving `t.last_update` untouched.
+*   **Result:** Restores functionality to the stale eviction timer. Stalled transfers whose seeders are permanently offline can now successfully age out (after 60s/90s of no chunks) instead of being kept alive indefinitely by watchdog resets.
+*   **Location:** `src/network/service.rs` L108, `src/network/mod.rs` L469-495, L6732
+
+### 8. Group Info Validation Guard (Fix 8 — APPLIED)
+*   **Change:** Added database lookup check for `group_id` on manifest (`FileTransfer`) receipt. If the group info is not found or the group secret is all-zeros (healing pending), the manifest is rejected and ignored early.
+*   **Result:** Prevents the client from entering stall loops for files in groups it is not a member of or doesn't have decryption keys for.
+*   **Location:** `src/network/mod.rs` L6610-6628
+
+---
+
 ## Phase 3: IntroClaw File Transfer Intelligence (Implemented)
 
 Designed and implemented 6 enhancements in `src/intro_claw.rs` and `src/network/mod.rs` to make IntroClaw actively manage and optimize file transfers:

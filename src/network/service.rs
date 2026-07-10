@@ -107,6 +107,7 @@ pub struct IncomingTransfer {
     pub(crate) providers: Vec<PeerId>,
     pub(crate) start_time: Instant,
     pub(crate) last_update: Instant,
+    pub(crate) last_retry: Instant,
     pub(crate) is_relayed: bool,
     pub(crate) group_id: Option<String>,
     pub(crate) next_pull_idx: u32,

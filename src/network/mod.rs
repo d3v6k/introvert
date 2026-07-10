@@ -467,7 +467,8 @@ impl NetworkService {
                             let current_chunk_count = t.received_chunks.len();
                             let watchdog_timeout = if is_direct_p2p { 10 } else { 8 };
                             let truly_stalled = current_chunk_count == t.stall_chunk_count
-                                && t.last_update.elapsed() > Duration::from_secs(watchdog_timeout);
+                                && t.last_update.elapsed() > Duration::from_secs(watchdog_timeout)
+                                && t.last_retry.elapsed() > Duration::from_secs(watchdog_timeout);
                             // Always update the stall_chunk_count so next tick reflects new arrivals.
                             t.stall_chunk_count = current_chunk_count;
 
@@ -488,7 +489,7 @@ impl NetworkService {
                                 if next < limit {
                                     // Align next_pull_idx so it starts pulling sequentially from the new limit
                                     t.next_pull_idx = limit;
-                                    t.last_update = Instant::now();
+                                    t.last_retry = Instant::now();
                                     t.is_relayed = true; // Auto-transition to pull model on stall
                                     stalled.push((tid.clone(), t.peer_id, t.providers.clone(), next, limit, t.chunk_size));
                                 }
@@ -6611,6 +6612,24 @@ impl NetworkService {
                      crate::ACTIVE_PULLS.lock().remove(&transfer_id);
                      return;
                  }
+
+                 // GROUP VALIDATION: If this is a group file transfer, only pull if we have the group key.
+                 // Otherwise, we cannot decrypt the file anyway and pulling it wastes mesh relay bandwidth.
+                 if let Some(ref gid) = group_id {
+                     match self.storage.get_group(gid) {
+                         Ok(Some(group_info)) => {
+                             let is_all_zeros = group_info.secret.iter().all(|&b| b == 0);
+                             if is_all_zeros {
+                                 info!("[Mesh] Group secret is all-zeros for group {}! Ignoring FileTransfer manifest for now.", gid);
+                                 return;
+                             }
+                         }
+                         _ => {
+                             info!("[Mesh] Group info not found in DB for group {}! Ignoring FileTransfer manifest.", gid);
+                             return;
+                         }
+                     }
+                 }
  
                  // BUG 3 FIX: Use the actual sender's peer ID if provided, otherwise fallback to the anchor peer
                 let actual_seeder_peer = if let Some(sid) = &sender_peer_id {
@@ -6735,6 +6754,7 @@ impl NetworkService {
                         providers: vec![actual_seeder_peer],
                         start_time: Instant::now(),
                         last_update: Instant::now(),
+                        last_retry: Instant::now(),
                         is_relayed: final_is_relayed,
                         group_id: group_id.clone(),
                         next_pull_idx: initial_pipeline,
