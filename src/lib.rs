@@ -2,7 +2,6 @@
 // Each function validates null pointers before dereferencing (see individual functions).
 // The clippy lint is overly strict for FFI boundary functions where the caller (Dart)
 // is responsible for passing valid pointers from the managed side.
-// TODO: Remove blanket allow and address individual warnings
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod identity;
@@ -115,8 +114,6 @@ pub static ACTIVE_PEER_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic
 pub static TEST_CALLBACK: Lazy<RwLock<Option<FfiNetworkCallback>>> = Lazy::new(|| RwLock::new(None));
 
 pub static WORMHOLE_TASK: Lazy<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>> = Lazy::new(|| parking_lot::Mutex::new(None));
-
-pub(crate) static ACTIVE_PULLS: Lazy<parking_lot::Mutex<std::collections::HashSet<String>>> = Lazy::new(|| parking_lot::Mutex::new(std::collections::HashSet::new()));
 
 /// Dispatches an event to the global FFI callback. 
 /// The memory pointed to by data_ptr MUST be allocated with libc::malloc 
@@ -724,6 +721,28 @@ pub extern "C" fn introvert_daily_reward_tick(
     FfiResult::success()
 }
 
+/// Triggers a request to connected Anchors to drain any pending mailbox messages.
+#[no_mangle]
+pub extern "C" fn introvert_network_fetch_mailbox() -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::FetchMailbox).await;
+    });
+
+    FfiResult::success()
+}
+
 /// Initiates a file transfer to a remote peer.
 #[no_mangle]
 pub extern "C" fn introvert_network_force_refresh() -> FfiResult {
@@ -755,194 +774,6 @@ pub extern "C" fn introvert_send_manual_telemetry() -> FfiResult {
         }
     }
     FfiResult::error(-1, "Network not started")
-}
-
-#[no_mangle]
-pub extern "C" fn introvert_network_propose_file_transfer(
-    peer_id_ptr: *const c_char,
-    batch_id_ptr: *const c_char,
-    files_json_ptr: *const c_char,
-    group_id_ptr: *const c_char,
-) -> FfiResult {
-    let lock = ENGINE.read();
-    let engine = match lock.as_ref() {
-        Some(e) => e,
-        None => return FfiResult::error(-10, "Engine not started"),
-    };
-
-    if peer_id_ptr.is_null() || batch_id_ptr.is_null() || files_json_ptr.is_null() {
-        return FfiResult::error(-11, "Null pointer");
-    }
-
-    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
-    let batch_id = unsafe { CStr::from_ptr(batch_id_ptr).to_string_lossy().into_owned() };
-    let files_json = unsafe { CStr::from_ptr(files_json_ptr).to_string_lossy().into_owned() };
-    let group_id = if !group_id_ptr.is_null() {
-        let gid = unsafe { CStr::from_ptr(group_id_ptr).to_string_lossy().into_owned() };
-        if gid.is_empty() { None } else { Some(gid) }
-    } else {
-        None
-    };
-
-    let peer_id = match PeerId::from_str(&peer_id_str) {
-        Ok(pid) => pid,
-        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
-    };
-
-    let files_metadata: Vec<crate::network::types::FileTransferMetadata> = match serde_json::from_str(&files_json) {
-        Ok(f) => f,
-        Err(e) => return FfiResult::error(-15, &format!("Invalid files JSON: {}", e)),
-    };
-
-    let tx_lock = engine.network_tx.read();
-    let tx = match tx_lock.as_ref() {
-        Some(t) => t.clone(),
-        None => return FfiResult::error(-13, "Network not started"),
-    };
-
-    let payload = crate::network::types::SignalingPayload::FileTransferProposal {
-        batch_id,
-        files_metadata,
-        group_id,
-    };
-
-    engine.runtime.spawn(async move {
-        let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-    });
-
-    FfiResult::success()
-}
-
-#[no_mangle]
-pub extern "C" fn introvert_network_accept_file_transfer(
-    peer_id_ptr: *const c_char,
-    batch_id_ptr: *const c_char,
-    accept: bool,
-) -> FfiResult {
-    let lock = ENGINE.read();
-    let engine = match lock.as_ref() {
-        Some(e) => e,
-        None => return FfiResult::error(-10, "Engine not started"),
-    };
-
-    if peer_id_ptr.is_null() || batch_id_ptr.is_null() {
-        return FfiResult::error(-11, "Null pointer");
-    }
-
-    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
-    let batch_id = unsafe { CStr::from_ptr(batch_id_ptr).to_string_lossy().into_owned() };
-
-    let peer_id = match PeerId::from_str(&peer_id_str) {
-        Ok(pid) => pid,
-        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
-    };
-
-    let tx_lock = engine.network_tx.read();
-    let tx = match tx_lock.as_ref() {
-        Some(t) => t.clone(),
-        None => return FfiResult::error(-13, "Network not started"),
-    };
-
-    let payload = crate::network::types::SignalingPayload::FileTransferAccept {
-        batch_id,
-        accept,
-    };
-
-    engine.runtime.spawn(async move {
-        let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-    });
-
-    FfiResult::success()
-}
-
-#[no_mangle]
-pub extern "C" fn introvert_network_verify_file_transfer(
-    peer_id_ptr: *const c_char,
-    batch_id_ptr: *const c_char,
-    hashes_json_ptr: *const c_char,
-) -> FfiResult {
-    let lock = ENGINE.read();
-    let engine = match lock.as_ref() {
-        Some(e) => e,
-        None => return FfiResult::error(-10, "Engine not started"),
-    };
-
-    if peer_id_ptr.is_null() || batch_id_ptr.is_null() || hashes_json_ptr.is_null() {
-        return FfiResult::error(-11, "Null pointer");
-    }
-
-    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
-    let batch_id = unsafe { CStr::from_ptr(batch_id_ptr).to_string_lossy().into_owned() };
-    let hashes_json = unsafe { CStr::from_ptr(hashes_json_ptr).to_string_lossy().into_owned() };
-
-    let peer_id = match PeerId::from_str(&peer_id_str) {
-        Ok(pid) => pid,
-        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
-    };
-
-    let file_hashes: std::collections::HashMap<String, String> = match serde_json::from_str(&hashes_json) {
-        Ok(h) => h,
-        Err(e) => return FfiResult::error(-15, &format!("Invalid hashes JSON: {}", e)),
-    };
-
-    let tx_lock = engine.network_tx.read();
-    let tx = match tx_lock.as_ref() {
-        Some(t) => t.clone(),
-        None => return FfiResult::error(-13, "Network not started"),
-    };
-
-    let payload = crate::network::types::SignalingPayload::FileTransferVerify {
-        batch_id,
-        file_hashes,
-    };
-
-    engine.runtime.spawn(async move {
-        let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-    });
-
-    FfiResult::success()
-}
-
-#[no_mangle]
-pub extern "C" fn introvert_network_ack_file_transfer_complete(
-    peer_id_ptr: *const c_char,
-    batch_id_ptr: *const c_char,
-    verified: bool,
-) -> FfiResult {
-    let lock = ENGINE.read();
-    let engine = match lock.as_ref() {
-        Some(e) => e,
-        None => return FfiResult::error(-10, "Engine not started"),
-    };
-
-    if peer_id_ptr.is_null() || batch_id_ptr.is_null() {
-        return FfiResult::error(-11, "Null pointer");
-    }
-
-    let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
-    let batch_id = unsafe { CStr::from_ptr(batch_id_ptr).to_string_lossy().into_owned() };
-
-    let peer_id = match PeerId::from_str(&peer_id_str) {
-        Ok(pid) => pid,
-        Err(_) => return FfiResult::error(-12, "Invalid PeerId"),
-    };
-
-    let tx_lock = engine.network_tx.read();
-    let tx = match tx_lock.as_ref() {
-        Some(t) => t.clone(),
-        None => return FfiResult::error(-13, "Network not started"),
-    };
-
-    let payload = crate::network::types::SignalingPayload::FileTransferCompleteAck {
-        batch_id,
-        verified,
-    };
-
-    engine.runtime.spawn(async move {
-        let _ = tx.send(crate::network::NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-    });
-
-    FfiResult::success()
 }
 
 #[no_mangle]
@@ -1911,7 +1742,7 @@ fn build_local_sovereign_identity(engine: &Engine) -> anyhow::Result<crate::iden
         global_name: local_name.clone(),
         local_alias: local_name,
         avatar_base64: local_avatar,
-        is_anchor_capable: engine.storage.is_anchor_mode_enabled(),
+        is_anchor_capable: true,
         retention_seconds: 0,
         handle: local_handle,
         prestige_tier: Some(local_tier as u8),
@@ -1984,7 +1815,7 @@ pub extern "C" fn introvert_wormhole_start() -> FfiResult {
             }
             Err(_) => {
                 error!("Wormhole invite creation timed out");
-                dispatch_global_event(6, "ERROR:TIMEOUT:Relay unreachable. Please check your connection or firewall (Port 443/WSS).".as_bytes());
+                dispatch_global_event(6, "ERROR:TIMEOUT:Mailbox relay unreachable. Please check your connection or firewall (Port 443/WSS).".as_bytes());
             }
         }
     });
@@ -2013,7 +1844,20 @@ pub extern "C" fn introvert_storage_delete_chat(peer_id_ptr: *const c_char) -> F
     };
 
     match engine.storage.delete_chat(&peer_id) {
-        Ok(_) => FfiResult::success(),
+        Ok(_) => {
+            // Trigger proactive mailbox drain so the MailboxDrained handler
+            // can skip pre-clear messages using should_skip_mailbox_message()
+            let network_tx = engine.network_tx.read();
+            if let Some(tx) = network_tx.as_ref() {
+                let tx = tx.clone();
+                engine.runtime.spawn(async move {
+                    let _ = tx.send(NetworkCommand::ClearMailboxForPeer {
+                        peer_id: peer_id.parse().unwrap_or(libp2p::PeerId::random()),
+                    }).await;
+                });
+            }
+            FfiResult::success()
+        }
         Err(e) => FfiResult::error(-1, &format!("Storage error: {}", e)),
     }
 }
@@ -2172,7 +2016,7 @@ pub extern "C" fn introvert_webrtc_renegotiate(
     FfiResult::success()
 }
 
-/// Sets the node's anchor capability. Enabling this makes the node a relay provider.
+/// Sets the node's anchor capability. Enabling this makes the node a relay/mailbox provider.
 #[no_mangle]
 pub extern "C" fn introvert_network_set_anchor_mode(enabled: bool) -> FfiResult {
     let lock = ENGINE.read();
@@ -3082,7 +2926,7 @@ pub extern "C" fn introvert_group_create(
         crate::dispatch_debug_log(&format!("introvert_group_create: Looking up contact for peer: {}", peer_id_str));
         match engine.storage.get_contact(&peer_id_str) {
             Ok(Some(contact)) => {
-                crate::dispatch_debug_log(&format!("introvert_group_create: Found contact for {}", peer_id_str));
+                crate::dispatch_debug_log(&format!("introvert_group_create: Found contact for {}. static_key prefix: {}", peer_id_str, hex::encode(&contact.static_key[0..4.min(contact.static_key.len())])));
                 members.push(crate::network::GroupMemberMetadata {
                     peer_id: peer_id_str,
                     pubkey: contact.p2p_pubkey,
@@ -3185,7 +3029,7 @@ pub extern "C" fn introvert_group_send_message(
 
     let group_secret_vec = match engine.storage.load_group_secret(&group_id) {
         Ok(Some(s)) => {
-            crate::dispatch_debug_log("introvert_group_send_message: Loaded group secret");
+            crate::dispatch_debug_log(&format!("introvert_group_send_message: Loaded group secret. Hex prefix: {}", hex::encode(&s[0..4.min(s.len())])));
             s
         }
         _ => return FfiResult::error(-1, "Group secret not found"),
@@ -4158,16 +4002,6 @@ pub extern "C" fn introvert_network_start_pull(
     let peer_id_str = unsafe { CStr::from_ptr(peer_id_ptr).to_string_lossy().into_owned() };
     let transfer_id = unsafe { CStr::from_ptr(transfer_id_ptr).to_string_lossy().into_owned() };
     crate::dispatch_debug_log(&format!("[FFI] start_pull called: peer={}, tid={}", peer_id_str, transfer_id));
-
-    // Dedup guard: prevent concurrent duplicate start_pull sequences
-    {
-        let mut active = ACTIVE_PULLS.lock();
-        if active.contains(&transfer_id) {
-            crate::dispatch_debug_log(&format!("[FFI] start_pull: DEDUPED duplicate call for tid={}", transfer_id));
-            return FfiResult::success();
-        }
-        active.insert(transfer_id.clone());
-    }
     let filename = unsafe { CStr::from_ptr(filename_ptr).to_string_lossy().into_owned() };
     let mime_type = unsafe { CStr::from_ptr(mime_type_ptr).to_string_lossy().into_owned() };
     let file_hash = unsafe { CStr::from_ptr(file_hash_ptr).to_string_lossy().into_owned() };
@@ -4575,7 +4409,7 @@ pub extern "C" fn introvert_network_send_direct_invite(
         global_name: local_name.clone(),
         local_alias: local_name,
         avatar_base64: local_avatar,
-        is_anchor_capable: storage.is_anchor_mode_enabled(), 
+        is_anchor_capable: true, 
         retention_seconds: 0,
         handle: local_handle,
         prestige_tier: Some(local_tier as u8),

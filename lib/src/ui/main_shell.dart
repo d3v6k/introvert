@@ -17,6 +17,7 @@ import '../native/identity_manager.dart';
 import '../native/alert_service.dart';
 import '../services/webrtc_call_service.dart';
 import '../services/group_call_service.dart';
+import '../services/background_sync_service.dart';
 import 'widgets/network_optimization_button.dart';
 import 'widgets/connection_request_overlay.dart';
 import 'widgets/whatsapp_icon.dart';
@@ -324,9 +325,11 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // Always acquire wake lock to prevent Doze mode from suspending the network loop.
       // Without this, Android can freeze the Tokio runtime and the 15-second status check stops.
       AlertService.startBackgroundService(awake: true);
+      BackgroundSyncService.instance.enterIdleMode();
     } else if (state == AppLifecycleState.resumed) {
       // Return to foreground: exit idle mode
       AlertService.stopBackgroundService();
+      BackgroundSyncService.instance.exitIdleMode();
       
       // Immediately trigger IntroClaw tick to refresh connections — no delay.
       // The 1-second delay caused 30-90s of "Connecting"/"Offline" after resume.
@@ -417,6 +420,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       } else if (status == 2) {
         _localStatus = "RELAY";
         _localStatusColor = Colors.orangeAccent;
+      } else if (status == 3) {
+        _localStatus = "SYNCING...";
+        _localStatusColor = AppTheme.current.accent;
       }
     }
 
@@ -663,6 +669,9 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
               // 4 = CONNECTING — RBN reachable, relay reservation in progress
               _localStatus = "CONNECTING";
               _localStatusColor = Colors.amberAccent;
+            } else if (status == 3) {
+              _localStatus = "SYNCING...";
+              _localStatusColor = AppTheme.current.accent;
             } else {
               // 0 = OFFLINE — no mesh connectivity, messages are being queued
               _localStatus = "OFFLINE";
@@ -690,13 +699,21 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // Network already started — this is expected
     }
     
-    // Register any pending push token now that the engine is active
+    // Register any pending push token and fetch mailbox now that the engine is active
     // Delay slightly to ensure engine is fully initialized
     Future.delayed(Duration(seconds: 2), () {
       if (mounted) {
         AlertService.tryRegisterPendingToken();
+        try {
+          client.fetchMailbox();
+        } catch (_) {}
       }
     });
+    
+    // Initialize background sync — push is the primary wakeup mechanism,
+    // with fallback polling if push delivery fails
+    final bool hasPush = AlertService.hasRegisteredToken || (AlertService.apnsToken != null && AlertService.apnsToken!.isNotEmpty);
+    BackgroundSyncService.instance.initialize(pushAvailable: hasPush);
   }
 
   int _getContactTier(String peerId) {
@@ -1599,8 +1616,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       '[00:05] ✓ Anchor nodes available for message relay',
       '[00:06] Attempting WebSocket tunnel fallback...',
       '[00:06] ✓ Connection strategy evaluated',
-      '[00:07] Compiling heal report...',
-      '[00:07] ✓ Heal cycle complete — strategies exhausted',
+      '[00:07] Storing messages in persistent mailbox...',
+      '[00:07] ✓ Pending messages queued for offline peers',
+      '[00:08] Compiling heal report...',
+      '[00:08] ✓ Heal cycle complete — strategies exhausted',
     ];
     for (int i = 0; i < milestones.length; i++) {
       await Future.delayed(Duration(milliseconds: 300 + (i * 100)));
@@ -1610,7 +1629,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       final offlineCount = RegExp(r'OFFLINE').allMatches(report).length;
       final healReport = offlineCount == 0
           ? "All peers are connected. No healing needed."
-          : "### Heal Summary\n\nFound $offlineCount offline peers.\n\nStrategies attempted:\n1. Direct libp2p dial\n2. Relay circuit v2\n3. Anchor node routing\n4. WebSocket tunnel";
+          : "### Heal Summary\n\nFound $offlineCount offline peers.\n\nStrategies attempted:\n1. Direct libp2p dial\n2. Relay circuit v2\n3. Anchor node routing\n4. WebSocket tunnel\n5. Persistent mailbox fallback";
       if (mounted) Navigator.of(context).pop();
       if (mounted) _showClawTerminal('INTRO-CLAW HEAL', milestones, finalReport: healReport);
     } catch (e) {
@@ -3716,6 +3735,8 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                       SizedBox(height: 8),
                       _buildAnchorRow(Icons.swap_horiz_rounded, 'Relay Server', 'Routes traffic between peers that cannot connect directly (NAT traversal)', Colors.blue),
                       _buildAnchorRow(Icons.hub_rounded, 'Full DHT Server', 'Participates in Kademlia routing table — helps peers discover each other', Colors.teal),
+                      _buildAnchorRow(Icons.mail_outline_rounded, 'Mailbox Storage', 'Stores encrypted messages for offline peers in persistent storage', Colors.orange),
+                      _buildAnchorRow(Icons.mark_email_read_rounded, 'Mailbox Drain', 'Delivers stored messages when offline peers reconnect', Colors.green),
                       _buildAnchorRow(Icons.group_rounded, 'Group Message Storage', 'Stores group chat messages for other members who missed them', Colors.purple),
                       _buildAnchorRow(Icons.download_rounded, 'Group Media Auto-Pull', 'Automatically fetches file attachments for group members', Colors.cyan),
                       _buildAnchorRow(Icons.cell_tower_rounded, 'Relay Reservations', 'Other peers reserve relay circuit slots through your node', Colors.indigo),
@@ -5535,8 +5556,10 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
       '[00:05] ✓ Anchor nodes available for message relay',
       '[00:06] Attempting WebSocket tunnel fallback...',
       '[00:06] ✓ Connection strategy evaluated',
-      '[00:07] Compiling heal report...',
-      '[00:07] ✓ Heal cycle complete — strategies exhausted',
+      '[00:07] Storing messages in persistent mailbox...',
+      '[00:07] ✓ Pending messages queued for offline peers',
+      '[00:08] Compiling heal report...',
+      '[00:08] ✓ Heal cycle complete — strategies exhausted',
     ];
     for (int i = 0; i < milestones.length; i++) {
       await Future.delayed(Duration(milliseconds: 300 + (i * 100)));
@@ -5546,7 +5569,7 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
       final offlineCount = RegExp(r'OFFLINE').allMatches(report).length;
       final healReport = offlineCount == 0
           ? "All peers are connected. No healing needed."
-          : "### Heal Summary\n\nFound $offlineCount offline peers.\n\nStrategies attempted:\n1. Direct libp2p dial\n2. Relay circuit v2\n3. Anchor node routing\n4. WebSocket tunnel";
+          : "### Heal Summary\n\nFound $offlineCount offline peers.\n\nStrategies attempted:\n1. Direct libp2p dial\n2. Relay circuit v2\n3. Anchor node routing\n4. WebSocket tunnel\n5. Persistent mailbox fallback";
       if (mounted) Navigator.of(context).pop();
       if (mounted) _showSettingsClawTerminal('INTRO-CLAW HEAL', milestones, finalReport: healReport);
     } catch (e) {
@@ -5619,7 +5642,7 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
       buffer.writeln('Total entries: $entryCount');
       buffer.writeln('=' * 60);
       buffer.writeln('Contents: Rust relay events, circuit establishment,');
-      buffer.writeln('mesh routing decisions, dial strategies.');
+      buffer.writeln('mesh routing decisions, dial strategies, mailbox drain.');
       buffer.writeln('=' * 60);
       buffer.writeln(logContent);
 

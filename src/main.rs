@@ -390,7 +390,7 @@ async fn start_dashboard_server(
                     let payload = json!({"status": "unauthorized"});
                     let payload_str = payload.to_string();
                     format!(
-                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                         payload_str.len(),
                         payload_str
                     )
@@ -498,7 +498,7 @@ async fn start_dashboard_server(
 
                 let payload_str = payload.to_string();
                 format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                     payload_str.len(),
                     payload_str
                 )
@@ -508,7 +508,7 @@ async fn start_dashboard_server(
                     let payload = json!({"status": "unauthorized"});
                     let payload_str = payload.to_string();
                     format!(
-                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                         payload_str.len(),
                         payload_str
                     )
@@ -527,7 +527,7 @@ async fn start_dashboard_server(
                     });
                     let payload_str = payload.to_string();
                     format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                         payload_str.len(),
                         payload_str
                     )
@@ -541,9 +541,9 @@ async fn start_dashboard_server(
                     .unwrap_or("");
                 
                 let expected_hash = get_stored_password_hash(&db_path);
-                let password_valid = bcrypt::verify(password, &expected_hash).unwrap_or(false);
+                let input_hash = hash_password(password);
 
-                if password_valid {
+                if input_hash == expected_hash {
                     let rand_bytes: [u8; 16] = rand::random();
                     let new_token = hex::encode(rand_bytes);
                     *session_token.lock() = Some(new_token.clone());
@@ -554,7 +554,7 @@ async fn start_dashboard_server(
                     });
                     let payload_str = payload.to_string();
                     format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                         payload_str.len(),
                         payload_str
                     )
@@ -565,7 +565,7 @@ async fn start_dashboard_server(
                     });
                     let payload_str = payload.to_string();
                     format!(
-                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                         payload_str.len(),
                         payload_str
                     )
@@ -575,7 +575,7 @@ async fn start_dashboard_server(
                     let payload = json!({"status": "unauthorized"});
                     let payload_str = payload.to_string();
                     format!(
-                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                        "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                         payload_str.len(),
                         payload_str
                     )
@@ -594,9 +594,9 @@ async fn start_dashboard_server(
                         .unwrap_or("");
 
                     let expected_hash = get_stored_password_hash(&db_path);
-                    let password_valid = bcrypt::verify(old_pwd, &expected_hash).unwrap_or(false);
+                    let input_hash = hash_password(old_pwd);
 
-                    if password_valid {
+                    if input_hash == expected_hash {
                         let new_hash = hash_password(new_pwd);
                         let payload = match set_stored_password_hash(&db_path, &new_hash) {
                             Ok(_) => json!({"status": "success"}),
@@ -604,7 +604,7 @@ async fn start_dashboard_server(
                         };
                         let payload_str = payload.to_string();
                         format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                             payload_str.len(),
                             payload_str
                         )
@@ -612,7 +612,7 @@ async fn start_dashboard_server(
                         let payload = json!({"status": "failed", "message": "Incorrect current password"});
                         let payload_str = payload.to_string();
                         format!(
-                            "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\nContent-Length: {}\r\n\r\n{}",
+                            "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
                             payload_str.len(),
                             payload_str
                         )
@@ -695,16 +695,16 @@ fn parse_linux_mem() -> Option<(u32, u32)> {
 
 
 fn hash_password(password: &str) -> String {
-    bcrypt::hash(password, bcrypt::DEFAULT_COST).unwrap_or_default()
+    use sha2::{Sha256, Digest};
+    let mut hasher = Sha256::new();
+    hasher.update(password.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 fn get_stored_password_hash(db_path: &str) -> String {
     let conn = match rusqlite::Connection::open(db_path) {
         Ok(c) => c,
-        Err(_) => {
-            // Generate bcrypt hash for default password on first run
-            return bcrypt::hash("introvert_rbn", bcrypt::DEFAULT_COST).unwrap_or_else(|_| "$2b$12$placeholder".to_string());
-        }
+        Err(_) => return "ac26da29d37bfa455a2697dc7d4179addeb1a2cc4fa1e113275948df823ace25".to_string(), // sha256 of "introvert_rbn"
     };
     let _ = conn.execute(
         "CREATE TABLE IF NOT EXISTS node_config (key TEXT PRIMARY KEY, value TEXT)",

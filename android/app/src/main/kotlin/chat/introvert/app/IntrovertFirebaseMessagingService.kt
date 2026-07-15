@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.app.ForegroundServiceStartNotAllowedException
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -116,6 +117,10 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
                 startService(intent)
             }
             Log.d(TAG, "Foreground service started for message fetch")
+        } catch (e: ForegroundServiceStartNotAllowedException) {
+            Log.w(TAG, "Cannot start FGS from background (API 31+ restriction). Service will start on next user interaction. ${e.message}")
+        } catch (e: IllegalStateException) {
+            Log.w(TAG, "FGS start failed (state violation): ${e.message}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start foreground service: ${e.message}")
         }

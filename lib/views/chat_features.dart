@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 
 // Helper to build a consistent reaction row for all bubbles
@@ -711,18 +713,8 @@ class LocationBubble extends StatelessWidget {
   });
 
   Future<void> _openMap() async {
-    final Uri uri;
-    if (Platform.isIOS || Platform.isMacOS) {
-      uri = Uri.parse("https://maps.apple.com/?q=$latitude,$longitude");
-    } else if (Platform.isAndroid) {
-      // Use geo: intent to open the native map app directly (bypasses browser on Android 12+)
-      uri = Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude");
-    } else {
-      uri = Uri.parse("https://www.google.com/maps/search/?api=1&query=$latitude,$longitude");
-    }
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+    final String url = Platform.isIOS ? "https://maps.apple.com/?q=$latitude,$longitude" : "https://www.google.com/maps/search/?api=1&query=$latitude,$longitude";
+    if (await canLaunchUrl(Uri.parse(url))) await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -744,27 +736,7 @@ class LocationBubble extends StatelessWidget {
               children: [
                 Row(children: [Icon(Icons.location_on_rounded, color: Colors.redAccent, size: 18), SizedBox(width: 8), Text("LOCATION SHARE", style: TextStyle(color: Colors.redAccent, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.bold))]),
                 SizedBox(height: 10),
-                GestureDetector(
-                  onTap: _openMap,
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D1117),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.map_rounded, color: Colors.redAccent.withValues(alpha: 0.6), size: 40),
-                        SizedBox(height: 8),
-                        Text("Location Shared", style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                        SizedBox(height: 4),
-                        Text("${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)}", style: TextStyle(color: Colors.white38, fontSize: 11, fontFamily: 'monospace')),
-                      ],
-                    ),
-                  ),
-                ),
+                GestureDetector(onTap: _openMap, child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Container(height: 140, width: double.infinity, color: Colors.black26, child: FlutterMap(options: MapOptions(initialCenter: LatLng(latitude, longitude), initialZoom: 14.0), children: [TileLayer(urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", subdomains: ['a', 'b', 'c', 'd']), MarkerLayer(markers: [Marker(point: LatLng(latitude, longitude), child: Icon(Icons.location_on_rounded, color: Colors.redAccent, size: 30))])])))),
                 SizedBox(height: 12),
                 SizedBox(width: double.infinity, height: 36, child: ElevatedButton.icon(onPressed: _openMap, icon: Icon(Icons.open_in_new_rounded, size: 14, color: Colors.black), label: Text("VIEW ON MAP", style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold)), style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent))),
                 Align(alignment: Alignment.bottomRight, child: Text("${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}", style: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.5), fontSize: 9))),

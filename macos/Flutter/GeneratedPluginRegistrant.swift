@@ -13,7 +13,6 @@ import flutter_inappwebview_macos
 import flutter_secure_storage_macos
 import flutter_video_thumbnail_plus
 import flutter_webrtc
-import geocoding_darwin
 import geolocator_apple
 import open_file_mac
 import package_info_plus
@@ -33,7 +32,6 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   FlutterSecureStoragePlugin.register(with: registry.registrar(forPlugin: "FlutterSecureStoragePlugin"))
   FlutterVideoThumbnailPlusPlugin.register(with: registry.registrar(forPlugin: "FlutterVideoThumbnailPlusPlugin"))
   FlutterWebRTCPlugin.register(with: registry.registrar(forPlugin: "FlutterWebRTCPlugin"))
-  GeocodingDarwinPlugin.register(with: registry.registrar(forPlugin: "GeocodingDarwinPlugin"))
   GeolocatorPlugin.register(with: registry.registrar(forPlugin: "GeolocatorPlugin"))
   OpenFilePlugin.register(with: registry.registrar(forPlugin: "OpenFilePlugin"))
   FPPPackageInfoPlusPlugin.register(with: registry.registrar(forPlugin: "FPPPackageInfoPlusPlugin"))

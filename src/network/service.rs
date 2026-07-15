@@ -38,8 +38,10 @@ pub struct NetworkService {
     pub(crate) relay_reservations: HashSet<PeerId>,
     pub(crate) relay_listeners: HashMap<ListenerId, PeerId>,
     pub(crate) relay_dial_limiter: HashMap<PeerId, (Instant, u32)>, // (last_attempt, failure_count)
+    pub(crate) last_file_chunk_dial: HashMap<PeerId, Instant>,     // Phase 3.4: file chunk dial cooldown
     pub(crate) outbound_tracker: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
     pub(crate) peer_supports_v2: HashSet<PeerId>,
+    pub(crate) outbound_tracker_v2: HashMap<libp2p::request_response::OutboundRequestId, (PeerId, SignalingPayload)>,
     pub(crate) inflight_requests: HashMap<PeerId, u32>,
     pub(crate) liveness_interval_secs: u64,
     pub(crate) downloads_dir: String,
@@ -61,13 +63,18 @@ pub struct NetworkService {
     pub(crate) intro_claw: crate::intro_claw::IntroClawService,
     pub(crate) heal_rate_limiter: HashMap<PeerId, Instant>,
     pub(crate) pending_requester_static_keys: HashMap<String, Vec<u8>>,
+    pub(crate) introclaw_command_log: Vec<(Instant, String)>,
+    /// Pending ACKs to be batched: peer_id -> Vec<(msg_id, status)>
+    pub(crate) pending_acks: HashMap<PeerId, Vec<(String, u8)>>,
     /// Peers discovered via mDNS (local network)
     pub(crate) mdns_peers: HashSet<PeerId>,
     /// Deduplication: recently seen group message IDs to prevent duplicate event dispatch
     pub(crate) seen_group_messages: HashSet<String>,
+    /// Last time ACKs were flushed
+    pub(crate) last_ack_flush: Instant,
     pub(crate) rbn_latencies: Arc<RwLock<HashMap<PeerId, u128>>>,
     pub(crate) pending_manual_rbns: Arc<RwLock<HashMap<Multiaddr, String>>>,
-    /// Verified RBNs trusted for relay routing.
+    /// Verified RBNs trusted for persistent mailbox storage.
     /// Populated from bootstrap_nodes (hardcoded) and future Solana registry.
     pub(crate) verified_rbns: HashSet<PeerId>,
     /// Chat syncs currently in progress (chat_id -> timestamp when sync started)
@@ -83,11 +90,6 @@ pub struct NetworkService {
     pub(crate) last_relay_reservation_attempt: Instant,
     /// Per-RBN push token registration timestamps (rate-limit to prevent flooding on Identify)
     pub(crate) last_token_registration: HashMap<PeerId, Instant>,
-    /// Tracks the duration since pending_messages became non-empty
-    pub(crate) pending_since: Option<Instant>,
-    /// Tracks recently flushed message IDs per peer to prevent duplicate sends on circuit reconnect.
-    /// Entries older than 60s are pruned on each flush cycle.
-    pub(crate) recently_flushed: HashMap<PeerId, (Instant, HashSet<String>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -107,7 +109,6 @@ pub struct IncomingTransfer {
     pub(crate) providers: Vec<PeerId>,
     pub(crate) start_time: Instant,
     pub(crate) last_update: Instant,
-    pub(crate) last_retry: Instant,
     pub(crate) is_relayed: bool,
     pub(crate) group_id: Option<String>,
     pub(crate) next_pull_idx: u32,

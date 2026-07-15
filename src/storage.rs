@@ -173,6 +173,20 @@ impl StorageService {
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_messages_peer_time ON messages (peer_id, timestamp DESC);
+            CREATE TABLE IF NOT EXISTS mailbox_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient_hash BLOB NOT NULL,
+                sender_peer_id TEXT NOT NULL,
+                encrypted_payload BLOB NOT NULL,
+                ttl_expiry INTEGER NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_mailbox_recipient ON mailbox_messages (recipient_hash);
+            CREATE INDEX IF NOT EXISTS idx_mailbox_ttl ON mailbox_messages (ttl_expiry);
+            CREATE TABLE IF NOT EXISTS mailbox_stats (
+                date TEXT PRIMARY KEY,
+                storage_bytes_seconds INTEGER DEFAULT 0
+            );
             CREATE TABLE IF NOT EXISTS crypto_sessions (
                 session_id TEXT PRIMARY KEY,
                 data BLOB NOT NULL,
@@ -326,6 +340,14 @@ impl StorageService {
             );
             CREATE INDEX IF NOT EXISTS idx_pending_chunks_peer ON pending_file_chunks(peer_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_pending_chunks_transfer ON pending_file_chunks(transfer_id, chunk_index);"
+        )?;
+
+        // Cleared chats — tracks when a chat was cleared to prevent mailbox re-delivery of old messages
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS cleared_chats (
+                peer_id TEXT PRIMARY KEY,
+                cleared_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );"
         )?;
 
         // Notes table
@@ -484,7 +506,6 @@ impl StorageService {
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS deleted_groups (group_id TEXT PRIMARY KEY, deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP)", []);
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS push_tokens (peer_id TEXT PRIMARY KEY, device_type TEXT NOT NULL, push_token TEXT NOT NULL, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP)", []);
         let _ = conn.execute("CREATE TABLE IF NOT EXISTS message_reactions (id INTEGER PRIMARY KEY AUTOINCREMENT, msg_id TEXT NOT NULL, sender_id TEXT NOT NULL, emoji TEXT NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(msg_id, sender_id))", []);
-        let _ = conn.execute("CREATE TABLE IF NOT EXISTS rbn_cache (peer_id TEXT PRIMARY KEY, address TEXT NOT NULL, last_active INTEGER DEFAULT 0)", []);
         let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_reactions_msg ON message_reactions (msg_id)", []);
         let _ = conn.execute("ALTER TABLE contacts ADD COLUMN retention_hours INTEGER DEFAULT 0", []);
         let _ = conn.execute("ALTER TABLE groups ADD COLUMN retention_hours INTEGER DEFAULT 0", []);
@@ -506,27 +527,10 @@ impl StorageService {
             )",
             [],
         );
-        let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS outbox (
-                msg_id TEXT PRIMARY KEY,
-                recipient_id TEXT NOT NULL,
-                payload BLOB NOT NULL,
-                status INTEGER NOT NULL,
-                created_at INTEGER NOT NULL,
-                attempts INTEGER DEFAULT 0,
-                last_attempt INTEGER DEFAULT 0,
-                group_id TEXT
-            )",
-            [],
-        );
-        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_outbox_recipient ON outbox(recipient_id, status)", []);
 
-        // Database Healing: Ensure that existing contacts who are NOT actual RBNs 
-        // are not incorrectly hidden due to the legacy is_anchor_capable=1 bug.
+        // Clean up bootstrap/RBN nodes from contacts — system infrastructure, not user contacts
         let _ = conn.execute(
-            "UPDATE contacts SET is_anchor_capable = 0 
-             WHERE peer_id != '12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a' 
-             AND (global_name NOT LIKE 'RBN-%' OR global_name IS NULL)",
+            "DELETE FROM contacts WHERE peer_id IN ('12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a')",
             [],
         );
 
@@ -770,6 +774,13 @@ impl StorageService {
         Ok(())
     }
 
+    /// Derives a truncated hash of a PeerId for zero-knowledge mailbox indexing.
+    fn hash_peer_id(peer_id: &libp2p::PeerId) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(peer_id.to_bytes());
+        hasher.finalize()[..16].to_vec()
+    }
+
     /// Logs a relay event to the database.
     pub fn log_reward(&self, bytes: u64) -> Result<()> {
         let conn = self.conn.lock();
@@ -930,9 +941,12 @@ impl StorageService {
     pub fn delete_contact(&self, peer_id: &str) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM contacts WHERE peer_id = ?1", params![peer_id])?;
-        // Also clean up any cached session and messages
+        // Also clean up any cached session, mailbox, and messages
         conn.execute("DELETE FROM session_cache WHERE peer_id = ?1", params![peer_id])?;
         conn.execute("DELETE FROM messages WHERE peer_id = ?1", params![peer_id])?;
+
+        let recipient_hash = Self::hash_peer_id(&peer_id.parse().unwrap_or(libp2p::PeerId::random()));
+        conn.execute("DELETE FROM mailbox_messages WHERE recipient_hash = ?1", params![recipient_hash])?;
         drop(conn);
         // Invalidate contacts cache so get_all_contacts() reflects the deletion
         let mut cache = self.contacts_cache.lock();
@@ -942,10 +956,52 @@ impl StorageService {
         Ok(())
     }
 
-    /// Removes all messages for a specific peer (Deletes chat history).
+    /// Removes all messages for a specific peer (Deletes chat history) and clears local mailbox entries.
     pub fn delete_chat(&self, peer_id: &str) -> Result<()> {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM messages WHERE peer_id = ?1", params![peer_id])?;
+        // Also clear local mailbox entries for this peer to prevent re-delivery
+        if let Ok(parsed) = peer_id.parse::<libp2p::PeerId>() {
+            let recipient_hash = Self::hash_peer_id(&parsed);
+            conn.execute("DELETE FROM mailbox_messages WHERE recipient_hash = ?1", params![recipient_hash])?;
+        }
+        // Record the clear timestamp to prevent mailbox drain from re-delivering old messages
+        conn.execute(
+            "INSERT OR REPLACE INTO cleared_chats (peer_id, cleared_at) VALUES (?1, CURRENT_TIMESTAMP)",
+            params![peer_id],
+        )?;
+        Ok(())
+    }
+
+    /// Check if a message should be skipped because the chat was cleared after it was sent.
+    pub fn should_skip_mailbox_message(&self, sender_peer_id: &str, msg_timestamp: i64) -> bool {
+        let conn = self.conn.lock();
+        let result = conn.query_row(
+            "SELECT cleared_at FROM cleared_chats WHERE peer_id = ?1",
+            params![sender_peer_id],
+            |row| row.get::<_, String>(0),
+        );
+        match result {
+            Ok(cleared_at_str) => {
+                // Parse the cleared_at timestamp and compare with message timestamp
+                if let Ok(cleared_dt) = chrono::NaiveDateTime::parse_from_str(&cleared_at_str, "%Y-%m-%d %H:%M:%S") {
+                    let cleared_ts = cleared_dt.and_utc().timestamp();
+                    msg_timestamp < cleared_ts
+                } else {
+                    false
+                }
+            }
+            Err(_) => false, // No clear record, don't skip
+        }
+    }
+
+    /// Clean up old cleared_chats entries (older than 7 days).
+    pub fn cleanup_cleared_chats(&self) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "DELETE FROM cleared_chats WHERE cleared_at < datetime('now', '-7 days')",
+            [],
+        )?;
         Ok(())
     }
 
@@ -964,6 +1020,7 @@ impl StorageService {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM contacts", [])?;
         conn.execute("DELETE FROM session_cache", [])?;
+        conn.execute("DELETE FROM mailbox_messages", [])?;
         drop(conn);
         // Invalidate contacts cache so get_all_contacts() reflects the deletion
         let mut cache = self.contacts_cache.lock();
@@ -986,7 +1043,7 @@ impl StorageService {
         }
 
         let conn = self.conn.lock();
-        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1 AND is_anchor_capable = 0")?;
+        let mut stmt = conn.prepare("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, retention_hours, handle, prestige_tier FROM contacts WHERE is_verified = 1")?;
         let rows = stmt.query_map([], |row| {
             let static_key_vec: Vec<u8> = row.get(2)?;
             let mut static_key = [0u8; 32];
@@ -1061,6 +1118,99 @@ impl StorageService {
         *cache = Some(CachedValue::new(nodes.clone(), ANCHOR_NODES_CACHE_TTL));
         
         Ok(nodes)
+    }
+
+    /// Stores a message for a peer that is currently offline (Anchor Service).
+    pub fn store_mailbox_payload(&self, recipient: &libp2p::PeerId, sender: &libp2p::PeerId, payload: Vec<u8>) -> Result<()> {
+        let conn = self.conn.lock();
+        let ttl_expiry = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs() + (7 * 24 * 60 * 60); // 7 days TTL
+
+        let recipient_hash = Self::hash_peer_id(recipient);
+
+        conn.execute(
+            "INSERT INTO mailbox_messages (recipient_hash, sender_peer_id, encrypted_payload, ttl_expiry) VALUES (?1, ?2, ?3, ?4)",
+            params![recipient_hash, sender.to_string(), payload, ttl_expiry],
+        )?;
+        Ok(())
+    }
+
+    /// Retrieves ALL mailbox messages hosted by this node, for handover to other nodes.
+    pub fn get_all_hosted_mailbox_messages(&self) -> Result<Vec<(String, String, Vec<u8>)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare("SELECT recipient_hash, sender_peer_id, encrypted_payload FROM mailbox_messages")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Vec<u8>>(2)?))
+        })?;
+        let mut messages = Vec::new();
+        for row in rows { messages.push(row?); }
+        Ok(messages)
+    }
+
+    /// Retrieves and removes a limited number of pending messages for a specific peer.
+    pub fn fetch_mailbox_payloads(&self, recipient: &libp2p::PeerId) -> Result<Vec<(String, Vec<u8>)>> {
+        let mut conn = self.conn.lock();
+        let tx = conn.transaction()?;
+        
+        let recipient_hash = Self::hash_peer_id(recipient);
+        let mut messages = Vec::new();
+        let mut row_ids = Vec::new();
+
+        {
+            // CRITICAL FIX: Limit to 4 messages to stay under 1MB libp2p limit (assuming ~250KB per chunk)
+            let mut stmt = tx.prepare("SELECT rowid, sender_peer_id, encrypted_payload FROM mailbox_messages WHERE recipient_hash = ?1 ORDER BY rowid ASC LIMIT 4")?;
+            let rows = stmt.query_map(params![recipient_hash], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Vec<u8>>(2)?))
+            })?;
+
+            for row in rows {
+                let (id, sender, payload) = row?;
+                row_ids.push(id);
+                messages.push((sender, payload));
+            }
+        }
+
+        for id in row_ids {
+            tx.execute("DELETE FROM mailbox_messages WHERE rowid = ?1", params![id])?;
+        }
+        tx.commit()?;
+        
+        Ok(messages)
+    }
+
+    /// Retrieves and removes all pending messages for a specific peer, formatted for network transmission.
+    pub fn drain_mailbox(&self, recipient: &libp2p::PeerId) -> Result<Vec<crate::network::MailboxMessage>> {
+        let payloads = self.fetch_mailbox_payloads(recipient)?;
+        Ok(payloads.into_iter().map(|(sender_id, payload)| {
+            crate::network::MailboxMessage { sender_id, payload }
+        }).collect())
+    }
+
+    /// Records mailbox storage usage (bytes-seconds) for the current day.
+    pub fn record_mailbox_storage(&self, bytes: u64) -> Result<()> {
+        let conn = self.conn.lock();
+        let date = crate::economy::daily_rewards::economy_today();
+        
+        conn.execute(
+            "INSERT INTO mailbox_stats (date, storage_bytes_seconds) 
+             VALUES (?1, ?2) 
+             ON CONFLICT(date) DO UPDATE SET 
+                storage_bytes_seconds = storage_bytes_seconds + excluded.storage_bytes_seconds",
+            params![date, bytes],
+        )?;
+        Ok(())
+    }
+
+    /// Purges expired mailbox messages (TTL Maintenance).
+    pub fn cleanup_expired_mailbox(&self) -> Result<usize> {
+        let conn = self.conn.lock();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+
+        let count = conn.execute("DELETE FROM mailbox_messages WHERE ttl_expiry < ?1", params![now])?;
+        Ok(count)
     }
 
     /// Retrieves the local profile (User's name, handle, avatar, and privacy mode).
@@ -2709,10 +2859,10 @@ impl StorageService {
             .any(|kw| query_lower.contains(kw));
 
         let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if is_generic {
-            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle, prestige_tier FROM contacts WHERE is_anchor_capable = 0 ORDER BY global_name ASC".to_string(), vec![])
+            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle, prestige_tier FROM contacts ORDER BY global_name ASC".to_string(), vec![])
         } else {
             let search_pattern = format!("%{}%", Self::escape_like(&query));
-            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle, prestige_tier FROM contacts WHERE is_anchor_capable = 0 AND (global_name LIKE ?1 OR local_alias LIKE ?1 OR handle LIKE ?1 OR peer_id LIKE ?1)".to_string(), vec![Box::new(search_pattern)])
+            ("SELECT peer_id, p2p_pubkey, static_key, solana_address, global_name, local_alias, avatar_base64, is_anchor_capable, handle, prestige_tier FROM contacts WHERE global_name LIKE ?1 OR local_alias LIKE ?1 OR handle LIKE ?1 OR peer_id LIKE ?1".to_string(), vec![Box::new(search_pattern)])
         };
 
         let mut stmt = conn.prepare(&sql)?;
@@ -3116,102 +3266,5 @@ impl StorageService {
             result.push(r?);
         }
         Ok(result)
-    }
-
-    /// Save or update an RBN coordinate entry in the database cache
-    pub fn save_rbn_cache(&self, peer_id: &str, address: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
-        conn.execute(
-            "INSERT INTO rbn_cache (peer_id, address, last_active) VALUES (?1, ?2, ?3) \
-             ON CONFLICT(peer_id) DO UPDATE SET address = excluded.address, last_active = excluded.last_active",
-            params![peer_id, address, now],
-        )?;
-        Ok(())
-    }
-
-    /// Fetch all cached RBN coordinates from the SQLite database
-    pub fn fetch_rbn_cache(&self) -> Result<Vec<(String, String)>> {
-        let conn = self.conn.lock();
-        let mut stmt = conn.prepare(
-            "SELECT peer_id, address FROM rbn_cache ORDER BY last_active DESC"
-        )?;
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })?;
-        let mut result = Vec::new();
-        for r in rows {
-            result.push(r?);
-        }
-        Ok(result)
-    }
-
-    /// Save a message payload to the local outbox table.
-    pub fn save_to_outbox(&self, msg_id: &str, recipient_id: &str, payload: &[u8], group_id: Option<&str>) -> Result<()> {
-        let conn = self.conn.lock();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
-        conn.execute(
-            "INSERT INTO outbox (msg_id, recipient_id, payload, status, created_at, attempts, last_attempt, group_id) \
-             VALUES (?1, ?2, ?3, 0, ?4, 0, 0, ?5) \
-             ON CONFLICT(msg_id) DO NOTHING",
-            params![msg_id, recipient_id, payload, now, group_id],
-        )?;
-        Ok(())
-    }
-
-    /// Fetch all pending (status = 0 or status = 1) outbox messages for a specific peer.
-    pub fn fetch_pending_outbox_for_peer(&self, recipient_id: &str) -> Result<Vec<(String, Vec<u8>, Option<String>)>> {
-        let conn = self.conn.lock();
-        let mut stmt = conn.prepare(
-            "SELECT msg_id, payload, group_id FROM outbox WHERE recipient_id = ?1 AND status < 2 ORDER BY created_at ASC"
-        )?;
-        let rows = stmt.query_map(params![recipient_id], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?, row.get::<_, Option<String>>(2)?))
-        })?;
-        let mut result = Vec::new();
-        for r in rows {
-            result.push(r?);
-        }
-        Ok(result)
-    }
-
-    /// Update the delivery status of an outbox message.
-    pub fn update_outbox_status(&self, msg_id: &str, status: i32) -> Result<()> {
-        let conn = self.conn.lock();
-        conn.execute(
-            "UPDATE outbox SET status = ?1 WHERE msg_id = ?2",
-            params![status, msg_id],
-        )?;
-        Ok(())
-    }
-
-    /// Increment attempts and update last_attempt timestamp for an outbox message.
-    pub fn increment_outbox_attempts(&self, msg_id: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
-        conn.execute(
-            "UPDATE outbox SET attempts = attempts + 1, last_attempt = ?1, status = 0 WHERE msg_id = ?2",
-            params![now, msg_id],
-        )?;
-        Ok(())
-    }
-
-    /// Delete a successfully delivered message from the outbox.
-    pub fn delete_from_outbox(&self, msg_id: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        conn.execute(
-            "DELETE FROM outbox WHERE msg_id = ?1",
-            params![msg_id],
-        )?;
-        Ok(())
     }
 }

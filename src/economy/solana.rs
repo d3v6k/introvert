@@ -8,7 +8,6 @@ use solana_sdk::{
 };
 use anyhow::{Result, anyhow};
 use std::str::FromStr;
-use zeroize::Zeroize;
 use serde_json::json;
 use base64::{Engine as _, engine::general_purpose};
 use std::sync::Arc;
@@ -23,25 +22,16 @@ pub struct SolanaIncentiveEngine {
     ipc_secret: [u8; 32],     // HMAC-SHA256 key loaded from /etc/introvert/ipc.secret
 }
 
-impl Drop for SolanaIncentiveEngine {
-    fn drop(&mut self) {
-        self.ipc_secret.zeroize();
-    }
-}
-
 impl SolanaIncentiveEngine {
     pub fn new(rpc_url: &str, treasury_pubkey: &str, treasury_api_url: &str) -> Result<Self> {
-        let ipc_secret = Self::load_ipc_secret().unwrap_or_else(|e| {
-            tracing::warn!("[Economy] IPC secret unavailable: {}. Treasury relay disabled.", e);
-            [0u8; 32]
-        });
+        let ipc_secret = Self::load_ipc_secret()?;
         Ok(Self {
             rpc_client: Arc::new(RpcClient::new_with_timeout(rpc_url.to_string(), std::time::Duration::from_secs(3))),
             http_client: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .unwrap_or_default(),
-            intr_mint: Pubkey::from_str("EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf")?,
+            intr_mint: Pubkey::from_str("FhKJjqpsCbymrk4Ntv5jFyZihHsAkW4Fb4fuJYBniydP")?,
             treasury_pubkey: Pubkey::from_str(treasury_pubkey)?,
             treasury_api_url: treasury_api_url.to_string(),
             ipc_secret,
@@ -67,8 +57,8 @@ impl SolanaIncentiveEngine {
                 Ok(secret)
             }
             Err(_) => {
-                tracing::warn!("[Economy] IPC secret not found at {} — treasury relay auth disabled", path.display());
-                Err(anyhow!("IPC secret file not found at {}", path.display()))
+                tracing::warn!("[Economy] IPC secret not found at {} — using dev fallback (treasury relay auth disabled)", path.display());
+                Ok([0u8; 32])
             }
         }
     }

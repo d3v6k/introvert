@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// INTR token mint address on Solana mainnet.
-const INTR_MINT: &str = "EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf";
+const INTR_MINT: &str = "FhKJjqpsCbymrk4Ntv5jFyZihHsAkW4Fb4fuJYBniydP";
 
 /// Token program and ATA program IDs.
 const TOKEN_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";

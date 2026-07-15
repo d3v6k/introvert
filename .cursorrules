@@ -1,0 +1,67 @@
+# Introvert Project — AI Context Rules
+
+## Network Lexicon
+
+### Swarm Marshal
+- **Location:** `introvert-token/` folder (off-chain administration tool)
+- **Role:** Local administration script runner and payload signer
+- **Keys:** Holds the Master Authority private key (`UUN1zBzL5g2TNGtHCVtJPUZNmMKfFrW8odwLPb4jFxk`) to execute `register_community_rbn` on the Anchor program
+- **Network posture:** Zero open inbound ports. Works purely via outbound Solana RPC calls
+- **Usage:** Runs on demand to promote handle entries to community RBN status by signing scoped Ed25519 proofs and submitting authority-gated transactions
+- **NOT a daemon.** Does not participate in the libp2p mesh, does not relay traffic, does not store mailboxes
+
+### RBN Daemon / Workers
+- **Location:** `for_linux/src/network/mod.rs` (on-chain-registered relay node)
+- **Role:** Always-on libp2p mesh relay that handles peer connections, mailbox storage, file chunking, and relay circuits
+- **Network posture:** Listens on public ports (443/tcp, 443/udp/quic, 80/tcp fallback)
+- **Background tasks:** `proactive_ip_monitor_worker` (1h IP check / 6h on-chain heartbeat), peer reaper, mailbox cleanup, message pruning
+- **NOT the Swarm Marshal.** The daemon uses its own operator keypair derived from the master seed, not the Master Authority key
+
+### Key Distinction
+| Property | Swarm Marshal | RBN Daemon |
+|----------|--------------|------------|
+| Runs in | `introvert-token/` | `for_linux/` |
+| Lifecycle | On-demand script | Always-on daemon |
+| Inbound ports | None | 443, 80 |
+| Signs with | Master Authority key | Operator keypair (seed-derived) |
+| Calls | `register_community_rbn` | `update_rbn_routing` (via treasury) |
+| Promotes RBNs | Yes (authority gate) | No (only updates IP) |
+
+## Anchor Program (On-Chain)
+
+- **Program ID:** `FeQNoPnPvvaPKo2Hg4u1c2beSx9xWhQgEs1qVyTjSvrW`
+- **Source:** `solana_program/programs/introvert_handle_registry/src/lib.rs`
+- **Instructions:** `initialize`, `claim_handle`, `update_rbn_routing`, `submit_onboarding_intent`, `register_community_rbn`
+- **Security model:** `claim_handle` sets `verified=false` and `is_community_rbn=false`. Only `register_community_rbn` (Master Authority gated) can promote entries. Ed25519 signature scope: `owner_wallet || handle || peer_id || ip_address`.
+
+### Onboarding Intent Pipeline
+- **Flow:** Operator → `submit_onboarding_intent` (PDA created, operator pays rent) → Swarm Marshal polls → test-dials → `register_community_rbn` (PDA closed, rent returned)
+- **OnboardingIntent PDA:** Seeds `[b"onboarding-intent", handle_entry.key()]`. Holds `peer_id`, `ip_address`, `signature_bytes`, `target_wallet`.
+- **Swarm Marshal script:** `introvert-token/src/marshal_polling.rs` — autonomous hourly loop, outbound-only, sweeps chain for intents, test-dials, executes registration.
+- **Lifecycle:** Intent PDA is created by the operator, closed atomically by `register_community_rbn`. Rent is returned to `target_wallet` on close.
+
+## Client-Side Bootstrap
+
+- **Persistent history list:** `src/network/config.rs` → `get_persistent_rbn_history_list()`
+- **Seed root:** `12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a` at `47.89.252.80`
+- **Registry validator:** `src/network/mod.rs` → `background_registry_validator` — mandatory test-dial with `/p2p/<PeerId>` binding before trusting any on-chain entry
+- **Verified set:** `verified_rbns` (mailbox + relay trust) updated via `AddVerifiedRbn` command after cryptographic test-dial passes
+
+## Token Address Directory
+- **Full reference:** `Docs/TOKEN_ADDRESS_DIRECTORY.md` (also at `/Users/dev/Documents/introvert-token/TOKEN_ADDRESS_DIRECTORY.md`)
+- **Deployer:** `2RhPjPgttAHZe5cEGdsZ4hLyznEQBKVXiC1T36MTZyWj` — 1.51 SOL (one-time)
+- **Production Treasury:** `DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm` — +0.5 SOL (Alibaba hot wallet)
+- **Master Authority:** `UUN1zBzL5g2TNGtHCVtJPUZNmMKfFrW8odwLPb4jFxk` — +0.05 SOL (Swarm Marshal)
+- **Escrow Vault:** `9jauyKiimh6SBnpoRXcNXiLXZKSnN4h2gWKoqMcG4zHy` — passive PDA, no funding
+- **INTR Mint:** `EAXT8h2qTtS5RPfAPX3qpbn6b99bqKfNwLKyqZp9ZZPf`
+
+## File Transfer & Relay Routing Rules
+
+### 1. Relay Reservation Lifetime & Desync Prevention
+- **Rule:** When the RBN or anchor connection drops completely, always clear the RBN from `self.relay_reservations` and `self.relay_listeners` immediately in the `ConnectionClosed` handler.
+- **Why:** Bypassing this cleanup leaves ghost entries in `self.relay_reservations`. Upon reconnection, the client will skip requesting a new reservation, leaving it stuck forever in status `4` (CONNECTING).
+
+### 2. Point-to-Point Chunk Routing
+- **Rule:** File chunk signaling payloads (`SignalingPayload::FileChunk` and `SignalingPayload::FileChunkRequest`) must NEVER be sent to the RBN peer ID (`rbn_id`).
+- **Why:** Standard RBNs run as transport-level circuit relays and do not run application-layer routing for file transfers. Since file chunk payloads lack a target peer ID wrapper field, the RBN cannot forward them and will drop them silently.
+- **Routing:** Chunks/requests must always be buffered in RAM/DB until `is_connected(&recipient_id)` is true, and then sent directly to the destination peer's PeerId over the circuit connection. Do not use bypass routing blocks that send to `rbn_id`.

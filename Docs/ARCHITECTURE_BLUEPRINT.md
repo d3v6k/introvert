@@ -20,26 +20,25 @@ The frontend handles user interaction and presentation:
 - **Main Shell (`lib/src/ui/main_shell.dart`):** Handles UI loops and serves as the presentation entry point.
 - **Sovereign Local Moderation:** To remain fully compliant with Apple and Google User-Generated Content (UGC) regulations without engineering a central censorship master-key, the client manages a localized block list inside SQLCipher. When a user blocks an offender, Flutter instructs the Rust core to drop all incoming Gossipsub frames from that specific `PeerId`.
 
-### C. Sovereign P2P Delivery & Swarm Seeding System
-Messages and files flow through a decentralized sovereign pipeline, removing server-side storage entirely:
-1. **Direct P2P** — WebRTC Data Channel or direct libp2p request-response (256KB chunks).
-2. **Relay Circuit** — Relayed libp2p request-response through RBN (64KB chunks). RBNs act solely as relays and NAT-traversal coordinators.
-3. **Sender Outbox Persistence** — Pending messages and file chunks are persisted locally in the sender's SQLite `outbox` table. Messages are never stored on RBNs.
-4. **Presence-Driven Delivery** — Edge nodes track peer connectivity. The sender's outbox is flushed immediately when a direct or relay connection is established.
-5. **Two-Way P2P File Handshake** — Transfers require pre-transfer proposal/acceptance (`FileTransferProposal` / `FileTransferAccept`) and post-transfer SHA-256 validation (`FileTransferVerify` / `FileTransferCompleteAck`).
-6. **Cooperative Swarm Seeding** — Completed peers automatically register as providers in Kademlia and seed chunks to other group members, distributing bandwidth.
+### C. Delivery Confirmation System
+Messages flow through a 4-tier delivery pipeline with end-to-end confirmation:
+1. **Direct P2P** — WebRTC Data Channel or libp2p request-response (256KB chunks)
+2. **Relay Circuit** — libp2p circuit relay through RBN (64KB chunks)
+3. **Anchor Mailbox** — Persistent storage on verified RBN nodes
+4. **RAM Buffer** — Pending messages flushed on circuit establishment
 
 **Message Status Flow:**
-- Status 0 (Sent): Message created locally, stored in the sender's `outbox`.
-- Status 1 (Delivered): Recipient's node processed the message and sent an E2E ACK, deleting it from Alice's outbox. Displays double grey tick.
-- Status 2 (Read): Recipient opened the chat, double blue tick.
-- Status 3 (In Mailbox): Deprecated/Removed (RBN mailboxes eliminated).
+- Status 0 (Sent): Message created locally, single tick
+- Status 3 (In Mailbox): Anchor confirmed storage via `MailboxStored` ACK, clock icon
+- Status 1 (Delivered): Recipient's node processed the message, double grey tick
+- Status 2 (Read): Recipient opened the chat, double blue tick
 
-**File Integrity & Resiliency:**
-- Hybrid Manifests: High-level `Batch Manifest` groups files for user approval; low-level `Per-File Manifest` dictates chunks, sizes, and hashes for independent pulling.
-- `store_message_if_new` (INSERT OR IGNORE) prevents sync from overwriting current messages.
-- File chunks are persisted in the local SQLite DB to survive app restarts.
-- Stale transfer requests are capped in RAM (max 8 concurrent requests per transfer) to prevent congestion collapse.
+**Mailbox Integrity:**
+- `MailboxStored` ACK confirms anchor storage before recipient delivery
+- `store_message_if_new` (INSERT OR IGNORE) prevents sync from overwriting current messages
+- `verified_rbns` filter ensures only trusted RBNs receive mailbox payloads
+- File messages excluded from chat sync to prevent metadata corruption
+- Stale `FileTransferComplete` ACKs are dropped if no active seeder exists
 
 ---
 

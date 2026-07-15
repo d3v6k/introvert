@@ -11,7 +11,9 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 
 class IntrovertService : Service() {
     private val CHANNEL_ID = "introvert_background"
@@ -86,7 +88,7 @@ class IntrovertService : Service() {
                 builder.setContentIntent(pendingIntent)
             }
 
-            startForeground(NOTIFICATION_ID, builder.build())
+            startForegroundCompat(NOTIFICATION_ID, builder.build())
         } catch (e: Exception) {
             Log.e("IntrovertService", "startForeground failed: ${e.message}", e)
             // Last resort: try with absolute minimal notification
@@ -95,10 +97,23 @@ class IntrovertService : Service() {
                     .setContentTitle("Introvert")
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .build()
-                startForeground(NOTIFICATION_ID, fallback)
+                startForegroundCompat(NOTIFICATION_ID, fallback)
             } catch (e2: Exception) {
                 Log.e("IntrovertService", "Fallback startForeground also failed: ${e2.message}", e2)
             }
+        }
+    }
+
+    private fun startForegroundCompat(id: Int, notification: android.app.Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceCompat.startForeground(
+                this,
+                id,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } else {
+            startForeground(id, notification)
         }
     }
 

@@ -58,9 +58,6 @@ PODS:
   - flutter_webrtc (0.14.0):
     - Flutter
     - WebRTC-SDK (= 125.6422.07)
-  - geocoding_darwin (0.0.1):
-    - Flutter
-    - FlutterMacOS
   - geolocator_apple (1.2.0):
     - Flutter
     - FlutterMacOS
@@ -113,7 +110,6 @@ DEPENDENCIES:
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
   - flutter_video_thumbnail_plus (from `.symlinks/plugins/flutter_video_thumbnail_plus/ios`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
-  - geocoding_darwin (from `.symlinks/plugins/geocoding_darwin/darwin`)
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - open_file_ios (from `.symlinks/plugins/open_file_ios/ios`)
@@ -155,8 +151,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_video_thumbnail_plus/ios"
   flutter_webrtc:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
-  geocoding_darwin:
-    :path: ".symlinks/plugins/geocoding_darwin/darwin"
   geolocator_apple:
     :path: ".symlinks/plugins/geolocator_apple/darwin"
   image_picker_ios:
@@ -191,7 +185,6 @@ SPEC CHECKSUMS:
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
   flutter_video_thumbnail_plus: 11624c05e788b4dac5d434e605f68762e44dd23d
   flutter_webrtc: fd0d3bdef8766a0736dbbe2e5b7e85f1f3c52117
-  geocoding_darwin: 968545604e6896deeef55517d53a81b3b9801971
   geolocator_apple: ab36aa0e8b7d7a2d7639b3b4e48308394e8cef5e
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8

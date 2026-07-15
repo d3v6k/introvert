@@ -93,11 +93,3 @@ introvertd
 android/app/src/main/jniLibs/**/*.so
 firebase/*adminsdk*.json
 Introvert-macOS.zip
-
-# MiMoCode agent plans
-.mimocode/
-
-# Operational scripts and configs
-.cursorrules
-release.sh
-scripts/backup.sh

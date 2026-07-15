@@ -921,24 +921,23 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         );
       }
       if (content.startsWith("[LOCATION]:")) {
-        try {
-          final parts = content.substring(11).split(',');
-          if (parts.length >= 2) {
-            final lat = double.tryParse(parts[0].trim());
-            final lng = double.tryParse(parts[1].trim());
-            if (lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-              return LocationBubble(
-                latitude: lat,
-                longitude: lng,
-                isMe: isMe,
-                timestamp: ts,
-                reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
-                msgId: msgIdVal,
-                onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
-              );
-            }
+        final locData = content.substring(11);
+        final commaIdx = locData.indexOf(',');
+        if (commaIdx > 0) {
+          final lat = double.tryParse(locData.substring(0, commaIdx));
+          final lng = double.tryParse(locData.substring(commaIdx + 1));
+          if (lat != null && lng != null) {
+            return LocationBubble(
+              latitude: lat,
+              longitude: lng,
+              isMe: isMe,
+              timestamp: ts,
+              reactions: msgIdVal.isNotEmpty ? (_reactionsCache[msgIdVal] ?? []) : null,
+              msgId: msgIdVal,
+              onReactionTap: msgIdVal.isNotEmpty ? () => _showReactionDetails(msgIdVal, (_reactionsCache[msgIdVal] ?? [])) : null,
+            );
           }
-        } catch (_) {}
+        }
       }
       if (content.startsWith("[NOTE]:")) {
         try {
@@ -2313,14 +2312,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         _client.sendGroupMessage(widget.groupId, text);
         _loadMessages();
       }
-    } catch (e) {
-      debugPrint("Location share error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Unable to share location: ${e.toString()}")),
-        );
-      }
-    }
+    } catch (_) {}
   }
 
   Widget _buildAttachmentItem({

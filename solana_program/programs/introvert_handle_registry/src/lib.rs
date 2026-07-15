@@ -9,7 +9,7 @@ const MAX_IP_ADDRESS_LEN: usize = 64;
 
 /// Immutable protocol Master Authority — the only pubkey that can promote
 /// entries to community RBN status. Hardcoded to prevent governance drift.
-const MASTER_AUTHORITY: &str = "UUN1zBzL5g2TNGtHCVtJPUZNmMKfFrW8odwLPb4jFxk";
+const MASTER_AUTHORITY: &str = "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm";
 
 /// Minimum IP address length (e.g., "1.2.3.4:80")
 const MIN_IP_ADDRESS_LEN: usize = 9;

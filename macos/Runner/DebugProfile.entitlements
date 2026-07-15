@@ -12,8 +12,6 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
-	<key>com.apple.security.personal-information.location</key>
-	<true/>
 	<key>com.apple.security.keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)com.example.introvertTests</string>

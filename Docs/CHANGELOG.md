@@ -2,50 +2,6 @@
 
 All notable changes to Introvert will be documented in this file.
 
-## [0.33.0] - 2026-07-10 — IntroClaw File Transfer Intelligence & FFI Dedup Guard
-
-### Milestone
-**Designed and implemented full IntroClaw File Transfer Intelligence integration. Replaced hardcoded pacing, size, and pipeline constants with a unified, network-adaptive TransferPolicy. Resolved FFI start_pull concurrency duplicate bug with a global registry, added local drive hash check to skip duplicate pulls, and resolved relay circuit drops using active health scoring and proactive pre-warming.**
-
-### Added
-- **FFI start_pull Dedup Guard**: Declared a global `ACTIVE_PULLS` registry to prevent concurrent duplicate download processes.
-- **Drive Verification Check**: Automatically checks file hashes against local drive before initiating pulls, skipping and acknowledging already completed files.
-- **Relay Circuit Health Scorer**: IntroClaw now tracks circuit drops and ages. If a relay thrashes, it triggers a `ForceMeshRefresh`.
-- **Transfer Circuit Pre-warmer**: Proactively dials seeder relay paths as soon as transfers start, bypassing rate limiters on active seeders.
-- **Stall Predictor**: Tracks EMA of chunk receipt intervals to predict stalls and trigger recovery in 3 seconds (down from 8).
-- **Network-Adaptive Transfer Policy**: dynamically scales chunk sizes, pipeline depth, and pacing delays according to WiFi, cellular, VPN, VoIP active calls, and battery saver mode.
-
-### Fixed
-- **Relay Flush Race Condition**: Removed premature pending message flushes; scheduled post-dial delay flushes and secondary watchdog ticks.
-- **Zero-Chunk watchdog stall**: Enriched tick contexts with active transfers and seeder states to trigger pulls on startup.
-- **Infinite Watchdog Retry Loop**: Decoupled watchdog retries from stale eviction checks by adding a separate `last_retry` tracking field, allowing inactive/offline transfers to correctly age out and clean up from memory.
-- **Group Info Validation Guard**: Rejects and ignores incoming group file transfer manifests early if the group info is not present locally or if the secret key has not yet synced, avoiding memory leak buildup.
-
-### Verified
-- macOS, Android, and iOS native cores fully compiled and build-packaged. यूनिट परीक्षण complete. unit tests passing. unit tests pass.
-
----
-
-## [0.32.0] - 2026-07-10 — File Transfer Performance Tuning & Relay Push Model
-
-### Milestone
-**Aggressive performance tuning for cross-network file transfers. Increased relay chunk size from 64KB to 256KB, unified in-flight limits at 8, reduced relay push pacing from 250ms to 50ms, and enabled push model for relay connections (was pull-only). Expected ~20x relay push throughput improvement. Discovered relay instability prevents verification.**
-
-### Changed
-- **Relay chunk size**: 64KB → 256KB for both relay and direct connections
-- **In-flight limit**: Unified at 8 (was 4 for relay, 8 for direct)
-- **Relay push pacing**: 250ms → 50ms between chunks
-- **Relay initial delay**: 2000ms → 500ms before first chunk
-- **Receiver pull pacing**: 50ms → 20ms between `FileChunkRequest` sends
-- **Relay push model**: Removed pull-only early return — relay connections now push chunks directly
-
-### Known Issues
-- **Relay circuit instability**: RBN relay drops within 13 seconds of establishment, preventing file transfers from completing
-- **Flush race condition**: `ReservationReqAccepted` flushes `pending_messages` before circuit is established
-- **Stall watchdog gap**: Watchdog not firing for transfers created while relay is down
-
----
-
 ## [0.31.0] - 2026-07-09 — Payout Pipeline Hardening & Automated Epoch Recovery
 
 ### Milestone

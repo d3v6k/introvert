@@ -28,7 +28,5 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app requires access to your location to share it with contacts.</string>
 </dict>
 </plist>

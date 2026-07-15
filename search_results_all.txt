@@ -1,0 +1,12 @@
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/.cursorrules
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/solana_program/programs/introvert_handle_registry/src/lib.rs
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/Docs/TOKEN_ADDRESS_DIRECTORY.md
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/introvert-token/src/marshal_polling.rs
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/.cursorrules
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/solana_program/programs/introvert_handle_registry/src/lib.rs
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/Docs/TOKEN_ADDRESS_DIRECTORY.md
+[FOUND TEXT] Reference in: /Users/dev/Development/introvert/introvert-token/src/marshal_polling.rs
+[FOUND TEXT] Reference in: /Users/dev/Documents/introvert-token/intorvert_ledger_3rd_july_2026.docx
+[FOUND TEXT] Reference in: /Users/dev/Documents/introvert-token/TOKEN_ADDRESS_DIRECTORY.md
+[FOUND TEXT] Reference in: /Users/dev/Documents/introvert-token/Query_sh_script/query_balances.sh
+[STATUS] Scan finished.

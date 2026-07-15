@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'introvert_client.dart';
+import '../services/background_sync_service.dart';
 
 /// Thin Dart wrapper around the native `introvert/alerts` MethodChannel.
 ///
@@ -51,7 +52,8 @@ class AlertService {
           tryRegisterPendingToken();
           break;
         case 'onWakeup':
-          debugPrint("🔔 AlertService: Background Wakeup!");
+          debugPrint("🔔 AlertService: Background Wakeup! Triggering P2P Fetch...");
+          IntrovertClient().fetchMailbox();
           break;
         case 'onPushNotification':
           final args = call.arguments as Map<dynamic, dynamic>;
@@ -67,6 +69,7 @@ class AlertService {
           }
           
           debugPrint("🔔 AlertService: Push notification received: chat=$openChat, group=$openGroup, call=$incomingCall");
+          IntrovertClient().fetchMailbox();
           break;
       }
     });
@@ -85,6 +88,7 @@ class AlertService {
       debugPrint("🔔 AlertService: Push token successfully registered with RBN.");
       _hasRegisteredToken = true;
       _pendingFcmToken = null;
+      BackgroundSyncService.instance.updatePushAvailability(true);
     } catch (e) {
       debugPrint("🔔 AlertService: Engine not ready yet to register push token: $e");
     }

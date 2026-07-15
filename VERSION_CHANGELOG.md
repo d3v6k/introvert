@@ -25,7 +25,7 @@ _Stable version history with key changes. Updated at every stable backup._
 | **v46 (0.20.0)** | **2026-07-01** | **Security Hardening & UX Polish** |
 | **v49 (0.21.2)** | **2026-07-01** | **Cross-Network Delivery & Mailbox Integrity** | **Relay reservation full multiaddr fix** (MissingRelayAddr). **Mailbox replication to ALL verified RBNs**. **`verified_rbns` filter** (bootstrap nodes only). **`OutboundCircuitEstablished` flush** with rate limiter clear. **TransitFileChunk removed** — chunks via normal relay circuit. **64KB relay chunks restored** (was 256KB). **Relay dial simplified** (one RBN, early break). | **Caption dialog thumbnails** (Cancel/Send). **Status 3 clock icon** (In Mailbox). **Double thumbnail fix** (removed `_addSendingPlaceholder`). **Stale FileTransferComplete guard**. | **`MailboxStored` ACK** from anchor to sender. **`store_message_if_new`** (INSERT OR IGNORE) for sync. **File messages excluded from sync**. **Chat sync no longer overwrites** existing messages. **Retry undelivered messages** (60s threshold). | **Known issue**: cross-network file chunks need live relay circuit (no mailbox fallback). See DEBUG_DOCUMENT.md. |
 | **v50 (0.21.3)** | **2026-07-01** | **Delivery Fixes & System Hardening** | **`dial_relay_path` parameterized** (`for_file_chunk: bool`). **ALL RBNs for file chunks** (no early break). **Persistent file chunk queue** (`pending_file_chunks` SQLite table). **Relay hint optimization** (prioritize hinted RBN). **VPN stale reservation detection** (force-clear and re-dial). **DCUtR on InboundCircuitEstablished** (hole-punch attempt). **Gemini: Relay reservation three-tier fallback** (bootstrap_nodes → anchor_mappings → filtered listen_addrs; fixes VPC private IP leak). | **Gemini: File transfer bubble** — thumbnail suppression scoped to `_buildThumbnailWidget()` only; transfer card with progress/status/cancel always shown to receiver. | **`update_message_status_if_higher`** (monotonic transitions). **`sync_in_progress` timeout** (60s cleanup). **[FILE]: filter in sync** (defense in depth). **for_linux sender authorization** (ChatSyncResponse). **for_linux relay reservation fix** (RBN-only cleanup). | **Status downgrade protection** (all ACK handlers). **Data loss prevention** (defer chunk removal to FileTransferComplete). **sync_in_progress lockout fix** (remove on unauthorized). |
-| **v54 (0.28.0)** | **2026-07-04** | **VPN Resilience & Session Optimization** | **VPN Adaptive Pathing**: Isolate bootstrap nodes list to ONLY the tunnel loopback address when VPN is active, preventing dead dials to public RBNs from clogging the queue. **Queue Congestion Prevention**: Removed redundant carpet-bombing dial loops from `forward_to_mesh`'s fallback block. **Blacklist Cooldown Bypass**: Clears RBN blacklists on network switch, manual refresh, and tunnel activation to prevent stale blocks; removes connected RBNs from blacklist immediately. | **Active Chat Session Prioritization**: Flutter UI dynamically propagates chat session state; Rust engine bypasses cooldowns, aggressively punches direct holes (DCUtR) for relayed partners, and proactively heals offline targets on every tick. **Chat Screen Offline Sync**: Updates chat status to Offline when local node goes offline. **App Launch Warm-Up**: `onAppLaunch()` executes initial warm-up connection pass. | Monotonic status upgrades and RBN blacklisting protect mesh integrity. | No changes |
+| **v54 (0.28.0)** | **2026-07-04** | **VPN Resilience & Session Optimization** | **VPN Adaptive Pathing**: Isolate bootstrap nodes list to ONLY the tunnel loopback address (`127.0.0.1`) when VPN (type 5) is active, preventing dead dials to public RBNs from clogging the queue. **Solana Registry Bypass**: Disabled on-chain Solana registry queries entirely for Mainnet, falling back strictly to the hardcoded Alibaba RBN node (`47.89.252.80`). **Queue Congestion Prevention**: Removed redundant carpet-bombing dial loops from `forward_to_mesh`'s fallback block. **Blacklist Cooldown Bypass**: Clears RBN blacklists on network switch, manual refresh, and tunnel activation to prevent stale blocks; removes connected RBNs from blacklist immediately. **LAN Node Removal**: Cleaned Thinkpad RBN (`192.168.1.81`) from default configuration. | **Active Chat Session Prioritization**: Flutter UI dynamically propagates chat session state (`setActiveChat` / `setActiveGroupMembers`); Rust engine bypasses cooldowns, aggressively punches direct holes (DCUtR) for relayed partners, and proactively heals offline targets on every tick. **Chat Screen Offline Sync**: Updates chat status to Offline when local node goes offline. **App Launch Warm-Up**: `onAppLaunch()` executes initial warm-up connection pass. | Monotonic status upgrades and RBN blacklisting protect mesh integrity. | No changes |
 | **v56 (0.30.0)** | **2026-07-06** | **Sovereign Economy & Snappy Mesh** | **Connection State Cycler 15s Status Check Integration**: Evaluates ConnectionStateCycler on the 15-second status loop when IntroClaw is active instead of waiting for 5-minute ticks, achieving rapid (15–30s) connection drop recovery on all devices. | No changes | **Cryptographic Telemetry Authentication**: Telemetry envelopes signed with client-derived Ed25519 Solana keys and validated at the RBN libp2p entry point. Persistent storage of Raw Envelopes in encrypted SQLCipher database to survive restarts. | **Stage 1-3 Rewards Pipeline Implementation**: 13-metrics schema alignment between client and RBN. SQLite telemetry persistence and recovery. Midnight UTC cron task to trigger epoch clearing, calculate rewards with IQR outlier mitigation, sign with HMAC-SHA256, and dispatch claims to Solana daemon on port 9001. |
 | **v55 (0.29.0)** | **2026-07-06** | **Recovery, Drive, VPN & Notifications** | **VPN Tunnel Fix**: `ws://` port 80 fallback when VPN detected (bypasses TLS blocking). **VPN Bootstrap Isolation**: Tunnel-only on VPN. **VPN Relay Fix**: Removed `relay_reservations.clear()`. **ListenerClosed Fix**: Full multiaddr. **In-flight Limits**: relay=4/direct=8. **Anchor Relay Strategy**. **Undelivered Retry**. **Telemetry Pipeline**: 30-min interval. **9-Field Bridge**. | **Drive Rebuild**: 612-line folder manager with grouping, minimized view, Introvert Explained, list/grid toggle, multi-select, batch ops, breadcrumb, storage bar. **Messenger tabs** (6 web messengers). **FIFA themes**. **Notification Hardening**: 3-min cooldown (native + Dart), foreground suppression, sound-only when app open. **android libc++_shared.so** bundled. | **FFI**: 134 exports, 0 mismatches. **Drive FFI**: `drive_add_file_with_folder`, `drive_update_folder`. **Storage**: `folder` column, `drive_folders` table. **Backup**: `dd_mm_yy_time` naming. **Economy daemon** restored. | **IQR Anti-Gaming Filter**. **Deployed** to Alibaba RBN. **Full recovery** from GitHub source + v54 networking. |
 | v53 (0.23.0) | 2026-07-03 | Beta Stability | **FCM push fix** (`message_type`→`msg_type`). **Connection limit** 102→204. **Step 1 reconnect** (dials disconnected RBNs). **Group ACK** (>=1 not >=total). | **Messenger WebView** — login CSS fix, scroll fix. **CAMERA permission**. **Firebase key** regenerated. | Beta stability release. Cross-network verified. |
@@ -162,26 +162,51 @@ _Stable version history with key changes. Updated at every stable backup._
 - Git: main @ 24b75ab
 - Machine: devs-Mac-mini.local
 
-## Backup 09_07_26_1919 (2026-07-09 19:19)
-- Git: main @ e6d2240
+## Backup 14_07_26_1707 (2026-07-14 17:07)
+- Git: main @ 80c5445
 - Machine: devs-Mac-mini.local
 
-## Backup 09_07_26_1709 (2026-07-09 17:09)
-- Git: main @ 9bbb2ac
+## v0.34.0 — Cross-Network File Transfer & VPN Stability (2026-07-14)
+
+### Networking
+- **Gossipsub file transfer fallback** — File chunks and requests routed through per-transfer gossipsub topics (`file-transfer-{transfer_id}`) instead of request_response. Works for both direct and relayed connections.
+- **Gossipsub handler fix** — `file-transfer-*` topics bypass group membership check in gossipsub message handler.
+- **Initial chunk requests** — Receiver sends chunk requests immediately when `IncomingTransfer` is created (no longer waits for stall watchdog).
+- **RBN auto-subscribe** — RBN daemon subscribes to `file-transfer-*` gossipsub topics on first message, enabling cross-network file transfer relay.
+- **Select-loop fix** — Command channel prioritized over swarm events in `tokio::select!` with `biased;` keyword. Prevents `HandleIncomingPayload` starvation.
+- **VPN tunnel stability** — Increased tunnel stale thresholds: VPN 300s, MOBILE/WiFi 300s. VPN detection no longer resets working tunnels.
+- **Mobile data fix** — Tunnel kept active on mobile data (type=2). Carriers often block direct connections to RBN.
+- **RBN mailbox architecture preserved** — Jul 9 backup restored with mailbox system intact.
+
+### Android Stability
+- **Foreground service type** — `startForegroundCompat()` with `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` for API 29+.
+- **Background FGS exception** — `ForegroundServiceStartNotAllowedException` catch for API 31+.
+- **Battery optimization removed** — `requestBatteryOptimizationExemption()` removed (Google Play policy).
+- **FFI panic safety** — `ffi_catch!` macro wrapping all 170 extern "C" functions.
+- **Safe unwrap** — Replaced risky `.unwrap()` on `get_group()` with safe match.
+
+### Token
+- **V2 migration re-applied** — All client + RBN code updated with V2 mint `FhKJjqpsCbymrk4Ntv5jFyZihHsAkW4Fb4fuJYBniydP`.
+- **RBN contact removed** — DB cleanup + registry filter prevents RBN from appearing as user contact.
+
+### Infrastructure
+- **RBN deployed** — `introvertd` with mailbox + V2 + file-transfer gossipsub on Alibaba (47.89.252.80).
+- **Economy daemon** — Disabled (treasury needs SOL funding for circuit breaker).
+
+### Additional Fixes (2026-07-14 session)
+- **Networking architecture redesign** — 3-tier progression: Direct P2P → Relay → VPN Tunnel
+- **VPN detection removed** — `connectivity_plus` VPN detection had false positives. Removed from `connectivity_listener.dart` and `SetConnectivityType` handler.
+- **TLS→plaintext tunnel fallback** — Tunnel tries `wss://443` first, falls back to `ws://80` on failure.
+- **Relay circuit stability** — Don't remove `relay_reservations` on `ListenerClosed`/`ListenerError`.
+- **File transfer pacing** — 256KB chunks, 8 in-flight, 500ms initial delay (~10x throughput).
+- **Relay reservation timer** — Reduced from 30s to 10s for faster relay establishment.
+- **Command drain loop** — `try_recv()` drain before `tokio::select!` prevents HandleIncomingPayload starvation.
+- **Expert consultation document** — `Docs/NETWORK_ARCHITECTURE_EXPERT_CONSULTATION.md` created.
+
+## Backup 14_07_26_1926 (2026-07-14 19:26)
+- Git: main @ 80c5445
 - Machine: devs-Mac-mini.local
 
-## Backup 09_07_26_1710 (2026-07-09 17:10)
-- Git: main @ 9bbb2ac
-- Machine: devs-Mac-mini.local
-
-## Backup 09_07_26_1920 (2026-07-09 19:20)
-- Git: main @ e6d2240
-- Machine: devs-Mac-mini.local
-
-## Backup 10_07_26_1056 (2026-07-10 10:56)
-- Git: main @ f476ae0
-- Machine: devs-Mac-mini.local
-
-## Backup 10_07_26_1322 (2026-07-10 13:22)
-- Git: main @ f476ae0
+## Backup 15_07_26_0553 (2026-07-15 05:53)
+- Git: main @ 80c5445
 - Machine: devs-Mac-mini.local

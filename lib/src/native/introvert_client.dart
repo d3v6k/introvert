@@ -113,6 +113,9 @@ typedef IntrovertStorageGetMessagesPaginatedDart = FfiResult Function(Pointer<Ut
 typedef IntrovertEstablishSecureSessionC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertEstablishSecureSessionDart = FfiResult Function(Pointer<Utf8> peerId);
 
+typedef IntrovertFetchMailboxC = FfiResult Function();
+typedef IntrovertFetchMailboxDart = FfiResult Function();
+
 typedef IntrovertStartMediaStreamC = FfiResult Function(Pointer<Utf8> peerId, Uint8 mediaType);
 typedef IntrovertStartMediaStreamDart = FfiResult Function(Pointer<Utf8> peerId, int mediaType);
 
@@ -609,6 +612,7 @@ class IntrovertClient {
   late IntrovertStorageGetMessagesDart _getMessages;
   late IntrovertStorageGetMessagesPaginatedDart _getMessagesPaginated;
   late IntrovertEstablishSecureSessionDart _establishSecureSession;
+  late IntrovertFetchMailboxDart _fetchMailbox;
   late IntrovertStartMediaStreamDart _startMediaStream;
   late IntrovertStorageGetContactsDart _getContacts;
   late IntrovertDeleteContactDart _deleteContact;
@@ -1054,6 +1058,7 @@ class IntrovertClient {
       _getMessages = safeLookup('get_messages', () => _dylib.lookupFunction<IntrovertStorageGetMessagesC, IntrovertStorageGetMessagesDart>('introvert_storage_get_messages'), (p) => FfiResult.dummy);
       _getMessagesPaginated = safeLookup('get_messages_paginated', () => _dylib.lookupFunction<IntrovertStorageGetMessagesPaginatedC, IntrovertStorageGetMessagesPaginatedDart>('introvert_storage_get_messages_paginated'), (p, o, l) => FfiResult.dummy);
       _establishSecureSession = safeLookup('secure_session', () => _dylib.lookupFunction<IntrovertEstablishSecureSessionC, IntrovertEstablishSecureSessionDart>('introvert_network_establish_secure_session'), (p) => FfiResult.dummy);
+      _fetchMailbox = safeLookup('fetch_mailbox', () => _dylib.lookupFunction<IntrovertFetchMailboxC, IntrovertFetchMailboxDart>('introvert_network_fetch_mailbox'), () => FfiResult.dummy);
       _startMediaStream = safeLookup('media_stream', () => _dylib.lookupFunction<IntrovertStartMediaStreamC, IntrovertStartMediaStreamDart>('introvert_network_start_media_stream'), (p, t) => FfiResult.dummy);
       _getContacts = safeLookup('get_contacts', () => _dylib.lookupFunction<IntrovertStorageGetContactsC, IntrovertStorageGetContactsDart>('introvert_storage_get_contacts'), () => FfiResult.dummy);
       _deleteContact = safeLookup('delete_contact', () => _dylib.lookupFunction<IntrovertDeleteContactC, IntrovertDeleteContactDart>('introvert_storage_delete_contact'), (p) => FfiResult.dummy);
@@ -1817,6 +1822,7 @@ class IntrovertClient {
     });
   }
 
+  void fetchMailbox() => _handleFfiResult(_fetchMailbox(), context: "Fetch Mailbox");
   void startMediaStream(String id, int type) => using((Arena arena) => _handleFfiResult(_startMediaStream(id.toNativeUtf8(allocator: arena), type), context: "Media Stream"));
 
   void setAnchorMode(bool enabled) {

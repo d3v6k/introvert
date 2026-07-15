@@ -3,7 +3,6 @@ use anyhow::Result;
 use hkdf::Hkdf;
 use sha2::Sha256;
 use serde::{Serialize, Deserialize};
-use zeroize::Zeroize;
 
 /// The canonical identity package exchanged during the Magic Wormhole handshake.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,7 +14,7 @@ pub struct SovereignIdentity {
     pub global_name: Option<String>,
     pub local_alias: Option<String>,
     pub avatar_base64: Option<String>,
-    pub is_anchor_capable: bool, // Node supports relay/anchor services
+    pub is_anchor_capable: bool, // Node supports mailbox storage
     pub retention_seconds: u32,
     pub handle: Option<String>,
     pub prestige_tier: Option<u8>, // 0=Citizen, 1=Sentinel, 2=Silver, 3=Gold, 4=Platinum, 5=Catalyst, 6=Pulsar
@@ -27,15 +26,8 @@ pub struct NodeIdentity {
     pub seed: [u8; 32], // Stored for secure domain-separated derivation
 }
 
-impl Drop for NodeIdentity {
-    fn drop(&mut self) {
-        self.seed.zeroize();
-    }
-}
-
 impl NodeIdentity {
     /// Derives the libp2p identity (Keypair/PeerId) from a 32-byte master seed using HKDF-SHA256.
-    /// Salt is None — security relies on domain-separated context strings per RFC 5869.
     pub fn from_seed(seed: [u8; 32]) -> Result<Self> {
         let hk = Hkdf::<Sha256>::new(None, &seed);
         let mut okm = [0u8; 32];

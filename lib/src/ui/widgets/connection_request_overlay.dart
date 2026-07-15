@@ -55,10 +55,7 @@ class ConnectionRequestOverlay extends StatelessWidget {
                 Icon(Icons.person_add_rounded, color: accent, size: 28),
                 SizedBox(width: 12),
                 Flexible(
-                  child: Text(
-                    "CONNECTION REQUEST",
-                    style: TextStyle(color: accent, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-                  ),
+                  child: Text("CONNECTION REQUEST", style: TextStyle(color: accent, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 2), overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),

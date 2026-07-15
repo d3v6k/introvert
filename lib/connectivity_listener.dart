@@ -21,10 +21,9 @@ class _ConnectivityListenerState extends State<ConnectivityListener> {
     super.initState();
     final client = IntrovertClient();
     _subscription = Connectivity().onConnectivityChanged.listen((results) {
-      final hasVpn = results.contains(ConnectivityResult.vpn);
-      final result = hasVpn 
-          ? ConnectivityResult.vpn 
-          : (results.isNotEmpty ? results.first : ConnectivityResult.none);
+      // No VPN detection — connectivity_plus VPN detection has false positives.
+      // Let the resilience ladder handle tunnel activation (60s no peers → activate tunnel).
+      final result = results.isNotEmpty ? results.first : ConnectivityResult.none;
       // Inform native layer — no UI notifications here (handled by main_shell with rate limiting)
       client.setConnectivityType(result);
       if (result == ConnectivityResult.none) {
