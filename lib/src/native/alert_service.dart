@@ -28,6 +28,10 @@ class AlertService {
   // ── Foreground state (set by main_shell.dart) ─────────────────────────────
   static bool _isInForeground = false;
 
+  // ── Wakeup cooldown (30s) — breaks the FCM echo loop ─────────────────────
+  static DateTime? _lastWakeupTime;
+  static const Duration _wakeupCooldown = Duration(seconds: 30);
+
   static bool get hasRegisteredToken => _hasRegisteredToken;
 
   /// Called by main_shell.dart when app lifecycle changes.
@@ -52,6 +56,12 @@ class AlertService {
           tryRegisterPendingToken();
           break;
         case 'onWakeup':
+          // Cooldown: break the FCM echo loop (fetchMailbox → RBN sends push → onWakeup → fetchMailbox)
+          if (_lastWakeupTime != null && DateTime.now().difference(_lastWakeupTime!) < _wakeupCooldown) {
+            debugPrint("🔔 AlertService: Wakeup suppressed (30s cooldown — FCM echo loop breaker)");
+            break;
+          }
+          _lastWakeupTime = DateTime.now();
           debugPrint("🔔 AlertService: Background Wakeup! Triggering P2P Fetch...");
           IntrovertClient().setAppIdleState(false);
           IntrovertClient().fetchMailbox();
