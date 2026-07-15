@@ -253,6 +253,8 @@ impl NetworkService {
             consecutive_zero_peers_ticks: 0,
             last_relay_reservation_attempt: Instant::now() - Duration::from_secs(60), // allow first attempt immediately
             last_token_registration: HashMap::new(),
+            idle_mode: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            last_idle_log: Instant::now(),
         };
 
         // Sync to global RBN bootstrap list
@@ -578,9 +580,9 @@ impl NetworkService {
                         warn!("[Resilience] Cleaning up stale transfer: {} (no update in >5min)", id);
                         crate::dispatch_debug_log(&format!("[Resilience] Cleaning up stale transfer: {} (no update in >5min)", id));
                         self.incoming_transfers.remove(id);
-                        // Unsubscribe from transfer-specific gossipsub topic
                         let ft_topic = libp2p::gossipsub::IdentTopic::new(format!("file-transfer-{}", id));
                         let _ = self.swarm.behaviour_mut().gossipsub.unsubscribe(&ft_topic);
+                        let _ = self.storage.remove_pending_chunks_for_transfer(id);
                     }
 
                     let connected_count = self.swarm.connected_peers().count();
@@ -728,19 +730,22 @@ impl NetworkService {
                     }
 
                     // --- PROGRESSIVE RECONNECT LADDER ---
-                    // This is the core resilience engine. It runs every 2 minutes and
-                    // escalates through connection strategies from fastest to most basic.
-                    // LADDER:
-                    //   Step 1: If RBN connected but no relay — re-request reservation
-                    //   Step 2: If no peers — re-dial all bootstrap nodes (TCP + QUIC)
-                    //   Step 3: If no peers after step 2 — activate WebSocket tunnel
-                    //   Step 4: If nothing works — report OFFLINE clearly
-                    //
-                    // When IntroClaw is active, steps 2-4 are managed by IntroClaw's
-                    // ConnectionStateCycler which intelligently cycles through strategies
-                    // and uses VPN passthrough only as a last resort.
+                    // Suppressed while app is idle/backgrounded to prevent dial flooding.
+                    let is_idle = self.idle_mode.load(std::sync::atomic::Ordering::Relaxed);
+                    if !is_idle {
+                        // This is the core resilience engine. It runs every 2 minutes and
+                        // escalates through connection strategies from fastest to most basic.
+                        // LADDER:
+                        //   Step 1: If RBN connected but no relay — re-request reservation
+                        //   Step 2: If no peers — re-dial all bootstrap nodes (TCP + QUIC)
+                        //   Step 3: If no peers after step 2 — activate WebSocket tunnel
+                        //   Step 4: If nothing works — report OFFLINE clearly
+                        //
+                        // When IntroClaw is active, steps 2-4 are managed by IntroClaw's
+                        // ConnectionStateCycler which intelligently cycles through strategies
+                        // and uses VPN passthrough only as a last resort.
 
-                    if connected_count == 0 {
+                        if connected_count == 0 {
                         self.consecutive_zero_peers_ticks += 1;
 
                         // PHASE 5: Network Status Stream — notify UI of connecting state
@@ -918,6 +923,10 @@ impl NetworkService {
                             }
                         }
                     }
+                    } else if self.last_idle_log.elapsed() > Duration::from_secs(300) {
+                        self.last_idle_log = Instant::now();
+                        crate::dispatch_debug_log("[Resilience] Idle — suppressing background dials");
+                    }
 
                     // Retry undelivered messages: re-send messages stuck at status=0 for >60s
                     // to recipients we are now connected to. Handles cases where initial
@@ -952,6 +961,10 @@ impl NetworkService {
                     }
                 }
                 _ = fast_reconnect_interval.tick() => {
+                    // Suppressed while app is idle/backgrounded
+                    if self.idle_mode.load(std::sync::atomic::Ordering::Relaxed) {
+                        continue;
+                    }
                     // Conditional aggressive reconnect: only fires when file transfers are
                     // waiting and no relay listener is active. Settles down once connected.
                     // Throttled to 30s to prevent log flooding — the 5s interval was
@@ -1125,18 +1138,6 @@ impl NetworkService {
                         let _ = self.swarm.dial(addr.clone());
                     }
 
-                    // Sweep RAM-buffered FileChunks to DB for restart survival
-                    for (recipient, payloads) in &self.pending_messages {
-                        let peer_str = recipient.to_string();
-                        for payload in payloads {
-                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
-                                if let Ok(chunk_data) = base64::decode(data_base64) {
-                                    let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer_str, *chunk_index, &chunk_data);
-                                }
-                            }
-                        }
-                    }
-
                     // Flush pending messages periodically (every 30 seconds)
                     let all_pending: Vec<(PeerId, Vec<SignalingPayload>)> = self.pending_messages.drain().collect();
                     for (recipient, payloads) in all_pending {
@@ -1146,9 +1147,7 @@ impl NetworkService {
                     }
 
                     // Flush pending DB chunks for connected peers
-                    // NOTE: Chunks are NOT removed after forwarding — they stay in DB until
-                    // FileTransferComplete arrives. This prevents data loss if the forward
-                    // succeeds but delivery fails later (circuit drops, peer restarts, etc.)
+                    // Chunks are removed in forward_to_mesh after successful gossipsub publish.
                     for peer_id in self.swarm.connected_peers().cloned().collect::<Vec<_>>() {
                         let peer_str = peer_id.to_string();
                         if let Ok(chunks) = self.storage.dequeue_pending_chunks(&peer_str, 50) {
@@ -1986,7 +1985,7 @@ impl NetworkService {
                                                             data_base64,
                                                         };
                                                         let _ = tx_db.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-                                                        // Don't remove from DB here — wait for FileTransferComplete
+                                                        // Removal handled by forward_to_mesh on gossipsub publish success
                                                     }
                                                 }
                                             }
@@ -3038,6 +3037,11 @@ impl NetworkService {
                                 info!("[Mesh] Published {} via gossipsub topic={}", if is_chunk_data { "FileChunk" } else { "FileChunkRequest" }, topic_str);
                                 if is_chunk_data {
                                     *self.inflight_requests.entry(recipient_id).or_insert(0) += 1;
+                                    // TODO(follow-up): per-chunk peer ACK — this removes on local
+                                    // mesh acceptance, not confirmed receipt. Good enough for dedup.
+                                    if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
+                                        let _ = self.storage.remove_pending_chunk(transfer_id, chunk_index);
+                                    }
                                 }
 
                                 // FALLBACK: Also publish FileChunkRequest to group topic.
@@ -3060,6 +3064,9 @@ impl NetworkService {
                             }
                             Err(e) => {
                                 warn!("[Mesh] Gossipsub publish FAILED: {:?}", e);
+                                if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
+                                    let _ = self.storage.release_in_flight_chunk(transfer_id, chunk_index);
+                                }
                                 // Fall through to direct delivery as last resort
                             }
                         }
@@ -3191,38 +3198,23 @@ impl NetworkService {
         }
 
         // CRITICAL: File data and requests must NEVER be stored in the persistent mailbox.
-        // They are buffered in RAM (pending_messages) and flushed only upon circuit establishment.
         if matches!(payload, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
-            // Check if any RBNs are connected
-            let has_rbn = self.bootstrap_nodes.iter().any(|(id, _)| self.swarm.is_connected(id));
-
-            if !has_rbn {
-                // No RBNs connected — persist to DB so chunks survive app restart
-                if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
-                    if let Ok(chunk_data) = base64::decode(data_base64) {
-                        debug!("[Mesh] No RBNs connected. Persisting chunk {} for transfer {} to DB", chunk_index, transfer_id);
-                        let _ = self.storage.enqueue_pending_chunk(transfer_id, &recipient_str, chunk_index, &chunk_data);
-                    }
-                }
-                // FileChunkRequests are not persisted — they're small and will be re-generated
-                return Ok(());
-            }
-
-            debug!("[Mesh] Path not ready. Buffering file chunk/request for {} in RAM...", recipient_str);
-            // REDUNDANCY FILTER: If adding a Request, remove older Requests for the same transfer to prevent buffer bloat
-            if let SignalingPayload::FileChunkRequest { ref transfer_id, chunk_index, .. } = payload {
-                if let Some(pending) = self.pending_messages.get_mut(&recipient_id) {
-                    pending.retain(|p| !matches!(p, SignalingPayload::FileChunkRequest { transfer_id: ref tid, chunk_index: ref idx, .. } if tid == transfer_id && idx == &chunk_index));
-                }
-            }
-            self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
-            // Also persist to DB so chunks survive app restart
+            // FileChunk: single source of truth is the DB queue. Never buffer in RAM.
             if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
                 if let Ok(chunk_data) = base64::decode(data_base64) {
                     let _ = self.storage.enqueue_pending_chunk(transfer_id, &recipient_str, chunk_index, &chunk_data);
                 }
+                return Ok(());
             }
-            return Ok(());
+
+            // FileChunkRequest: RAM-only with redundancy filter (cheap, regenerable)
+            if let SignalingPayload::FileChunkRequest { ref transfer_id, chunk_index, .. } = payload {
+                if let Some(pending) = self.pending_messages.get_mut(&recipient_id) {
+                    pending.retain(|p| !matches!(p, SignalingPayload::FileChunkRequest { transfer_id: ref tid, chunk_index: ref idx, .. } if tid == transfer_id && idx == &chunk_index));
+                }
+                self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
+                return Ok(());
+            }
         }
 
 
@@ -4011,6 +4003,7 @@ impl NetworkService {
                 // Unsubscribe from transfer-specific gossipsub topic
                 let ft_topic = libp2p::gossipsub::IdentTopic::new(format!("file-transfer-{}", transfer_id));
                 let _ = self.swarm.behaviour_mut().gossipsub.unsubscribe(&ft_topic);
+                let _ = self.storage.remove_pending_chunks_for_transfer(&transfer_id);
                 // Notify UI of cancellation
                 let progress = FileTransferProgress {
                     transfer_id: transfer_id.clone(),
@@ -4215,10 +4208,22 @@ impl NetworkService {
                 let _ = self.forward_to_mesh(peer_id, payload, true).await;
             }
             NetworkCommand::HandleIncomingPayload { peer_id, payload } => {
+                // Wake-on-push: reset idle mode so the relay reservation logic
+                // can run on the next status_check tick. Without this, an FCM-woken
+                // incoming transfer while the app is backgrounded would stall because
+                // the proactive RBN-dial loop is suppressed by idle_mode.
+                if self.idle_mode.load(std::sync::atomic::Ordering::Relaxed) {
+                    self.idle_mode.store(false, std::sync::atomic::Ordering::Relaxed);
+                    crate::dispatch_debug_log("[Resilience] Wake-on-push: idle_mode reset to false");
+                }
                 info!("[Mesh] HandleIncomingPayload received for peer {}", peer_id);
                 self.handle_signaling_payload(peer_id, payload, false).await;
             }
             NetworkCommand::HandleIncomingWebRtcPayload { peer_id, payload } => {
+                if self.idle_mode.load(std::sync::atomic::Ordering::Relaxed) {
+                    self.idle_mode.store(false, std::sync::atomic::Ordering::Relaxed);
+                    crate::dispatch_debug_log("[Resilience] Wake-on-push: idle_mode reset to false (WebRTC)");
+                }
                 self.handle_signaling_payload(peer_id, payload, true).await;
             }
             NetworkCommand::TestManualRbn { address } => {
@@ -5154,6 +5159,10 @@ impl NetworkService {
                 let actions = self.intro_claw.on_app_launch();
                 self.execute_claw_actions(actions).await;
                 let _ = result_tx.send(());
+            }
+            NetworkCommand::SetAppIdleState { is_idle } => {
+                self.idle_mode.store(is_idle, std::sync::atomic::Ordering::Relaxed);
+                crate::dispatch_debug_log(&format!("[Resilience] idle_mode set to {}", is_idle));
             }
         }
         Ok(())

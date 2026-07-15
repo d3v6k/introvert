@@ -161,6 +161,9 @@ typedef IntrovertSetAnchorModeDart = FfiResult Function(bool enabled);
 typedef IntrovertNetworkSetConnectivityTypeC = FfiResult Function(Uint8 connectivity_type);
 typedef IntrovertNetworkSetConnectivityTypeDart = FfiResult Function(int connectivity_type);
 
+typedef IntrovertSetAppIdleStateC = FfiResult Function(Int32 isIdle);
+typedef IntrovertSetAppIdleStateDart = FfiResult Function(int isIdle);
+
 typedef IntrovertNetworkSetTunnelModeC = FfiResult Function(Bool enabled);
 typedef IntrovertNetworkSetTunnelModeDart = FfiResult Function(bool enabled);
 typedef IntrovertNetworkGetTunnelModeC = Int32 Function();
@@ -629,6 +632,7 @@ class IntrovertClient {
   late IntrovertSetAnchorModeDart _setAnchorMode;
   late IntrovertGetAnchorModeDart _getAnchorMode;
   late IntrovertNetworkSetConnectivityTypeDart _setConnectivityType;
+  late IntrovertSetAppIdleStateDart _setAppIdleState;
   late IntrovertNetworkSetTunnelModeDart _setTunnelMode;
   late IntrovertNetworkGetTunnelModeDart _getTunnelMode;
   late IntrovertNetworkGetRbnsDart _getRbns;
@@ -1105,6 +1109,7 @@ class IntrovertClient {
       _forceNetworkRefresh = safeLookup('force_refresh', () => _dylib.lookupFunction<IntrovertNetworkForceRefreshC, IntrovertNetworkForceRefreshDart>('introvert_network_force_refresh'), () => FfiResult.dummy);
       _sendManualTelemetry = safeLookup('send_manual_telemetry', () => _dylib.lookupFunction<IntrovertSendManualTelemetryC, IntrovertSendManualTelemetryDart>('introvert_send_manual_telemetry'), () => FfiResult.dummy);
       _setConnectivityType = safeLookup('set_connectivity_type', () => _dylib.lookupFunction<IntrovertNetworkSetConnectivityTypeC, IntrovertNetworkSetConnectivityTypeDart>('introvert_network_set_connectivity_type'), (type) => FfiResult.dummy);
+      _setAppIdleState = safeLookup('set_app_idle_state', () => _dylib.lookupFunction<IntrovertSetAppIdleStateC, IntrovertSetAppIdleStateDart>('introvert_set_app_idle_state'), (state) => FfiResult.dummy);
       _groupCreate = safeLookup('group_create', () => _dylib.lookupFunction<IntrovertGroupCreateC, IntrovertGroupCreateDart>('introvert_group_create'), (n, d, m) => FfiResult.dummy);
       _groupSendMessage = safeLookup('group_send', () => _dylib.lookupFunction<IntrovertGroupSendMessageC, IntrovertGroupSendMessageDart>('introvert_group_send_message'), (g, m, r) => FfiResult.dummy);
       _groupGetAll = safeLookup('group_get_all', () => _dylib.lookupFunction<IntrovertGroupGetAllC, IntrovertGroupGetAllDart>('introvert_group_get_all'), () => FfiResult.dummy);
@@ -1249,6 +1254,11 @@ class IntrovertClient {
         type = 0;
     }
     _setConnectivityType(type);
+  }
+
+  // Inform native layer of app lifecycle state (0=active, 1=idle/backgrounded)
+  void setAppIdleState(bool isIdle) {
+    _setAppIdleState(isIdle ? 1 : 0);
   }
 
   void createGroup(String name, String description, List<String> members) {

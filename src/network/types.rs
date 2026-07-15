@@ -392,6 +392,7 @@ pub enum NetworkCommand {
     IntroClawOnAppLaunch {
         result_tx: tokio::sync::oneshot::Sender<()>,
     },
+    SetAppIdleState { is_idle: bool },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

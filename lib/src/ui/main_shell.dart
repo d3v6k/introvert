@@ -326,10 +326,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       // Without this, Android can freeze the Tokio runtime and the 15-second status check stops.
       AlertService.startBackgroundService(awake: true);
       BackgroundSyncService.instance.enterIdleMode();
+      _client.setAppIdleState(true);
     } else if (state == AppLifecycleState.resumed) {
       // Return to foreground: exit idle mode
       AlertService.stopBackgroundService();
       BackgroundSyncService.instance.exitIdleMode();
+      _client.setAppIdleState(false);
       
       // Immediately trigger IntroClaw tick to refresh connections — no delay.
       // The 1-second delay caused 30-90s of "Connecting"/"Offline" after resume.

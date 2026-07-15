@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use libp2p::{kad::QueryId, Swarm, Multiaddr, PeerId, identity::Keypair};
 use libp2p::core::transport::ListenerId;
 use parking_lot::RwLock;
@@ -90,6 +91,10 @@ pub struct NetworkService {
     pub(crate) last_relay_reservation_attempt: Instant,
     /// Per-RBN push token registration timestamps (rate-limit to prevent flooding on Identify)
     pub(crate) last_token_registration: HashMap<PeerId, Instant>,
+    /// App idle/background state — suppresses proactive dials when true
+    pub(crate) idle_mode: Arc<AtomicBool>,
+    /// Last time an idle-mode suppression log was emitted (rate-limit to 5min)
+    pub(crate) last_idle_log: Instant,
 }
 
 #[derive(Debug, Clone)]

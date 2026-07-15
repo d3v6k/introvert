@@ -53,6 +53,7 @@ class AlertService {
           break;
         case 'onWakeup':
           debugPrint("🔔 AlertService: Background Wakeup! Triggering P2P Fetch...");
+          IntrovertClient().setAppIdleState(false);
           IntrovertClient().fetchMailbox();
           break;
         case 'onPushNotification':

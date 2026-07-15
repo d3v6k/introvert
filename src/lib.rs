@@ -899,6 +899,26 @@ pub extern "C" fn introvert_network_set_connectivity_type(connectivity_type: u8)
     FfiResult::success()
 }
 
+/// Sets the app idle/background state (0 = active, 1 = idle).
+/// When idle, proactive RBN dials and relay reservations are suppressed.
+#[no_mangle]
+pub extern "C" fn introvert_set_app_idle_state(is_idle: i32) -> FfiResult {
+    let lock = ENGINE.read();
+    let engine = match lock.as_ref() {
+        Some(e) => e,
+        None => return FfiResult::error(-10, "Engine not started"),
+    };
+    let tx_lock = engine.network_tx.read();
+    let tx = match tx_lock.as_ref() {
+        Some(t) => t.clone(),
+        None => return FfiResult::error(-13, "Network not started"),
+    };
+    engine.runtime.spawn(async move {
+        let _ = tx.send(NetworkCommand::SetAppIdleState { is_idle: is_idle != 0 }).await;
+    });
+    FfiResult::success()
+}
+
 /// Explicitly triggers a network diagnostics recheck / redial sequence for a peer.
 #[no_mangle]
 pub extern "C" fn introvert_network_recheck_connection(peer_id_ptr: *const c_char) -> FfiResult {

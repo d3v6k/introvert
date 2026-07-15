@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{params, params_from_iter, Connection};
 use anyhow::Result;
 use std::path::Path;
 use std::collections::HashMap;
@@ -341,6 +341,12 @@ impl StorageService {
             CREATE INDEX IF NOT EXISTS idx_pending_chunks_peer ON pending_file_chunks(peer_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_pending_chunks_transfer ON pending_file_chunks(transfer_id, chunk_index);"
         )?;
+
+        // Add in_flight_since column for atomic chunk claiming (idempotent)
+        let _ = conn.execute(
+            "ALTER TABLE pending_file_chunks ADD COLUMN in_flight_since INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
 
         // Cleared chats — tracks when a chat was cleared to prevent mailbox re-delivery of old messages
         conn.execute_batch(
@@ -1397,18 +1403,60 @@ impl StorageService {
     }
 
     pub fn dequeue_pending_chunks(&self, peer_id: &str, limit: usize) -> Result<Vec<(String, u32, Vec<u8>)>> {
-        let conn = self.conn.lock();
-        let mut stmt = conn.prepare(
-            "SELECT transfer_id, chunk_index, chunk_data FROM pending_file_chunks WHERE peer_id = ?1 ORDER BY transfer_id ASC, chunk_index ASC LIMIT ?2"
-        )?;
-        let rows = stmt.query_map(params![peer_id, limit as i32], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)? as u32, row.get::<_, Vec<u8>>(2)?))
-        })?;
-        let mut result = Vec::new();
-        for row in rows {
-            result.push(row?);
+        let mut conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp();
+        let stale_cutoff = now - 30; // in-flight claims older than 30s are considered dead
+
+        let tx = conn.transaction()?;
+        let ids: Vec<i64> = {
+            let mut stmt = tx.prepare(
+                "SELECT id FROM pending_file_chunks
+                 WHERE peer_id = ?1 AND (in_flight_since = 0 OR in_flight_since < ?2)
+                 ORDER BY transfer_id ASC, chunk_index ASC LIMIT ?3"
+            )?;
+            let rows = stmt.query_map(params![peer_id, stale_cutoff, limit as i32], |row| row.get(0))?;
+            let mut ids = Vec::new();
+            for row in rows {
+                if let Ok(id) = row {
+                    ids.push(id);
+                }
+            }
+            ids
+        };
+        if ids.is_empty() {
+            tx.commit()?;
+            return Ok(Vec::new());
         }
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        tx.execute(
+            &format!("UPDATE pending_file_chunks SET in_flight_since = ?1 WHERE id IN ({})", placeholders),
+            params_from_iter(std::iter::once(&now as &dyn rusqlite::ToSql).chain(ids.iter().map(|i| i as &dyn rusqlite::ToSql))),
+        )?;
+        let mut result = Vec::new();
+        {
+            let mut stmt = tx.prepare(&format!(
+                "SELECT transfer_id, chunk_index, chunk_data FROM pending_file_chunks WHERE id IN ({})", placeholders
+            ))?;
+            let rows = stmt.query_map(params_from_iter(ids.iter()), |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)? as u32, row.get::<_, Vec<u8>>(2)?))
+            })?;
+            for row in rows {
+                if let Ok(r) = row {
+                    result.push(r);
+                }
+            }
+        }
+        tx.commit()?;
         Ok(result)
+    }
+
+    pub fn release_in_flight_chunk(&self, transfer_id: &str, chunk_index: u32) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "UPDATE pending_file_chunks SET in_flight_since = 0 WHERE transfer_id = ?1 AND chunk_index = ?2",
+            params![transfer_id, chunk_index as i32],
+        )?;
+        Ok(())
     }
 
     pub fn remove_pending_chunk(&self, transfer_id: &str, chunk_index: u32) -> Result<()> {
