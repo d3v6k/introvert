@@ -2711,17 +2711,17 @@ impl NetworkService {
         // 4. Fallback: Persistent Mesh Storage (Mailbox)
         
         // Send FCM push notification to wake the recipient's device
-        // Dedup: use module-level PUSH_DEDUP shared with MailboxStore handler
+        // Atomic dedup: hold lock across check AND insert
         let should_push = {
-            let dedup = PUSH_DEDUP.lock();
-            dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
+            let mut dedup = PUSH_DEDUP.lock();
+            let should = dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30));
+            if should {
+                dedup.insert(recipient_str.clone(), Instant::now());
+            }
+            should
         };
         if should_push {
             if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                {
-                    let mut dedup = PUSH_DEDUP.lock();
-                    dedup.insert(recipient_str.clone(), Instant::now());
-                }
                 info!("[FCM] Triggering Push Wakeup for {} ({})", recipient_str, device_type);
                 match self.push_tx.try_send(PushRequest {
                     device_type: device_type.clone(),
@@ -4497,17 +4497,17 @@ impl NetworkService {
                             let storage = self.storage.clone();
                             let sender_peer_id = peer.to_string();
                             tokio::spawn(async move {
-                                // Dedup check at execution time using module-level PUSH_DEDUP
+                                // Atomic dedup: hold lock across check AND insert to prevent race
                                 let should_push = {
-                                    let dedup = PUSH_DEDUP.lock();
-                                    dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
+                                    let mut dedup = PUSH_DEDUP.lock();
+                                    let should = dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30));
+                                    if should {
+                                        dedup.insert(recipient_str.clone(), Instant::now());
+                                    }
+                                    should
                                 };
                                 if should_push {
                                     if let Ok(Some((device_type, token))) = storage.get_push_token(&recipient_str) {
-                                        {
-                                            let mut dedup = PUSH_DEDUP.lock();
-                                            dedup.insert(recipient_str.clone(), Instant::now());
-                                        }
                                         info!("[FCM] Triggering Push Wakeup for mailbox recipient {} ({})", recipient_str, device_type);
                                         match push_tx.try_send(PushRequest {
                                             device_type: device_type.clone(),
