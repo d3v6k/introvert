@@ -4476,8 +4476,12 @@ impl NetworkService {
                             // Same PUSH_DEDUP map used by forward_to_mesh fallback.
                             let recipient_str = recipient.to_string();
                             let is_duplicate = {
-                                let dedup = PUSH_DEDUP.lock();
-                                dedup.get(&recipient_str).map_or(false, |t| t.elapsed() < Duration::from_secs(30))
+                                let mut dedup = PUSH_DEDUP.lock();
+                                let dup = dedup.get(&recipient_str).map_or(false, |t| t.elapsed() < Duration::from_secs(30));
+                                if !dup {
+                                    dedup.insert(recipient_str.clone(), Instant::now());
+                                }
+                                dup
                             };
                             if !is_duplicate {
                             {
