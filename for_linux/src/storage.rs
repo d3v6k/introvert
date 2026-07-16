@@ -60,6 +60,10 @@ impl StorageService {
         let key_hex = hex::encode(key);
         conn.pragma_update(None, "key", format!("x'{}'", key_hex))?;
 
+        // Enable WAL mode — allows concurrent reads while a write is in progress.
+        // Must be set AFTER PRAGMA key (SQLCipher requirement).
+        conn.pragma_update(None, "journal_mode", "wal")?;
+
         let slf = Self { conn: Mutex::new(conn), is_ephemeral: false, push_token_cache: RwLock::new(HashMap::new()) };
         slf.bootstrap()?;
         Ok(slf)

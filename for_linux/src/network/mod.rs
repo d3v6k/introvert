@@ -4457,7 +4457,13 @@ impl NetworkService {
                                 queue.push((peer, inner, false));
                             }
                         } else {
-                            let _ = self.storage.store_mailbox_payload(&recipient, &peer, payload);
+                            {
+                                let storage = self.storage.clone();
+                                let r = recipient.clone();
+                                let p = peer.clone();
+                                let pl = payload.clone();
+                                let _ = tokio::task::spawn_blocking(move || storage.store_mailbox_payload(&r, &p, pl)).await;
+                            }
 
                             // Confirm to sender that message was stored in mailbox
                             if let Some(mid) = original_msg_id {
@@ -4499,7 +4505,9 @@ impl NetworkService {
 
                             // Push upgrade for other peers...
                             if self.swarm.is_connected(&recipient) {
-                                if let Ok(messages) = self.storage.drain_mailbox(&recipient) {
+                                let storage = self.storage.clone();
+                                let r = recipient.clone();
+                                if let Ok(Ok(messages)) = tokio::task::spawn_blocking(move || storage.drain_mailbox(&r)).await {
                                     if !messages.is_empty() {
                                         let _ = self.forward_to_mesh(recipient, SignalingPayload::MailboxDrained(messages), false).await;
                                     }
@@ -5647,7 +5655,9 @@ impl NetworkService {
             SignalingPayload::MailboxDrain => {
                 let is_anchor = self.swarm.behaviour().relay_server.as_ref().is_some() || self.storage.is_anchor_mode_enabled();
                 if is_anchor {
-                    if let Ok(messages) = self.storage.drain_mailbox(&peer) {
+                    let storage = self.storage.clone();
+                    let p = peer.clone();
+                    if let Ok(Ok(messages)) = tokio::task::spawn_blocking(move || storage.drain_mailbox(&p)).await {
                         let _ = self.forward_to_mesh(peer, SignalingPayload::MailboxDrained(messages), false).await;
                     }
                 } else {
