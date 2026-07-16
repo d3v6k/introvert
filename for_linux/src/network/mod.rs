@@ -444,6 +444,15 @@ pub struct NetworkService {
     push_dedup: HashMap<String, Instant>,
     /// Cached connected peer count — O(1) replacement for swarm.connected_peers().count()
     connected_peer_count: Arc<AtomicUsize>,
+    /// Push queue sender — try_send from event loop, background worker processes batches
+    push_tx: mpsc::Sender<PushRequest>,
+}
+
+struct PushRequest {
+    device_type: String,
+    token: String,
+    sender_peer_id: String,
+    recipient_peer_id: String,
 }
 
 /// Whether to actively block tokenless forks or just log them.
@@ -584,6 +593,7 @@ impl NetworkService {
 
         let rbn_latencies = Arc::new(RwLock::new(HashMap::new()));
         let pending_manual_rbns = Arc::new(RwLock::new(HashMap::new()));
+        let (push_tx, push_rx) = mpsc::channel::<PushRequest>(500);
 
         let res = Self {
             swarm, 
@@ -625,7 +635,12 @@ impl NetworkService {
             tunnel_active: is_tunnel_enabled,
             pending_diagnostics: HashMap::new(),
             registry: registry::RegistryManager::new(storage.clone()),
-            fcm: Arc::new(crate::fcm::FcmPushService::new()),
+            fcm: {
+                let fcm = Arc::new(crate::fcm::FcmPushService::new());
+                let fcm_ref = fcm.clone();
+                tokio::spawn(async move { Self::run_push_worker(push_rx, fcm_ref).await; });
+                fcm
+            },
             pending_claims: HashMap::new(),
             diagnostic_requests: HashMap::new(),
             is_stress_test,
@@ -639,6 +654,7 @@ impl NetworkService {
             peer_relay_activity: HashMap::new(),
             push_dedup: HashMap::new(),
             connected_peer_count: Arc::new(AtomicUsize::new(0)),
+            push_tx,
             reward_engine,
         };
 
@@ -1141,6 +1157,34 @@ impl NetworkService {
                         let _ = self.swarm.dial(pid);
                     }
                 }
+            }
+        }
+    }
+
+    async fn run_push_worker(mut rx: mpsc::Receiver<PushRequest>, fcm: Arc<crate::fcm::FcmPushService>) {
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(100));
+        loop {
+            let mut batch = Vec::new();
+            tokio::select! {
+                Some(req) = rx.recv() => {
+                    batch.push(req);
+                    while let Ok(req) = rx.try_recv() {
+                        batch.push(req);
+                        if batch.len() >= 50 { break; }
+                    }
+                }
+                _ = tokio::time::sleep(Duration::from_millis(200)) => {}
+            }
+            if !batch.is_empty() {
+                let futs: Vec<_> = batch.into_iter().map(|r| {
+                    let fcm = fcm.clone();
+                    let sem = semaphore.clone();
+                    async move {
+                        let _permit = sem.acquire().await;
+                        fcm.send_push(&r.device_type, &r.token, &r.sender_peer_id).await;
+                    }
+                }).collect();
+                futures::future::join_all(futs).await;
             }
         }
     }
@@ -2663,15 +2707,22 @@ impl NetworkService {
         };
         if should_push {
             if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                let fcm = self.fcm.clone();
-                let peer_id_str = self.swarm.local_peer_id().to_string();
-                let device_type = device_type.clone();
-                let token = token.clone();
                 self.push_dedup.insert(recipient_str.clone(), Instant::now());
                 info!("[FCM] Triggering Push Wakeup for {} ({})", recipient_str, device_type);
-                tokio::spawn(async move {
-                    fcm.send_push(&device_type, &token, &peer_id_str).await;
-                });
+                match self.push_tx.try_send(PushRequest {
+                    device_type: device_type.clone(),
+                    token: token.clone(),
+                    sender_peer_id: self.swarm.local_peer_id().to_string(),
+                    recipient_peer_id: recipient_str.clone(),
+                }) {
+                    Ok(_) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        error!("[FCM] Push queue closed — this should never happen");
+                    }
+                }
             }
         }
 
@@ -4427,15 +4478,22 @@ impl NetworkService {
                             };
                             if should_push {
                                 if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                                    let fcm = self.fcm.clone();
-                                    let peer_id_str = peer.to_string();
-                                    let device_type = device_type.clone();
-                                    let token = token.clone();
                                     self.push_dedup.insert(recipient_str.clone(), Instant::now());
                                     info!("[FCM] Triggering Push Wakeup for mailbox recipient {} ({})", recipient_str, device_type);
-                                    tokio::spawn(async move {
-                                        fcm.send_push(&device_type, &token, &peer_id_str).await;
-                                    });
+                                    match self.push_tx.try_send(PushRequest {
+                                        device_type: device_type.clone(),
+                                        token: token.clone(),
+                                        sender_peer_id: peer.to_string(),
+                                        recipient_peer_id: recipient_str.clone(),
+                                    }) {
+                                        Ok(_) => {}
+                                        Err(mpsc::error::TrySendError::Full(_)) => {
+                                            warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
+                                        }
+                                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                                            error!("[FCM] Push queue closed — this should never happen");
+                                        }
+                                    }
                                 }
                             }
 
