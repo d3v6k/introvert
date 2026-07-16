@@ -731,8 +731,12 @@ impl NetworkService {
 
                     // --- PROGRESSIVE RECONNECT LADDER ---
                     // Suppressed while app is idle/backgrounded to prevent dial flooding.
+                    // BUT: always allow reconnects when transfers are active.
                     let is_idle = self.idle_mode.load(std::sync::atomic::Ordering::Relaxed);
-                    if !is_idle {
+                    let has_active_transfers = !self.incoming_transfers.is_empty()
+                        || !self.active_seeders.is_empty()
+                        || !self.pending_messages.is_empty();
+                    if !is_idle || has_active_transfers {
                         // This is the core resilience engine. It runs every 2 minutes and
                         // escalates through connection strategies from fastest to most basic.
                         // LADDER:
@@ -962,7 +966,12 @@ impl NetworkService {
                 }
                 _ = fast_reconnect_interval.tick() => {
                     // Suppressed while app is idle/backgrounded
-                    if self.idle_mode.load(std::sync::atomic::Ordering::Relaxed) {
+                    // BUT: always allow fast reconnect when transfers are active
+                    let is_idle = self.idle_mode.load(std::sync::atomic::Ordering::Relaxed);
+                    let has_active_transfers = !self.incoming_transfers.is_empty()
+                        || !self.active_seeders.is_empty()
+                        || !self.pending_messages.is_empty();
+                    if is_idle && !has_active_transfers {
                         continue;
                     }
                     // Conditional aggressive reconnect: only fires when file transfers are
@@ -988,11 +997,11 @@ impl NetworkService {
                             if self.tunnel_active && connected_count == 0 {
                                 if let Some(tunnel_start) = self.tunnel_started_at {
                                     // Mobile data: 15s threshold (carriers block faster)
-                                    // WiFi/VPN: 300s threshold (VPN needs more time for relay establishment, matches VPN tunnel stale threshold)
+                                    // WiFi/VPN: 60s threshold (VPN causes relay flapping — faster recovery needed)
                                     let threshold = if self.intro_claw.is_on_mobile_data() {
                                         Duration::from_secs(15)
                                     } else {
-                                        Duration::from_secs(300)
+                                        Duration::from_secs(60)
                                     };
                                     if tunnel_start.elapsed() > threshold {
                                         warn!("[MOBILE] Tunnel active {}s with 0 peers on {} — force-resetting",
@@ -2036,7 +2045,7 @@ impl NetworkService {
                                 let tx_db = self.command_tx.clone();
                                 let peer_str = src_peer_id.to_string();
                                 tokio::spawn(async move {
-                                    tokio::time::sleep(Duration::from_millis(400)).await; // Let circuit stabilize
+                                    tokio::time::sleep(Duration::from_millis(200)).await; // Let circuit stabilize (was 400ms)
                                     if let Ok(chunks) = storage.dequeue_pending_chunks(&peer_str, 100) {
                                         if !chunks.is_empty() {
                                             info!("[Relay] InboundCircuit: flushing {} pending DB chunks to {}", chunks.len(), peer_str);
@@ -2724,10 +2733,8 @@ impl NetworkService {
                 let is_rbn_or_anchor = self.bootstrap_nodes.iter().any(|(id, _)| id == &peer_id)
                     || self.discovered_anchors.contains(&peer_id);
                 if is_rbn_or_anchor {
-                    // Only clear relay reservation and listeners if there are NO remaining connections to this RBN/anchor.
-                    // If we are still connected (e.g., via another connection), let SwarmEvent::ListenerClosed
-                    // handle the cleanup and auto-recovery of the reservation if the active listener closes.
                     if !self.swarm.is_connected(&peer_id) {
+                        warn!("[Relay] Circuit dropped for RBN/anchor {} — will re-request reservation on next tick", peer_id);
                         self.relay_reservations.remove(&peer_id);
                         self.relay_listeners.retain(|_, rbn| rbn != &peer_id);
                         info!("[Mesh] RBN/anchor {} disconnected (0 connections). Cleared relay reservation and listeners.", peer_id);
@@ -3080,7 +3087,7 @@ impl NetworkService {
                 if is_chunk_data {
                     let is_relayed_conn = self.is_relayed_map.read().get(&recipient_id).cloned().unwrap_or(false);
                     let inflight = self.inflight_requests.get(&recipient_id).cloned().unwrap_or(0);
-                    let limit = if is_relayed_conn { 8 } else { 8 };
+                    let limit = if is_relayed_conn { 16 } else { 8 };
                     if inflight >= limit {
                         debug!("[Mesh] In-flight limit ({}) reached for {}. Buffering chunk.", limit, recipient_str);
                         self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
@@ -7791,7 +7798,7 @@ impl NetworkService {
                 }
             };
             let is_direct = !current_relayed || has_webrtc;
-            tokio::time::sleep(Duration::from_millis(if is_direct { 20 } else { 250 })).await;
+            tokio::time::sleep(Duration::from_millis(if is_direct { 20 } else { 100 })).await;
         }
         
 
