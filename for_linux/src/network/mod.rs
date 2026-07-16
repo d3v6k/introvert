@@ -4521,9 +4521,8 @@ impl NetworkService {
                                             }
                                         }
                                     });
-                                    }
                                 }
-                            });
+                            }
 
                             // Push upgrade for other peers...
                             if self.swarm.is_connected(&recipient) {
