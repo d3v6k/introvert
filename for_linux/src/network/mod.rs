@@ -2709,36 +2709,8 @@ impl NetworkService {
             self.dial_relay_path(recipient_id, false);
         }
         // 4. Fallback: Persistent Mesh Storage (Mailbox)
-        
-        // Send FCM push notification to wake the recipient's device
-        // Atomic dedup: hold lock across check AND insert
-        let should_push = {
-            let mut dedup = PUSH_DEDUP.lock();
-            let should = dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30));
-            if should {
-                dedup.insert(recipient_str.clone(), Instant::now());
-            }
-            should
-        };
-        if should_push {
-            if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                info!("[FCM] Triggering Push Wakeup for {} ({})", recipient_str, device_type);
-                match self.push_tx.try_send(PushRequest {
-                    device_type: device_type.clone(),
-                    token: token.clone(),
-                    sender_peer_id: self.swarm.local_peer_id().to_string(),
-                    recipient_peer_id: recipient_str.clone(),
-                }) {
-                    Ok(_) => {}
-                    Err(mpsc::error::TrySendError::Full(_)) => {
-                        warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
-                    }
-                    Err(mpsc::error::TrySendError::Closed(_)) => {
-                        error!("[FCM] Push queue closed — this should never happen");
-                    }
-                }
-            }
-        }
+        // The anchor's MailboxStore handler handles push notification and dedup.
+        // Do NOT fire push here — it would race with the anchor's push.
 
         // WebRTC signaling and handle claims are transient and should never be stored in persistent mailboxes.
         if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. }) {
