@@ -3366,28 +3366,11 @@ impl NetworkService {
                                     if let Ok(data) = serde_json::to_vec(&payload) {
                                         let _ = tx.send(NetworkCommand::PublishGossipsub { topic: gid.clone(), data: data.clone() }).await;
                                         
-                                        // Phase 2.1: Direct-forward ONLY to connected mesh peers for instant delivery.
-                                        // Offline peers are handled by gossipsub propagation + mailbox drain.
-                                        if let Ok(Some(group)) = storage.get_group(&gid) {
-                                            let members: Vec<GroupMemberMetadata> = serde_json::from_str(&group.members_json).unwrap_or_default();
-                                            for m in members {
-                                                if m.peer_id != my_peer_id {
-                                                    let is_connected = connected_peers.contains(&m.peer_id);
-                                                    let is_active_mesh = m.peer_id.parse::<libp2p::PeerId>()
-                                                        .map(|pid| active_mesh_peers.contains(&pid))
-                                                        .unwrap_or(false);
-                                                    if is_connected || is_active_mesh {
-                                                        if let Ok(pid) = m.peer_id.parse::<libp2p::PeerId>() {
-                                                            let tx_clone = tx.clone();
-                                                            let payload_clone = payload.clone();
-                                                            tokio::spawn(async move {
-                                                                let _ = tx_clone.send(NetworkCommand::ForwardMeshSignaling { peer_id: pid, payload: payload_clone }).await;
-                                                            });
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        // Phase 2.1: Rely on gossipsub for delivery to all subscribers.
+                                        // Direct-forward was removed — it caused duplicate forward_to_mesh
+                                        // calls for every connected peer (once from gossipsub, once from direct).
+                                        // Gossipsub delivers to all mesh subscribers; offline peers get
+                                        // MailboxStore via the anchor handler when gossipsub can't reach them.
                                     }
                                 }
                             }
