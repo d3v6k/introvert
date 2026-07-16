@@ -4426,15 +4426,15 @@ impl NetworkService {
                                 queue.push((peer, inner, false));
                             }
                         } else {
-                            // Dedup: skip duplicate MailboxStore for same recipient within 30s.
-                            // Group messages arrive via both gossipsub and direct-forward.
-                            // Same PUSH_DEDUP map used by forward_to_mesh fallback.
+                            // Dedup: skip duplicate MailboxStore for same MESSAGE within 30s.
+                            // Use message ID (from original_msg_id) as key, not recipient.
                             let recipient_str = recipient.to_string();
+                            let dedup_key = original_msg_id.clone().unwrap_or_else(|| format!("{}-{}", recipient_str, chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
                             let is_duplicate = {
                                 let mut dedup = PUSH_DEDUP.lock();
-                                let dup = dedup.get(&recipient_str).map_or(false, |t| t.elapsed() < Duration::from_secs(30));
+                                let dup = dedup.get(&dedup_key).map_or(false, |t| t.elapsed() < Duration::from_secs(30));
                                 if !dup {
-                                    dedup.insert(recipient_str.clone(), Instant::now());
+                                    dedup.insert(dedup_key.clone(), Instant::now());
                                 }
                                 dup
                             };
@@ -4458,38 +4458,26 @@ impl NetworkService {
                             }
                             
                             // Send FCM push notification to wake the recipient's device if offline
-                            // Dedup: check in main loop (synchronous), spawn only the push send
-                            let recipient_str = recipient.to_string();
-                            let should_push = {
-                                let mut dedup = PUSH_DEDUP.lock();
-                                let should = dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30));
-                                if should {
-                                    dedup.insert(recipient_str.clone(), Instant::now());
-                                }
-                                should
-                            };
-                            if should_push {
-                                if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                                    let push_tx = self.push_tx.clone();
-                                    let sender_peer_id = peer.to_string();
-                                    info!("[FCM] Triggering Push Wakeup for mailbox recipient {} ({})", recipient_str, device_type);
-                                    tokio::spawn(async move {
-                                        match push_tx.try_send(PushRequest {
-                                            device_type: device_type.clone(),
-                                            token: token.clone(),
-                                            sender_peer_id,
-                                            recipient_peer_id: recipient_str.clone(),
-                                        }) {
-                                            Ok(_) => {}
-                                            Err(mpsc::error::TrySendError::Full(_)) => {
-                                                warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
-                                            }
-                                            Err(mpsc::error::TrySendError::Closed(_)) => {
-                                                error!("[FCM] Push queue closed — this should never happen");
-                                            }
+                            if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
+                                let push_tx = self.push_tx.clone();
+                                let sender_peer_id = peer.to_string();
+                                info!("[FCM] Triggering Push Wakeup for mailbox recipient {} ({})", recipient_str, device_type);
+                                tokio::spawn(async move {
+                                    match push_tx.try_send(PushRequest {
+                                        device_type: device_type.clone(),
+                                        token: token.clone(),
+                                        sender_peer_id,
+                                        recipient_peer_id: recipient_str.clone(),
+                                    }) {
+                                        Ok(_) => {}
+                                        Err(mpsc::error::TrySendError::Full(_)) => {
+                                            warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
                                         }
-                                    });
-                                }
+                                        Err(mpsc::error::TrySendError::Closed(_)) => {
+                                            error!("[FCM] Push queue closed — this should never happen");
+                                        }
+                                    }
+                                });
                             }
 
                             // Push upgrade for other peers...
