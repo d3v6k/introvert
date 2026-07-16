@@ -4471,12 +4471,13 @@ impl NetworkService {
                                 queue.push((peer, inner, false));
                             }
                         } else {
-                            // Dedup: skip duplicate MailboxStore for same recipient within 5s.
+                            // Dedup: skip duplicate MailboxStore for same recipient within 30s.
                             // Group messages arrive via both gossipsub and direct-forward.
+                            // Same PUSH_DEDUP map used by forward_to_mesh fallback.
                             let recipient_str = recipient.to_string();
                             let is_duplicate = {
                                 let dedup = PUSH_DEDUP.lock();
-                                dedup.get(&recipient_str).map_or(false, |t| t.elapsed() < Duration::from_secs(5))
+                                dedup.get(&recipient_str).map_or(false, |t| t.elapsed() < Duration::from_secs(30))
                             };
                             if !is_duplicate {
                             {
