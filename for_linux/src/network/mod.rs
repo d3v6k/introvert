@@ -460,6 +460,12 @@ struct PushRequest {
 // TODO: Toggle ENFORCE_FORK_GUARD to true after 6 months to automatically activate the network blacklist
 const ENFORCE_FORK_GUARD: bool = false;
 
+/// Shared push dedup map — prevents duplicate FCM pushes when the same message
+/// arrives via multiple paths (gossipsub + direct-forward). Used by both
+/// forward_to_mesh fallback and MailboxStore anchor handler.
+static PUSH_DEDUP: once_cell::sync::Lazy<Mutex<std::collections::HashMap<String, Instant>>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
+
 /// Duration without authenticated telemetry before a wallet is flagged as a potential fork
 const FORK_DETECTION_THRESHOLD: Duration = Duration::from_secs(72 * 3600); // 72 hours
 
@@ -2012,8 +2018,13 @@ impl NetworkService {
                                         let _ = tx.send(NetworkCommand::StoreInMailbox { peer_id: target_peer, payload }).await;
                                     });
                                 } else {
-                                    info!("[Mesh] Re-queuing failed payload for Mailbox routing...");
-                                    self.pending_messages.entry(target_peer).or_default().push(payload);
+                                    // Non-relay peer: also store in mailbox to break the retry loop.
+                                    // Re-queuing to pending_messages creates an infinite retry cycle.
+                                    info!("[Mesh] Direct send failed for {}. Storing in mailbox.", peer);
+                                    let tx = self.command_tx.clone();
+                                    tokio::spawn(async move {
+                                        let _ = tx.send(NetworkCommand::StoreInMailbox { peer_id: target_peer, payload }).await;
+                                    });
                                 }
                             }
                         }
@@ -2700,9 +2711,7 @@ impl NetworkService {
         // 4. Fallback: Persistent Mesh Storage (Mailbox)
         
         // Send FCM push notification to wake the recipient's device
-        // Dedup: use static PUSH_DEDUP shared with MailboxStore handler
-        static PUSH_DEDUP: once_cell::sync::Lazy<parking_lot::Mutex<std::collections::HashMap<String, Instant>>> =
-            once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(std::collections::HashMap::new()));
+        // Dedup: use module-level PUSH_DEDUP shared with MailboxStore handler
         let should_push = {
             let dedup = PUSH_DEDUP.lock();
             dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
@@ -4488,9 +4497,7 @@ impl NetworkService {
                             let storage = self.storage.clone();
                             let sender_peer_id = peer.to_string();
                             tokio::spawn(async move {
-                                // Dedup check at execution time, not queue time
-                                static PUSH_DEDUP: once_cell::sync::Lazy<parking_lot::Mutex<std::collections::HashMap<String, Instant>>> =
-                                    once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(std::collections::HashMap::new()));
+                                // Dedup check at execution time using module-level PUSH_DEDUP
                                 let should_push = {
                                     let dedup = PUSH_DEDUP.lock();
                                     dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
