@@ -159,6 +159,9 @@ pub enum SignalingPayload {
     FileChunk { transfer_id: String, chunk_index: u32, total_chunks: u32, data_base64: String },
     FileTransferComplete { transfer_id: String },
     FileTransferError { transfer_id: String, reason: String },
+    /// Announces that a peer has received all chunks for a file.
+    /// Other receivers can pull from this peer instead of the original sender (e.g., LAN vs VPN).
+    FileAvailable { file_hash: String, transfer_id: String, peer_id: String, #[serde(default)] group_id: Option<String> },
     TransitFileChunk { target_peer: String, chunk: Box<SignalingPayload> },
     DeleteMessage { msg_id: String },
     EditMessage { msg_id: String, new_content: String },
@@ -252,6 +255,7 @@ impl PrioritizedPayload {
             SignalingPayload::FileChunk { .. } |
             SignalingPayload::FileChunkRequest { .. } |
             SignalingPayload::FileTransfer { .. } |
+            SignalingPayload::FileAvailable { .. } |
             SignalingPayload::ChatSyncRequest { .. } |
             SignalingPayload::ChatSyncResponse { .. } => MessagePriority::Low,
 

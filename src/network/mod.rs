@@ -1444,6 +1444,20 @@ impl NetworkService {
                                     total_chunks,
                                     group_id: Some(gid.clone()),
                                 }).await;
+
+                                // FIX 3: Announce FileAvailable to group so LAN peers can pull from us
+                                // instead of waiting for VPN relay to the original sender.
+                                let available = SignalingPayload::FileAvailable {
+                                    file_hash: transfer.file_hash.clone(),
+                                    transfer_id: transfer_id.clone(),
+                                    peer_id: self.swarm.local_peer_id().to_string(),
+                                    group_id: Some(gid.clone()),
+                                };
+                                let topic = libp2p::gossipsub::IdentTopic::new(gid);
+                                if let Ok(bytes) = serde_json::to_vec(&available) {
+                                    let _ = self.swarm.behaviour_mut().gossipsub.publish(topic, bytes);
+                                    info!("[Mesh] Published FileAvailable for {} to group {}", transfer_id, gid);
+                                }
                             } else {
                                 info!("[Mesh] 1-to-1 transfer complete. Skipping mesh seeding to preserve privacy.");
                             }
@@ -2392,6 +2406,18 @@ impl NetworkService {
                                     ping_event.peer, transport, rtt.as_millis()
                                 );
                                 crate::dispatch_global_event(15, payload.as_bytes());
+                            }
+                        } else {
+                            // FIX 1: Ping failure to RBN/anchor — force disconnect to trigger
+                            // ConnectionClosed → reservation cleanup → relay re-request.
+                            // Catches VPN black-holing that doesn't surface as ConnectionClosed.
+                            let is_rbn_or_anchor = self.bootstrap_nodes.iter().any(|(id, _)| id == &ping_event.peer)
+                                || self.discovered_anchors.contains(&ping_event.peer);
+                            if is_rbn_or_anchor {
+                                warn!("[Relay] Ping failure to RBN/anchor {} — forcing disconnect to trigger reservation cleanup", ping_event.peer);
+                                let _ = self.swarm.disconnect_peer_id(ping_event.peer);
+                                // FIX 2: Reset rate limiter so next tick retries reservation immediately
+                                self.last_relay_reservation_attempt = Instant::now() - Duration::from_secs(11);
                             }
                         }
                     }
@@ -6605,6 +6631,42 @@ impl NetworkService {
             SignalingPayload::FileChunk { transfer_id, chunk_index, total_chunks, data_base64 } => {
                 info!("[Mesh] Received chunk {}/{} for {}", chunk_index, total_chunks, transfer_id);
                 self.handle_file_chunk(peer, transfer_id, chunk_index, total_chunks, data_base64).await;
+            }
+            SignalingPayload::FileAvailable { file_hash, transfer_id, peer_id, group_id } => {
+                // FIX 3: A peer has all chunks for a file. If we're still pulling this
+                // transfer and the announcer is LAN-connected (not relayed), retarget.
+                let (needs_chunks, missing_indices, chunk_size) = {
+                    if let Some(transfer) = self.incoming_transfers.get(&transfer_id) {
+                        if transfer.received_chunks.len() < transfer.total_chunks as usize {
+                            let missing: Vec<u32> = (0..transfer.total_chunks)
+                                .filter(|i| !transfer.received_chunks.contains_key(i))
+                                .collect();
+                            (true, missing, transfer.chunk_size)
+                        } else {
+                            (false, Vec::new(), 0)
+                        }
+                    } else {
+                        (false, Vec::new(), 0)
+                    }
+                };
+                if needs_chunks {
+                    if let Ok(new_peer) = peer_id.parse::<libp2p::PeerId>() {
+                        let is_lan = self.swarm.is_connected(&new_peer)
+                            && !self.is_relayed_map.read().get(&new_peer).unwrap_or(&false);
+                        if is_lan {
+                            info!("[FileTransfer] FileAvailable from LAN peer {} for {} — retargeting pull", new_peer, transfer_id);
+                            for chunk_idx in missing_indices {
+                                let req = SignalingPayload::FileChunkRequest {
+                                    transfer_id: transfer_id.clone(),
+                                    chunk_index: chunk_idx,
+                                    chunk_size: Some(chunk_size),
+                                    relay_hint: None,
+                                };
+                                let _ = self.forward_to_mesh(new_peer, req, false).await;
+                            }
+                        }
+                    }
+                }
             }
             SignalingPayload::TransitFileChunk { target_peer, chunk } => {
                 info!("[Mesh] Received TransitFileChunk for target {} from sender {}", target_peer, peer);
