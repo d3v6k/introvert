@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use chrono::Utc;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use webrtc::peer_connection::RTCPeerConnection;
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::data_channel::data_channel_state::RTCDataChannelState;
@@ -2700,14 +2700,19 @@ impl NetworkService {
         // 4. Fallback: Persistent Mesh Storage (Mailbox)
         
         // Send FCM push notification to wake the recipient's device
-        // Dedup: skip if we pushed to this recipient within the last 30s
+        // Dedup: use static PUSH_DEDUP shared with MailboxStore handler
+        static PUSH_DEDUP: once_cell::sync::Lazy<parking_lot::Mutex<std::collections::HashMap<String, Instant>>> =
+            once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(std::collections::HashMap::new()));
         let should_push = {
-            let last = self.push_dedup.get(&recipient_str);
-            last.map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
+            let dedup = PUSH_DEDUP.lock();
+            dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
         };
         if should_push {
             if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                self.push_dedup.insert(recipient_str.clone(), Instant::now());
+                {
+                    let mut dedup = PUSH_DEDUP.lock();
+                    dedup.insert(recipient_str.clone(), Instant::now());
+                }
                 info!("[FCM] Triggering Push Wakeup for {} ({})", recipient_str, device_type);
                 match self.push_tx.try_send(PushRequest {
                     device_type: device_type.clone(),
@@ -4476,32 +4481,44 @@ impl NetworkService {
                             }
                             
                             // Send FCM push notification to wake the recipient's device if offline
-                            // Dedup: skip if we pushed to this recipient within the last 30s
+                            // Dedup: check inside the spawned task to prevent race conditions
+                            // when the same message arrives via multiple paths (gossipsub + direct)
                             let recipient_str = recipient.to_string();
-                            let should_push = {
-                                let last = self.push_dedup.get(&recipient_str);
-                                last.map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
-                            };
-                            if should_push {
-                                if let Ok(Some((device_type, token))) = self.storage.get_push_token(&recipient_str) {
-                                    self.push_dedup.insert(recipient_str.clone(), Instant::now());
-                                    info!("[FCM] Triggering Push Wakeup for mailbox recipient {} ({})", recipient_str, device_type);
-                                    match self.push_tx.try_send(PushRequest {
-                                        device_type: device_type.clone(),
-                                        token: token.clone(),
-                                        sender_peer_id: peer.to_string(),
-                                        recipient_peer_id: recipient_str.clone(),
-                                    }) {
-                                        Ok(_) => {}
-                                        Err(mpsc::error::TrySendError::Full(_)) => {
-                                            warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
+                            let push_tx = self.push_tx.clone();
+                            let storage = self.storage.clone();
+                            let sender_peer_id = peer.to_string();
+                            tokio::spawn(async move {
+                                // Dedup check at execution time, not queue time
+                                static PUSH_DEDUP: once_cell::sync::Lazy<parking_lot::Mutex<std::collections::HashMap<String, Instant>>> =
+                                    once_cell::sync::Lazy::new(|| parking_lot::Mutex::new(std::collections::HashMap::new()));
+                                let should_push = {
+                                    let dedup = PUSH_DEDUP.lock();
+                                    dedup.get(&recipient_str).map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(30))
+                                };
+                                if should_push {
+                                    if let Ok(Some((device_type, token))) = storage.get_push_token(&recipient_str) {
+                                        {
+                                            let mut dedup = PUSH_DEDUP.lock();
+                                            dedup.insert(recipient_str.clone(), Instant::now());
                                         }
-                                        Err(mpsc::error::TrySendError::Closed(_)) => {
-                                            error!("[FCM] Push queue closed — this should never happen");
+                                        info!("[FCM] Triggering Push Wakeup for mailbox recipient {} ({})", recipient_str, device_type);
+                                        match push_tx.try_send(PushRequest {
+                                            device_type: device_type.clone(),
+                                            token: token.clone(),
+                                            sender_peer_id,
+                                            recipient_peer_id: recipient_str.clone(),
+                                        }) {
+                                            Ok(_) => {}
+                                            Err(mpsc::error::TrySendError::Full(_)) => {
+                                                warn!("[FCM] Push queue full — dropping push for {}", recipient_str);
+                                            }
+                                            Err(mpsc::error::TrySendError::Closed(_)) => {
+                                                error!("[FCM] Push queue closed — this should never happen");
+                                            }
                                         }
                                     }
                                 }
-                            }
+                            });
 
                             // Push upgrade for other peers...
                             if self.swarm.is_connected(&recipient) {
