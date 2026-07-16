@@ -2336,6 +2336,8 @@ impl NetworkService {
                 }
             }
             SwarmEvent::ConnectionClosed { peer_id, endpoint, .. } => {
+               // Always decrement peer count on connection close
+               self.connected_peer_count.fetch_sub(1, Ordering::Relaxed);
                // Clean up WebRTC resources immediately on connection loss to prevent stale ghost channels
                self.data_channels.write().remove(&peer_id);
                self.anchor_mappings.remove(&peer_id);
@@ -2370,7 +2372,6 @@ impl NetworkService {
             }
 
                if !self.swarm.is_connected(&peer_id) {
-                   self.connected_peer_count.fetch_sub(1, Ordering::Relaxed);
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
                    self.is_relayed_map.write().remove(&peer_id);
                    self.direct_conn_count.remove(&peer_id);
