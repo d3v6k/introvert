@@ -817,7 +817,7 @@ impl NetworkService {
 
     fn handle_heartbeat(&self) {
         let peers = self.connected_peer_count.load(Ordering::Relaxed);
-        debug!("[Swarm Heartbeat] Connected peers: {}", peers);
+        info!("[Swarm Heartbeat] Connected peers: {}", peers);
     }
 
     fn handle_fork_check(&mut self) {
