@@ -5,7 +5,7 @@ use libp2p::{
     core::transport::ListenerId,
     identity::Keypair,
     PeerId, Swarm, Multiaddr,
-    futures::StreamExt,
+    futures::{StreamExt, FutureExt},
 };
 use base64::{Engine as _, engine::general_purpose};
 use sha2::{Sha256, Digest};
@@ -721,18 +721,10 @@ impl NetworkService {
             let _ = self.swarm.behaviour_mut().kademlia.start_providing(key);
         }
 
-        let mut republication_interval = tokio::time::interval(Duration::from_secs(60)); // 1 min (Aggressive for Background Reachability)
+        let mut base_tick = tokio::time::interval(Duration::from_secs(1));
+        let mut tick_count: u64 = 0;
 
-        let mut liveness_interval = tokio::time::interval(Duration::from_secs(self.liveness_interval_secs));
-        let mut contact_refresh_interval = tokio::time::interval(Duration::from_secs(30));
-        let mut anchor_discovery_interval = tokio::time::interval(Duration::from_secs(2 * 60));
-        let mut mailbox_fetch_interval = tokio::time::interval(Duration::from_secs(30));
-        let mut fast_poll_interval = tokio::time::interval(Duration::from_secs(1)); // Fast poll when transfers are active
-        let mut status_check_interval = tokio::time::interval(Duration::from_secs(15)); // Check local status every 15s
-        let mut pull_retry_interval = tokio::time::interval(Duration::from_secs(4));
-        let mut lease_interval = tokio::time::interval(Duration::from_secs(60 * 60));
-        let mut heartbeat_interval = tokio::time::interval(Duration::from_secs(10));
-        let mut fork_check_interval = tokio::time::interval(Duration::from_secs(6 * 3600)); // Every 6 hours
+        let liveness_interval_secs = self.liveness_interval_secs;
 
 
         let mut last_status = 0u8;
@@ -740,394 +732,56 @@ impl NetworkService {
 
         loop {
             tokio::select! {
-                _ = heartbeat_interval.tick() => {
-                    let peers = self.connected_peer_count.load(Ordering::Relaxed);
-                    debug!("[Swarm Heartbeat] Connected peers: {}", peers);
-                }
-                _ = fork_check_interval.tick() => {
-                    // Passive Telemetry-Correlation Engine: Check for tokenless forks
-                    // that consume relay bandwidth without authenticating economy telemetry.
-                    let now = Instant::now();
-                    let stale_wallets: Vec<(PeerId, String)> = self.peer_solana_wallets.iter()
-                        .filter_map(|(peer_id, wallet)| {
-                            if let Some(last_activity) = self.peer_relay_activity.get(peer_id) {
-                                if now.duration_since(*last_activity) < FORK_DETECTION_THRESHOLD {
-                                    // This peer is actively using relay bandwidth
-                                    if !self.reward_engine.has_recent_telemetry(wallet, FORK_DETECTION_THRESHOLD) {
-                                        return Some((*peer_id, wallet.clone()));
-                                    }
-                                }
-                            }
-                            None
-                        })
-                        .collect();
+                _ = base_tick.tick() => {
+                    tick_count += 1;
 
-                    for (peer_id, wallet) in stale_wallets {
-                        if ENFORCE_FORK_GUARD {
-                            warn!("[ForkGuard] ENFORCING: Disconnecting tokenless fork {} (wallet: {})", peer_id, wallet);
-                            let _ = self.swarm.disconnect_peer_id(peer_id);
-                            self.peer_solana_wallets.remove(&peer_id);
-                            self.peer_relay_activity.remove(&peer_id);
-                        } else {
-                            info!("[ForkGuard] AUDIT-ONLY: Tokenless fork detected — {} (wallet: {}) has consumed relay bandwidth for >72h without authenticated telemetry. Traffic continues.", peer_id, wallet);
-                        }
-                    }
-                }
-                _ = fast_poll_interval.tick() => {
-                    let has_active_incoming = self.incoming_transfers.values().any(|t| t.is_relayed);
-                    let has_active_seeding = !self.active_seeders.is_empty();
-                    let has_relay_peers = self.is_relayed_map.read().values().any(|&r| r);
-                    if has_active_incoming || has_active_seeding || has_relay_peers {
-                        // FLUSH NON-CHUNK PENDING MESSAGES ONLY.
-                        // File chunks/requests are handled by the pull model (pull_retry_interval below).
-                        // Flushing file chunks here would cause relay flooding.
-                        let all_pending_targets: Vec<PeerId> = self.pending_messages.keys().cloned().collect();
-                        for recipient in all_pending_targets {
-                            if let Some(payloads) = self.pending_messages.get_mut(&recipient) {
-                                // Stable extract: split into chunks (keep) and non-chunks (send now)
-                                let mut non_chunks = Vec::new();
-                                payloads.retain(|p| {
-                                    if matches!(p, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
-                                        true // keep in pending
-                                    } else {
-                                        non_chunks.push(p.clone());
-                                        false // remove from pending
-                                    }
-                                });
-                                if payloads.is_empty() { self.pending_messages.remove(&recipient); }
-                                for payload in non_chunks {
-                                    let _ = self.forward_to_mesh(recipient, payload, false).await;
-                                }
-                            }
-                        }
-                        // FAST MAILBOX FETCH: Poll mailbox every 5s when relay peers are connected.
-                        // This ensures ACKs and receipts arrive promptly — not just during file transfers.
-                        // Throttled to 5s to avoid flooding the RBN anchor with MailboxDrain requests.
-                        if last_fast_mailbox_fetch.elapsed() > Duration::from_secs(5) {
-                            last_fast_mailbox_fetch = Instant::now();
-                            self.perform_mailbox_fetch().await;
-                        }
-                    }
-                }
-                _ = pull_retry_interval.tick() => {
-                    // Check if we are online (have at least one active connection to the swarm/mesh)
-                    let is_online = self.connected_peer_count.load(Ordering::Relaxed) > 0;
-                    
-                    if is_online {
-                        // Check for stalled relay transfers: if no new chunk in 8s, re-request missing chunks
-                        let mut stalled = Vec::new();
-                        for (tid, t) in self.incoming_transfers.iter_mut() {
-                            let is_connected = self.swarm.is_connected(&t.peer_id);
-                            let is_relayed_conn = self.is_relayed_map.read().get(&t.peer_id).cloned().unwrap_or(false);
-                            let has_webrtc = {
-                                let dc_store_read = self.data_channels.read();
-                                if let Some(dc) = dc_store_read.get(&t.peer_id) {
-                                    dc.ready_state() == RTCDataChannelState::Open
-                                } else {
-                                    false
-                                }
-                            };
-                            let is_direct_p2p = (is_connected && !is_relayed_conn) || has_webrtc;
-                            
-                            let should_retry = if is_direct_p2p {
-                                // Fallback/Stall recovery: if direct push is active but has stalled for 2s, trigger pull retry
-                                t.last_update.elapsed() > Duration::from_secs(2)
-                            } else {
-                                // For relayed connections or when disconnected, trigger pull retry after 8s
-                                (t.is_relayed || is_relayed_conn) && t.last_update.elapsed() > Duration::from_secs(8)
-                            };
+                    // Every 1s: fast_poll
+                    self.handle_fast_poll(&mut last_fast_mailbox_fetch).await;
 
-                            if should_retry {
-                                // Find the first missing chunk index
-                                let mut next = 0u32;
-                                while t.received_chunks.contains_key(&next) { next += 1; }
-                                let limit = if t.total_chunks > 0 {
-                                    std::cmp::min(next + 4, t.total_chunks)
-                                } else {
-                                    next + 4
-                                };
-                                if next < limit {
-                                    // Align next_pull_idx so it starts pulling sequentially from the new limit
-                                    t.next_pull_idx = limit;
-                                    t.last_update = Instant::now();
-                                    t.is_relayed = true; // Auto-transition to pull model to recover from push stall!
-                                    stalled.push((tid.clone(), t.peer_id, t.providers.clone(), next, limit, t.chunk_size));
-                                }
-                            }
-                        }
-                        
-                        for (tid, peer, providers, first_missing_idx, limit, csize) in stalled {
-                            info!("[Mesh] Transfer {} stalled. Retrying PULL for chunks {}..{} from {} providers", 
-                                     tid, first_missing_idx, limit - 1, providers.len());
-                            
-                            // REDUNDANCY FILTER: Remove old requests for this transfer from RAM buffer
-                            if let Some(pending) = self.pending_messages.get_mut(&peer) {
-                                pending.retain(|p| !matches!(p, SignalingPayload::FileChunkRequest { transfer_id: ref id, .. } if id == &tid));
-                            }
-                            
-                            let tx = self.command_tx.clone();
-                            let tid_clone = tid.clone();
-                            let selected_providers = Self::select_best_providers_static(&self.swarm, &self.is_relayed_map, &providers);
-                            let relay_hint = self.relay_reservations.iter().next().map(|id| id.to_string());
-                            tokio::spawn(async move {
-                                for idx in first_missing_idx..limit {
-                                    let target_peer = if !selected_providers.is_empty() {
-                                        selected_providers[(idx as usize) % selected_providers.len()]
-                                    } else {
-                                        peer
-                                    };
-                                    let req = SignalingPayload::FileChunkRequest { 
-                                        transfer_id: tid_clone.clone(), 
-                                        chunk_index: idx,
-                                        chunk_size: Some(csize),
-                                        relay_hint: relay_hint.clone(),
-                                    };
-                                    let _ = tx.send(NetworkCommand::ForwardMeshSignaling { 
-                                        peer_id: target_peer, 
-                                        payload: req 
-                                    }).await;
-                                    tokio::time::sleep(Duration::from_millis(50)).await;
-                                }
-                            });
-                        }
-                    }
-                }
-                _ = status_check_interval.tick() => {
-                    let connected_count = self.connected_peer_count.load(Ordering::Relaxed);
-                    let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
-                    let has_confirmed_reservation = !self.relay_reservations.is_empty();
-                    let current_status = if connected_count == 0 {
-                        // Check if we have anchors but no peers
-                        if self.discovered_anchors.is_empty() { 0u8 } else { 3u8 } // 0=Offline, 3=Syncing
-                    } else if has_relay_listener || has_confirmed_reservation {
-                        2u8 // Relay Ready
-                    } else {
-                        1u8 // Connected
-                    };
+                    // Every 4s: pull_retry
+                    if tick_count % 4 == 0 { self.handle_pull_retry().await; }
 
-                    if current_status != last_status {
-                        last_status = current_status;
-                        crate::dispatch_global_event(10, &[current_status]);
+                    // Every 10s: heartbeat
+                    if tick_count % 10 == 0 { self.handle_heartbeat(); }
+
+                    // Every 15s: status_check
+                    if tick_count % 15 == 0 { self.handle_status_check(&mut last_status).await; }
+
+                    // Every 30s: mailbox_fetch, contact_refresh
+                    if tick_count % 30 == 0 {
+                        self.handle_mailbox_fetch().await;
+                        self.handle_contact_refresh().await;
                     }
 
-                    // --- RELIABILITY FIX: Proactive Reservation Check ---
-                    // Client devices must have relay reservations to be reachable through NATs/VPNs.
-                    // RBN/relay servers SKIP this — they provide reservations, not request them.
-                    let is_relay_server = self.swarm.behaviour().relay_server.as_ref().is_some() || self.storage.is_anchor_mode_enabled();
-                    let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
-                    if !has_relay_listener && !is_relay_server {
-                        info!("[Mesh] No active relay listeners — requesting reservations on all bootstrap nodes...");
-                        for (rbn_id, rbn_addr) in self.bootstrap_nodes.clone() {
-                            // Build full multiaddr from stored bootstrap address.
-                            // Relative addresses fail with MissingRelayAddr.
-                            let mut relay_addr = rbn_addr.clone();
-                            if !relay_addr.to_string().contains(&rbn_id.to_string()) {
-                                relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(rbn_id));
-                            }
-                            relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
-                            if let Err(e) = self.swarm.listen_on(relay_addr.clone()) {
-                                debug!("[Mesh] Proactive reservation failed for {}: {:?}", rbn_id, e);
-                            }
-                        }
+                    // Every 60s: republication
+                    if tick_count % 60 == 0 { self.handle_republication().await; }
 
-                        // VPN DETECTION: If reservations are empty but RBNs are connected,
-                        // the VPN likely made reservations stale. Force-clear and re-dial.
-                        // BUT: if we have pending relay listeners (requested, not yet accepted),
-                        // don't force-disconnect — the reservation is still being established.
-                        if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
-                            let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
-                                .filter(|(id, _)| self.swarm.is_connected(id))
-                                .map(|(id, _)| *id)
-                                .collect();
-                            if !rbn_connected.is_empty() {
-                                warn!("[VPN] Stale relay reservation detected — re-establishing connections to {} RBNs", rbn_connected.len());
-                                crate::dispatch_debug_log(&format!("[VPN] Stale reservation: {} RBNs connected but 0 reservations. Force re-dial.", rbn_connected.len()));
-                                for rbn_id in &rbn_connected {
-                                    let _ = self.swarm.disconnect_peer_id(*rbn_id);
-                                }
-                                // Re-dial will happen on next tick via mailbox_fetch_interval
-                            }
-                        }
-                    }
+                    // Every 120s: anchor_discovery
+                    if tick_count % 120 == 0 { self.handle_anchor_discovery(); }
 
-                    // Periodically broadcast connection status of all currently connected peers.
-                    let connected_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
-                    for peer_id in connected_peers {
-                        let is_relayed = self.is_relayed_map.read().get(&peer_id).cloned().unwrap_or(false);
-                        let status: u8 = if is_relayed { 1 } else { 0 }; // 0 = Direct P2P, 1 = Relay Active
-                        let mut data = peer_id.to_string().into_bytes();
-                        data.push(b':');
-                        data.push(status);
-                        crate::dispatch_global_event(8, &data);
-                    }
-                }
-                _ = mailbox_fetch_interval.tick() => {
-                    self.perform_mailbox_fetch().await;
-                    for (_, addr) in self.bootstrap_nodes.clone() {
-                        let _ = self.swarm.dial(addr);
-                    }
+                    // Every liveness_interval_secs: liveness
+                    if tick_count % liveness_interval_secs == 0 { self.handle_liveness(); }
 
-                    // Sweep RAM-buffered FileChunks to DB for restart survival
-                    for (recipient, payloads) in &self.pending_messages {
-                        let peer_str = recipient.to_string();
-                        for payload in payloads {
-                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
-                                if let Ok(chunk_data) = base64::decode(data_base64) {
-                                    let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer_str, *chunk_index, &chunk_data);
-                                }
-                            }
-                        }
-                    }
+                    // Every 3600s: lease
+                    if tick_count % 3600 == 0 { self.handle_lease_check().await; }
 
-                    // Flush pending messages periodically (every 30 seconds)
-                    let all_pending: Vec<(PeerId, Vec<SignalingPayload>)> = self.pending_messages.drain().collect();
-                    for (recipient, payloads) in all_pending {
-                        for payload in payloads {
-                            let _ = self.forward_to_mesh(recipient, payload, false).await;
-                        }
-                    }
-
-                    // Flush pending DB chunks for connected peers
-                    // NOTE: Chunks are NOT removed after forwarding — they stay in DB until
-                    // FileTransferComplete arrives. This prevents data loss if the forward
-                    // succeeds but delivery fails later (circuit drops, peer restarts, etc.)
-                    for peer_id in self.swarm.connected_peers().cloned().collect::<Vec<_>>() {
-                        let peer_str = peer_id.to_string();
-                        if let Ok(chunks) = self.storage.dequeue_pending_chunks(&peer_str, 50) {
-                            if !chunks.is_empty() {
-                                info!("[Periodic] Flushing {} pending DB chunks for {}", chunks.len(), peer_str);
-                                for (transfer_id, chunk_index, chunk_data) in chunks {
-                                    let data_base64 = base64::encode(&chunk_data);
-                                    let payload = SignalingPayload::FileChunk {
-                                        transfer_id: transfer_id.clone(),
-                                        chunk_index,
-                                        total_chunks: 0,
-                                        data_base64,
-                                    };
-                                    let _ = self.forward_to_mesh(peer_id, payload, false).await;
-                                }
-                            }
-                        }
-                    }
-
-                    // Cleanup stale pending chunks (>24h)
-                    let _ = self.storage.cleanup_stale_pending_chunks(86400);
-
-                    // Cleanup stale sync_in_progress entries (>60s)
-                    self.sync_in_progress.retain(|_, started| started.elapsed() < Duration::from_secs(60));
-
-                    // Retry undelivered messages: re-send messages stuck at status=0 for >60s
-                    // to recipients we are now connected to. Handles cases where initial
-                    // delivery silently failed (no MailboxStored ACK, no recipient ACK).
-                    if let Ok(undelivered) = self.storage.fetch_undelivered_messages(60) {
-                        for (msg_id, peer_id_str, content, reply_to) in undelivered {
-                            if let Ok(pid) = peer_id_str.parse::<PeerId>() {
-                                if self.swarm.is_connected(&pid) {
-                                    info!("[Retry] Re-sending undelivered msg {} to {}", msg_id, pid);
-                                    let timestamp = chrono::Utc::now().timestamp();
-                                    let payload = SignalingPayload::ChatMessage {
-                                        content,
-                                        msg_id: msg_id.clone(),
-                                        timestamp,
-                                        reply_to,
-                                    };
-                                    let _ = self.forward_to_mesh(pid, payload, false).await;
-                                }
-                            }
-                        }
-                    }
-                }
-                _ = lease_interval.tick() => {
-                    let solana_client = Arc::clone(&self.solana_client);
-                    let local_pubkey = self.operator_pubkey;
-                    if let Ok(balance) = solana_client.fetch_balance(&local_pubkey).await {
-                        let intr_balance = balance as f64 / 1_000_000_000.0;
-                        if !self.reward_tracker.is_lease_valid(balance) {
-                            // TODO: Re-enable strict lease pruning enforcement here after initial deployment phase
-                            info!("[Mesh] Operator lease check bypassed for bootstrap phase. Current balance: {:.2} INTR (under 100,000 INTR target).", intr_balance);
-                        } else {
-                            info!("[Mesh] Operator lease valid. Balance: {:.2} INTR.", intr_balance);
-                        }
-                    } else {
-                        warn!("[Mesh] Failed to fetch operator balance for lease check.");
-                    }
-                }
-                _ = republication_interval.tick() => {
-                    let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
-                    
-                    // Periodically republish local public key for E2EE discovery
-                    let local_peer_id = *self.swarm.local_peer_id();
-                    let pubkey_record = kad::Record {
-                        key: RecordKey::new(&local_peer_id.to_bytes()),
-                        value: self.local_static_public.to_bytes().to_vec(),
-                        publisher: Some(local_peer_id),
-                        expires: None,
-                    };
-                    let _ = self.swarm.behaviour_mut().kademlia.put_record(pubkey_record, kad::Quorum::One);
-
-                    // Periodically republish HANDLE if set
-                    if let Ok(Some((_, Some(handle), _, _, _))) = self.storage.get_profile() {
-                        if handle.starts_with("i@") {
-                            let h_key = RecordKey::new(&handle.as_bytes());
-                            let mut h_value = local_peer_id.to_string().into_bytes();
-                            if let Ok(Some((_, timestamp, sigs_json, verified))) = self.storage.get_handle_claim(&handle) {
-                                if verified {
-                                    if let Ok(sigs) = serde_json::from_str::<Vec<String>>(&sigs_json) {
-                                        let claim = registry::HandleClaim {
-                                            handle: handle.clone(),
-                                            peer_id: local_peer_id.to_string(),
-                                            timestamp,
-                                            pow_nonce: 0,
-                                            signatures: sigs,
-                                        };
-                                        if let Ok(json) = serde_json::to_string(&claim) {
-                                            h_value = json.into_bytes();
-                                        }
-                                    }
-                                }
-                            }
-                            let h_record = kad::Record {
-                                key: h_key.clone(),
-                                value: h_value,
-                                publisher: Some(local_peer_id),
-                                expires: None,
-                            };
-                            let _ = self.swarm.behaviour_mut().kademlia.put_record(h_record, kad::Quorum::One);
-                            let _ = self.swarm.behaviour_mut().kademlia.start_providing(h_key);
-
-                            // Also publish reverse mapping peer_id -> handle for device restoration
-                            let ph_key = RecordKey::new(&format!("ph_{}", local_peer_id).as_bytes());
-                            let ph_record = kad::Record {
-                                key: ph_key,
-                                value: handle.into_bytes(),
-                                publisher: Some(local_peer_id),
-                                expires: None,
-                            };
-                            let _ = self.swarm.behaviour_mut().kademlia.put_record(ph_record, kad::Quorum::One);
-                        }
-                    }
-                }
-                _ = anchor_discovery_interval.tick() => {
-                    let key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
-                    let _ = self.swarm.behaviour_mut().kademlia.get_providers(key);
-                }
-                _ = liveness_interval.tick() => {
-                    self.swarm.behaviour_mut().prune_stale_peers();
-                }
-                _ = contact_refresh_interval.tick() => {
-                    if let Ok(contacts) = self.storage.get_all_contacts() {
-                        for contact in contacts {
-                            if let Ok(pid) = contact.peer_id.parse::<PeerId>() {
-                                if !self.swarm.is_connected(&pid) {
-                                    let _ = self.swarm.dial(pid);
-                                }
-                            }
-                        }
-                    }
+                    // Every 21600s: fork_check
+                    if tick_count % 21600 == 0 { self.handle_fork_check(); }
                 }
                 event = self.swarm.select_next_some() => {
                     if let Err(e) = self.handle_swarm_event(event).await {
                         error!("Error handling swarm event: {:?}", e);
+                    }
+                    // Drain up to 64 more events without yielding to timers
+                    for _ in 0..64 {
+                        match self.swarm.next().now_or_never() {
+                            Some(Some(event)) => {
+                                if let Err(e) = self.handle_swarm_event(event).await {
+                                    error!("Error handling swarm event: {:?}", e);
+                                }
+                            }
+                            _ => break,
+                        }
                     }
                 }
                 command = self.command_rx.recv() => {
@@ -1142,6 +796,356 @@ impl NetworkService {
             }
         }
     }
+
+    // ── Extracted Timer Handlers ─────────────────────────────────────────────
+
+    fn handle_heartbeat(&self) {
+        let peers = self.connected_peer_count.load(Ordering::Relaxed);
+        debug!("[Swarm Heartbeat] Connected peers: {}", peers);
+    }
+
+    fn handle_fork_check(&mut self) {
+        let now = Instant::now();
+        let stale_wallets: Vec<(PeerId, String)> = self.peer_solana_wallets.iter()
+            .filter_map(|(peer_id, wallet)| {
+                if let Some(last_activity) = self.peer_relay_activity.get(peer_id) {
+                    if now.duration_since(*last_activity) < FORK_DETECTION_THRESHOLD {
+                        if !self.reward_engine.has_recent_telemetry(wallet, FORK_DETECTION_THRESHOLD) {
+                            return Some((*peer_id, wallet.clone()));
+                        }
+                    }
+                }
+                None
+            })
+            .collect();
+
+        for (peer_id, wallet) in stale_wallets {
+            if ENFORCE_FORK_GUARD {
+                warn!("[ForkGuard] ENFORCING: Disconnecting tokenless fork {} (wallet: {})", peer_id, wallet);
+                let _ = self.swarm.disconnect_peer_id(peer_id);
+                self.peer_solana_wallets.remove(&peer_id);
+                self.peer_relay_activity.remove(&peer_id);
+            } else {
+                info!("[ForkGuard] AUDIT-ONLY: Tokenless fork detected — {} (wallet: {}) has consumed relay bandwidth for >72h without authenticated telemetry. Traffic continues.", peer_id, wallet);
+            }
+        }
+    }
+
+    async fn handle_fast_poll(&mut self, last_fast_mailbox_fetch: &mut Instant) {
+        let has_active_incoming = self.incoming_transfers.values().any(|t| t.is_relayed);
+        let has_active_seeding = !self.active_seeders.is_empty();
+        let has_relay_peers = self.is_relayed_map.read().values().any(|&r| r);
+        if has_active_incoming || has_active_seeding || has_relay_peers {
+            let all_pending_targets: Vec<PeerId> = self.pending_messages.keys().cloned().collect();
+            for recipient in all_pending_targets {
+                if let Some(payloads) = self.pending_messages.get_mut(&recipient) {
+                    let mut non_chunks = Vec::new();
+                    payloads.retain(|p| {
+                        if matches!(p, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. }) {
+                            true
+                        } else {
+                            non_chunks.push(p.clone());
+                            false
+                        }
+                    });
+                    if payloads.is_empty() { self.pending_messages.remove(&recipient); }
+                    for payload in non_chunks {
+                        let _ = self.forward_to_mesh(recipient, payload, false).await;
+                    }
+                }
+            }
+            if last_fast_mailbox_fetch.elapsed() > Duration::from_secs(5) {
+                *last_fast_mailbox_fetch = Instant::now();
+                self.perform_mailbox_fetch().await;
+            }
+        }
+    }
+
+    async fn handle_pull_retry(&mut self) {
+        let is_online = self.connected_peer_count.load(Ordering::Relaxed) > 0;
+        if !is_online { return; }
+
+        let mut stalled = Vec::new();
+        for (tid, t) in self.incoming_transfers.iter_mut() {
+            let is_connected = self.swarm.is_connected(&t.peer_id);
+            let is_relayed_conn = self.is_relayed_map.read().get(&t.peer_id).cloned().unwrap_or(false);
+            let has_webrtc = {
+                let dc_store_read = self.data_channels.read();
+                if let Some(dc) = dc_store_read.get(&t.peer_id) {
+                    dc.ready_state() == RTCDataChannelState::Open
+                } else {
+                    false
+                }
+            };
+            let is_direct_p2p = (is_connected && !is_relayed_conn) || has_webrtc;
+            let should_retry = if is_direct_p2p {
+                t.last_update.elapsed() > Duration::from_secs(2)
+            } else {
+                (t.is_relayed || is_relayed_conn) && t.last_update.elapsed() > Duration::from_secs(8)
+            };
+
+            if should_retry {
+                let mut next = 0u32;
+                while t.received_chunks.contains_key(&next) { next += 1; }
+                let limit = if t.total_chunks > 0 {
+                    std::cmp::min(next + 4, t.total_chunks)
+                } else {
+                    next + 4
+                };
+                if next < limit {
+                    t.next_pull_idx = limit;
+                    t.last_update = Instant::now();
+                    t.is_relayed = true;
+                    stalled.push((tid.clone(), t.peer_id, t.providers.clone(), next, limit, t.chunk_size));
+                }
+            }
+        }
+
+        for (tid, peer, providers, first_missing_idx, limit, csize) in stalled {
+            info!("[Mesh] Transfer {} stalled. Retrying PULL for chunks {}..{} from {} providers",
+                     tid, first_missing_idx, limit - 1, providers.len());
+            if let Some(pending) = self.pending_messages.get_mut(&peer) {
+                pending.retain(|p| !matches!(p, SignalingPayload::FileChunkRequest { transfer_id: ref id, .. } if id == &tid));
+            }
+            let tx = self.command_tx.clone();
+            let tid_clone = tid.clone();
+            let selected_providers = Self::select_best_providers_static(&self.swarm, &self.is_relayed_map, &providers);
+            let relay_hint = self.relay_reservations.iter().next().map(|id| id.to_string());
+            tokio::spawn(async move {
+                for idx in first_missing_idx..limit {
+                    let target_peer = if !selected_providers.is_empty() {
+                        selected_providers[(idx as usize) % selected_providers.len()]
+                    } else {
+                        peer
+                    };
+                    let req = SignalingPayload::FileChunkRequest {
+                        transfer_id: tid_clone.clone(),
+                        chunk_index: idx,
+                        chunk_size: Some(csize),
+                        relay_hint: relay_hint.clone(),
+                    };
+                    let _ = tx.send(NetworkCommand::ForwardMeshSignaling {
+                        peer_id: target_peer,
+                        payload: req
+                    }).await;
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+            });
+        }
+    }
+
+    async fn handle_status_check(&mut self, last_status: &mut u8) {
+        let connected_count = self.connected_peer_count.load(Ordering::Relaxed);
+        let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
+        let has_confirmed_reservation = !self.relay_reservations.is_empty();
+        let current_status = if connected_count == 0 {
+            if self.discovered_anchors.is_empty() { 0u8 } else { 3u8 }
+        } else if has_relay_listener || has_confirmed_reservation {
+            2u8
+        } else {
+            1u8
+        };
+
+        if current_status != *last_status {
+            *last_status = current_status;
+            crate::dispatch_global_event(10, &[current_status]);
+        }
+
+        let is_relay_server = self.swarm.behaviour().relay_server.as_ref().is_some() || self.storage.is_anchor_mode_enabled();
+        let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
+        if !has_relay_listener && !is_relay_server {
+            info!("[Mesh] No active relay listeners — requesting reservations on all bootstrap nodes...");
+            for (rbn_id, rbn_addr) in self.bootstrap_nodes.clone() {
+                let mut relay_addr = rbn_addr.clone();
+                if !relay_addr.to_string().contains(&rbn_id.to_string()) {
+                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(rbn_id));
+                }
+                relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+                if let Err(e) = self.swarm.listen_on(relay_addr.clone()) {
+                    debug!("[Mesh] Proactive reservation failed for {}: {:?}", rbn_id, e);
+                }
+            }
+
+            if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
+                let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
+                    .filter(|(id, _)| self.swarm.is_connected(id))
+                    .map(|(id, _)| *id)
+                    .collect();
+                if !rbn_connected.is_empty() {
+                    warn!("[VPN] Stale relay reservation detected — re-establishing connections to {} RBNs", rbn_connected.len());
+                    crate::dispatch_debug_log(&format!("[VPN] Stale reservation: {} RBNs connected but 0 reservations. Force re-dial.", rbn_connected.len()));
+                    for rbn_id in &rbn_connected {
+                        let _ = self.swarm.disconnect_peer_id(*rbn_id);
+                    }
+                }
+            }
+        }
+
+        let connected_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
+        for peer_id in connected_peers {
+            let is_relayed = self.is_relayed_map.read().get(&peer_id).cloned().unwrap_or(false);
+            let status: u8 = if is_relayed { 1 } else { 0 };
+            let mut data = peer_id.to_string().into_bytes();
+            data.push(b':');
+            data.push(status);
+            crate::dispatch_global_event(8, &data);
+        }
+    }
+
+    async fn handle_mailbox_fetch(&mut self) {
+        self.perform_mailbox_fetch().await;
+        for (_, addr) in self.bootstrap_nodes.clone() {
+            let _ = self.swarm.dial(addr);
+        }
+
+        for (recipient, payloads) in &self.pending_messages {
+            let peer_str = recipient.to_string();
+            for payload in payloads {
+                if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, ref data_base64, .. } = payload {
+                    if let Ok(chunk_data) = base64::decode(data_base64) {
+                        let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer_str, *chunk_index, &chunk_data);
+                    }
+                }
+            }
+        }
+
+        let all_pending: Vec<(PeerId, Vec<SignalingPayload>)> = self.pending_messages.drain().collect();
+        for (recipient, payloads) in all_pending {
+            for payload in payloads {
+                let _ = self.forward_to_mesh(recipient, payload, false).await;
+            }
+        }
+
+        for peer_id in self.swarm.connected_peers().cloned().collect::<Vec<_>>() {
+            let peer_str = peer_id.to_string();
+            if let Ok(chunks) = self.storage.dequeue_pending_chunks(&peer_str, 50) {
+                if !chunks.is_empty() {
+                    info!("[Periodic] Flushing {} pending DB chunks for {}", chunks.len(), peer_str);
+                    for (transfer_id, chunk_index, chunk_data) in chunks {
+                        let data_base64 = base64::encode(&chunk_data);
+                        let payload = SignalingPayload::FileChunk {
+                            transfer_id: transfer_id.clone(),
+                            chunk_index,
+                            total_chunks: 0,
+                            data_base64,
+                        };
+                        let _ = self.forward_to_mesh(peer_id, payload, false).await;
+                    }
+                }
+            }
+        }
+
+        let _ = self.storage.cleanup_stale_pending_chunks(86400);
+        self.sync_in_progress.retain(|_, started| started.elapsed() < Duration::from_secs(60));
+
+        if let Ok(undelivered) = self.storage.fetch_undelivered_messages(60) {
+            for (msg_id, peer_id_str, content, reply_to) in undelivered {
+                if let Ok(pid) = peer_id_str.parse::<PeerId>() {
+                    if self.swarm.is_connected(&pid) {
+                        info!("[Retry] Re-sending undelivered msg {} to {}", msg_id, pid);
+                        let timestamp = chrono::Utc::now().timestamp();
+                        let payload = SignalingPayload::ChatMessage {
+                            content,
+                            msg_id: msg_id.clone(),
+                            timestamp,
+                            reply_to,
+                        };
+                        let _ = self.forward_to_mesh(pid, payload, false).await;
+                    }
+                }
+            }
+        }
+    }
+
+    async fn handle_lease_check(&mut self) {
+        let solana_client = Arc::clone(&self.solana_client);
+        let local_pubkey = self.operator_pubkey;
+        if let Ok(balance) = solana_client.fetch_balance(&local_pubkey).await {
+            let intr_balance = balance as f64 / 1_000_000_000.0;
+            if !self.reward_tracker.is_lease_valid(balance) {
+                info!("[Mesh] Operator lease check bypassed for bootstrap phase. Current balance: {:.2} INTR (under 100,000 INTR target).", intr_balance);
+            } else {
+                info!("[Mesh] Operator lease valid. Balance: {:.2} INTR.", intr_balance);
+            }
+        } else {
+            warn!("[Mesh] Failed to fetch operator balance for lease check.");
+        }
+    }
+
+    async fn handle_republication(&mut self) {
+        let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
+        let local_peer_id = *self.swarm.local_peer_id();
+        let pubkey_record = kad::Record {
+            key: RecordKey::new(&local_peer_id.to_bytes()),
+            value: self.local_static_public.to_bytes().to_vec(),
+            publisher: Some(local_peer_id),
+            expires: None,
+        };
+        let _ = self.swarm.behaviour_mut().kademlia.put_record(pubkey_record, kad::Quorum::One);
+
+        if let Ok(Some((_, Some(handle), _, _, _))) = self.storage.get_profile() {
+            if handle.starts_with("i@") {
+                let h_key = RecordKey::new(&handle.as_bytes());
+                let mut h_value = local_peer_id.to_string().into_bytes();
+                if let Ok(Some((_, timestamp, sigs_json, verified))) = self.storage.get_handle_claim(&handle) {
+                    if verified {
+                        if let Ok(sigs) = serde_json::from_str::<Vec<String>>(&sigs_json) {
+                            let claim = registry::HandleClaim {
+                                handle: handle.clone(),
+                                peer_id: local_peer_id.to_string(),
+                                timestamp,
+                                pow_nonce: 0,
+                                signatures: sigs,
+                            };
+                            if let Ok(json) = serde_json::to_string(&claim) {
+                                h_value = json.into_bytes();
+                            }
+                        }
+                    }
+                }
+                let h_record = kad::Record {
+                    key: h_key.clone(),
+                    value: h_value,
+                    publisher: Some(local_peer_id),
+                    expires: None,
+                };
+                let _ = self.swarm.behaviour_mut().kademlia.put_record(h_record, kad::Quorum::One);
+                let _ = self.swarm.behaviour_mut().kademlia.start_providing(h_key);
+
+                let ph_key = RecordKey::new(&format!("ph_{}", local_peer_id).as_bytes());
+                let ph_record = kad::Record {
+                    key: ph_key,
+                    value: handle.into_bytes(),
+                    publisher: Some(local_peer_id),
+                    expires: None,
+                };
+                let _ = self.swarm.behaviour_mut().kademlia.put_record(ph_record, kad::Quorum::One);
+            }
+        }
+    }
+
+    fn handle_anchor_discovery(&mut self) {
+        let key = RecordKey::new(&ANCHOR_PROVIDER_KEY);
+        let _ = self.swarm.behaviour_mut().kademlia.get_providers(key);
+    }
+
+    fn handle_liveness(&mut self) {
+        self.swarm.behaviour_mut().prune_stale_peers();
+    }
+
+    async fn handle_contact_refresh(&mut self) {
+        if let Ok(contacts) = self.storage.get_all_contacts() {
+            for contact in contacts {
+                if let Ok(pid) = contact.peer_id.parse::<PeerId>() {
+                    if !self.swarm.is_connected(&pid) {
+                        let _ = self.swarm.dial(pid);
+                    }
+                }
+            }
+        }
+    }
+
+    // ── End Extracted Timer Handlers ─────────────────────────────────────────
 
     async fn handle_file_chunk(&mut self, peer: PeerId, transfer_id: String, chunk_index: u32, total_chunks: u32, data_base64: String) {
         if let Some(transfer) = self.incoming_transfers.get_mut(&transfer_id) {
