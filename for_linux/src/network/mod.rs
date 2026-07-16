@@ -14,6 +14,7 @@ use std::io::Read;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use chrono::Utc;
@@ -441,6 +442,8 @@ pub struct NetworkService {
     /// when both forward_to_mesh fallback and MailboxStore anchor handler fire
     /// for the same offline peer within a short window.
     push_dedup: HashMap<String, Instant>,
+    /// Cached connected peer count — O(1) replacement for swarm.connected_peers().count()
+    connected_peer_count: Arc<AtomicUsize>,
 }
 
 /// Whether to actively block tokenless forks or just log them.
@@ -635,6 +638,7 @@ impl NetworkService {
             peer_solana_wallets: HashMap::new(),
             peer_relay_activity: HashMap::new(),
             push_dedup: HashMap::new(),
+            connected_peer_count: Arc::new(AtomicUsize::new(0)),
             reward_engine,
         };
 
@@ -737,7 +741,7 @@ impl NetworkService {
         loop {
             tokio::select! {
                 _ = heartbeat_interval.tick() => {
-                    let peers = self.swarm.connected_peers().count();
+                    let peers = self.connected_peer_count.load(Ordering::Relaxed);
                     debug!("[Swarm Heartbeat] Connected peers: {}", peers);
                 }
                 _ = fork_check_interval.tick() => {
@@ -807,7 +811,7 @@ impl NetworkService {
                 }
                 _ = pull_retry_interval.tick() => {
                     // Check if we are online (have at least one active connection to the swarm/mesh)
-                    let is_online = self.swarm.connected_peers().count() > 0;
+                    let is_online = self.connected_peer_count.load(Ordering::Relaxed) > 0;
                     
                     if is_online {
                         // Check for stalled relay transfers: if no new chunk in 8s, re-request missing chunks
@@ -889,7 +893,7 @@ impl NetworkService {
                     }
                 }
                 _ = status_check_interval.tick() => {
-                    let connected_count = self.swarm.connected_peers().count();
+                    let connected_count = self.connected_peer_count.load(Ordering::Relaxed);
                     let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
                     let has_confirmed_reservation = !self.relay_reservations.is_empty();
                     let current_status = if connected_count == 0 {
@@ -2161,6 +2165,7 @@ impl NetworkService {
             }
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                 debug!("[Swarm] Connection established with {}", peer_id);
+                self.connected_peer_count.fetch_add(1, Ordering::Relaxed);
 
                 let endpoint_addr = endpoint.get_remote_address();
                 let is_manual = {
@@ -2306,6 +2311,7 @@ impl NetworkService {
             }
 
                if !self.swarm.is_connected(&peer_id) {
+                   self.connected_peer_count.fetch_sub(1, Ordering::Relaxed);
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
                    self.is_relayed_map.write().remove(&peer_id);
                    self.direct_conn_count.remove(&peer_id);
