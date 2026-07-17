@@ -1,19 +1,19 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-14 19:30 UTC
-**Git:** main @ 80c5445 + uncommitted VPN/mobile fixes
+**Last Updated:** 2026-07-17 00:10 UTC
+**Git:** main @ 521d315 + uncommitted FCM/peer-count fixes
 
 ---
 
 ## Current System State
 
 ### RBN Server
-- **introvertd**: ACTIVE (PID 56478) — relay server fix deployed, no more relay loop
+- **introvertd**: ACTIVE (PID 197406) — push dedup + per-recipient cooldown deployed
 - **introvert-solana**: ACTIVE — treasury/IPC daemon with unified credential management
 - **IPC Secret**: Both daemons reading from `/etc/introvert/ipc.secret` (chmod 600)
 - **Firebase**: Service account loaded, FCM push working
 - **APNs**: Not configured (iOS push disabled)
-- **Connected Peers**: 3 (Android, Mac, iOS) — all connected at TCP level
+- **Connected Peers**: 6+ reconnecting after RBN restart
 
 ### Client Build
 - **macOS**: `make mac` — builds `libintrovert.dylib`
@@ -211,5 +211,80 @@ Non-VPN:
 ---
 ## Backup Status (2026-07-15 05:53)
 - Git: main @ 80c5445
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-16 15:41)
+- Git: main @ d11ecc7
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-16 16:52)
+- Git: main @ d5a7c9c
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-16 20:26)
+- Git: main @ 521d315
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Mobile Data Drain Investigation (2026-07-16 20:30)
+
+### Issue
+App drains mobile data and phone gets warm when on mobile data. User reported excessive data usage and device heating.
+
+### Root Causes Found (ranked by impact)
+
+| # | Cause | File:Line | Impact |
+|---|-------|-----------|--------|
+| 1 | `onPushNotification` has NO cooldown — FCM echo loop | `alert_service.dart:82` | **Infinite fetchMailbox loop** — every push triggers fetchMailbox, RBN sends another push, repeat |
+| 2 | `status_check_interval` = 15s dials ALL bootstrap nodes | `mod.rs:381, 803-815` | Dial storm every 15s when disconnected on mobile |
+| 3 | Gossipsub heartbeat = 10s, no max_transmit_size | `behaviour.rs:128,131` | Constant mesh maintenance traffic, unbounded messages |
+| 4 | `fast_reconnect_interval` = 5s with 15s mobile tunnel reset | `mod.rs:382, 999-1002` | Tunnel churn cycle on unstable mobile connections |
+| 5 | `mailbox_fetch_interval` dials ALL bootstrap nodes | `mod.rs:1146-1148` | Burst of dials every 5 min (2.5 min on mobile) |
+| 6 | No mobile-data-aware timer scaling | `mod.rs:373-386` | All timers run at full speed on cellular |
+
+### Critical Finding: FCM Echo Loop
+
+`onWakeup` handler (alert_service.dart:60-61) has a 30-second cooldown that prevents the echo loop. But `onPushNotification` handler (alert_service.dart:68-83) calls `fetchMailbox()` with **ZERO cooldown**. This creates an infinite loop:
+
+1. Push notification arrives → `onPushNotification` fires → calls `fetchMailbox()`
+2. `fetchMailbox()` contacts RBN → RBN sends another push notification
+3. `onPushNotification` fires again → calls `fetchMailbox()` again
+4. Infinite loop — drains data and battery
+
+### Rectification Plan
+
+**Fix 1 (CRITICAL):** Add 30s cooldown to `onPushNotification` in `alert_service.dart` — same pattern as `onWakeup`.
+
+**Fix 2:** Scale timers on mobile data in `mod.rs`:
+- `status_check_interval`: 15s → 30s on mobile
+- `fast_reconnect_interval`: 5s → 15s on mobile
+
+**Fix 3:** Throttle bootstrap dials on mobile in `mod.rs`:
+- Only dial primary RBN (not all bootstrap nodes) on mobile
+- Skip `kademlia.bootstrap()` on mobile
+
+**Fix 4:** Skip Kademlia `FindProviders` queries on mobile during transfers in `mod.rs`.
+
+### Status
+**Fix 1 DEPLOYED** (2026-07-17): 30s cooldown added to `onPushNotification` in `alert_service.dart:81-85`. Also added `setAppIdleState(false)` before `fetchMailbox()` to wake idle mode on push.
+**RBN DEPLOYED** (2026-07-17): Push dedup (SHA-256 payload hash) + per-recipient 30s push cooldown. FCM 429 errors resolved.
+
+---
+
+## Backup Status (2026-07-17 00:10)
+- Git: main @ 521d315 + uncommitted FCM/peer-count fixes
+- RBN: introvertd on 47.89.252.80:443 (push dedup + cooldown deployed)
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-17 04:22)
+- Git: main @ 521d315
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001

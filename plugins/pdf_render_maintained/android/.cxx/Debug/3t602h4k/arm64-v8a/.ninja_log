@@ -1,7 +1,0 @@
-# ninja log v5
-0	157	1784016195788597626	CMakeFiles/bbhelper.dir/c++/directBufferAndroid.cpp.o	93a0740b9d8fff69
-159	299	1784016195926166303	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/3t602h4k/obj/arm64-v8a/libbbhelper.so	7180fd98a4f48bc
-102	1029	1784029613545212551	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/3t602h4k/obj/arm64-v8a/libbbhelper.so	7180fd98a4f48bc
-8	627	1784048018509312616	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/3t602h4k/obj/arm64-v8a/libbbhelper.so	7180fd98a4f48bc
-14	2068	1784055873810849492	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/3t602h4k/obj/arm64-v8a/libbbhelper.so	7180fd98a4f48bc
-11	466	1784062174119626118	/Users/dev/Development/introvert/build/pdf_render_maintained/intermediates/cxx/Debug/3t602h4k/obj/arm64-v8a/libbbhelper.so	7180fd98a4f48bc

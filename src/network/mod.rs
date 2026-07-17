@@ -254,6 +254,7 @@ impl NetworkService {
             last_relay_reservation_attempt: Instant::now() - Duration::from_secs(60), // allow first attempt immediately
             last_token_registration: HashMap::new(),
             idle_mode: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            connected_peer_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             last_idle_log: Instant::now(),
         };
 
@@ -466,7 +467,7 @@ impl NetworkService {
                 }
                 _ = pull_retry_interval.tick() => {
                     // Check if we are online (have at least one active connection to the swarm/mesh)
-                    let is_online = self.swarm.connected_peers().count() > 0;
+                    let is_online = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed) > 0;
                     
                     if is_online {
                         // Check for stalled relay transfers: if no new chunk in 8s, re-request missing chunks
@@ -585,7 +586,7 @@ impl NetworkService {
                         let _ = self.storage.remove_pending_chunks_for_transfer(id);
                     }
 
-                    let connected_count = self.swarm.connected_peers().count();
+                    let connected_count = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed);
                     let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
                     let has_confirmed_reservation = !self.relay_reservations.is_empty();
 
@@ -986,7 +987,7 @@ impl NetworkService {
 
                         if has_pending_transfers && self.last_relay_reservation_attempt.elapsed() >= Duration::from_secs(30) {
                             self.last_relay_reservation_attempt = Instant::now();
-                            let connected_count = self.swarm.connected_peers().count();
+                            let connected_count = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed);
                             crate::dispatch_debug_log(&format!(
                                 "[Resilience] Fast reconnect: transfers waiting, no relay (peers={}, incoming={}, seeders={}, pending={})",
                                 connected_count, self.incoming_transfers.len(), self.active_seeders.len(), self.pending_messages.len()
@@ -2612,6 +2613,7 @@ impl NetworkService {
                 }
             }
             SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
+                self.connected_peer_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 info!("[Swarm] Connection established with {}", peer_id);
 
                 let endpoint_addr = endpoint.get_remote_address();
@@ -2795,6 +2797,7 @@ impl NetworkService {
                }
 
                if !self.swarm.is_connected(&peer_id) {
+                   self.connected_peer_count.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
                    self.is_relayed_map.write().remove(&peer_id);
                    self.direct_conn_count.remove(&peer_id);
@@ -4356,7 +4359,7 @@ impl NetworkService {
                 self.perform_mailbox_fetch().await;
 
                 // 6. Report current status immediately
-                let connected_count = self.swarm.connected_peers().count();
+                let connected_count = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed);
                 if connected_count > 0 {
                     let status = if self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit")) { 2u8 } else { 1u8 };
                     crate::dispatch_global_event(10, &[status]);
@@ -4370,7 +4373,7 @@ impl NetworkService {
                 // 7. VPN/NAT/MOBILE fallback: Reset tunnel if stale, then activate if needed
                 //    On mobile data, carriers often block direct connections — tunnel is critical
                 let tx_tunnel = self.command_tx.clone();
-                let has_peers = self.swarm.connected_peers().count() > 0;
+                let has_peers = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed) > 0;
                 let is_mobile = self.intro_claw.is_on_mobile_data();
 
                 // MOBILE FIX: Force-reset tunnel on network change to clear stale VPN sockets

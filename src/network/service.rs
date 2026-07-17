@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use libp2p::{kad::QueryId, Swarm, Multiaddr, PeerId, identity::Keypair};
 use libp2p::core::transport::ListenerId;
 use parking_lot::RwLock;
@@ -93,6 +93,8 @@ pub struct NetworkService {
     pub(crate) last_token_registration: HashMap<PeerId, Instant>,
     /// App idle/background state — suppresses proactive dials when true
     pub(crate) idle_mode: Arc<AtomicBool>,
+    /// Cached connected peer count (avoids O(n) swarm.connected_peers().count())
+    pub(crate) connected_peer_count: Arc<AtomicUsize>,
     /// Last time an idle-mode suppression log was emitted (rate-limit to 5min)
     pub(crate) last_idle_log: Instant,
 }

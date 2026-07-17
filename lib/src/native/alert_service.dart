@@ -58,8 +58,7 @@ class AlertService {
         case 'onWakeup':
           // Cooldown: break the FCM echo loop (fetchMailbox → RBN sends push → onWakeup → fetchMailbox)
           if (_lastWakeupTime != null && DateTime.now().difference(_lastWakeupTime!) < _wakeupCooldown) {
-            debugPrint("🔔 AlertService: Wakeup suppressed (30s cooldown — FCM echo loop breaker)");
-            break;
+            break; // silently suppress — don't log (was spamming thousands of lines)
           }
           _lastWakeupTime = DateTime.now();
           debugPrint("🔔 AlertService: Background Wakeup! Triggering P2P Fetch...");
@@ -79,7 +78,14 @@ class AlertService {
             tryRegisterPendingToken();
           }
           
+          // Cooldown: prevent FCM echo loop (same as onWakeup)
+          if (_lastWakeupTime != null && DateTime.now().difference(_lastWakeupTime!) < _wakeupCooldown) {
+            break;
+          }
+          _lastWakeupTime = DateTime.now();
+          
           debugPrint("🔔 AlertService: Push notification received: chat=$openChat, group=$openGroup, call=$incomingCall");
+          IntrovertClient().setAppIdleState(false);
           IntrovertClient().fetchMailbox();
           break;
       }

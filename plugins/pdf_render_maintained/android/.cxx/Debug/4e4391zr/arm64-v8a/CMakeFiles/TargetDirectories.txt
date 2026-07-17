@@ -1,3 +1,0 @@
-/Users/dev/.pub-cache/hosted/pub.dev/pdf_render_maintained-1.6.1/android/.cxx/Debug/4e4391zr/arm64-v8a/CMakeFiles/bbhelper.dir
-/Users/dev/.pub-cache/hosted/pub.dev/pdf_render_maintained-1.6.1/android/.cxx/Debug/4e4391zr/arm64-v8a/CMakeFiles/edit_cache.dir
-/Users/dev/.pub-cache/hosted/pub.dev/pdf_render_maintained-1.6.1/android/.cxx/Debug/4e4391zr/arm64-v8a/CMakeFiles/rebuild_cache.dir
