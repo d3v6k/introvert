@@ -1,0 +1,30 @@
+188:            pending_messages: HashMap::new(),
+198:            relay_reservations: HashSet::new(),
+292:                    self.relay_reservations.insert(*peer_id);
+370:                    let connected: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
+373:                        let _ = self.forward_to_mesh(peer_id, payload, false).await;
+391:                        let all_pending_targets: Vec<PeerId> = self.pending_messages.keys().cloned().collect();
+393:                            if let Some(payloads) = self.pending_messages.get_mut(&recipient) {
+404:                                if payloads.is_empty() { self.pending_messages.remove(&recipient); }
+406:                                    let _ = self.forward_to_mesh(recipient, payload, false).await;
+421:                    let is_online = self.swarm.connected_peers().count() > 0;
+488:                            if let Some(pending) = self.pending_messages.get_mut(&peer) {
+494:                            let relay_hint = self.relay_reservations.iter().next().map(|id| id.to_string());
+523:                    let connected_count = self.swarm.connected_peers().count();
+525:                    let has_confirmed_reservation = !self.relay_reservations.is_empty();
+635:                                            let _ = self.forward_to_mesh(*rbn_id, payload.clone(), false).await;
+689:                                connected_peers: Vec::new(),
+697:                                has_relay_reservation: !self.relay_reservations.is_empty(),
+732:                        let had_recent_relay = self.relay_reservations.len() > 0
+794:                            if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
+802:                                        self.relay_reservations.insert(*rbn_id);
+821:                        if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
+839:                    // delivery silently failed (no MailboxStored ACK, no recipient ACK).
+852:                                    let _ = self.forward_to_mesh(pid, payload, false).await;
+859:                    let connected_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
+860:                    for peer_id in connected_peers {
+876:                            || !self.pending_messages.is_empty();
+879:                            let connected_count = self.swarm.connected_peers().count();
+882:                                connected_count, self.incoming_transfers.len(), self.active_seeders.len(), self.pending_messages.len()
+926:                                if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
+934:                                            self.relay_reservations.insert(*rbn_id);

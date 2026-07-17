@@ -1,0 +1,40 @@
+123:    /// Raw flutter_webrtc SDP/ICE signal forwarded over the mesh
+276:    /// Forward a raw flutter_webrtc JSON signal over the mesh (no webrtc-rs involvement)
+294:    PublishGossipsub { topic: String, data: Vec<u8> },
+386:    mesh_active_peers: HashSet<PeerId>,
+442:    /// when both forward_to_mesh fallback and MailboxStore anchor handler fire
+464:/// arrives via multiple paths (gossipsub + direct-forward). Used by both
+465:/// forward_to_mesh fallback and MailboxStore anchor handler.
+593:        // Subscribe to gossipsub topics for all existing groups
+596:                let topic = libp2p::gossipsub::IdentTopic::new(group_id.clone());
+597:                if let Err(e) = swarm.behaviour_mut().gossipsub.subscribe(&topic) {
+598:                    error!("[Mesh] Failed to subscribe to gossipsub topic {}: {}", group_id, e);
+600:                    info!("[Mesh] Subscribed to gossipsub topic {}", group_id);
+628:            mesh_active_peers: HashSet::new(),
+771:                    // Every 10s: heartbeat
+772:                    if tick_count % 10 == 0 { self.handle_heartbeat(); }
+829:    fn handle_heartbeat(&self) {
+880:                        let _ = self.forward_to_mesh(recipient, payload, false).await;
+1042:                let _ = self.forward_to_mesh(recipient, payload, false).await;
+1059:                        let _ = self.forward_to_mesh(peer_id, payload, false).await;
+1080:                        let _ = self.forward_to_mesh(pid, payload, false).await;
+1290:                            info!("[Mesh] 1-to-1 transfer complete. Skipping mesh seeding to preserve privacy.");
+1315:                            // SOVEREIGN DRIVE: Persist metadata so this node can serve as a mesh seeder indefinitely
+1507:                        if self.mesh_active_peers.insert(peer_id) {
+1709:                                // returns true and forward_to_mesh can send the queued payloads.
+2136:                    IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Message { propagation_source, message_id, message }) => {
+2137:                        info!("[Mesh] Received gossipsub message from {} with id {}", propagation_source, message_id);
+2139:                        // Auto-subscribe to file-transfer topics so the RBN can relay file payloads
+2140:                        let topic_str = message.topic.as_str();
+2141:                        if topic_str.starts_with("file-transfer-") {
+2142:                            let topic = libp2p::gossipsub::IdentTopic::new(topic_str);
+2143:                            let _ = self.swarm.behaviour_mut().gossipsub.subscribe(&topic);
+2147:                        // subscribe to the corresponding file-transfer topic so we can relay chunks
+2154:                                        let ft_topic = libp2p::gossipsub::IdentTopic::new(format!("file-transfer-{}", transfer_id));
+2155:                                        let _ = self.swarm.behaviour_mut().gossipsub.subscribe(&ft_topic);
+2156:                                        info!("[RBN] Proactive subscribe to file-transfer-{} from group manifest", transfer_id);
+2164:                        if self.mesh_active_peers.insert(propagation_source) {
+2172:                    IntrovertBehaviourEvent::Gossipsub(libp2p::gossipsub::Event::Subscribed { peer_id, topic }) => {
+2173:                        info!("[Mesh] Peer {} subscribed to topic {}", peer_id, topic);
+2174:                        if self.mesh_active_peers.insert(peer_id) {
+2178:                    IntrovertBehaviourEvent::Gossipsub(_) => {}

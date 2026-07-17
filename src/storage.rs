@@ -348,6 +348,12 @@ impl StorageService {
             [],
         );
 
+        // Add connection_id column for diagnostic tracking (idempotent)
+        let _ = conn.execute(
+            "ALTER TABLE pending_file_chunks ADD COLUMN connection_id TEXT DEFAULT NULL",
+            [],
+        );
+
         // Cleared chats — tracks when a chat was cleared to prevent mailbox re-delivery of old messages
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS cleared_chats (

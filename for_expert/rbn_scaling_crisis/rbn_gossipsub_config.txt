@@ -1,0 +1,38 @@
+        let gossipsub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(std::time::Duration::from_secs(10))
+            .validation_mode(gossipsub::ValidationMode::Strict)
+            .message_id_fn(message_id_fn)
+            .build()
+            .expect("Valid gossipsub config");
+
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(local_keypair.clone()), 
+            gossipsub_config
+        ).expect("Valid gossipsub");
+
+        let mdns = if enable_mdns {
+            match mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id) {
+                Ok(b) => {
+                    crate::dispatch_debug_log("mDNS behaviour initialized");
+                    Some(b)
+                },
+                Err(e) => {
+                    crate::dispatch_debug_log(&format!("mDNS initialization failed: {}", e));
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        
+        let autonat = autonat::Behaviour::new(peer_id, autonat::Config::default());
+        
+        let identify = identify::Behaviour::new(identify::Config::new(
+            "/introvert/id/1.0.0".to_string(),
+            local_keypair.public(),
+        ).with_agent_version("introvert/1.0.0".to_string()));
+
+
+        let relay_server = if enable_relay_server {
+            let relay_config = relay::Config {
+                max_circuit_bytes: 1024 * 1024 * 1024, // 1GB for high-volume file relaying

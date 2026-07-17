@@ -37,6 +37,7 @@ pub mod e2ee;
 
 pub use types::*;
 pub use service::{NetworkService, NetworkConfig, IncomingTransfer, ActiveSeeder, PendingDiagnostic};
+use service::AppState;
 
 use crate::media::{MediaManager, WebRtcSignal};
 use noise_session::NoiseSession;
@@ -253,9 +254,12 @@ impl NetworkService {
             consecutive_zero_peers_ticks: 0,
             last_relay_reservation_attempt: Instant::now() - Duration::from_secs(60), // allow first attempt immediately
             last_token_registration: HashMap::new(),
-            idle_mode: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            app_state: AppState::Foreground,
+            last_state_change: Instant::now(),
             connected_peer_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             last_idle_log: Instant::now(),
+            last_mailbox_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
+            flush_in_progress: HashMap::new(),
         };
 
         // Sync to global RBN bootstrap list
@@ -733,7 +737,7 @@ impl NetworkService {
                     // --- PROGRESSIVE RECONNECT LADDER ---
                     // Suppressed while app is idle/backgrounded to prevent dial flooding.
                     // BUT: always allow reconnects when transfers are active.
-                    let is_idle = self.idle_mode.load(std::sync::atomic::Ordering::Relaxed);
+                    let is_idle = self.app_state != AppState::Foreground;
                     let has_active_transfers = !self.incoming_transfers.is_empty()
                         || !self.active_seeders.is_empty()
                         || !self.pending_messages.is_empty();
@@ -968,7 +972,7 @@ impl NetworkService {
                 _ = fast_reconnect_interval.tick() => {
                     // Suppressed while app is idle/backgrounded
                     // BUT: always allow fast reconnect when transfers are active
-                    let is_idle = self.idle_mode.load(std::sync::atomic::Ordering::Relaxed);
+                    let is_idle = self.app_state != AppState::Foreground;
                     let has_active_transfers = !self.incoming_transfers.is_empty()
                         || !self.active_seeders.is_empty()
                         || !self.pending_messages.is_empty();
@@ -1905,9 +1909,9 @@ impl NetworkService {
                     }
                     IntrovertBehaviourEvent::RelayClient(event) => {
                         match event {
-                             libp2p::relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
-                                info!("✅ Relay reservation ACCEPTED by {}. Renewal: {}", relay_peer_id, renewal);
-                                crate::dispatch_debug_log(&format!("[Relay] ✅ ReservationReqAccepted via {} (renewal={})", relay_peer_id, renewal));
+                             libp2p::relay::client::Event::ReservationReqAccepted { relay_peer_id, renewal, limit } => {
+                                info!("✅ Relay reservation ACCEPTED by {}. Renewal: {}, Limit: {:?}", relay_peer_id, renewal, limit);
+                                crate::dispatch_debug_log(&format!("[Relay] ✅ ReservationReqAccepted via {} (renewal={}, limit={:?})", relay_peer_id, renewal, limit));
                                 // Mark reservation as confirmed (not just requested)
                                 self.relay_reservations.insert(relay_peer_id);
                                 // Re-register our addresses in Kademlia so peers can discover our relay path
@@ -1948,9 +1952,9 @@ impl NetworkService {
                                     }
                                 }
                             }
-                            libp2p::relay::client::Event::OutboundCircuitEstablished { relay_peer_id, .. } => {
-                                info!("[Relay] 🔌 OutboundCircuitEstablished via {}", relay_peer_id);
-                                crate::dispatch_debug_log(&format!("[Relay] 🔌 OutboundCircuitEstablished via {}", relay_peer_id));
+                            libp2p::relay::client::Event::OutboundCircuitEstablished { relay_peer_id, limit } => {
+                                info!("[Relay] 🔌 OutboundCircuitEstablished via {} (limit={:?})", relay_peer_id, limit);
+                                crate::dispatch_debug_log(&format!("[Relay] 🔌 OutboundCircuitEstablished via {} (limit={:?})", relay_peer_id, limit));
 
                                 // Clear dial rate limiter for all peers with pending messages.
                                 // Without this, dial_relay_path returns early (5s cooldown) and
@@ -2017,9 +2021,9 @@ impl NetworkService {
                                     }
                                 });
                             }
-                            libp2p::relay::client::Event::InboundCircuitEstablished { src_peer_id, .. } => {
-                                info!("[Relay] ✅ InboundCircuitEstablished from {}", src_peer_id);
-                                crate::dispatch_debug_log(&format!("[Relay] ✅ InboundCircuitEstablished from {} — flushing pending payloads", src_peer_id));
+                            libp2p::relay::client::Event::InboundCircuitEstablished { src_peer_id, limit } => {
+                                info!("[Relay] ✅ InboundCircuitEstablished from {} (limit={:?})", src_peer_id, limit);
+                                crate::dispatch_debug_log(&format!("[Relay] ✅ InboundCircuitEstablished from {} (limit={:?}) — flushing pending payloads", src_peer_id, limit));
 
                                 // RELAY HINT: Record which RBN this peer is behind.
                                 // This enables relay-aware routing in forward_to_mesh so file
@@ -2036,52 +2040,81 @@ impl NetworkService {
                                 // DCUtR hole-punch attempt for potential direct upgrade
                                 let _ = self.swarm.dial(src_peer_id);
 
-                                // CRITICAL FIX: Flush pending messages to src_peer_id.
-                                // This is the CORRECT moment — src_peer_id just connected to us through the relay.
-                                // The OutboundCircuitEstablished flush targets connected_peers which may not include
-                                // this peer yet. InboundCircuit fires when the receiver is actually ready.
-                                if let Some(payloads) = self.pending_messages.remove(&src_peer_id) {
-                                    let tx = self.command_tx.clone();
-                                    info!("[Relay] InboundCircuit: flushing {} pending payloads to {}", payloads.len(), src_peer_id);
-                                    crate::dispatch_debug_log(&format!("[Relay] InboundCircuit flush: {} payloads → {}", payloads.len(), src_peer_id));
-                                    tokio::spawn(async move {
-                                        // Small delay to let the circuit sub-stream fully open
-                                        tokio::time::sleep(Duration::from_millis(150)).await;
-                                        for payload in payloads {
-                                            let _ = tx.send(NetworkCommand::ForwardMeshSignaling { peer_id: src_peer_id, payload }).await;
-                                            tokio::time::sleep(Duration::from_millis(20)).await;
-                                        }
-                                    });
-                                }
+                                // Single-flight: don't spawn duplicate flush tasks for the same peer
+                                // Auto-clear locks older than 30s as safety net against task panics
+                                const FLUSH_LOCK_TIMEOUT_SECS: u64 = 30;
+                                self.flush_in_progress.retain(|_, t| t.elapsed() < Duration::from_secs(FLUSH_LOCK_TIMEOUT_SECS));
 
-                                // Flush pending DB file chunks for this peer.
-                                // This covers the case where chunks were persisted to DB because no RBN was connected.
-                                let storage = Arc::clone(&self.storage);
-                                let tx_db = self.command_tx.clone();
-                                let peer_str = src_peer_id.to_string();
-                                tokio::spawn(async move {
-                                    tokio::time::sleep(Duration::from_millis(200)).await; // Let circuit stabilize (was 400ms)
-                                    if let Ok(chunks) = storage.dequeue_pending_chunks(&peer_str, 100) {
-                                        if !chunks.is_empty() {
-                                            info!("[Relay] InboundCircuit: flushing {} pending DB chunks to {}", chunks.len(), peer_str);
-                                            crate::dispatch_debug_log(&format!("[Relay] InboundCircuit DB flush: {} chunks → {}", chunks.len(), peer_str));
-                                            if let Ok(peer_id) = peer_str.parse::<PeerId>() {
-                                                for (transfer_id, chunk_index, chunk_data) in chunks {
-                                                    use base64::Engine;
-                                                    let data_base64 = base64::engine::general_purpose::STANDARD.encode(&chunk_data);
-                                                    let payload = SignalingPayload::FileChunk {
-                                                        transfer_id,
-                                                        chunk_index,
-                                                        total_chunks: 0,
-                                                        data_base64,
-                                                    };
-                                                    let _ = tx_db.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-                                                    tokio::time::sleep(Duration::from_millis(50)).await;
+                                if self.flush_in_progress.contains_key(&src_peer_id) {
+                                    crate::dispatch_debug_log(&format!("[Relay] Flush already in progress for {} — skipping", src_peer_id));
+                                } else {
+                                    self.flush_in_progress.insert(src_peer_id, Instant::now());
+
+                                    // Prepare RAM flush data
+                                    let ram_payloads = self.pending_messages.remove(&src_peer_id);
+                                    let tx_ram = self.command_tx.clone();
+                                    let flush_peer_ram = src_peer_id;
+
+                                    // Prepare DB flush data
+                                    let storage = Arc::clone(&self.storage);
+                                    let tx_db = self.command_tx.clone();
+                                    let peer_str = src_peer_id.to_string();
+                                    let flush_peer_db = src_peer_id;
+
+                                    // Spawn a SINGLE task that runs both flushes concurrently via join!
+                                    // Lock is released ONCE after BOTH complete, preventing the race where
+                                    // one task finishes and releases the lock while the other is still running.
+                                    tokio::spawn(async move {
+                                        let ram_flush = async {
+                                            if let Some(payloads) = ram_payloads {
+                                                info!("[Relay] InboundCircuit: flushing {} pending payloads to {}", payloads.len(), flush_peer_ram);
+                                                crate::dispatch_debug_log(&format!("[Relay] InboundCircuit flush: {} payloads → {}", payloads.len(), flush_peer_ram));
+                                                tokio::time::sleep(Duration::from_millis(150)).await;
+                                                for payload in payloads {
+                                                    let _ = tx_ram.send(NetworkCommand::ForwardMeshSignaling { peer_id: flush_peer_ram, payload }).await;
+                                                    tokio::time::sleep(Duration::from_millis(20)).await;
                                                 }
                                             }
-                                        }
-                                    }
-                                });
+                                        };
+
+                                        let db_flush = async {
+                                            tokio::time::sleep(Duration::from_millis(200)).await;
+                                            if let Ok(chunks) = storage.dequeue_pending_chunks(&peer_str, 100) {
+                                                if !chunks.is_empty() {
+                                                    let first_tid = &chunks[0].0;
+                                                    let first_idx = chunks[0].1;
+                                                    let last_idx = chunks[chunks.len() - 1].1;
+                                                    let batch_hash = chunks.iter().fold(0u32, |acc, (tid, idx, _)| acc.wrapping_add(tid.len() as u32 + *idx));
+                                                    info!("[Relay] InboundCircuit: flushing {} pending DB chunks to {}", chunks.len(), peer_str);
+                                                    crate::dispatch_debug_log(&format!(
+                                                        "[Relay] InboundCircuit DB flush: {} chunks → {} (transfer={}, chunks={}-{}, hash={:08x})",
+                                                        chunks.len(), peer_str, first_tid, first_idx, last_idx, batch_hash
+                                                    ));
+                                                    if let Ok(peer_id) = peer_str.parse::<PeerId>() {
+                                                        for (transfer_id, chunk_index, chunk_data) in chunks {
+                                                            use base64::Engine;
+                                                            let data_base64 = base64::engine::general_purpose::STANDARD.encode(&chunk_data);
+                                                            let payload = SignalingPayload::FileChunk {
+                                                                transfer_id,
+                                                                chunk_index,
+                                                                total_chunks: 0,
+                                                                data_base64,
+                                                            };
+                                                            let _ = tx_db.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+                                                            tokio::time::sleep(Duration::from_millis(50)).await;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        };
+
+                                        // Run both flushes concurrently, release lock once BOTH complete
+                                        tokio::join!(ram_flush, db_flush);
+
+                                        // Release lock — both tasks are done (success or failure)
+                                        let _ = tx_db.send(NetworkCommand::ClearFlushInProgress { peer_id: flush_peer_db }).await;
+                                    });
+                                }
                             }
                         }
                     }
@@ -3381,6 +3414,13 @@ impl NetworkService {
     }
 
     async fn perform_mailbox_fetch(&mut self) {
+        // Guard: skip if last drain was < 5 seconds ago (prevents spam on reservation flap)
+        if self.last_mailbox_drain.elapsed() < Duration::from_secs(5) {
+            crate::dispatch_debug_log("[Mailbox] Skipping drain — last drain was < 5s ago");
+            return;
+        }
+        self.last_mailbox_drain = Instant::now();
+
         let mut anchor_ids = Vec::new();
         if let Ok(verified_anchors) = self.storage.fetch_all_anchor_nodes() {
             for node in verified_anchors { if let Ok(pid) = node.peer_id.parse::<PeerId>() { anchor_ids.push(pid); } }
@@ -4244,21 +4284,29 @@ impl NetworkService {
                 let _ = self.forward_to_mesh(peer_id, payload, true).await;
             }
             NetworkCommand::HandleIncomingPayload { peer_id, payload } => {
-                // Wake-on-push: reset idle mode so the relay reservation logic
-                // can run on the next status_check tick. Without this, an FCM-woken
-                // incoming transfer while the app is backgrounded would stall because
-                // the proactive RBN-dial loop is suppressed by idle_mode.
-                if self.idle_mode.load(std::sync::atomic::Ordering::Relaxed) {
-                    self.idle_mode.store(false, std::sync::atomic::Ordering::Relaxed);
-                    crate::dispatch_debug_log("[Resilience] Wake-on-push: idle_mode reset to false");
+                // Wake-on-push: transition from Backgrounded to BackgroundedPendingWake
+                // only if enough time has passed since explicit background signal.
+                // This prevents the idle_mode race where Dart's lifecycle callback
+                // fights with incoming payloads.
+                const WAKE_DEBOUNCE_SECS: u64 = 5; // Starting value, tune with Fix 4 data
+                if self.app_state == AppState::Backgrounded {
+                    if self.last_state_change.elapsed() > Duration::from_secs(WAKE_DEBOUNCE_SECS) {
+                        self.app_state = AppState::BackgroundedPendingWake;
+                        crate::dispatch_debug_log("[Resilience] Wake-on-push: app_state → BackgroundedPendingWake");
+                    }
+                    // Always process the payload regardless of state transition
                 }
                 info!("[Mesh] HandleIncomingPayload received for peer {}", peer_id);
                 self.handle_signaling_payload(peer_id, payload, false).await;
             }
             NetworkCommand::HandleIncomingWebRtcPayload { peer_id, payload } => {
-                if self.idle_mode.load(std::sync::atomic::Ordering::Relaxed) {
-                    self.idle_mode.store(false, std::sync::atomic::Ordering::Relaxed);
-                    crate::dispatch_debug_log("[Resilience] Wake-on-push: idle_mode reset to false (WebRTC)");
+                // Same wake-on-push logic as HandleIncomingPayload
+                const WAKE_DEBOUNCE_SECS: u64 = 5;
+                if self.app_state == AppState::Backgrounded {
+                    if self.last_state_change.elapsed() > Duration::from_secs(WAKE_DEBOUNCE_SECS) {
+                        self.app_state = AppState::BackgroundedPendingWake;
+                        crate::dispatch_debug_log("[Resilience] Wake-on-push: app_state → BackgroundedPendingWake (WebRTC)");
+                    }
                 }
                 self.handle_signaling_payload(peer_id, payload, true).await;
             }
@@ -5196,9 +5244,17 @@ impl NetworkService {
                 self.execute_claw_actions(actions).await;
                 let _ = result_tx.send(());
             }
+            NetworkCommand::ClearFlushInProgress { peer_id } => {
+                self.flush_in_progress.remove(&peer_id);
+                crate::dispatch_debug_log(&format!("[Relay] Flush completed for {} — lock released", peer_id));
+            }
             NetworkCommand::SetAppIdleState { is_idle } => {
-                self.idle_mode.store(is_idle, std::sync::atomic::Ordering::Relaxed);
-                crate::dispatch_debug_log(&format!("[Resilience] idle_mode set to {}", is_idle));
+                let new_state = if is_idle { AppState::Backgrounded } else { AppState::Foreground };
+                if self.app_state != new_state {
+                    self.app_state = new_state;
+                    self.last_state_change = Instant::now();
+                    crate::dispatch_debug_log(&format!("[Resilience] app_state set to {:?}", new_state));
+                }
             }
         }
         Ok(())

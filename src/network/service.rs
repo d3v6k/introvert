@@ -12,6 +12,13 @@ use x25519_dalek::{StaticSecret, PublicKey};
 use super::types::*;
 use super::{registry, noise_session::NoiseSession, IntrovertBehaviour};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum AppState {
+    Foreground,
+    Backgrounded,
+    BackgroundedPendingWake,
+}
+
 pub struct NetworkService {
     pub(crate) swarm: Swarm<IntrovertBehaviour>,
     pub(crate) command_rx: mpsc::Receiver<NetworkCommand>,
@@ -91,12 +98,19 @@ pub struct NetworkService {
     pub(crate) last_relay_reservation_attempt: Instant,
     /// Per-RBN push token registration timestamps (rate-limit to prevent flooding on Identify)
     pub(crate) last_token_registration: HashMap<PeerId, Instant>,
-    /// App idle/background state — suppresses proactive dials when true
-    pub(crate) idle_mode: Arc<AtomicBool>,
+    /// App foreground/background state — suppresses proactive dials when not foreground
+    pub(crate) app_state: AppState,
+    /// Last time app_state changed (for wake-on-push debounce)
+    pub(crate) last_state_change: Instant,
     /// Cached connected peer count (avoids O(n) swarm.connected_peers().count())
     pub(crate) connected_peer_count: Arc<AtomicUsize>,
     /// Last time an idle-mode suppression log was emitted (rate-limit to 5min)
     pub(crate) last_idle_log: Instant,
+    /// Last time a mailbox drain was performed (rate-limit to prevent spam on reservation flap)
+    pub(crate) last_mailbox_drain: Instant,
+    /// Peers with an active flush task — prevents duplicate flush spawns on circuit flap
+    /// Value is the Instant when the lock was acquired (for timeout fallback)
+    pub(crate) flush_in_progress: HashMap<PeerId, Instant>,
 }
 
 #[derive(Debug, Clone)]

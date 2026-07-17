@@ -337,6 +337,7 @@ pub enum NetworkCommand {
     FindProviders { file_hash: String },
     StoreInMailbox { peer_id: PeerId, payload: SignalingPayload },
     ClearMailboxForPeer { peer_id: PeerId },
+    ClearFlushInProgress { peer_id: PeerId },
     LookupPeerHandle { peer_id: String },
     CancelFileTransfer { transfer_id: String },
     RecheckConnection { peer_id: PeerId },

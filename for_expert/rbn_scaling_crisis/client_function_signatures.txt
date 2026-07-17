@@ -1,0 +1,5 @@
+1545:    async fn handle_swarm_event(&mut self, event: SwarmEvent<IntrovertBehaviourEvent>) -> anyhow::Result<()> {
+2860:    async fn forward_to_mesh(&mut self, recipient_id: PeerId, payload: SignalingPayload, force_mailbox: bool) -> anyhow::Result<()> {
+3218:    async fn perform_mailbox_fetch(&mut self) {
+3236:    async fn handle_command(&mut self, command: NetworkCommand) -> anyhow::Result<()> {
+5281:    async fn handle_single_payload(&mut self, peer: PeerId, payload: SignalingPayload, _is_webrtc: bool) {

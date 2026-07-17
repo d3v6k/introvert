@@ -1,0 +1,278 @@
+INTROVERT NETWORK DEBUG LOG
+Generated: 2026-07-17T04:46:55.404306
+Total entries: 271
+============================================================
+Contents: Rust relay events, circuit establishment,
+mesh routing decisions, dial strategies, mailbox drain.
+============================================================
+[2026-07-17T04:37:32.262107] Starting NetworkService initialization...
+[2026-07-17T04:37:32.276421] mDNS behaviour initialized
+[2026-07-17T04:37:32.279594] NetworkService initialized. Running swarm...
+[2026-07-17T04:37:32.281018] FFI: Push token saved successfully to local DB under key: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-17T04:37:32.281738] [StatusStream] Connecting to the mesh swarm...
+[2026-07-17T04:37:32.282195] [Resilience] Step 2: Re-dialing all bootstrap nodes (TCP+QUIC) [WIFI]
+[2026-07-17T04:37:32.282667] [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:37:32.283107] [Resilience] Dialing bootstrap: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:37:32.283829] [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:37:32.284677] [Resilience] Tunnel active (0s). Waiting for connection...
+[2026-07-17T04:37:32.285159] [Resilience] Fast reconnect: transfers waiting, no relay (peers=0, incoming=0, seeders=0, pending=1)
+[2026-07-17T04:37:33.467416] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:37:33.469547] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:37:33.471542] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:37:33.472587] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:37:33.473837] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:37:33.474902] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:37:33.901260] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+[2026-07-17T04:37:33.903710] [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+[2026-07-17T04:37:34.412340] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:37:34.417542] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:37:37.254955] [Tunnel] Activated on port 43511 → wss://47.89.252.80/tunnel
+[2026-07-17T04:37:47.250887] [Status] Status change: 4 (peers=5, relay_listener=false)
+[2026-07-17T04:37:47.252284] [Resilience] Step 1: 5 peers connected but no relay. Re-establishing...
+[2026-07-17T04:37:47.253513] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:37:47.254166] [Resilience] Dialing RBN: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:37:47.254830] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:37:47.255342] [Resilience] Dialing RBN: /ip4/127.0.0.1/tcp/43511
+[2026-07-17T04:37:47.256244] [Resilience] No RBNs reachable — will retry in 30s
+[2026-07-17T04:38:02.242933] [Resilience] Step 1: 5 peers connected but no relay. Re-establishing...
+[2026-07-17T04:38:02.244376] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:38:02.245230] [Resilience] Dialing RBN: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:38:02.248616] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:38:02.249684] [Resilience] Dialing RBN: /ip4/127.0.0.1/tcp/43511
+[2026-07-17T04:38:02.250915] [Resilience] No RBNs reachable — will retry in 30s
+[2026-07-17T04:38:19.994245] [Resilience] Step 1: 5 peers connected but no relay. Re-establishing...
+[2026-07-17T04:38:20.000573] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:38:20.001212] [Resilience] Dialing RBN: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:38:20.001668] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:38:20.001998] [Resilience] Dialing RBN: /ip4/127.0.0.1/tcp/43511
+[2026-07-17T04:38:20.002541] [Resilience] No RBNs reachable — will retry in 30s
+[2026-07-17T04:38:22.762071] Network already started. Ignoring duplicate start call.
+[2026-07-17T04:38:23.731530] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:38:24.796176] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:38:24.797961] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:38:32.231911] [Status] Status change: 1 (peers=7, relay_listener=true)
+[2026-07-17T04:38:33.000440] [Resilience] idle_mode set to false
+[2026-07-17T04:38:33.377560] [Relay] ✅ InboundCircuitEstablished from 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — flushing pending payloads
+[2026-07-17T04:38:33.377794] [Relay] Relay hint: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:34.146185] [Relay] InboundCircuit DB flush: 75 chunks → 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:38:35.174224] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:38:35.174650] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:35.603877] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:38:36.758619] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:38:36.758843] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:36.759137] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:38:36.759257] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:37.155295] [Relay] InboundCircuit DB flush: 26 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:38:44.930695] [Resilience] idle_mode set to true
+[2026-07-17T04:38:45.253848] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:38:46.415566] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:38:46.416895] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:38:46.417195] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:38:51.459254] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:38:51.460038] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:51.460241] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:38:51.460399] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:51.900711] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:38:51.974944] [Relay] InboundCircuit DB flush: 1 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:38:52.708550] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:38:52.708748] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:38:53.109904] [Relay] InboundCircuit DB flush: 19 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:39:03.019772] [Resilience] idle_mode set to false
+[2026-07-17T04:39:07.781632] [Resilience] idle_mode set to false
+[2026-07-17T04:39:08.033718] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:39:08.033985] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:39:08.034113] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:39:08.034233] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:39:08.034367] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:39:33.069735] [Resilience] idle_mode set to false
+[2026-07-17T04:39:41.008056] [Relay] ✅ InboundCircuitEstablished from 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — flushing pending payloads
+[2026-07-17T04:39:41.008195] [Relay] Relay hint: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:39:41.839998] [Relay] InboundCircuit DB flush: 75 chunks → 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:39:42.678372] [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:40:03.070917] [Resilience] idle_mode set to false
+[2026-07-17T04:40:06.499538] [Resilience] idle_mode set to true
+[2026-07-17T04:40:06.604670] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:40:21.949932] [Resilience] idle_mode set to false
+[2026-07-17T04:40:22.772559] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:40:22.772785] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:40:22.772925] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:40:22.773060] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:40:22.773223] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:40:23.406734] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:40:23.406891] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:40:23.438180] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:40:23.438358] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:40:23.438536] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:40:23.949171] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:40:23.949473] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:40:23.949656] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:40:23.949840] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:40:23.950032] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:40:24.440684] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:40:24.440928] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:40:24.441137] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:40:24.441301] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:40:24.441445] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:40:33.098296] [Resilience] idle_mode set to false
+[2026-07-17T04:40:44.628406] [Resilience] idle_mode set to true
+[2026-07-17T04:40:44.647716] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:41:03.449273] [Resilience] idle_mode set to false
+[2026-07-17T04:41:12.292131] [Resilience] idle_mode set to false
+[2026-07-17T04:41:12.292294] [Resilience] Fast reconnect: transfers waiting, no relay (peers=14, incoming=0, seeders=5, pending=2)
+[2026-07-17T04:41:17.124381] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:41:17.124624] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:41:17.125275] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:41:17.125444] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:17.125601] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:41:17.234410] [Status] Status change: 4 (peers=14, relay_listener=false)
+[2026-07-17T04:41:20.887171] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:41:21.010665] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:41:24.244955] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:41:24.245609] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:41:28.406709] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:28.406934] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:28.994510] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:32.285558] [Status] Status change: 1 (peers=17, relay_listener=true)
+[2026-07-17T04:41:32.714025] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:32.714459] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:33.217899] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:33.504325] [Resilience] idle_mode set to false
+[2026-07-17T04:41:37.749513] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:37.749825] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:37.749990] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:37.750126] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:38.256937] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:38.347319] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:38.347689] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:38.615237] [Relay] InboundCircuit DB flush: 6 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:44.332953] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:44.333189] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:44.333336] [Relay] InboundCircuit flush: 1 payloads → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:44.333576] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:44.333730] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:44.829041] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:45.578931] [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:46.434701] [Relay] ✅ InboundCircuitEstablished from 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — flushing pending payloads
+[2026-07-17T04:41:46.435007] [Relay] Relay hint: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:46.554969] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:46.555564] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:47.357988] [Relay] InboundCircuit DB flush: 75 chunks → 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:41:47.748637] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:41:48.328824] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:41:48.329123] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:41:48.723577] [Relay] InboundCircuit DB flush: 16 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:03.550618] [Resilience] idle_mode set to false
+[2026-07-17T04:42:06.852910] [Resilience] idle_mode set to true
+[2026-07-17T04:42:06.908242] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:42:07.610727] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:42:07.610842] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:42:08.045294] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:10.229724] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:42:10.230178] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:42:10.230564] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:42:10.230727] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:42:10.785336] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:11.687503] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:42:11.687886] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:42:11.688325] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:42:11.688504] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:42:12.015958] [Relay] InboundCircuit DB flush: 20 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:12.087500] [Relay] InboundCircuit DB flush: 1 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:27.519627] [Resilience] idle_mode set to false
+[2026-07-17T04:42:28.123613] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:42:28.123904] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:42:28.123997] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:42:28.124219] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:28.124317] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:42:28.374847] introvert_group_send_message: Loaded group secret. Hex prefix: 303d955a
+[2026-07-17T04:42:28.374955] introvert_group_send_message: Spawning send loop for group 35de7dacf206ec48686a39e2a59638cc
+[2026-07-17T04:42:28.375121] introvert_group_send_message: Group 35de7dacf206ec48686a39e2a59638cc has 3 members
+[2026-07-17T04:42:28.375178] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:28.375224] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:42:29.675110] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:42:29.675329] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:42:30.227108] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:42:34.184844] [Resilience] idle_mode set to false
+[2026-07-17T04:42:35.095284] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+[2026-07-17T04:42:35.095581] [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+[2026-07-17T04:43:04.225336] [Resilience] idle_mode set to false
+[2026-07-17T04:43:34.246104] [Resilience] idle_mode set to false
+[2026-07-17T04:43:44.843588] [Relay] ✅ InboundCircuitEstablished from 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — flushing pending payloads
+[2026-07-17T04:43:44.843860] [Relay] Relay hint: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:43:45.824416] [Relay] InboundCircuit DB flush: 75 chunks → 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-17T04:43:49.084576] [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:43:56.487573] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:43:57.228304] [Resilience] Fast reconnect: transfers waiting, no relay (peers=25, incoming=0, seeders=7, pending=0)
+[2026-07-17T04:43:57.449627] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:43:57.450538] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:44:04.255986] [Resilience] idle_mode set to false
+[2026-07-17T04:44:32.599247] [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — flushing pending payloads
+[2026-07-17T04:44:32.599473] [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-17T04:44:33.170626] [Relay] InboundCircuit DB flush: 30 chunks → 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+[2026-07-17T04:44:34.263655] [Resilience] idle_mode set to false
+[2026-07-17T04:44:47.257093] [Status] Status change: 4 (peers=25, relay_listener=false)
+[2026-07-17T04:44:47.258145] [Resilience] Step 1: 25 peers connected but no relay. Re-establishing...
+[2026-07-17T04:44:47.258421] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:44:47.258645] [Resilience] Dialing RBN: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:44:47.258818] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:44:47.259026] [Resilience] No RBNs reachable — will retry in 30s
+[2026-07-17T04:44:55.027353] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:44:55.545248] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:45:02.232739] [Status] Status change: 1 (peers=27, relay_listener=false)
+[2026-07-17T04:45:02.236015] [Resilience] Step 1: 27 peers connected but no relay. Re-establishing...
+[2026-07-17T04:45:04.216469] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:45:04.218191] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:45:05.884177] [Resilience] idle_mode set to false
+[2026-07-17T04:45:15.616799] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:45:16.768896] [Resilience] idle_mode set to true
+[2026-07-17T04:45:16.883396] [Resilience] idle_mode set to true
+[2026-07-17T04:45:17.231054] [Resilience] Step 1: 28 peers connected but no relay. Re-establishing...
+[2026-07-17T04:45:20.558073] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:45:20.561907] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:45:20.562157] [Relay] Flushing pending queues for 2 peers after reservation
+[2026-07-17T04:45:24.071799] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:45:32.254065] [Status] Status change: 4 (peers=28, relay_listener=false)
+[2026-07-17T04:45:32.254517] [Resilience] Step 1: 28 peers connected but no relay. Re-establishing...
+[2026-07-17T04:45:32.255388] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:45:32.256028] [Resilience] Dialing RBN: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:45:32.256330] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:45:32.256747] [Resilience] No RBNs reachable — will retry in 30s
+[2026-07-17T04:45:34.993383] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:45:35.784451] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:45:37.959514] [Resilience] idle_mode set to false
+[2026-07-17T04:45:40.705156] [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false)
+[2026-07-17T04:45:40.706055] [Relay] Triggering mailbox drain after ReservationReqAccepted
+[2026-07-17T04:45:40.706234] [Relay] Flushing pending queues for 1 peers after reservation
+[2026-07-17T04:45:47.243639] [Resilience] Step 1: 30 peers connected but no relay. Re-establishing...
+[2026-07-17T04:45:47.244126] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+[2026-07-17T04:45:47.244320] [Resilience] Dialing RBN: /ip4/47.89.252.80/udp/443/quic-v1
+[2026-07-17T04:45:47.244489] [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/80
+[2026-07-17T04:45:47.244778] [Resilience] No RBNs reachable — will retry in 30s
+[2026-07-17T04:45:52.892136] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:45:53.100406] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:02.238700] [Status] Status change: 1 (peers=32, relay_listener=false)
+[2026-07-17T04:46:02.244060] [Resilience] Step 1: 32 peers connected but no relay. Re-establishing...
+[2026-07-17T04:46:10.001394] [Resilience] idle_mode set to false
+[2026-07-17T04:46:11.835274] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:14.808894] [Resilience] idle_mode set to true
+[2026-07-17T04:46:15.477550] [Resilience] idle_mode set to false
+[2026-07-17T04:46:16.260467] [Resilience] idle_mode set to true
+[2026-07-17T04:46:17.231120] [Resilience] Step 1: 32 peers connected but no relay. Re-establishing...
+[2026-07-17T04:46:40.661629] [Resilience] idle_mode set to false
+[2026-07-17T04:46:40.662172] [Resilience] idle_mode set to true
+[2026-07-17T04:46:40.662392] [Resilience] idle_mode set to true
+[2026-07-17T04:46:40.662746] [Resilience] Step 1: 32 peers connected but no relay. Re-establishing...
+[2026-07-17T04:46:41.057897] [Status] ConnectionEstablished with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:41.088756] [Status] ConnectionEstablished with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:41.089512] [Status] ConnectionEstablished with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:41.090194] [Status] ConnectionEstablished with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:41.095058] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:46:41.967827] [Status] ConnectionEstablished with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:41.971395] [Status] ConnectionEstablished with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:46.694976] [Resilience] idle_mode set to true
+[2026-07-17T04:46:46.871510] [Resilience] Wake-on-push: idle_mode reset to false
+[2026-07-17T04:46:46.945540] [Resilience] idle_mode set to false
+[2026-07-17T04:46:47.229011] [Status] Status change: 4 (peers=37, relay_listener=false)
+[2026-07-17T04:46:49.178750] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:49.716791] [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+[2026-07-17T04:46:55.088680] [Resilience] idle_mode set to false

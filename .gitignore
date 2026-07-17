@@ -96,3 +96,9 @@ Introvert-macOS.zip
 
 # MiMoCode agent files
 .mimocode/
+
+# Expert consultation — sensitive RBN source code
+for_expert/src/
+for_expert/lib/
+for_expert/rbn_scaling_audit/
+for_expert/vpn_relay_performance/
