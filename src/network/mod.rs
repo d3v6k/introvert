@@ -1651,13 +1651,16 @@ impl NetworkService {
             SwarmEvent::Behaviour(b_event) => {
                 match b_event {
                     IntrovertBehaviourEvent::Mdns(libp2p::mdns::Event::Discovered(list)) => {
+                        crate::dispatch_debug_log(&format!("[mDNS] Discovered event: {} raw entries", list.len()));
                         let mut grouped: std::collections::HashMap<PeerId, Vec<libp2p::Multiaddr>> = std::collections::HashMap::new();
                         for (peer_id, addr) in list {
+                            crate::dispatch_debug_log(&format!("[mDNS] Raw entry: peer={} addr={}", peer_id, addr));
                             grouped.entry(peer_id).or_default().push(addr);
                         }
                         for (peer_id, addrs) in grouped {
                             info!("mDNS discovered peer: {} with {} addresses", peer_id, addrs.len());
-                            
+                            crate::dispatch_debug_log(&format!("[mDNS] Discovered peer {} with {} addresses", peer_id, addrs.len()));
+
                             // Track mDNS peers for Intro-Claw context
                             self.mdns_peers.insert(peer_id);
                             
@@ -1674,6 +1677,13 @@ impl NetworkService {
                                 // Dial the specific active address directly to bypass PeerId dial backoff
                                 let _ = self.swarm.dial(addr);
                             }
+                        }
+                    }
+                    IntrovertBehaviourEvent::Mdns(libp2p::mdns::Event::Expired(list)) => {
+                        crate::dispatch_debug_log(&format!("[mDNS] Expired event: {} entries", list.len()));
+                        for (peer_id, addr) in list {
+                            crate::dispatch_debug_log(&format!("[mDNS] Expired peer {} addr {}", peer_id, addr));
+                            self.mdns_peers.remove(&peer_id);
                         }
                     }
                     IntrovertBehaviourEvent::Autonat(autonat::Event::StatusChanged { old, new }) => {
@@ -2719,8 +2729,18 @@ impl NetworkService {
                     *count += 1;
                 }
                 
-                let is_now_relayed = self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0) == 0;
+                // If THIS connection is relayed, force is_relayed=true immediately.
+                // direct_conn_count may still be > 0 from a stale direct connection
+                // that hasn't been closed yet (e.g., device moved LAN→VPN without
+                // triggering ConnectionClosed on the old path).
+                let is_now_relayed = is_relayed || self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0) == 0;
                 self.is_relayed_map.write().insert(peer_id, is_now_relayed);
+                
+                crate::dispatch_debug_log(&format!(
+                    "[RelayMap] ConnectionEstablished to {}: is_relayed_endpoint={}, local_ip={}, direct_count={}, now_relayed={}",
+                    peer_id, endpoint.is_relayed(), is_local_ip,
+                    self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0), is_now_relayed
+                ));
                 
                 if is_local_ip && endpoint.is_relayed() {
                     info!("[Mesh] Peer {} connected via LOCAL RELAY. Treating as DIRECT for performance.", peer_id);
@@ -2851,6 +2871,7 @@ impl NetworkService {
                    self.connected_peer_count.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                    self.noise_sessions.remove(&peer_id); // MEMORY FIX: Remove stale noise session
                    self.is_relayed_map.write().remove(&peer_id);
+                    crate::dispatch_debug_log(&format!("[RelayMap] ConnectionClosed with {} — removed from is_relayed_map", peer_id));
                    self.direct_conn_count.remove(&peer_id);
                    if self.mesh_active_peers.remove(&peer_id) {
                        crate::ACTIVE_PEER_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
@@ -3134,8 +3155,9 @@ impl NetworkService {
                 let transfer_path = {
                     let mdns = &self.mdns_peers;
                     let swarm = &self.swarm;
+                    let relayed = &self.is_relayed_map;
                     let seeders: Vec<PeerId> = Vec::new(); // TODO: wire known_seeders in PR-2
-                    self.transfer_router.resolve(&recipient_id, &transfer_id, mdns, |pid| swarm.is_connected(pid), &seeders)
+                    self.transfer_router.resolve(&recipient_id, &transfer_id, mdns, |pid| swarm.is_connected(pid), |pid| relayed.read().get(pid).cloned().unwrap_or(true), &seeders)
                 };
 
                 match transfer_path {

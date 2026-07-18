@@ -77,15 +77,16 @@ impl IntrovertBehaviour {
         let mdns = if enable_mdns {
             match mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id) {
                 Ok(b) => {
-                    crate::dispatch_debug_log("mDNS behaviour initialized");
+                    crate::dispatch_debug_log(&format!("[mDNS] Behaviour initialized for peer {}", peer_id));
                     Some(b)
                 },
                 Err(e) => {
-                    crate::dispatch_debug_log(&format!("mDNS initialization failed: {}", e));
+                    crate::dispatch_debug_log(&format!("[mDNS] Initialization FAILED: {}", e));
                     None
                 }
             }
         } else {
+            crate::dispatch_debug_log("[mDNS] Disabled by config");
             None
         };
         

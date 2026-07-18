@@ -42,13 +42,24 @@ impl TransferRouter {
         transfer_id: &str,
         mdns_peers: &HashSet<PeerId>,
         swarm_connected: impl Fn(&PeerId) -> bool,
+        is_relayed: impl Fn(&PeerId) -> bool,
         known_seeders: &[PeerId],
     ) -> TransferPath {
-        // P1 — direct dial to the actual recipient (same LAN via mDNS or already connected)
-        // Skip if this (transfer_id, recipient) pair recently failed on Direct path
-        if (mdns_peers.contains(recipient_id) || swarm_connected(recipient_id))
-            && !self.is_seeder_in_cooldown(transfer_id, recipient_id)
-        {
+        let is_mdns = mdns_peers.contains(recipient_id);
+        let is_connected = swarm_connected(recipient_id);
+        let relayed = is_relayed(recipient_id);
+        let in_cooldown = self.is_seeder_in_cooldown(transfer_id, recipient_id);
+
+        crate::dispatch_debug_log(&format!(
+            "[TransferRouter] resolve(tid={}, recipient={}): mdns_peers={}, connected={}, relayed={}, cooldown={}, mdns_set_size={}",
+            &transfer_id[..transfer_id.len().min(20)], recipient_id, is_mdns, is_connected, relayed, in_cooldown, mdns_peers.len()
+        ));
+
+        // P1 — direct dial to the actual recipient (same LAN via mDNS AND not relayed)
+        // Relay connections (different network via RBN) must NOT use Direct path even if
+        // mdns_peers contains stale entries from a previous LAN session.
+        if is_mdns && !relayed && !in_cooldown {
+            crate::dispatch_debug_log(&format!("[TransferRouter] → Direct({})", recipient_id));
             return TransferPath::Direct(*recipient_id);
         }
 
@@ -56,10 +67,12 @@ impl TransferRouter {
         if let Some(local_seeder) = known_seeders.iter().find(|p| {
             mdns_peers.contains(*p) && !self.is_seeder_in_cooldown(transfer_id, p)
         }) {
+            crate::dispatch_debug_log(&format!("[TransferRouter] → LocalSeeder({})", local_seeder));
             return TransferPath::LocalSeeder(*local_seeder);
         }
 
         // P4 — fall back to relay
+        crate::dispatch_debug_log(&format!("[TransferRouter] → Relay({})", recipient_id));
         TransferPath::Relay(*recipient_id)
     }
 
