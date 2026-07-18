@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use libp2p::{kad::QueryId, Swarm, Multiaddr, PeerId, identity::Keypair};
@@ -8,6 +8,87 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use webrtc::peer_connection::RTCPeerConnection;
 use x25519_dalek::{StaticSecret, PublicKey};
+
+/// Resolves the optimal transfer path for file payloads.
+/// Priority: P1 Direct > P2/P3 LocalSeeder > P4 Relay
+pub enum TransferPath {
+    /// Dial recipient directly — same LAN or already-connected peer
+    Direct(PeerId),
+    /// Dial a different peer on our LAN who already holds the file
+    LocalSeeder(PeerId),
+    /// Recipient behind RBN — use gossipsub/relay circuit
+    Relay(PeerId),
+}
+
+pub struct TransferRouter {
+    /// Seeders that recently failed to serve — (transfer_id, seeder) -> last failure time
+    pub(crate) failed_seeders: HashMap<(String, PeerId), Instant>,
+    /// Cooldown before retrying a failed seeder
+    pub(crate) seeder_cooldown: Duration,
+}
+
+impl TransferRouter {
+    pub fn new() -> Self {
+        Self {
+            failed_seeders: HashMap::new(),
+            seeder_cooldown: Duration::from_secs(30),
+        }
+    }
+
+    /// Resolve the best transfer path for a file payload.
+    pub fn resolve(
+        &self,
+        recipient_id: &PeerId,
+        transfer_id: &str,
+        mdns_peers: &HashSet<PeerId>,
+        swarm_connected: impl Fn(&PeerId) -> bool,
+        known_seeders: &[PeerId],
+    ) -> TransferPath {
+        // P1 — direct dial to the actual recipient (same LAN via mDNS or already connected)
+        // Skip if this (transfer_id, recipient) pair recently failed on Direct path
+        if (mdns_peers.contains(recipient_id) || swarm_connected(recipient_id))
+            && !self.is_seeder_in_cooldown(transfer_id, recipient_id)
+        {
+            return TransferPath::Direct(*recipient_id);
+        }
+
+        // P2/P3 — is there a seeder for this transfer on our LAN?
+        if let Some(local_seeder) = known_seeders.iter().find(|p| {
+            mdns_peers.contains(*p) && !self.is_seeder_in_cooldown(transfer_id, p)
+        }) {
+            return TransferPath::LocalSeeder(*local_seeder);
+        }
+
+        // P4 — fall back to relay
+        TransferPath::Relay(*recipient_id)
+    }
+
+    fn is_seeder_in_cooldown(&self, transfer_id: &str, seeder: &PeerId) -> bool {
+        if let Some(last_failure) = self.failed_seeders.get(&(transfer_id.to_string(), *seeder)) {
+            last_failure.elapsed() < self.seeder_cooldown
+        } else {
+            false
+        }
+    }
+
+    /// Mark a seeder as failed for a transfer (triggers cooldown before retry)
+    pub fn mark_seeder_failed(&mut self, transfer_id: &str, seeder: PeerId) {
+        self.failed_seeders.insert((transfer_id.to_string(), seeder), Instant::now());
+    }
+
+    /// Mark a direct-recipient as failed for a transfer (triggers cooldown before retry).
+    /// When a Direct-path send fails, this prevents resolve() from returning Direct
+    /// for the same (transfer_id, recipient) pair for seeder_cooldown seconds,
+    /// allowing the next chunk to fall through to Relay.
+    pub fn mark_direct_failed(&mut self, transfer_id: &str, recipient: PeerId) {
+        self.failed_seeders.insert((transfer_id.to_string(), recipient), Instant::now());
+    }
+
+    /// Cleanup all state for a completed/evicted transfer
+    pub fn clear_transfer(&mut self, transfer_id: &str) {
+        self.failed_seeders.retain(|(tid, _), _| tid != transfer_id);
+    }
+}
 
 use super::types::*;
 use super::{registry, noise_session::NoiseSession, IntrovertBehaviour};
@@ -108,9 +189,13 @@ pub struct NetworkService {
     pub(crate) last_idle_log: Instant,
     /// Last time a mailbox drain was performed (rate-limit to prevent spam on reservation flap)
     pub(crate) last_mailbox_drain: Instant,
+    /// Last time a file chunk drain was performed (separate from mail drain for faster chunk delivery)
+    pub(crate) last_chunk_drain: Instant,
     /// Peers with an active flush task — prevents duplicate flush spawns on circuit flap
     /// Value is the Instant when the lock was acquired (for timeout fallback)
     pub(crate) flush_in_progress: HashMap<PeerId, Instant>,
+    /// Intelligent file transfer router — resolves Direct vs LocalSeeder vs Relay path
+    pub(crate) transfer_router: TransferRouter,
 }
 
 #[derive(Debug, Clone)]

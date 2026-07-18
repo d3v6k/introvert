@@ -259,7 +259,9 @@ impl NetworkService {
             connected_peer_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             last_idle_log: Instant::now(),
             last_mailbox_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
+            last_chunk_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
             flush_in_progress: HashMap::new(),
+            transfer_router: service::TransferRouter::new(),
         };
 
         // Sync to global RBN bootstrap list
@@ -588,6 +590,7 @@ impl NetworkService {
                         let ft_topic = libp2p::gossipsub::IdentTopic::new(format!("file-transfer-{}", id));
                         let _ = self.swarm.behaviour_mut().gossipsub.unsubscribe(&ft_topic);
                         let _ = self.storage.remove_pending_chunks_for_transfer(id);
+                        self.transfer_router.clear_transfer(id);
                     }
 
                     let connected_count = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed);
@@ -1599,6 +1602,7 @@ impl NetworkService {
                     // Unsubscribe from transfer-specific gossipsub topic
                     let ft_topic = libp2p::gossipsub::IdentTopic::new(format!("file-transfer-{}", transfer_id));
                     let _ = self.swarm.behaviour_mut().gossipsub.unsubscribe(&ft_topic);
+                    self.transfer_router.clear_transfer(&transfer_id);
                 }
             } else {
                 debug!("[DEBUG] Failed to decode base64 for chunk {}", chunk_index);
@@ -1992,34 +1996,40 @@ impl NetworkService {
                                  }
 
                                 // Flush pending DB chunks for all peers (will check connectivity per-peer)
-                                let storage = Arc::clone(&self.storage);
-                                let tx_db = self.command_tx.clone();
-                                let connected_peers: Vec<String> = self.swarm.connected_peers()
-                                    .map(|p| p.to_string())
-                                    .collect();
-                                tokio::spawn(async move {
-                                    tokio::time::sleep(Duration::from_millis(600)).await; // Wait for circuit to stabilize
-                                    for peer_str in connected_peers {
-                                        if let Ok(chunks) = storage.dequeue_pending_chunks(&peer_str, 50) {
-                                            if !chunks.is_empty() {
-                                                info!("[Relay] Flushing {} pending DB chunks for {}", chunks.len(), peer_str);
-                                                if let Ok(peer_id) = peer_str.parse::<PeerId>() {
-                                                    for (transfer_id, chunk_index, chunk_data) in chunks {
-                                                        let data_base64 = base64::encode(&chunk_data);
-                                                        let payload = SignalingPayload::FileChunk {
-                                                            transfer_id: transfer_id.clone(),
-                                                            chunk_index,
-                                                            total_chunks: 0,
-                                                            data_base64,
-                                                        };
-                                                        let _ = tx_db.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
-                                                        // Removal handled by forward_to_mesh on gossipsub publish success
+                                // Chunk drain cooldown: 250ms to prevent thundering herd on rapid circuit flaps
+                                if self.last_chunk_drain.elapsed() < Duration::from_millis(250) {
+                                    debug!("[Relay] Skipping chunk drain — last chunk drain was < 250ms ago");
+                                } else {
+                                    self.last_chunk_drain = Instant::now();
+                                    let storage = Arc::clone(&self.storage);
+                                    let tx_db = self.command_tx.clone();
+                                    let connected_peers: Vec<String> = self.swarm.connected_peers()
+                                        .map(|p| p.to_string())
+                                        .collect();
+                                    tokio::spawn(async move {
+                                        tokio::time::sleep(Duration::from_millis(600)).await; // Wait for circuit to stabilize
+                                        for peer_str in connected_peers {
+                                            if let Ok(chunks) = storage.dequeue_pending_chunks(&peer_str, 50) {
+                                                if !chunks.is_empty() {
+                                                    info!("[Relay] Flushing {} pending DB chunks for {}", chunks.len(), peer_str);
+                                                    if let Ok(peer_id) = peer_str.parse::<PeerId>() {
+                                                        for (transfer_id, chunk_index, chunk_data) in chunks {
+                                                            let data_base64 = base64::encode(&chunk_data);
+                                                            let payload = SignalingPayload::FileChunk {
+                                                                transfer_id: transfer_id.clone(),
+                                                                chunk_index,
+                                                                total_chunks: 0,
+                                                                data_base64,
+                                                            };
+                                                            let _ = tx_db.send(NetworkCommand::ForwardMeshSignaling { peer_id, payload }).await;
+                                                            // Removal handled by forward_to_mesh on gossipsub publish success
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                });
+                                    });
+                                }
                             }
                             libp2p::relay::client::Event::InboundCircuitEstablished { src_peer_id, limit } => {
                                 info!("[Relay] ✅ InboundCircuitEstablished from {} (limit={:?})", src_peer_id, limit);
@@ -2047,8 +2057,11 @@ impl NetworkService {
 
                                 if self.flush_in_progress.contains_key(&src_peer_id) {
                                     crate::dispatch_debug_log(&format!("[Relay] Flush already in progress for {} — skipping", src_peer_id));
+                                } else if self.last_chunk_drain.elapsed() < Duration::from_millis(250) {
+                                    debug!("[Relay] Skipping InboundCircuit chunk drain — last chunk drain was < 250ms ago");
                                 } else {
                                     self.flush_in_progress.insert(src_peer_id, Instant::now());
+                                    self.last_chunk_drain = Instant::now();
 
                                     // Prepare RAM flush data
                                     let ram_payloads = self.pending_messages.remove(&src_peer_id);
@@ -2393,6 +2406,9 @@ impl NetworkService {
                                 if let Ok(chunk_data) = base64::decode(data_base64) {
                                     info!("[Mesh] FileChunk send failed for {}. Persisting to DB for retry.", peer);
                                     let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer.to_string(), chunk_index, &chunk_data);
+                                    // Mark this (transfer_id, peer) as failed on Direct path so the next
+                                    // chunk falls through to Relay instead of retrying Direct repeatedly.
+                                    self.transfer_router.mark_direct_failed(transfer_id, peer);
                                 }
                             } else if is_file_chunk {
                                 // FileChunkRequest: tiny control message, receiver will regenerate — drop it.
@@ -2508,6 +2524,8 @@ impl NetworkService {
                                 let _ = self.storage.increment_chunk_retry(transfer_id, chunk_index, 5);
                                 if let Ok(chunk_data) = base64::decode(data_base64) {
                                     let _ = self.storage.enqueue_pending_chunk(transfer_id, &peer.to_string(), chunk_index, &chunk_data);
+                                    // Mark this (transfer_id, peer) as failed on Direct path
+                                    self.transfer_router.mark_direct_failed(transfer_id, peer);
                                 }
                             }
                         }
@@ -3033,6 +3051,14 @@ impl NetworkService {
     }
 
     async fn forward_to_mesh(&mut self, recipient_id: PeerId, payload: SignalingPayload, force_mailbox: bool) -> anyhow::Result<()> {
+        /// Helper: get the path name for logging
+        fn transfer_path_name(path: &service::TransferPath) -> &'static str {
+            match path {
+                service::TransferPath::Direct(_) => "Direct",
+                service::TransferPath::LocalSeeder(_) => "LocalSeeder",
+                service::TransferPath::Relay(_) => "Relay",
+            }
+        }
         let recipient_str = recipient_id.to_string();
 
         // LOOPBACK PROTECTION: If sending to ourselves, handle locally
@@ -3083,10 +3109,9 @@ impl NetworkService {
                     }
                 }
             }
-            // 2. Route ALL file payloads through gossipsub via per-transfer topic.
-            // This MUST be before the is_connected check because cross-network peers
-            // are not directly connected — is_connected returns false for them.
-            // Gossipsub works for both direct and relayed connections.
+            // 2. File payload routing — use TransferRouter to resolve optimal path.
+            // P1 Direct (same-LAN mDNS) / P3 LocalSeeder bypass gossipsub entirely,
+            // sending via direct request-response codec. Only Relay (P4) uses gossipsub.
             let is_file_payload = matches!(payload, SignalingPayload::FileChunk { .. } | SignalingPayload::FileChunkRequest { .. });
             if is_file_payload {
                 let is_chunk_data = matches!(payload, SignalingPayload::FileChunk { .. });
@@ -3096,54 +3121,103 @@ impl NetworkService {
                     | SignalingPayload::FileChunkRequest { transfer_id, .. } => transfer_id.clone(),
                     _ => String::new(),
                 };
+
+                // Always subscribe to the control topic for SeederAnnounce/FileChunkAck,
+                // regardless of which TransferPath we resolve to.
                 if !transfer_id.is_empty() {
                     let topic_str = format!("file-transfer-{}", transfer_id);
                     let topic = libp2p::gossipsub::IdentTopic::new(&topic_str);
                     let _ = self.swarm.behaviour_mut().gossipsub.subscribe(&topic);
-                    if let Ok(bytes) = serde_json::to_vec(&payload) {
-                        match self.swarm.behaviour_mut().gossipsub.publish(topic.clone(), bytes) {
-                            Ok(_) => {
-                                info!("[Mesh] Published {} via gossipsub topic={}", if is_chunk_data { "FileChunk" } else { "FileChunkRequest" }, topic_str);
-                                if is_chunk_data {
-                                    *self.inflight_requests.entry(recipient_id).or_insert(0) += 1;
-                                    // TODO(follow-up): per-chunk peer ACK — this removes on local
-                                    // mesh acceptance, not confirmed receipt. Good enough for dedup.
-                                    if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
-                                        let _ = self.storage.remove_pending_chunk(transfer_id, chunk_index);
-                                    }
-                                }
+                }
 
-                                // FALLBACK: Also publish FileChunkRequest to group topic.
-                                // RBN is subscribed to group topics but not file-transfer topics.
-                                // This ensures the sender receives the request through the RBN.
-                                if is_chunk_request {
-                                    let group_id = self.incoming_transfers.get(&transfer_id)
-                                        .and_then(|t| t.group_id.clone())
-                                        .or_else(|| self.active_seeders.get(&transfer_id).and_then(|s| s.group_id.clone()));
-                                    if let Some(gid) = group_id {
-                                        let group_topic = libp2p::gossipsub::IdentTopic::new(&gid);
-                                        if let Ok(bytes) = serde_json::to_vec(&payload) {
-                                            let _ = self.swarm.behaviour_mut().gossipsub.publish(group_topic, bytes);
-                                            info!("[Mesh] Published FileChunkRequest via group topic={} (RBN fallback)", gid);
-                                        }
-                                    }
-                                }
+                // Resolve the best path via TransferRouter
+                let transfer_path = {
+                    let mdns = &self.mdns_peers;
+                    let swarm = &self.swarm;
+                    let seeders: Vec<PeerId> = Vec::new(); // TODO: wire known_seeders in PR-2
+                    self.transfer_router.resolve(&recipient_id, &transfer_id, mdns, |pid| swarm.is_connected(pid), &seeders)
+                };
 
-                                return Ok(());
+                match transfer_path {
+                    service::TransferPath::Direct(target_peer) | service::TransferPath::LocalSeeder(target_peer) => {
+                        // P1/P2/P3 — send via direct request-response codec (skip gossipsub)
+                        info!("[Mesh] TransferRouter: {} for {} — sending direct to {}", transfer_path_name(&transfer_path), transfer_id, target_peer);
+                        if !transfer_id.is_empty() {
+                            // In-flight limit check (same cap as §3: 8 for direct, 16 for relay)
+                            if is_chunk_data {
+                                let inflight = self.inflight_requests.get(&target_peer).cloned().unwrap_or(0);
+                                let limit = 8; // Direct path is always non-relayed
+                                if inflight >= limit {
+                                    debug!("[Mesh] In-flight limit ({}) reached for {}. Buffering chunk via direct path.", limit, target_peer);
+                                    self.pending_messages.entry(target_peer).or_default().push(payload.clone());
+                                    return Ok(());
+                                }
                             }
-                            Err(e) => {
-                                warn!("[Mesh] Gossipsub publish FAILED: {:?}", e);
+                            let use_v2 = self.peer_supports_v2.contains(&target_peer);
+                            if use_v2 {
+                                let req_id = self.swarm.behaviour_mut().request_response_v2.send_request(&target_peer, crate::network::codec::BinarySignalingRequest(payload.clone()));
+                                self.outbound_tracker_v2.insert(req_id, (target_peer, payload.clone()));
+                            } else {
+                                let req_id = self.swarm.behaviour_mut().request_response.send_request(&target_peer, SignalingRequest(payload.clone()));
+                                self.outbound_tracker.insert(req_id, (target_peer, payload.clone()));
+                            }
+                            if is_chunk_data {
+                                *self.inflight_requests.entry(target_peer).or_insert(0) += 1;
                                 if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
-                                    let _ = self.storage.release_in_flight_chunk(transfer_id, chunk_index);
+                                    let _ = self.storage.remove_pending_chunk(transfer_id, chunk_index);
                                 }
-                                // Fall through to direct delivery as last resort
+                            }
+                            return Ok(());
+                        }
+                        // Fall through to relay if no transfer_id (shouldn't happen for file payloads)
+                    }
+                    service::TransferPath::Relay(_) => {
+                        // P4 — use gossipsub via per-transfer topic (existing behavior)
+                        if !transfer_id.is_empty() {
+                            let topic_str = format!("file-transfer-{}", transfer_id);
+                            let topic = libp2p::gossipsub::IdentTopic::new(&topic_str);
+                            if let Ok(bytes) = serde_json::to_vec(&payload) {
+                                match self.swarm.behaviour_mut().gossipsub.publish(topic.clone(), bytes) {
+                                    Ok(_) => {
+                                        info!("[Mesh] TransferRouter: Relay for {} — published via gossipsub topic={}", transfer_id, topic_str);
+                                        if is_chunk_data {
+                                            *self.inflight_requests.entry(recipient_id).or_insert(0) += 1;
+                                            if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
+                                                let _ = self.storage.remove_pending_chunk(transfer_id, chunk_index);
+                                            }
+                                        }
+
+                                        // FALLBACK: Also publish FileChunkRequest to group topic.
+                                        if is_chunk_request {
+                                            let group_id = self.incoming_transfers.get(&transfer_id)
+                                                .and_then(|t| t.group_id.clone())
+                                                .or_else(|| self.active_seeders.get(&transfer_id).and_then(|s| s.group_id.clone()));
+                                            if let Some(gid) = group_id {
+                                                let group_topic = libp2p::gossipsub::IdentTopic::new(&gid);
+                                                if let Ok(bytes) = serde_json::to_vec(&payload) {
+                                                    let _ = self.swarm.behaviour_mut().gossipsub.publish(group_topic, bytes);
+                                                    info!("[Mesh] Published FileChunkRequest via group topic={} (RBN fallback)", gid);
+                                                }
+                                            }
+                                        }
+
+                                        return Ok(());
+                                    }
+                                    Err(e) => {
+                                        warn!("[Mesh] Gossipsub publish FAILED: {:?}", e);
+                                        if let SignalingPayload::FileChunk { ref transfer_id, chunk_index, .. } = payload {
+                                            let _ = self.storage.release_in_flight_chunk(transfer_id, chunk_index);
+                                        }
+                                        // Fall through to direct delivery as last resort
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // 3. Try direct libp2p delivery if connected
+            // 3. Try direct libp2p delivery if connected (non-file payloads, or file fallback)
             if self.swarm.is_connected(&recipient_id) {
                 let is_chunk_data = matches!(payload, SignalingPayload::FileChunk { .. });
                 if is_chunk_data {
@@ -3414,9 +3488,10 @@ impl NetworkService {
     }
 
     async fn perform_mailbox_fetch(&mut self) {
-        // Guard: skip if last drain was < 5 seconds ago (prevents spam on reservation flap)
-        if self.last_mailbox_drain.elapsed() < Duration::from_secs(5) {
-            crate::dispatch_debug_log("[Mailbox] Skipping drain — last drain was < 5s ago");
+        // Guard: skip if last mail drain was < 30 seconds ago (prevents FCM echo loop)
+        // File chunk delivery uses separate event-driven flush in circuit handlers (no cooldown)
+        if self.last_mailbox_drain.elapsed() < Duration::from_secs(30) {
+            crate::dispatch_debug_log("[Mailbox] Skipping drain — last drain was < 30s ago");
             return;
         }
         self.last_mailbox_drain = Instant::now();
@@ -4080,6 +4155,7 @@ impl NetworkService {
                 let ft_topic = libp2p::gossipsub::IdentTopic::new(format!("file-transfer-{}", transfer_id));
                 let _ = self.swarm.behaviour_mut().gossipsub.unsubscribe(&ft_topic);
                 let _ = self.storage.remove_pending_chunks_for_transfer(&transfer_id);
+                self.transfer_router.clear_transfer(&transfer_id);
                 // Notify UI of cancellation
                 let progress = FileTransferProgress {
                     transfer_id: transfer_id.clone(),
@@ -7288,6 +7364,7 @@ impl NetworkService {
 
                 // Clean up any persisted chunks for this transfer
                 let _ = self.storage.remove_pending_chunks_for_transfer(&transfer_id);
+                self.transfer_router.clear_transfer(&transfer_id);
 
                 let mut local_path = None;
                 let mut filename = "".to_string();
