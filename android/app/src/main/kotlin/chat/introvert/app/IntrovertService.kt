@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
+import android.net.wifi.WifiManager
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -19,6 +20,7 @@ class IntrovertService : Service() {
     private val CHANNEL_ID = "introvert_background"
     private val NOTIFICATION_ID = 1001
     private var wakeLock: PowerManager.WakeLock? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     companion object {
         // Static callback set by MainActivity when Flutter engine is ready.
@@ -33,6 +35,7 @@ class IntrovertService : Service() {
     }
 
     override fun onDestroy() {
+        releaseMulticastLock()
         releaseWakeLock()
         super.onDestroy()
     }
@@ -41,6 +44,7 @@ class IntrovertService : Service() {
         // CRITICAL: Call startForeground IMMEDIATELY — before anything else.
         // Android kills the app if this isn't called within 5 seconds of startForegroundService().
         startForegroundMinimal()
+        acquireMulticastLock()
 
         val shouldStayAwake = intent?.getBooleanExtra("awake", false) ?: false
         if (shouldStayAwake) {
@@ -135,6 +139,27 @@ class IntrovertService : Service() {
         }
         wakeLock = null
         Log.d("IntrovertService", "Standard Mode: WakeLock released.")
+    }
+
+    private fun acquireMulticastLock() {
+        if (multicastLock == null) {
+            val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            multicastLock = wifi.createMulticastLock("introvert_mdns").apply {
+                setReferenceCounted(true)
+                acquire()
+            }
+            Log.d("IntrovertService", "MulticastLock acquired for mDNS discovery.")
+        }
+    }
+
+    private fun releaseMulticastLock() {
+        multicastLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
+        multicastLock = null
+        Log.d("IntrovertService", "MulticastLock released.")
     }
 
     private fun createNotificationChannel() {

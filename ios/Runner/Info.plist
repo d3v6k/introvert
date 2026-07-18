@@ -72,6 +72,7 @@
 		<string>This app uses the local network to discover and connect to other Introvert nodes on your Wi-Fi.</string>
 		<key>NSBonjourServices</key>
 		<array>
+			<string>_p2p._udp</string>
 			<string>_ipfs-discovery._udp</string>
 			<string>_ipfs._udp</string>
 			<string>_libp2p._udp</string>

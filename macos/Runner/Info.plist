@@ -26,6 +26,15 @@
 	<string>$(PRODUCT_COPYRIGHT)</string>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Introvert uses the local network to discover and connect to other Introvert nodes on your Wi-Fi for fast peer-to-peer file transfers.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_p2p._udp</string>
+		<string>_ipfs-discovery._udp</string>
+		<string>_ipfs._udp</string>
+		<string>_libp2p._udp</string>
+	</array>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>
