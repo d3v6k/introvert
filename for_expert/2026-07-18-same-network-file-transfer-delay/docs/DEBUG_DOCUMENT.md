@@ -1,7 +1,7 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-18 11:00 UTC
-**Git:** main @ 66ca960 (v0.32.0 — Intelligent Transfer Routing)
+**Last Updated:** 2026-07-17 00:10 UTC
+**Git:** main @ 521d315 + uncommitted FCM/peer-count fixes
 
 ---
 
@@ -114,44 +114,6 @@ Updated `SwarmEvent::ConnectionClosed` to check if we are completely disconnecte
 ### Medium-term
 - **Anchor Handle Registry deployment** — needs 1.51 SOL for deployer wallet
 - **Client balance display** — app shows 0 INTR despite on-chain balances
-- **mDNS peer discovery** — OS permissions added (PR-1.5) but mDNS still not discovering peers on LAN. Needs socket-level investigation. TransferRouter Direct path (P1) depends on this.
-- **Seeder cascade (PR-2)** — depends on mDNS working. Deferred until mDNS is fixed.
-
----
-
-## Networking File Status (2026-07-18)
-
-### Current State — STABLE
-File transfers working well across all scenarios: same-network, cross-network, and VPN connections.
-
-### Key Networking Files
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| `src/network/mod.rs` | 8270 | Core network loop, swarm events, command handlers, TransferRouter integration |
-| `src/network/service.rs` | 257 | `NetworkService` struct, `TransferRouter` struct, `TransferPath` enum |
-| `src/network/types.rs` | 422 | `NetworkCommand` enum, `SignalingPayload` variants |
-| `src/network/behaviour.rs` | 161 | libp2p behaviour composition (gossipsub, mDNS, relay, etc.) |
-| `src/network/codec.rs` | 414 | Binary v2 request-response codec |
-| `src/storage.rs` | 3324 | SQLite/SQLCipher operations, `pending_file_chunks` table |
-| `src/intro_claw.rs` | 3406 | IntroClaw intelligence engine, connection optimizer |
-| `src/lib.rs` | 5458 | FFI exports (134 symbols), library entry point |
-
-### TransferRouter (v0.32.0)
-- **Location:** `src/network/service.rs` (struct) + `src/network/mod.rs` (integration in `forward_to_mesh`)
-- **Priority:** Direct (P1) > LocalSeeder (P2/P3) > Relay (P4)
-- **Detection:** Uses `mdns_peers` set for same-network detection
-- **Fallback:** `mark_direct_failed()` cooldown (30s) degrades to Relay on LAN drop
-- **Status:** Implemented and working. Direct path not yet triggered (mDNS not discovering peers).
-
-### Drain Cooldowns (v0.32.0)
-- **Mail drain:** 30s cooldown (FCM echo-loop protection)
-- **Chunk drain:** 250ms cooldown on both `InboundCircuitEstablished` and `OutboundCircuitEstablished`
-
-### In-Flight Limits
-- **Direct/LocalSeeder path:** 8 concurrent requests (cap enforced before send)
-- **Relay path:** 16 concurrent requests (existing behavior)
-- **Sliding window drain:** On response/failure, next buffered chunk is sent automatically
 
 ---
 
