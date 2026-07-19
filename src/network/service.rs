@@ -44,7 +44,16 @@ impl TransferRouter {
         swarm_connected: impl Fn(&PeerId) -> bool,
         is_relayed: impl Fn(&PeerId) -> bool,
         known_seeders: &[PeerId],
+        connectivity_type: u8,
     ) -> TransferPath {
+        // On mobile data, mDNS LAN peers are unreachable — always relay
+        if connectivity_type == 2 {
+            crate::dispatch_debug_log(&format!(
+                "[TransferRouter] Mobile data — forcing Relay for {}", recipient_id
+            ));
+            return TransferPath::Relay(*recipient_id);
+        }
+
         let is_mdns = mdns_peers.contains(recipient_id);
         let is_connected = swarm_connected(recipient_id);
         let relayed = is_relayed(recipient_id);

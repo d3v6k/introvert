@@ -1,0 +1,507 @@
+INTROVERT NETWORK DEBUG LOG
+Generated: 2026-07-18T16:12:17.134704
+Total entries: 500
+============================================================
+Contents: Rust relay events, circuit establishment,
+mesh routing decisions, dial strategies, mailbox drain.
+============================================================
+[2026-07-18T15:39:24.996263] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:39:24.998770] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:39:24.998963] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:39:26.145839] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:39:31.146325] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:39:36.146694] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:39:42.146498] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:39:48.145893] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:39:58.146497] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:03.146656] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:09.145957] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:14.145992] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:19.146140] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:30.146794] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:36.146633] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:42.149529] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:48.146911] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:40:54.146285] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:04.146929] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:09.146960] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:15.146967] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:20.071749] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:41:20.071944] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:41:21.146679] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:26.146985] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:37.146369] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:42.148531] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:47.147336] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:53.146337] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:41:58.147347] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:09.147331] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:14.150099] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:20.146620] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:24.147288] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:25.147007] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:31.145807] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:41.147616] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:47.145896] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:52.146801] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:42:57.147651] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:03.145976] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:14.146633] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:20.146789] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:26.147752] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:32.146717] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:37.147163] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:48.146886] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:53.147841] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:43:59.146475] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:04.147398] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:10.147356] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:21.147553] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:24.953519] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:44:24.953851] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:44:25.000624] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:44:25.000783] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:44:25.001226] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:44:25.001470] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:44:25.006215] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:44:25.006377] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:44:27.147485] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:32.147903] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:38.147613] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:44.147648] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:44:56.147294] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:02.148259] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:08.146866] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:13.149352] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:18.147700] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:29.147808] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:35.147121] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:40.147519] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:45.148135] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:45:51.146967] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:02.148491] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:08.147620] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:14.147590] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:20.075548] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:46:20.075774] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:46:20.146359] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:32.127611] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:38.122331] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:44.119368] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:49.117139] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:46:54.115942] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:05.114403] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:11.112189] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:16.113383] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:22.112240] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:24.115588] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:28.112222] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:38.112667] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:44.111753] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:49.112517] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:47:55.111918] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:00.112130] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:12.112297] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:18.112002] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:24.111081] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:29.112324] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:35.111836] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:45.112104] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:50.112143] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:48:56.111853] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:02.112045] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:07.112123] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:18.113924] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:24.111042] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:24.929416] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:49:24.929631] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:49:24.971421] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:49:24.971621] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:49:24.974156] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:49:24.974484] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:49:24.975864] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:49:24.976005] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:49:25.139958] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:49:25.140036] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:49:29.112031] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:35.110475] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:40.111085] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:51.111450] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:49:56.112302] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:01.112772] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:07.111119] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:12.112147] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:23.110443] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:28.110923] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:33.112033] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:39.111082] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:44.116165] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:50:56.111922] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:02.111730] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:08.112196] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:14.114145] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:20.044851] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:51:20.045161] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:51:25.111735] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:31.111381] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:36.111375] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:42.111455] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:47.112315] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:51:59.110714] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:04.112233] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:09.111859] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:15.111059] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:20.111460] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:25.111938] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:31.110356] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:36.110694] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:41.111883] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:46.112349] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:52:52.111500] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:04.111227] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:09.111766] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:14.112305] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:20.111650] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:26.112116] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:37.112292] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:43.110371] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:48.111667] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:53:54.111669] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:00.111191] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:10.112035] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:16.111064] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:21.111962] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:24.899028] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:54:24.899284] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:54:24.929786] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:54:24.930101] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:54:24.973894] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:54:24.974039] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:54:24.977368] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:54:24.977550] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:54:24.991325] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:54:24.991563] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:54:27.111391] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:32.112147] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:43.112126] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:49.111508] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:54:55.110255] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:00.112284] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:06.112006] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:17.112340] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:23.111315] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:28.112085] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:34.112224] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:40.111518] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:51.110323] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:55:56.112149] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:02.111138] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:08.111163] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:13.112342] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:20.044444] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:56:20.044681] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:56:25.111628] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:31.110555] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:36.111846] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:42.112085] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:48.111029] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:56:59.111554] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:04.111722] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:10.111102] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:15.113979] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:20.107045] [Relay] ✅ InboundCircuitEstablished from 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+[2026-07-18T15:57:20.107292] [Relay] Relay hint: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+[2026-07-18T15:57:20.310351] [Relay] Flush completed for 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — lock released
+[2026-07-18T15:57:21.111722] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:26.112058] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:32.111825] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:38.111940] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:44.111438] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:57:49.112265] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:00.111682] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:06.111498] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:12.111997] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:18.111569] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:24.110466] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:34.111351] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:40.111084] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:46.111768] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:52.111477] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:58:57.111324] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:08.111537] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:14.111819] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:20.111645] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:24.903435] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:59:24.903669] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:59:24.934677] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:59:24.934921] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:59:24.977473] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:59:24.977719] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:59:24.980581] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:59:24.980888] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:59:24.994788] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T15:59:24.995059] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T15:59:26.111058] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:31.111388] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:42.111753] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:47.111481] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:53.111951] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T15:59:59.110707] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:04.112074] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:16.111269] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:21.111840] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:27.111157] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:33.111034] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:38.111316] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:49.112091] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:00:55.110470] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:00.111163] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:05.111168] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:10.111632] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:20.048435] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:01:20.048899] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:01:21.111177] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:27.110537] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:32.111599] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:38.110708] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:44.111358] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:01:55.111980] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:01.110539] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:06.111958] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:12.111067] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:18.111076] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:24.109131] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:30.106307] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:35.106035] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:41.105372] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:46.104410] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:02:52.104334] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:04.103393] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:09.103521] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:15.103497] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:20.104099] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:26.102816] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:36.103061] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:42.103100] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:47.103569] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:53.103117] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:03:59.102271] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:10.103428] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:16.103844] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:22.102083] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:24.901992] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:04:24.902166] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:04:24.927027] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:04:24.927269] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:04:24.970468] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:04:24.970688] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:04:24.973797] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:04:24.974015] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:04:24.987859] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:04:24.988033] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:04:27.102219] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:32.102645] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:43.103520] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:48.103457] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:54.102838] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:04:59.102851] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:05.102626] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:15.103652] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:21.103760] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:27.102113] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:32.102577] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:37.103414] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:48.103189] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:05:54.103043] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:00.102908] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:06.102334] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:12.105957] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:20.041505] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:06:20.041731] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:06:24.101700] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:29.102167] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:34.103337] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:40.103091] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:41.188173] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-18T16:06:41.189206] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:06:41.189311] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:06:41.189741] handle_single_payload: GroupAction::Message: msg_id=gm_f0c2a00be8d2ed210cc09c9ed16d6927_1784376401178185000_490ec23d, content_encrypted_len=33, reply_to=Some("")
+[2026-07-18T16:06:41.192333] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:06:41.193644] handle_single_payload: Decrypted group message content: hello
+[2026-07-18T16:06:41.196574] handle_single_payload: Successfully stored group message
+[2026-07-18T16:06:45.102962] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:06:46.053773] [Resilience] app_state set to Foreground
+[2026-07-18T16:06:46.196267] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_85317763a6b765a3c94d3e1438b373ba31e61449cbc735e9a407777290fbfc57_1784341510517
+[2026-07-18T16:06:46.196317] [FFI] start_pull: spawning async send for tid=gft_85317763a6b765a3c94d3e1438b373ba31e61449cbc735e9a407777290fbfc57_1784341510517
+[2026-07-18T16:06:46.196340] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:06:46.196370] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:06:46.196395] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784347329127
+[2026-07-18T16:06:46.196417] [FFI] start_pull: spawning async send for tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784347329127
+[2026-07-18T16:06:46.196435] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:06:46.196454] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:06:57.102941] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:03.101245] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:08.102559] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:14.103043] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:20.102766] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:25.856497] introvert_group_send_message: Loaded group secret. Hex prefix: 233c82d5
+[2026-07-18T16:07:25.856795] introvert_group_send_message: Spawning send loop for group f0c2a00be8d2ed210cc09c9ed16d6927
+[2026-07-18T16:07:25.856817] introvert_group_send_message: Group f0c2a00be8d2ed210cc09c9ed16d6927 has 3 members
+[2026-07-18T16:07:25.856837] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:07:25.856856] introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+[2026-07-18T16:07:26.102120] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:31.102816] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:37.101929] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:42.787878] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:43.101930] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:48.103314] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:07:54.102267] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:01.368888] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:05.102443] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:11.102253] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:16.102363] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:21.102441] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:26.102627] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:37.102645] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:42.102692] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:46.041745] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:47.721003] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:08:47.721358] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:08:47.721595] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:08:47.721816] handle_single_payload: GroupAction::Message: msg_id=gft_e91eba14c2a4d9494fba4aa5d5e5875db800e753d2ca378978cb77ac560f2403_1784376527632, content_encrypted_len=424, reply_to=Some("")
+[2026-07-18T16:08:47.722288] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:08:47.722429] handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_e91eba14c2a4d9494fba4aa5d5e5875db800e753d2ca378978cb77ac560f2403_1784376527632","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"1000136018.jpg","mime_type":"image/jpeg","total_size":1969586,"file_hash":"e91eba14c2a4d9494fba4aa5d5e5875db800e753d2ca378978cb77ac560f2403","is_relayed":true,"group_id":"f0c2a00be8d2ed210cc09c9ed16d6927"}
+[2026-07-18T16:08:47.725185] handle_single_payload: Successfully stored group message
+[2026-07-18T16:08:47.910402] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:08:47.910856] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:08:47.911121] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:08:47.911320] handle_single_payload: GroupAction::Message: msg_id=gft_5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a_1784376527823, content_encrypted_len=424, reply_to=Some("")
+[2026-07-18T16:08:47.911824] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:08:47.912112] handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a_1784376527823","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"1000135897.jpg","mime_type":"image/jpeg","total_size":3161137,"file_hash":"5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a","is_relayed":true,"group_id":"f0c2a00be8d2ed210cc09c9ed16d6927"}
+[2026-07-18T16:08:47.914220] handle_single_payload: Successfully stored group message
+[2026-07-18T16:08:48.062578] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:08:48.062910] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:08:48.063064] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:08:48.063214] handle_single_payload: GroupAction::Message: msg_id=gft_01e69b2868efa6507b9353b76b2491a9e389f845458c8f45aaba97cdd2576518_1784376527978, content_encrypted_len=423, reply_to=Some("")
+[2026-07-18T16:08:48.063495] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:08:48.064] handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_01e69b2868efa6507b9353b76b2491a9e389f845458c8f45aaba97cdd2576518_1784376527978","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"1000135896.jpg","mime_type":"image/jpeg","total_size":935497,"file_hash":"01e69b2868efa6507b9353b76b2491a9e389f845458c8f45aaba97cdd2576518","is_relayed":true,"group_id":"f0c2a00be8d2ed210cc09c9ed16d6927"}
+[2026-07-18T16:08:48.065083] handle_single_payload: Successfully stored group message
+[2026-07-18T16:08:48.102218] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:48.240299] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:08:48.240625] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:08:48.242468] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:08:48.242619] handle_single_payload: GroupAction::Message: msg_id=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784376528154, content_encrypted_len=424, reply_to=Some("")
+[2026-07-18T16:08:48.242692] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:08:48.242773] handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784376528154","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"1000135927.jpg","mime_type":"image/jpeg","total_size":2133982,"file_hash":"0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702","is_relayed":true,"group_id":"f0c2a00be8d2ed210cc09c9ed16d6927"}
+[2026-07-18T16:08:48.244367] handle_single_payload: Successfully stored group message
+[2026-07-18T16:08:48.416001] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:08:48.416499] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:08:48.416691] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:08:48.416842] handle_single_payload: GroupAction::Message: msg_id=gft_1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61_1784376528329, content_encrypted_len=424, reply_to=Some("")
+[2026-07-18T16:08:48.416990] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:08:48.417078] handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61_1784376528329","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"1000135883.jpg","mime_type":"image/jpeg","total_size":2164723,"file_hash":"1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61","is_relayed":true,"group_id":"f0c2a00be8d2ed210cc09c9ed16d6927"}
+[2026-07-18T16:08:48.418993] handle_single_payload: Successfully stored group message
+[2026-07-18T16:08:48.611302] handle_single_payload: Received GroupAction for group f0c2a00be8d2ed210cc09c9ed16d6927 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+[2026-07-18T16:08:48.611916] handle_single_payload: GroupAction signature verified successfully
+[2026-07-18T16:08:48.612503] handle_single_payload: Processing GroupAction action variant
+[2026-07-18T16:08:48.612635] handle_single_payload: GroupAction::Message: msg_id=gft_aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740_1784376528526, content_encrypted_len=424, reply_to=Some("")
+[2026-07-18T16:08:48.612778] handle_single_payload: Found group info for f0c2a00be8d2ed210cc09c9ed16d6927. secret is all zeros: false. Hex prefix: 233c82d5
+[2026-07-18T16:08:48.612904] handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740_1784376528526","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"1000135882.jpg","mime_type":"image/jpeg","total_size":2145874,"file_hash":"aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740","is_relayed":true,"group_id":"f0c2a00be8d2ed210cc09c9ed16d6927"}
+[2026-07-18T16:08:48.614476] handle_single_payload: Successfully stored group message
+[2026-07-18T16:08:48.693839] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_01e69b2868efa6507b9353b76b2491a9e389f845458c8f45aaba97cdd2576518_1784376527978
+[2026-07-18T16:08:48.693947] [FFI] start_pull: spawning async send for tid=gft_01e69b2868efa6507b9353b76b2491a9e389f845458c8f45aaba97cdd2576518_1784376527978
+[2026-07-18T16:08:48.694008] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:08:48.694053] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:08:48.694100] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a_1784376527823
+[2026-07-18T16:08:48.694143] [FFI] start_pull: spawning async send for tid=gft_5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a_1784376527823
+[2026-07-18T16:08:48.694190] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_e91eba14c2a4d9494fba4aa5d5e5875db800e753d2ca378978cb77ac560f2403_1784376527632
+[2026-07-18T16:08:48.694237] [FFI] start_pull: spawning async send for tid=gft_e91eba14c2a4d9494fba4aa5d5e5875db800e753d2ca378978cb77ac560f2403_1784376527632
+[2026-07-18T16:08:48.694275] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:08:48.694318] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740_1784376528526
+[2026-07-18T16:08:48.694357] [FFI] start_pull: spawning async send for tid=gft_aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740_1784376528526
+[2026-07-18T16:08:48.694393] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:08:48.694429] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:08:48.694472] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61_1784376528329
+[2026-07-18T16:08:48.694511] [FFI] start_pull: spawning async send for tid=gft_1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61_1784376528329
+[2026-07-18T16:08:48.694552] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784376528154
+[2026-07-18T16:08:48.694591] [FFI] start_pull: spawning async send for tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784376528154
+[2026-07-18T16:08:48.694632] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:08:48.694668] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:08:48.694704] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:08:48.694743] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:08:48.694832] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:08:48.694878] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:08:48.694915] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:08:50.173621] [Resilience] app_state set to Backgrounded
+[2026-07-18T16:08:53.102888] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:59.102265] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:08:59.157395] [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+[2026-07-18T16:09:10.101465] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:15.102288] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:21.102107] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:24.901624] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:09:24.901795] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:09:24.927598] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:09:24.927888] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:09:24.973112] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:09:24.973518] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:09:24.974512] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:09:24.976031] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:09:24.976717] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:09:24.976859] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:09:26.102181] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:32.102046] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:44.102134] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:49.102485] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:09:54.102956] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:00.102019] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:05.102037] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:16.102228] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:22.102624] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:28.103146] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:34.101718] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:39.102137] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:50.102700] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:56.102020] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:10:57.657268] [Resilience] app_state set to Foreground
+[2026-07-18T16:10:58.841893] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_85317763a6b765a3c94d3e1438b373ba31e61449cbc735e9a407777290fbfc57_1784341510517
+[2026-07-18T16:10:58.841936] [FFI] start_pull: spawning async send for tid=gft_85317763a6b765a3c94d3e1438b373ba31e61449cbc735e9a407777290fbfc57_1784341510517
+[2026-07-18T16:10:58.841961] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:10:58.841990] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784347329127
+[2026-07-18T16:10:58.842015] [FFI] start_pull: spawning async send for tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784347329127
+[2026-07-18T16:10:58.842037] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:10:58.842058] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:10:58.842078] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:10:58.842106] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a_1784376527823
+[2026-07-18T16:10:58.842131] [FFI] start_pull: spawning async send for tid=gft_5c5e5eeb1c41d664b7020b9b162706bd7f83fd67d47deb505455e12050627c8a_1784376527823
+[2026-07-18T16:10:58.842157] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740_1784376528526
+[2026-07-18T16:10:58.842185] [FFI] start_pull: spawning async send for tid=gft_aa6d44edbd893baf38bbe8f54b2550fd498f95688fb3327ac4ef1ec8b9247740_1784376528526
+[2026-07-18T16:10:58.842224] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:10:58.842243] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:10:58.842277] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61_1784376528329
+[2026-07-18T16:10:58.842299] [FFI] start_pull: spawning async send for tid=gft_1a2c54d87c1346498ed2de7d2920cd8916d73c3d1d8a85d0dfc1ff7c95f1af61_1784376528329
+[2026-07-18T16:10:58.842317] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:10:58.842336] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:10:58.842355] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:10:58.842381] [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784376528154
+[2026-07-18T16:10:58.842402] [FFI] start_pull: spawning async send for tid=gft_0238a7e62abc0cc440bd439b1769caf5d253f4541eaeb3378e7888986d01b702_1784376528154
+[2026-07-18T16:10:58.842421] [FFI] start_pull: inside spawn, about to send...
+[2026-07-18T16:10:58.842440] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:10:58.842459] [FFI] start_pull: HandleIncomingPayload sent successfully
+[2026-07-18T16:11:01.102215] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:07.102379] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:13.102301] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:20.040938] [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+[2026-07-18T16:11:20.041091] [Mesh] No local push token found in DB to auto-register.
+[2026-07-18T16:11:25.101931] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:30.102890] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:36.102740] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:42.101716] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:42.222275] [Resilience] app_state set to Backgrounded
+[2026-07-18T16:11:48.101832] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:11:49.707147] [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+[2026-07-18T16:12:00.102323] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:12:04.272274] [Resilience] app_state set to Foreground
+[2026-07-18T16:12:05.102362] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:12:11.101227] [Mailbox] Skipping drain — last drain was < 30s ago
+[2026-07-18T16:12:16.101966] [Mailbox] Skipping drain — last drain was < 30s ago

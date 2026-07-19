@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'custom_theme_creator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
@@ -3118,6 +3119,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   Timer? _clawActivityLogTimer;
   final _clawLogScrollController = ScrollController();
   int _rbnCount = 0;
+  String _appVersion = 'Loading...';
   int _meshNodeCount = 0;
   int _connectedPeerCount = 0;
   StreamSubscription? _economySubscription;
@@ -3149,6 +3151,7 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
     _isTunnelMode = IntrovertClient().isTunnelModeEnabled();
     _loadKlipyApiKey();
     _loadMessengerSettings();
+    _loadAppVersion();
     
     // Intro-Claw is always active — no toggle needed
     IntrovertClient().setIntroClawActive(true);
@@ -3181,10 +3184,18 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
   }
 
   String _getBuildNumber() {
-    // Read from pubspec.yaml version field (format: "x.y.z+build")
-    const version = String.fromEnvironment('VERSION', defaultValue: '0.29.0');
-    const build = String.fromEnvironment('BUILD_NUMBER', defaultValue: '1');
-    return '$version+$build';
+    return _appVersion;
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+      }
+    } catch (e) {
+      debugPrint('[Settings] Failed to load app version: $e');
+    }
   }
 
   void _showRbnManagerDialog() {
@@ -4237,27 +4248,17 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
               'Software Updates',
               [
                 ListTile(
+                  leading: Icon(Icons.info_outline_rounded, color: AppTheme.current.accent),
+                  title: Text('Current Version'),
+                  subtitle: Text('v${_getBuildNumber()}', style: TextStyle(fontFamily: 'monospace', fontSize: 13)),
+                ),
+                ListTile(
                   leading: Icon(Icons.update_rounded, color: AppTheme.current.accent),
                   title: Text('Check for Updates'),
-                  subtitle: Text('Check manually if a new version is available.'),
+                  subtitle: Text('Check GitHub for the latest release and download.'),
                   onTap: () {
                     UpdateService.checkForUpdates(context, forceShowMessage: true);
                   },
-                ),
-                ListTile(
-                  leading: Icon(Icons.settings_suggest_rounded, color: AppTheme.current.accent),
-                  title: Text('Update Server URL'),
-                  subtitle: FutureBuilder<String>(
-                    future: UpdateService.getUpdateUrl(),
-                    builder: (context, snapshot) {
-                      return Text(
-                        snapshot.data ?? 'Loading...',
-                        style: TextStyle(fontFamily: 'monospace', fontSize: 11),
-                        overflow: TextOverflow.ellipsis,
-                      );
-                    },
-                  ),
-                  onTap: _showUpdateUrlDialog,
                 ),
                 ListTile(
                   leading: Icon(Icons.code_rounded, color: AppTheme.current.accent),
@@ -4276,73 +4277,6 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
         ),
       ),
     );
-  }
-
-  void _showUpdateUrlDialog() async {
-    final currentUrl = await UpdateService.getUpdateUrl();
-    final controller = TextEditingController(text: currentUrl);
-
-    if (!mounted) return;
-
-    final parentContext = context;
-    final surface = AppTheme.current.surface;
-    final accent = AppTheme.current.accent;
-    final text = AppTheme.current.text;
-    final mutedText = AppTheme.current.mutedText;
-    showDialog(
-      context: parentContext,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: surface,
-          title: Text(
-            "UPDATE SERVER CONFIG",
-            style: TextStyle(color: accent, fontFamily: 'monospace', fontSize: 14, fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Configure a custom URL for checking compiled updates. Leave empty to restore the default server location.",
-                style: TextStyle(color: text.withValues(alpha: 0.7), fontSize: 12, height: 1.3),
-              ),
-              SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                style: TextStyle(color: text, fontSize: 13, fontFamily: 'monospace'),
-                decoration: InputDecoration(
-                  labelText: "Server JSON URL",
-                  labelStyle: TextStyle(color: mutedText.withValues(alpha: 0.7), fontSize: 12),
-                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: mutedText.withValues(alpha: 0.5))),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: accent)),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: Text("CANCEL", style: TextStyle(color: mutedText.withValues(alpha: 0.7))),
-            ),
-            TextButton(
-              onPressed: () async {
-                await UpdateService.setUpdateUrl(controller.text);
-                if (parentContext.mounted) {
-                  Navigator.pop(dialogContext);
-                  if (mounted) setState(() {});
-                  ScaffoldMessenger.of(parentContext).showSnackBar(
-                    SnackBar(content: Text('Update server configuration saved.')),
-                  );
-                }
-              },
-              child: Text("SAVE", style: TextStyle(color: AppTheme.current.accent)),
-            ),
-          ],
-        );
-      },
-    ).whenComplete(() => controller.dispose());
   }
 
   void _showTermsOfUse() {

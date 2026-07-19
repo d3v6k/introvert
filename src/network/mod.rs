@@ -3157,7 +3157,7 @@ impl NetworkService {
                     let swarm = &self.swarm;
                     let relayed = &self.is_relayed_map;
                     let seeders: Vec<PeerId> = Vec::new(); // TODO: wire known_seeders in PR-2
-                    self.transfer_router.resolve(&recipient_id, &transfer_id, mdns, |pid| swarm.is_connected(pid), |pid| relayed.read().get(pid).cloned().unwrap_or(true), &seeders)
+                    self.transfer_router.resolve(&recipient_id, &transfer_id, mdns, |pid| swarm.is_connected(pid), |pid| relayed.read().get(pid).cloned().unwrap_or(true), &seeders, self.connectivity_type)
                 };
 
                 match transfer_path {
@@ -3629,6 +3629,17 @@ impl NetworkService {
                         tokio::spawn(async move {
                             let _ = tx.send(NetworkCommand::ActivateTunnel).await;
                         });
+                    }
+
+                    // Clear stale LAN state on mobile — mDNS peers are unreachable via cellular,
+                    // so TransferRouter must not pick Direct/LocalSeeder paths
+                    if is_mobile {
+                        self.mdns_peers.clear();
+                        self.direct_conn_count.clear();
+                        for (_, relayed) in self.is_relayed_map.write().iter_mut() {
+                            *relayed = true;
+                        }
+                        info!("[Network] Cleared stale LAN state for mobile transition");
                     }
                     
                     // Trigger dynamic recheck/bootstrap
@@ -4239,6 +4250,7 @@ impl NetworkService {
                                     // Even if not currently connected direct, try a SendFile.
                                     // SendFile logic will auto-negotiate WebRTC/Direct paths.
                                     info!("[Mesh] 🚀 Proactively initiating path discovery for group member {}.", member.peer_id);
+                                    info!("[Mesh] Group file transfer {} dispatched to member {}", t_id, member.peer_id);
                                     let f_path = file_path.clone();
                                     let g_id = Some(gid.clone());
                                     let t_id_clone = Some(t_id.clone());

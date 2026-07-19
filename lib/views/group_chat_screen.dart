@@ -3477,7 +3477,7 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
     );
   }
 
-  void _showMemberOptions(String peerId, String name, bool isMuted) {
+  void _showMemberOptions(String peerId, String name, bool isMuted, String role) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.current.surface,
@@ -3507,6 +3507,21 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
               },
             ),
           ),
+          if (role != "Creator")
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: Icon(role == "Admin" ? Icons.person : Icons.shield, color: AppTheme.current.accent),
+                title: Text(role == "Admin" ? "Remove Admin" : "Make Admin", style: TextStyle(color: AppTheme.current.text)),
+                onTap: () {
+                  final newRole = role == "Admin" ? 2 : 1; // 2=Member, 1=Admin
+                  _client.updateGroupRole(widget.groupId, peerId, newRole);
+                  Navigator.pop(ctx);
+                  _loadMembers();
+                  widget.onUpdate();
+                },
+              ),
+            ),
           Material(
             color: Colors.transparent,
             child: ListTile(
@@ -3645,8 +3660,8 @@ class _GroupInfoDialogState extends State<_GroupInfoDialog> {
                 ],
               ],
             ), 
-            trailing: Text(role.toUpperCase(), style: TextStyle(color: role == "Creator" ? Colors.orangeAccent : AppTheme.current.accent, fontSize: 8, fontWeight: FontWeight.bold)),
-            onTap: (widget.isAdmin && pid != _client.localPeerId) ? () => _showMemberOptions(pid, name, isMuted) : null,
+            trailing: Container(padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: role == "Creator" ? Colors.orangeAccent.withValues(alpha: 0.15) : role == "Admin" ? AppTheme.current.accent.withValues(alpha: 0.15) : Colors.transparent, borderRadius: BorderRadius.circular(4)), child: Text(role.toUpperCase(), style: TextStyle(color: role == "Creator" ? Colors.orangeAccent : role == "Admin" ? AppTheme.current.accent : AppTheme.current.mutedText, fontSize: 8, fontWeight: FontWeight.bold))),
+            onTap: (widget.isAdmin && pid != _client.localPeerId) ? () => _showMemberOptions(pid, name, isMuted, role) : null,
           ); 
         })), 
         SizedBox(height: 16),

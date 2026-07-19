@@ -62,8 +62,17 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     try {
       final existing = _client.driveGetAll();
       final hasExplained = existing.any((f) =>
-          (f['filename']?.toString() ?? '').contains('Sovereign_Login') ||
-          (f['local_path']?.toString() ?? '').contains('Introvert Explained'));
+          (f['folder']?.toString() ?? '') == 'Introvert Explained');
+
+      // Fix existing entries that were added without the correct folder
+      for (final f in existing) {
+        final path = f['local_path']?.toString() ?? '';
+        final folder = f['folder']?.toString() ?? '';
+        if (path.contains('Introvert Explained') && folder != 'Introvert Explained') {
+          _client.driveUpdateFolder(f['file_hash']?.toString() ?? '', 'Introvert Explained');
+        }
+      }
+
       if (hasExplained) return;
 
       final appDir = await getApplicationDocumentsDirectory();
@@ -87,7 +96,7 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
         }
         final fileBytes = await destFile.readAsBytes();
         final hash = sha256.convert(fileBytes).toString();
-        _client.driveAddFile(filename, hash, 'image/png', fileBytes.length, destPath);
+        _client.driveAddFileWithFolder(filename, hash, 'image/png', fileBytes.length, destPath, 'Introvert Explained');
       }
     } catch (e) {
       debugPrint('[Drive] Failed to seed Introvert Explained: $e');
@@ -350,6 +359,85 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     );
   }
 
+  Widget _buildSovereignDriveCard() {
+    final totalSize = _allFiles.fold<int>(0, (sum, f) => sum + ((f['total_size'] as int?) ?? 0));
+    final usedStr = _formatFileSize(totalSize);
+    final limitBytes = 1 * 1024 * 1024 * 1024; // 1 GB
+    final percentUsed = (totalSize / limitBytes).clamp(0.0, 1.0);
+
+    return Container(
+      margin: EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.current.accent.withValues(alpha: 0.1),
+            AppTheme.current.accent.withValues(alpha: 0.03),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.current.accent.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cloud_done_rounded, color: AppTheme.current.accent, size: 24),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SOVEREIGN DRIVE',
+                      style: TextStyle(
+                        color: AppTheme.current.accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '${_allFiles.length} files · ${_folderGroups.length} folders',
+                      style: TextStyle(color: AppTheme.current.mutedText, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${(percentUsed * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                  color: AppTheme.current.accent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: percentUsed,
+              backgroundColor: AppTheme.current.surface,
+              valueColor: AlwaysStoppedAnimation(AppTheme.current.accent),
+              minHeight: 4,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            '$usedStr of 1 GB used',
+            style: TextStyle(color: AppTheme.current.mutedText, fontSize: 10),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFolderView() {
     if (_currentFolder.isNotEmpty && _currentFolder != 'Drive') {
       return _buildFileList(_filteredFiles);
@@ -357,7 +445,6 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
 
     return ListView(
       children: [
-        _buildStorageBar(),
         ..._folderGroups.entries.map((entry) {
           final folderName = entry.key;
           final files = entry.value;
@@ -636,6 +723,9 @@ class _DriveTabState extends State<DriveTab> with AutomaticKeepAliveClientMixin 
     super.build(context);
     return Column(
       children: [
+        // Sovereign Drive header
+        _buildSovereignDriveCard(),
+
         // Search bar
         Padding(
           padding: EdgeInsets.fromLTRB(16, 8, 16, 4),

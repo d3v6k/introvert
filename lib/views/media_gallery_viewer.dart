@@ -1,5 +1,11 @@
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+// ignore: implementation_imports
+import 'package:vector_math/vector_math_64.dart' show Vector3, Quaternion;
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../src/native/introvert_client.dart';
 import '../theme/app_theme.dart';
@@ -18,234 +24,458 @@ class MediaGalleryViewer extends StatefulWidget {
   State<MediaGalleryViewer> createState() => _MediaGalleryViewerState();
 }
 
-class _MediaGalleryViewerState extends State<MediaGalleryViewer> {
+class _MediaGalleryViewerState extends State<MediaGalleryViewer> with TickerProviderStateMixin {
   late PageController _pageController;
-  late ScrollController _dotScrollController;
   late int _currentIndex;
   bool _showControls = true;
+
+  // Swipe-to-dismiss state
+  double _dismissDragY = 0.0;
+  bool _isDismissing = false;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
-    _dotScrollController = ScrollController();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _scrollToActiveDot(widget.initialIndex, animate: false);
-      }
-    });
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _dotScrollController.dispose();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
-  void _scrollToActiveDot(int index, {bool animate = true}) {
-    if (!_dotScrollController.hasClients) return;
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+  }
 
-    final double dotCenter = index * 16.0 + 16.0;
-    final double viewportWidth = MediaQuery.of(context).size.width - 32;
-    final double targetOffset = dotCenter - (viewportWidth / 2);
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    // Only allow dismiss gesture when not zoomed in
+    setState(() {
+      _dismissDragY += details.delta.dy;
+      _isDismissing = _dismissDragY.abs() > 50;
+    });
+  }
 
-    final double maxScroll = _dotScrollController.position.maxScrollExtent;
-    final double minScroll = _dotScrollController.position.minScrollExtent;
-    final double clampedOffset = targetOffset.clamp(minScroll, maxScroll);
-
-    if (animate) {
-      _dotScrollController.animateTo(
-        clampedOffset,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-      );
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (_dismissDragY.abs() > 120 || details.velocity.pixelsPerSecond.dy.abs() > 500) {
+      Navigator.of(context).pop();
     } else {
-      _dotScrollController.jumpTo(clampedOffset);
+      setState(() {
+        _dismissDragY = 0;
+        _isDismissing = false;
+      });
     }
   }
 
-  void _toggleControls() {
-    setState(() {
-      _showControls = !_showControls;
-    });
+  Future<void> _shareCurrentMedia() async {
+    final item = widget.mediaList[_currentIndex];
+    if (item.localPath == null) return;
+    try {
+      await Share.shareXFiles([XFile(item.localPath!)], text: item.filename);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Share failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveToDownloads() async {
+    final item = widget.mediaList[_currentIndex];
+    if (item.localPath == null) return;
+    try {
+      final src = File(item.localPath!);
+      if (!src.existsSync()) return;
+
+      // On mobile, save to the app's external documents dir (accessible via file manager)
+      // On desktop, save to Downloads
+      Directory saveDir;
+      if (Platform.isAndroid || Platform.isIOS) {
+        saveDir = await getApplicationDocumentsDirectory();
+      } else {
+        final home = Platform.environment['HOME'] ?? '/tmp';
+        saveDir = Directory('$home/Downloads');
+        if (!saveDir.existsSync()) saveDir.createSync(recursive: true);
+      }
+
+      final destPath = '${saveDir.path}/${item.filename}';
+      await src.copy(destPath);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved to ${Platform.isAndroid || Platform.isIOS ? "Documents" : "Downloads"}'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
+  void _openExternally() {
+    final item = widget.mediaList[_currentIndex];
+    if (item.localPath != null) {
+      OpenFile.open(item.localPath!);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final scale = 1.0 - (_dismissDragY.abs() / 600).clamp(0.0, 0.3);
+    final opacity = 1.0 - (_dismissDragY.abs() / 400).clamp(0.0, 1.0);
+
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Content Viewer
-          GestureDetector(
-            onTap: _toggleControls,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: widget.mediaList.length,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-                _scrollToActiveDot(index);
-              },
-              itemBuilder: (context, index) {
-                final item = widget.mediaList[index];
-                final ext = item.filename.split('.').last.toLowerCase();
-                final isVideo = item.mimeType.startsWith('video/') ||
-                    ['mp4', 'mov', 'avi', 'mkv', 'webm'].contains(ext);
+      backgroundColor: Colors.transparent,
+      body: GestureDetector(
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
+        child: AnimatedContainer(
+          duration: _isDismissing ? Duration.zero : const Duration(milliseconds: 200),
+          transform: Matrix4.translationValues(0, _dismissDragY, 0)..scaleByDouble(scale, scale, scale, 1),
+          child: Opacity(
+            opacity: opacity,
+            child: Stack(
+              children: [
+                // Content Viewer
+                PageView.builder(
+                  controller: _pageController,
+                  physics: const _NeverOutScreenScrollPhysics(),
+                  itemCount: widget.mediaList.length,
+                  onPageChanged: (index) {
+                    setState(() => _currentIndex = index);
+                  },
+                  itemBuilder: (context, index) {
+                    final item = widget.mediaList[index];
+                    final ext = item.filename.split('.').last.toLowerCase();
+                    final isVideo = item.mimeType.startsWith('video/') ||
+                        ['mp4', 'mov', 'avi', 'mkv', 'webm'].contains(ext);
 
-                if (item.localPath == null || !File(item.localPath!).existsSync()) {
-                  return const Center(
-                    child: Text(
-                      "File missing on disk",
-                      style: TextStyle(color: Colors.redAccent, fontSize: 14),
-                    ),
-                  );
-                }
+                    if (item.localPath == null || !File(item.localPath!).existsSync()) {
+                      return const Center(
+                        child: Text("File missing on disk",
+                            style: TextStyle(color: Colors.redAccent, fontSize: 14)),
+                      );
+                    }
 
-                if (isVideo) {
-                  return Center(
-                    child: VideoPlayerWidget(
-                      localPath: item.localPath!,
-                      showControls: _showControls,
-                      bottomPadding: widget.mediaList.length > 1 ? 80.0 : 24.0,
-                    ),
-                  );
-                } else {
-                  // Image viewer with pinch to zoom
-                  return InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Center(
-                      child: Image.file(
-                        File(item.localPath!),
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.broken_image, color: Colors.grey, size: 64),
+                    if (isVideo) {
+                      return Center(
+                        child: VideoPlayerWidget(
+                          localPath: item.localPath!,
+                          showControls: _showControls,
+                          bottomPadding: 100.0,
                         ),
-                      ),
-                    ),
-                  );
-                }
-              },
+                      );
+                    }
+
+                    return _ZoomableImage(
+                      imagePath: item.localPath!,
+                      onTap: _toggleControls,
+                      onScaleChanged: (scale) {
+                        // When zoomed in, disable PageView swiping
+                        if (scale > 1.05 && _pageController.hasClients) {
+                          // PageView physics handles this via _NeverOutScreenScrollPhysics
+                        }
+                      },
+                    );
+                  },
+                ),
+
+                // Header
+                if (_showControls)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildHeader(),
+                  ),
+
+                // Bottom action bar
+                if (_showControls)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildBottomBar(),
+                  ),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
 
-          // Header Overlay
-          if (_showControls)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top + 8,
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+  Widget _buildHeader() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        bottom: 16,
+        left: 8,
+        right: 16,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 22),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.mediaList[_currentIndex].filename,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.mediaList[_currentIndex].filename,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            "${_currentIndex + 1} of ${widget.mediaList.length}",
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                if (widget.mediaList.length > 1)
+                  Text(
+                    "${_currentIndex + 1} / ${widget.mediaList.length}",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                  ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-          // Bottom Roll/Thumbnail Strip Indicator
-          if (_showControls && widget.mediaList.length > 1)
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + 16,
-              left: 16,
-              right: 16,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width - 32,
-                  ),
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: SingleChildScrollView(
-                      controller: _dotScrollController,
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: List.generate(widget.mediaList.length, (index) {
-                          final isSelected = index == _currentIndex;
-                          return GestureDetector(
-                            onTap: () {
-                              _pageController.animateToPage(
-                                index,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              width: isSelected ? 24 : 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppTheme.current.accent : Colors.white38,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+  Widget _buildBottomBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom + 12,
+        top: 12,
+        left: 16,
+        right: 16,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildActionButton(Icons.reply_rounded, "Forward", () {
+            // Forward/share
+            _shareCurrentMedia();
+          }),
+          _buildActionButton(Icons.download_rounded, "Save", _saveToDownloads),
+          _buildActionButton(Icons.share_rounded, "Share", _shareCurrentMedia),
+          _buildActionButton(Icons.open_in_new_rounded, "Open", _openExternally),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 10),
+          ),
         ],
       ),
     );
   }
 }
+
+/// A single zoomable image widget with double-tap-to-zoom and pinch-to-zoom.
+/// Uses a TransformationController for precise control over zoom state.
+class _ZoomableImage extends StatefulWidget {
+  final String imagePath;
+  final VoidCallback onTap;
+  final void Function(double scale)? onScaleChanged;
+
+  const _ZoomableImage({
+    required this.imagePath,
+    required this.onTap,
+    this.onScaleChanged,
+  });
+
+  @override
+  State<_ZoomableImage> createState() => _ZoomableImageState();
+}
+
+class _ZoomableImageState extends State<_ZoomableImage> with SingleTickerProviderStateMixin {
+  final TransformationController _controller = TransformationController();
+  late AnimationController _animController;
+  Animation<Matrix4>? _animation;
+
+  // Track current scale to route gestures
+  double _currentScale = 1.0;
+
+  // Double-tap zoom levels
+  static const double _minScale = 1.0;
+  static const double _maxScale = 5.0;
+  static const double _doubleTapScale = 2.5;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    )..addListener(() {
+        if (_animation != null) {
+          _controller.value = _animation!.value;
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _onDoubleTap(TapDownDetails details) {
+    final tapPosition = details.localPosition;
+
+    if (_currentScale > 1.1) {
+      // Already zoomed — zoom back to 1x
+      _animateToScale(Matrix4.identity(), 1.0);
+    } else {
+      // Zoom to doubleTapScale centered on tap position
+      final translated = Matrix4.compose(
+        Vector3(-tapPosition.dx * (_doubleTapScale - 1), -tapPosition.dy * (_doubleTapScale - 1), 0),
+        Quaternion.identity(),
+        Vector3.all(_doubleTapScale),
+      );
+      _animateToScale(translated, _doubleTapScale);
+    }
+  }
+
+  void _animateToScale(Matrix4 target, double newScale) {
+    _animation = Matrix4Tween(begin: _controller.value, end: target)
+        .animate(CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic));
+    _animController.forward(from: 0);
+    setState(() => _currentScale = newScale);
+    widget.onScaleChanged?.call(newScale);
+  }
+
+  void _onInteractionStart(ScaleStartDetails details) {
+    // Stop any running animation when user starts interacting
+    if (_animController.isAnimating) {
+      _animController.stop();
+    }
+  }
+
+  void _onInteractionUpdate(ScaleUpdateDetails details) {
+    // Track the current scale from the transformation matrix
+    final scale = _controller.value.getMaxScaleOnAxis();
+    if (scale != _currentScale) {
+      setState(() => _currentScale = scale);
+      widget.onScaleChanged?.call(scale);
+    }
+  }
+
+  void _onInteractionEnd(ScaleEndDetails details) {
+    final scale = _controller.value.getMaxScaleOnAxis();
+
+    // Snap back to 1x if slightly zoomed out
+    if (scale < 1.0) {
+      _animateToScale(Matrix4.identity(), 1.0);
+    }
+    // Clamp if over-zoomed
+    else if (scale > _maxScale) {
+      final center = MediaQuery.of(context).size.center(Offset.zero);
+      final clamped = Matrix4.identity()
+        ..translateByDouble(-center.dx * (_maxScale - 1), -center.dy * (_maxScale - 1), 0, 1)
+        ..scaleByDouble(_maxScale, _maxScale, _maxScale, 1);
+      _animateToScale(clamped, _maxScale);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onDoubleTapDown: _onDoubleTap,
+      child: InteractiveViewer(
+        transformationController: _controller,
+        minScale: _minScale,
+        maxScale: _maxScale,
+        onInteractionStart: _onInteractionStart,
+        onInteractionUpdate: _onInteractionUpdate,
+        onInteractionEnd: _onInteractionEnd,
+        // Disable panning when at 1x scale to allow PageView swiping
+        panEnabled: _currentScale > 1.05,
+        scaleEnabled: true,
+        child: Center(
+          child: Image.file(
+            File(widget.imagePath),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Center(
+              child: Icon(Icons.broken_image, color: Colors.grey, size: 64),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Custom scroll physics that prevents PageView from scrolling horizontally
+/// when the child is zoomed in (allows the image's pan to take over).
+class _NeverOutScreenScrollPhysics extends ScrollPhysics {
+  const _NeverOutScreenScrollPhysics({super.parent});
+
+  @override
+  _NeverOutScreenScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _NeverOutScreenScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+    // Default behavior — let PageView snap to pages normally
+    return super.createBallisticSimulation(position, velocity);
+  }
+}
+
+// ============================================================================
+// Video Player Widget (unchanged from original)
+// ============================================================================
 
 class VideoPlayerWidget extends StatefulWidget {
   final String localPath;
@@ -318,9 +548,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   @override
   Widget build(BuildContext context) {
     if (!_initialized) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
+      return const Center(child: CircularProgressIndicator(color: Colors.white));
     }
 
     return Stack(
@@ -332,8 +560,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             child: VideoPlayer(_controller),
           ),
         ),
-        
-        // Big Center Play/Pause Indicator Overlay
+
         if (widget.showControls)
           Center(
             child: GestureDetector(
@@ -354,7 +581,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             ),
           ),
 
-        // Bottom Controls Progress Slider Overlay
         if (widget.showControls)
           Positioned(
             bottom: widget.bottomPadding,
@@ -372,7 +598,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Slider
                   SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 3,
@@ -398,8 +623,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
                       },
                     ),
                   ),
-                  
-                  // Time and Actions Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
