@@ -202,17 +202,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       AlertService.requestPermissions();
       UpdateService.checkForUpdates(context);
 
-      // Check if onboarding left a handle prompt pending
-      if (OnboardingScreen.needsHandlePrompt) {
-        OnboardingScreen.needsHandlePrompt = false;
-        final peerId = OnboardingScreen.promptPeerId;
-        OnboardingScreen.promptPeerId = null;
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (mounted) {
-            OnboardingScreen.showHandleCreationPrompt(context, peerId);
-          }
-        });
-      }
+
     });
 
     // Intro-Claw: Monitor connectivity changes for adaptive networking
