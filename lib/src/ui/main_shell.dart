@@ -201,6 +201,18 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AlertService.requestPermissions();
       UpdateService.checkForUpdates(context);
+
+      // Check if onboarding left a handle prompt pending
+      if (OnboardingScreen.needsHandlePrompt) {
+        OnboardingScreen.needsHandlePrompt = false;
+        final peerId = OnboardingScreen.promptPeerId;
+        OnboardingScreen.promptPeerId = null;
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) {
+            OnboardingScreen.showHandleCreationPrompt(context, peerId);
+          }
+        });
+      }
     });
 
     // Intro-Claw: Monitor connectivity changes for adaptive networking
@@ -4273,6 +4285,8 @@ class _SettingsTabState extends State<SettingsTab> with AutomaticKeepAliveClient
                 ),
               ],
             ),
+            // Bottom padding so Software Updates section scrolls above navigation bar on iOS/Android/macOS
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 160),
           ],
         ),
       ),
@@ -4424,7 +4438,7 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Introvert is a decentralized, sovereign peer-to-peer network app designed for total privacy.",
+                "Introvert is an open source server-less peer to peer (p2p) communication software utility.",
                 style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 13, height: 1.3),
               ),
               SizedBox(height: 12),
@@ -4434,6 +4448,15 @@ Because Introvert operates on total user sovereignty, you bear exclusive legal l
                   color: AppTheme.current.accent,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
+                  fontFamily: 'monospace',
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                "i@devofintrovert  /  @devofintrovert",
+                style: TextStyle(
+                  color: AppTheme.current.text.withValues(alpha: 0.5),
+                  fontSize: 12,
                   fontFamily: 'monospace',
                 ),
               ),
@@ -5744,6 +5767,16 @@ class _ResolveHandleDialogState extends State<_ResolveHandleDialog> {
         _state = _ResolveState.failed;
       });
     }
+
+    // Timeout: if no Event 33/35 in 15 seconds, show error
+    Future.delayed(const Duration(seconds: 15), () {
+      if (mounted && _state == _ResolveState.resolving && _resolvingHandle == h) {
+        setState(() {
+          _errorMessage = "Timed out resolving $h. The handle may not exist or the network is unreachable.";
+          _state = _ResolveState.failed;
+        });
+      }
+    });
   }
 
   @override

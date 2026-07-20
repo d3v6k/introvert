@@ -32,6 +32,7 @@ class _MediaGalleryViewerState extends State<MediaGalleryViewer> with TickerProv
   // Swipe-to-dismiss state
   double _dismissDragY = 0.0;
   bool _isDismissing = false;
+  bool _isZoomed = false;
 
   @override
   void initState() {
@@ -53,7 +54,8 @@ class _MediaGalleryViewerState extends State<MediaGalleryViewer> with TickerProv
   }
 
   void _onVerticalDragUpdate(DragUpdateDetails details) {
-    // Only allow dismiss gesture when not zoomed in
+    // Block dismiss gesture when zoomed in — let InteractiveViewer handle panning
+    if (_isZoomed) return;
     setState(() {
       _dismissDragY += details.delta.dy;
       _isDismissing = _dismissDragY.abs() > 50;
@@ -150,7 +152,9 @@ class _MediaGalleryViewerState extends State<MediaGalleryViewer> with TickerProv
                 // Content Viewer
                 PageView.builder(
                   controller: _pageController,
-                  physics: const _NeverOutScreenScrollPhysics(),
+                  physics: _isZoomed
+                    ? const NeverScrollableScrollPhysics()
+                    : const BouncingScrollPhysics(),
                   itemCount: widget.mediaList.length,
                   onPageChanged: (index) {
                     setState(() => _currentIndex = index);
@@ -182,9 +186,9 @@ class _MediaGalleryViewerState extends State<MediaGalleryViewer> with TickerProv
                       imagePath: item.localPath!,
                       onTap: _toggleControls,
                       onScaleChanged: (scale) {
-                        // When zoomed in, disable PageView swiping
-                        if (scale > 1.05 && _pageController.hasClients) {
-                          // PageView physics handles this via _NeverOutScreenScrollPhysics
+                        final zoomed = scale > 1.05;
+                        if (zoomed != _isZoomed) {
+                          setState(() => _isZoomed = zoomed);
                         }
                       },
                     );
@@ -439,8 +443,8 @@ class _ZoomableImageState extends State<_ZoomableImage> with SingleTickerProvide
         onInteractionStart: _onInteractionStart,
         onInteractionUpdate: _onInteractionUpdate,
         onInteractionEnd: _onInteractionEnd,
-        // Disable panning when at 1x scale to allow PageView swiping
-        panEnabled: _currentScale > 1.05,
+        // Always allow pan; PageView NeverScrollableScrollPhysics handles the conflict when zoomed
+        panEnabled: true,
         scaleEnabled: true,
         child: Center(
           child: Image.file(
@@ -456,22 +460,7 @@ class _ZoomableImageState extends State<_ZoomableImage> with SingleTickerProvide
   }
 }
 
-/// Custom scroll physics that prevents PageView from scrolling horizontally
-/// when the child is zoomed in (allows the image's pan to take over).
-class _NeverOutScreenScrollPhysics extends ScrollPhysics {
-  const _NeverOutScreenScrollPhysics({super.parent});
 
-  @override
-  _NeverOutScreenScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return _NeverOutScreenScrollPhysics(parent: buildParent(ancestor));
-  }
-
-  @override
-  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
-    // Default behavior — let PageView snap to pages normally
-    return super.createBallisticSimulation(position, velocity);
-  }
-}
 
 // ============================================================================
 // Video Player Widget (unchanged from original)

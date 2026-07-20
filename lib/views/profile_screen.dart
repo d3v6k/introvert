@@ -21,6 +21,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _handleController = TextEditingController();
+  final FocusNode _handleFocusNode = FocusNode();
   String? _base64Avatar;
   int _privacyMode = 1; // Default: 1 (Extroverted / Allowed)
   bool _isSaving = false;
@@ -54,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _isDisposing = true;
     _handleController.removeListener(_onHandleChanged);
+    _handleFocusNode.dispose();
     _economySubscription?.cancel();
     _networkSubscription?.cancel();
     super.dispose();
@@ -457,6 +459,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(height: 24),
             TextField(
               controller: _handleController,
+              focusNode: _handleFocusNode,
               readOnly: _isClaimed || _hasExistingHandle,
               style: TextStyle(
                 color: (_isClaimed || _hasExistingHandle) ? AppTheme.current.accent : AppTheme.current.text,
@@ -490,17 +493,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: TextStyle(color: AppTheme.current.accent.withValues(alpha: 0.6), fontSize: 10, fontStyle: FontStyle.italic),
               ),
             ],
-            // Fetch ID from Mesh button — shown when no handle is set
+            // Claim Handle button — shown when no handle is set
             if (!_isClaimed && !_hasExistingHandle) ...[
               SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _isFetching ? null : _fetchIdFromMesh,
-                  icon: _isFetching
-                      ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent))
-                      : Icon(Icons.wifi_find_rounded, size: 16),
-                  label: Text(_isFetching ? 'FETCHING...' : 'FETCH ID FROM MESH'),
+                  onPressed: () {
+                    // Focus the handle text field so user can start typing
+                    FocusScope.of(context).requestFocus(_handleFocusNode);
+                  },
+                  icon: Icon(Icons.alternate_email_rounded, size: 16),
+                  label: Text('Set Introvert Handle'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.current.accent,
                     side: BorderSide(color: AppTheme.current.accent.withValues(alpha: 0.4)),
@@ -509,63 +513,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ),
-              if (_fetchStatus != null) ...[
-                SizedBox(height: 8),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _fetchStatus!.startsWith('found:')
-                        ? Colors.greenAccent.withValues(alpha: 0.08)
-                        : _fetchStatus == 'not_found'
-                            ? Colors.amberAccent.withValues(alpha: 0.08)
-                            : Colors.redAccent.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _fetchStatus!.startsWith('found:')
-                          ? Colors.greenAccent.withValues(alpha: 0.3)
-                          : _fetchStatus == 'not_found'
-                              ? Colors.amberAccent.withValues(alpha: 0.3)
-                              : Colors.redAccent.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _fetchStatus!.startsWith('found:')
-                            ? Icons.check_circle_rounded
-                            : _fetchStatus == 'not_found'
-                                ? Icons.search_off_rounded
-                                : Icons.error_outline_rounded,
-                        size: 16,
-                        color: _fetchStatus!.startsWith('found:')
-                            ? Colors.greenAccent
-                            : _fetchStatus == 'not_found'
-                                ? Colors.amberAccent
-                                : Colors.redAccent,
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _fetchStatus!.startsWith('found:')
-                              ? 'ID found: ${_fetchStatus!.substring(6)}'
-                              : _fetchStatus == 'not_found'
-                                  ? 'No ID found for this peer ID on the mesh'
-                                  : 'Error: ${_fetchStatus!.substring(6)}',
-                          style: TextStyle(
-                            color: _fetchStatus!.startsWith('found:')
-                                ? Colors.greenAccent
-                                : _fetchStatus == 'not_found'
-                                    ? Colors.amberAccent
-                                    : Colors.redAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+
             ],
             if (!_isClaimed && !_hasExistingHandle && _handleController.text.isNotEmpty) ...[
               SizedBox(height: 12),

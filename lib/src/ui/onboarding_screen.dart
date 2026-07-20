@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 import '../native/identity_manager.dart';
@@ -8,6 +9,11 @@ class OnboardingScreen extends StatefulWidget {
   final Function(Uint8List seed, String avatarName) onComplete;
   final GlobalKey<ScaffoldMessengerState>? messengerKey;
   const OnboardingScreen({super.key, required this.onComplete, this.messengerKey});
+
+  /// Set by _confirmAndCreate when no handle was found for a recovered identity.
+  /// main_shell.dart checks this after app load and shows handle creation dialog.
+  static bool needsHandlePrompt = false;
+  static String? promptPeerId;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -20,6 +26,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   
   bool _isCreating = false;
   bool _showMnemonic = false;
+  bool _isRecovery = false;
   String? _mnemonic;
 
   void _showSnackBar(dynamic snackBarOrText) {
@@ -46,6 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() {
         _mnemonic = mnemonic;
         _showMnemonic = true;
+        _isRecovery = false;
         _avatarNameController.clear();
       });
     } on UnsupportedError catch (e) {
@@ -86,6 +94,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _startRecover() {
+    _isRecovery = true;
     showDialog<Map<String, String>>(
       context: context,
       builder: (dialogContext) => _RecoveryDialog(onSnackBar: _showSnackBar),
@@ -106,40 +115,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     setState(() => _isCreating = true);
     try {
       final seed = await _idManager.createIdentityFromMnemonic(mnemonic);
-      
-      // Check if this peer ID has a registered handle
       final peerId = _client.getPeerId();
+
+      // For recovery: check if handle exists before prompting
       String? recoveredHandle;
-      if (peerId != null) {
+      if (_isRecovery && peerId != null) {
+        // Check local DB first
         try {
           final handleStatus = _client.getHandleStatus(peerId);
           if (handleStatus.isNotEmpty && handleStatus['handle'] != null) {
             recoveredHandle = handleStatus['handle'] as String;
           }
         } catch (_) {}
-        
-        // Trigger mesh DHT lookup for handle tied to this peer ID.
-        // Result arrives asynchronously as Event 37 — handled by main_shell.dart
-        // which persists across navigation and will update the profile automatically.
-        try {
-          _client.lookupPeerHandle(peerId);
-        } catch (_) {}
+
+        // Trigger DHT lookup and wait up to 8 seconds
+        if (recoveredHandle == null) {
+          try {
+            _client.lookupPeerHandle(peerId);
+          } catch (_) {}
+          recoveredHandle = await _waitForDhtHandle(peerId, timeout: const Duration(seconds: 8));
+        }
       }
-      
+
+      // Start the engine and navigate to main app
       widget.onComplete(seed, avatarName);
-      
-      // Show recovered identity info
-      if (mounted && peerId != null) {
-        final handleInfo = recoveredHandle != null ? '\nHandle: $recoveredHandle' : '';
-        _showSnackBar(
-          SnackBar(
-            content: Text("Identity recovered!\nPeer ID: ${peerId.substring(0, 16)}...$handleInfo"),
-            duration: const Duration(seconds: 4),
-          ),
-        );
+
+      // Set static flag for main_shell to pick up after navigation
+      if (recoveredHandle != null) {
+        // Handle found — no prompt needed
+      } else {
+        // No handle found (new identity or recovery without handle) — schedule prompt
+        OnboardingScreen.needsHandlePrompt = true;
+        OnboardingScreen.promptPeerId = peerId;
       }
-      
-      // Safety: if callback doesn't navigate, reset spinner after delay
+
+      // Safety: reset spinner after delay
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted && _isCreating) {
           setState(() => _isCreating = false);
@@ -150,6 +160,237 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _showSnackBar('Identity process failed: $e');
       setState(() => _isCreating = false);
     }
+  }
+
+  Future<String?> _waitForDhtHandle(String peerId, {Duration timeout = const Duration(seconds: 8)}) async {
+    final completer = Completer<String?>();
+    late StreamSubscription sub;
+    sub = _client.networkStream.listen((event) {
+      if (event.type == 37) {
+        try {
+          final data = String.fromCharCodes(event.data);
+          final parts = data.split('\x00');
+          if (parts.length >= 2 && parts[0] == peerId) {
+            final handle = parts[1];
+            if (handle.isNotEmpty && !completer.isCompleted) {
+              completer.complete(handle);
+            }
+          }
+        } catch (_) {}
+      }
+    });
+
+    // Also check if handle was already set by main_shell.dart listener
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!completer.isCompleted) {
+        try {
+          final handleStatus = _client.getHandleStatus(peerId);
+          if (handleStatus.isNotEmpty && handleStatus['handle'] != null) {
+            completer.complete(handleStatus['handle'] as String);
+          }
+        } catch (_) {}
+      }
+    });
+
+    Future.delayed(timeout, () {
+      if (!completer.isCompleted) completer.complete(null);
+    });
+
+    final result = await completer.future;
+    sub.cancel();
+    return result;
+  }
+
+
+
+
+  /// Show a dialog prompting the user to create an introvert handle.
+  /// Can be called from main_shell after navigation completes.
+  static void showHandleCreationPrompt(BuildContext context, String? peerId) {
+    final handleController = TextEditingController();
+    bool isClaiming = false;
+    String? claimStatus;
+    final client = IntrovertClient();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppTheme.current.surface,
+              title: Row(
+                children: [
+                  Icon(Icons.alternate_email_rounded, color: AppTheme.current.accent, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    "CHOOSE YOUR HANDLE",
+                    style: TextStyle(
+                      color: AppTheme.current.text,
+                      fontFamily: 'monospace',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Choose a unique handle for your identity. This cannot be changed later.",
+                      style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.7), fontSize: 12, height: 1.4),
+                    ),
+                    SizedBox(height: 16),
+                    TextField(
+                      controller: handleController,
+                      style: TextStyle(color: AppTheme.current.text, fontFamily: 'monospace', fontSize: 14),
+                      decoration: InputDecoration(
+                        prefixText: 'i@',
+                        prefixStyle: TextStyle(color: AppTheme.current.accent, fontFamily: 'monospace', fontSize: 14),
+                        hintText: "yourname",
+                        hintStyle: TextStyle(color: AppTheme.current.mutedText.withValues(alpha: 0.3)),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: AppTheme.current.mutedText.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: AppTheme.current.accent),
+                        ),
+                      ),
+                      enabled: !isClaiming,
+                    ),
+                    if (claimStatus != null) ...[
+                      SizedBox(height: 12),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: claimStatus!.startsWith('verified')
+                              ? Colors.greenAccent.withValues(alpha: 0.08)
+                              : claimStatus!.startsWith('error')
+                                  ? Colors.redAccent.withValues(alpha: 0.08)
+                                  : Colors.amberAccent.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: claimStatus!.startsWith('verified')
+                                ? Colors.greenAccent.withValues(alpha: 0.3)
+                                : claimStatus!.startsWith('error')
+                                    ? Colors.redAccent.withValues(alpha: 0.3)
+                                    : Colors.amberAccent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (isClaiming)
+                              SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.current.accent))
+                            else
+                              Icon(
+                                claimStatus!.startsWith('verified')
+                                    ? Icons.check_circle_rounded
+                                    : Icons.info_outline_rounded,
+                                size: 16,
+                                color: claimStatus!.startsWith('verified')
+                                    ? Colors.greenAccent
+                                    : claimStatus!.startsWith('error')
+                                        ? Colors.redAccent
+                                        : Colors.amberAccent,
+                              ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                claimStatus!.startsWith('verified')
+                                    ? 'Handle verified!'
+                                    : claimStatus!,
+                                style: TextStyle(fontSize: 11, color: AppTheme.current.text.withValues(alpha: 0.7)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: 12),
+                    Text(
+                      '\u26a0\ufe0f Handles are permanent and cannot be changed once claimed.',
+                      style: TextStyle(color: Colors.orangeAccent.withValues(alpha: 0.7), fontSize: 10, height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isClaiming ? null : () {
+                    Navigator.pop(ctx);
+                  },
+                  child: Text("SKIP", style: TextStyle(color: AppTheme.current.mutedText)),
+                ),
+                ElevatedButton(
+                  onPressed: isClaiming ? null : () async {
+                    final handle = handleController.text.trim();
+                    if (handle.isEmpty) {
+                      setDialogState(() => claimStatus = 'Please enter a handle');
+                      return;
+                    }
+                    if (!RegExp(r'^[a-zA-Z0-9_]{3,64}$').hasMatch(handle)) {
+                      setDialogState(() => claimStatus = 'error: 3-64 chars, letters/numbers/underscores only');
+                      return;
+                    }
+
+                    setDialogState(() {
+                      isClaiming = true;
+                      claimStatus = 'Generating proof of work...';
+                    });
+
+                    try {
+                      client.claimHandle('i@$handle');
+                      setDialogState(() => claimStatus = 'Claiming handle — waiting for RBN verification...');
+
+                      // Poll for verification
+                      bool verified = false;
+                      for (int i = 0; i < 10; i++) {
+                        await Future.delayed(const Duration(seconds: 3));
+                        if (!ctx.mounted) break;
+                        try {
+                          final status = client.getHandleStatus(client.getPeerId() ?? '');
+                          if (status.isNotEmpty && status['verified'] == true) {
+                            verified = true;
+                            break;
+                          }
+                        } catch (_) {}
+                      }
+
+                      if (verified) {
+                        setDialogState(() => claimStatus = 'verified: i@$handle');
+                        client.setProfile(null, 'i@$handle', null, 1);
+                        Future.delayed(const Duration(seconds: 2), () {
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        });
+                      } else {
+                        setDialogState(() {
+                          isClaiming = false;
+                          claimStatus = 'error: Verification timed out. Try again from Profile tab.';
+                        });
+                      }
+                    } catch (e) {
+                      setDialogState(() {
+                        isClaiming = false;
+                        claimStatus = 'error: $e';
+                      });
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.current.accent,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: Text(isClaiming ? 'CLAIMING...' : 'CLAIM HANDLE'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override

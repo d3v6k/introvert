@@ -1,6 +1,6 @@
 # Introvert: Open-Source, Sovereign P2P Mesh Messenger
 
-**Version:** 0.35.0 | **Status:** Beta | **Last Updated:** 2026-07-20
+**Version:** 0.35.1 | **Status:** Beta | **Last Updated:** 2026-07-20
 
 Introvert is a privacy-focused, decentralized communication system that eliminates central servers entirely. Operating via a crowdsourced, self-healing Peer-to-Peer (P2P) mesh network, it ensures zero-knowledge, autonomous, and censorship-resistant utility for global users.
 
@@ -46,7 +46,7 @@ Introvert is a privacy-focused, decentralized communication system that eliminat
 
 | Platform | Link |
 |----------|------|
-| Android | [app-release.apk](https://github.com/d3v6k/introvert/releases/download/v0.35.0/app-release.apk) |
-| macOS | [Introvert-macOS.dmg](https://github.com/d3v6k/introvert/releases/download/v0.35.0/Introvert-macOS.dmg) |
+| Android | [app-release.apk](https://github.com/d3v6k/introvert/releases/download/v0.35.1/app-release.apk) |
+| macOS | [Introvert-macOS.dmg](https://github.com/d3v6k/introvert/releases/download/v0.35.1/Introvert-macOS.dmg) |
 
 For details on configuration and build steps, refer to [Docs/README.md](./Docs/README.md).
