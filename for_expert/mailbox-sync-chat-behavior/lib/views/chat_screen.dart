@@ -8,7 +8,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image/image.dart' as img;
 import '../src/native/introvert_client.dart';
 import 'package:provider/provider.dart';import '../src/ui/media/upload_controller.dart';
@@ -666,7 +665,6 @@ class _ContactInfoDialogState extends State<_ContactInfoDialog> {
                 );
                 if (confirm == true) {
                   _client.deleteChat(widget.peerId);
-                  _client.clearPendingMessages(widget.peerId);
                   if (mounted) Navigator.pop(context, true);
                 }
               },
@@ -731,45 +729,9 @@ class _ChatScreenState extends State<ChatScreen> {
   StreamSubscription<FileTransferProgress>? _transferSubscription;
   final Map<String, Map<String, List<String>>> _polls = {};
   final Map<String, List<dynamic>> _reactionsCache = {}; // msgId -> reactions
-  final Map<String, int> _messagesById = {}; // msgId/transferId -> index in _messages
-  // Persisted pull-attempt state (survives chat close/reopen and app restart)
-  static const int _maxPullAttempts = 5;
-  static const List<int> _pullBackoffSeconds = [30, 120, 600, 1800]; // 30s, 2m, 10m, 30m
-  SharedPreferences? _pullPrefs;
-  
-  Future<void> _initPullPrefs() async {
-    _pullPrefs = await SharedPreferences.getInstance();
-  }
-  
-  int _getPullAttemptCount(String transferId) {
-    return _pullPrefs?.getInt('pull_${transferId}_count') ?? 0;
-  }
-  
-  DateTime? _getPullLastAttempt(String transferId) {
-    final ms = _pullPrefs?.getInt('pull_${transferId}_at');
-    return ms != null ? DateTime.fromMillisecondsSinceEpoch(ms) : null;
-  }
-  
-  bool _shouldPull(String transferId) {
-    final count = _getPullAttemptCount(transferId);
-    if (count >= _maxPullAttempts) return false;
-    final lastAttempt = _getPullLastAttempt(transferId);
-    if (lastAttempt == null) return true;
-    final backoffIdx = (count - 1).clamp(0, _pullBackoffSeconds.length - 1);
-    final backoff = Duration(seconds: _pullBackoffSeconds[backoffIdx]);
-    return DateTime.now().difference(lastAttempt) > backoff;
-  }
-  
-  void _recordPullAttempt(String transferId) {
-    final count = _getPullAttemptCount(transferId) + 1;
-    _pullPrefs?.setInt('pull_${transferId}_count', count);
-    _pullPrefs?.setInt('pull_${transferId}_at', DateTime.now().millisecondsSinceEpoch);
-  }
-  
-  void _resetPullAttempts(String transferId) {
-    _pullPrefs?.remove('pull_${transferId}_count');
-    _pullPrefs?.remove('pull_${transferId}_at');
-  }
+  final Set<String> _pullRequested = {};
+  final Map<String, DateTime> _pullRequestedAt = {};
+  static const Duration _pullRetryTimeout = Duration(seconds: 30);
   int _elevatedCount = 0;
   Timer? _pullRetryTimer;
   DateTime? _lastNetworkOptimizeTime;
@@ -795,7 +757,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _loadProfile();
     _loadPeerTier();
-    _initPullPrefs().then((_) => _loadMessages());
+    _loadMessages();
     _markMessagesAsRead();
     _startNetworkDiscovery();
     _startEconomyMonitor();
@@ -867,29 +829,17 @@ class _ChatScreenState extends State<ChatScreen> {
   void _markMessagesAsRead() {
     // Mark all incoming messages as read locally
     _client.updateMessageStatusForPeer(widget.peerId, 0);
-    // Send read receipts only for RECENT unread incoming messages (not entire history).
-    // Uses a per-chat persisted timestamp to avoid re-sending receipts for old messages.
+    // Send read receipts to the remote peer for each unread incoming message
     try {
-      final lastReadKey = 'last_read_receipt_${widget.peerId}';
-      final lastReadMs = _pullPrefs?.getInt(lastReadKey) ?? 0;
-      final now = DateTime.now().millisecondsSinceEpoch;
       final raw = _client.getMessages(widget.peerId);
-      int newestReceiptTs = lastReadMs;
       for (var m in raw) {
         final isMe = m['is_me'] == true || m['is_me'] == 1 || m['is_me'] == '1';
         final msgId = m['msg_id'] as String?;
         final status = m['status'] as int? ?? 1;
-        final timestampStr = m['timestamp'] as String? ?? '';
-        final msgTs = _parseTimestamp(timestampStr).millisecondsSinceEpoch;
-        // Only send read receipt for incoming messages that are unread AND newer than last receipt batch
-        if (!isMe && msgId != null && msgId.isNotEmpty && status != 0 && msgTs > lastReadMs) {
+        // Only send read receipt for incoming messages that haven't been marked read (status != 0)
+        if (!isMe && msgId != null && msgId.isNotEmpty && status != 0) {
           _client.sendAcknowledgement(widget.peerId, msgId, 2);
-          if (msgTs > newestReceiptTs) newestReceiptTs = msgTs;
         }
-      }
-      // Persist the timestamp of the newest receipt we sent
-      if (newestReceiptTs > lastReadMs) {
-        _pullPrefs?.setInt(lastReadKey, newestReceiptTs);
       }
     } catch (e) {
       debugPrint("Error sending read receipts: $e");
@@ -1000,11 +950,14 @@ class _ChatScreenState extends State<ChatScreen> {
             );
 
             if (!isMe && !exists && existingIdx == -1) {
-              if (_shouldPull(progress.transferId)) {
+              final shouldPull = !_pullRequested.contains(progress.transferId) ||
+                (_pullRequestedAt[progress.transferId]?.isBefore(DateTime.now().subtract(_pullRetryTimeout)) ?? false);
+              if (shouldPull) {
                 try {
                   final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                   final isRelayed = _status != "Direct P2P";
-                  _recordPullAttempt(progress.transferId);
+                  _pullRequested.add(progress.transferId);
+                  _pullRequestedAt[progress.transferId] = DateTime.now();
                   _client.startPull(progress.peerId, progress.transferId, progress.filename, progress.mimeType, fileHash, totalSize, isRelayed, null);
                 } catch (_) {}
               }
@@ -1037,39 +990,9 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       }
 
-      // Incremental merge: update existing entries in place, insert new ones
-      final loadedById = <String, dynamic>{};
-      for (var m in loaded) {
-        final id = m is MessageModel ? m.msgId : (m is FileTransferProgress ? m.transferId : null);
-        if (id != null && id.isNotEmpty) loadedById[id] = m;
-      }
-      
       setState(() {
-        // Update existing entries in place
-        for (int i = 0; i < _messages.length; i++) {
-          final m = _messages[i];
-          final id = m is MessageModel ? m.msgId : (m is FileTransferProgress ? m.transferId : null);
-          if (id != null && loadedById.containsKey(id)) {
-            _messages[i] = loadedById[id]!;
-            loadedById.remove(id); // Mark as processed
-          }
-        }
-        // Append genuinely new entries
-        bool hasNew = false;
-        for (var m in loaded) {
-          final id = m is MessageModel ? m.msgId : (m is FileTransferProgress ? m.transferId : null);
-          if (id != null && loadedById.containsKey(id)) {
-            _messages.add(m);
-            hasNew = true;
-          }
-        }
-        // Rebuild index
-        _messagesById.clear();
-        for (int i = 0; i < _messages.length; i++) {
-          final m = _messages[i];
-          final id = m is MessageModel ? m.msgId : (m is FileTransferProgress ? m.transferId : null);
-          if (id != null && id.isNotEmpty) _messagesById[id] = i;
-        }
+        _messages.clear();
+        _messages.addAll(loaded);
         _messagesVersion++;
         _isLoading = false;
       });
@@ -1555,58 +1478,6 @@ class _ChatScreenState extends State<ChatScreen> {
           msgId: msgId,
         );
       }
-      // Terminal state: check if this transfer has failed/expired (status 5) or hit retry ceiling
-      final isFailedTransfer = !msg.isOutgoing && !msg.isComplete && 
-        (_getPullAttemptCount(msg.transferId) >= _maxPullAttempts);
-      
-      if (isFailedTransfer) {
-        // Greyed-out terminal state with tap-to-retry
-        return GestureDetector(
-          onTap: () {
-            // Reset attempt counter and retry once
-            _resetPullAttempts(msg.transferId);
-            final msgs = _client.getMessages(widget.peerId);
-            final directMsg = msgs.firstWhere(
-              (m) => (m['content'] as String).startsWith("[FILE]:") && (m['content'] as String).contains(msg.transferId),
-              orElse: () => null,
-            );
-            if (directMsg != null) {
-              try {
-                final content = directMsg['content'] as String;
-                final meta = json.decode(content.substring(7));
-                final fileHash = meta['file_hash']?.toString() ?? '';
-                final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
-                final isRelayed = _status != "Direct P2P";
-                _recordPullAttempt(msg.transferId);
-                _client.startPull(msg.peerId, msg.transferId, msg.filename, msg.mimeType, fileHash, totalSize, isRelayed, null);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Retrying download of '${msg.filename}'...")),
-                );
-              } catch (e) {
-                debugPrint("Error retrying download: $e");
-              }
-            }
-          },
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            margin: EdgeInsets.symmetric(vertical: 2, horizontal: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.current.surface.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.error_outline, color: AppTheme.current.mutedText, size: 18),
-              SizedBox(width: 8),
-              Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(msg.filename, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.5), fontSize: 13, fontWeight: FontWeight.w500)),
-                SizedBox(height: 2),
-                Text('Failed to download — tap to retry', style: TextStyle(color: AppTheme.current.mutedText, fontSize: 11)),
-              ])),
-            ]),
-          ),
-        );
-      }
-
       return FileTransferBubble(
         key: ValueKey('${msg.transferId}_${msg.isVerified}_${msg.isComplete}'),
         progress: msg,
@@ -1628,8 +1499,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 final fileHash = meta['file_hash']?.toString() ?? '';
                 final totalSize = (meta['total_size'] as num?)?.toInt() ?? 0;
                 final isRelayed = _status != "Direct P2P";
-                if (_shouldPull(msg.transferId)) {
-                  _recordPullAttempt(msg.transferId);
+                if (!_pullRequested.contains(msg.transferId)) {
+                  _pullRequested.add(msg.transferId);
                   _client.startPull(msg.peerId, msg.transferId, msg.filename, msg.mimeType, fileHash, totalSize, isRelayed, null);
                 }
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -2381,80 +2252,31 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       } else if (event.type == 2 || event.type == 4) {
         final data = event.data;
-        if (data.length < 9) return;
-        // Detect new format: first byte 0x01 = versioned with backfill flag
-        final isNewFormat = data[0] == 0x01;
-        bool isBackfill = false;
-        int timestamp;
+        if (data.length < 8) return;
+        final timestamp = ByteData.sublistView(Uint8List.fromList(data.sublist(0, 8))).getInt64(0, Endian.big);
         String content; String? msgId; String? replyTo;
-        if (isNewFormat) {
-          // New format: [0x01][8-byte timestamp][msg_id_len][msg_id][rt_len][rt][content][is_backfill]
-          timestamp = ByteData.sublistView(Uint8List.fromList(data.sublist(1, 9))).getInt64(0, Endian.big);
-          if (event.type == 2 && data.length > 10) {
-            int offset = 9;
+        if (event.type == 2) {
+          if (data.length > 9) {
+            int offset = 8;
             final midLen = data[offset++];
             msgId = utf8.decode(data.sublist(offset, offset + midLen));
             offset += midLen;
-            if (data.length > offset + 1) {
+            if (data.length > offset) {
               final rtLen = data[offset++];
               replyTo = rtLen > 0 ? utf8.decode(data.sublist(offset, offset + rtLen)) : null;
               offset += rtLen;
-            } else { replyTo = null; }
-            // Last byte is backfill flag, rest is content
-            if (data.length > offset + 1) {
-              content = utf8.decode(data.sublist(offset, data.length - 1));
-              isBackfill = data.last == 1;
-            } else {
-              content = utf8.decode(data.sublist(offset));
             }
-          } else {
-            content = utf8.decode(data.sublist(9));
-          }
-        } else {
-          // Legacy format: [8-byte timestamp][msg_id_len][msg_id][rt_len][rt][content]
-          timestamp = ByteData.sublistView(Uint8List.fromList(data.sublist(0, 8))).getInt64(0, Endian.big);
-          if (event.type == 2) {
-            if (data.length > 9) {
-              int offset = 8;
-              final midLen = data[offset++];
-              msgId = utf8.decode(data.sublist(offset, offset + midLen));
-              offset += midLen;
-              if (data.length > offset) {
-                final rtLen = data[offset++];
-                replyTo = rtLen > 0 ? utf8.decode(data.sublist(offset, offset + rtLen)) : null;
-                offset += rtLen;
-              } else { replyTo = null; }
-              content = utf8.decode(data.sublist(offset));
-            } else { content = utf8.decode(data.sublist(8)); }
+            content = utf8.decode(data.sublist(offset));
           } else { content = utf8.decode(data.sublist(8)); }
-        }
+        } else { content = utf8.decode(data.sublist(8)); }
 
         if (content.startsWith("WEBRTC:")) return;
         if (!mounted) return;
         final eventTime = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
         setState(() {
           if (event.type == 2) _isE2eeActive = true;
-          // Targeted update for [FILE]: messages instead of full _loadMessages() reload
-          if (content.startsWith("[FILE]:")) {
-            try {
-              final jsonStr = content.substring(7);
-              final meta = json.decode(jsonStr);
-              final transferId = meta['transfer_id']?.toString() ?? '';
-              if (transferId.isNotEmpty) {
-                final idx = _messages.indexWhere((m) => m is FileTransferProgress && m.transferId == transferId);
-                if (idx != -1) {
-                  // Update existing entry in place (progress will be updated by event 12)
-                  debugPrint("[Chat] [FILE]: update for existing transfer $transferId");
-                } else {
-                  // New file transfer — trigger a reload for this specific case
-                  _loadMessages();
-                }
-              }
-            } catch (_) {}
-            return;
-          }
-          // Only send read receipts for live (non-backfill) messages
-          if (!isBackfill && msgId != null) _client.sendAcknowledgement(widget.peerId, msgId, 2);
+          if (content.startsWith("[FILE]:")) { _loadMessages(); return; }
+          if (msgId != null) _client.sendAcknowledgement(widget.peerId, msgId, 2);
           
           final bool isDuplicate = msgId != null && msgId.isNotEmpty && _messages.any((m) => m is MessageModel && m.msgId == msgId);
           if (!isDuplicate) {
@@ -2475,8 +2297,7 @@ class _ChatScreenState extends State<ChatScreen> {
             _messagesVersion++;
           }
         });
-        // Only scroll to bottom for live messages, not backfill
-        if (!isBackfill) _scrollToBottom();
+        _scrollToBottom();
       } else if (event.type == 23) {
         final chatId = utf8.decode(event.data);
         if (chatId == widget.peerId && mounted) {
@@ -2578,7 +2399,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         final idx = _messages.indexWhere((m) => m is FileTransferProgress && m.transferId == progress.transferId);
         if (progress.isComplete || progress.isCancelled) {
-          _resetPullAttempts(progress.transferId);
+          _pullRequested.remove(progress.transferId);
         }
         if (idx != -1) {
           final existing = _messages[idx] as FileTransferProgress;

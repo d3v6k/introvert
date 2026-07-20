@@ -130,8 +130,6 @@ typedef IntrovertSetProfileTierDart = FfiResult Function(int tier);
 
 typedef IntrovertDeleteChatC = FfiResult Function(Pointer<Utf8> peerId);
 typedef IntrovertDeleteChatDart = FfiResult Function(Pointer<Utf8> peerId);
-typedef IntrovertClearPendingMessagesC = FfiResult Function(Pointer<Utf8> peerId);
-typedef IntrovertClearPendingMessagesDart = FfiResult Function(Pointer<Utf8> peerId);
 
 typedef IntrovertClearContactsC = FfiResult Function();
 typedef IntrovertClearContactsDart = FfiResult Function();
@@ -623,7 +621,6 @@ class IntrovertClient {
   late IntrovertDeleteContactDart _deleteContact;
   late IntrovertSetProfileTierDart _setProfileTier;
   late IntrovertDeleteChatDart _deleteChat;
-  late IntrovertClearPendingMessagesDart _clearPendingMessages;
   late IntrovertClearContactsDart _clearContacts;
   late IntrovertWormholeStartDart _wormholeStart;
   late IntrovertWormholeJoinDart _wormholeJoin;
@@ -1071,7 +1068,6 @@ class IntrovertClient {
       _deleteContact = safeLookup('delete_contact', () => _dylib.lookupFunction<IntrovertDeleteContactC, IntrovertDeleteContactDart>('introvert_storage_delete_contact'), (p) => FfiResult.dummy);
       _setProfileTier = safeLookup('set_profile_tier', () => _dylib.lookupFunction<IntrovertSetProfileTierC, IntrovertSetProfileTierDart>('introvert_storage_set_profile_tier'), (t) => FfiResult.dummy);
       _deleteChat = safeLookup('delete_chat', () => _dylib.lookupFunction<IntrovertDeleteChatC, IntrovertDeleteChatDart>('introvert_storage_delete_chat'), (p) => FfiResult.dummy);
-      _clearPendingMessages = safeLookup('clear_pending_messages', () => _dylib.lookupFunction<IntrovertClearPendingMessagesC, IntrovertClearPendingMessagesDart>('introvert_network_clear_pending_messages'), (p) => FfiResult.dummy);
       _clearContacts = safeLookup('clear_contacts', () => _dylib.lookupFunction<IntrovertClearContactsC, IntrovertClearContactsDart>('introvert_storage_clear_contacts'), () => FfiResult.dummy);
       _wormholeStart = safeLookup('wormhole_start', () => _dylib.lookupFunction<IntrovertWormholeStartC, IntrovertWormholeStartDart>('introvert_wormhole_start'), () => FfiResult.dummy);
       _wormholeJoin = safeLookup('wormhole_join', () => _dylib.lookupFunction<IntrovertWormholeJoinC, IntrovertWormholeJoinDart>('introvert_wormhole_join'), (c) => FfiResult.dummy);
@@ -1724,7 +1720,6 @@ class IntrovertClient {
 
   Future<void> deleteContact(String id) async => using((Arena arena) => _handleFfiResult(_deleteContact(id.toNativeUtf8(allocator: arena)), context: "Delete Contact"));
   Future<void> deleteChat(String id) async => using((Arena arena) => _handleFfiResult(_deleteChat(id.toNativeUtf8(allocator: arena)), context: "Delete Chat"));
-  void clearPendingMessages(String peerId) => using((Arena arena) => _handleFfiResult(_clearPendingMessages(peerId.toNativeUtf8(allocator: arena)), context: "Clear Pending Messages"));
   Future<void> clearAllContacts() async => _handleFfiResult(_clearContacts(), context: "Clear Contacts");
   void setProfileTier(int tier) => _handleFfiResult(_setProfileTier(tier), context: "Set Profile Tier");
 

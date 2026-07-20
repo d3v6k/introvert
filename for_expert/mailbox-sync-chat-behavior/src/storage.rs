@@ -1170,8 +1170,8 @@ impl StorageService {
         let mut row_ids = Vec::new();
 
         {
-            // Limit to 8 messages per drain (libp2p max restored to 10MB in v37)
-            let mut stmt = tx.prepare("SELECT rowid, sender_peer_id, encrypted_payload FROM mailbox_messages WHERE recipient_hash = ?1 ORDER BY rowid ASC LIMIT 8")?;
+            // CRITICAL FIX: Limit to 4 messages to stay under 1MB libp2p limit (assuming ~250KB per chunk)
+            let mut stmt = tx.prepare("SELECT rowid, sender_peer_id, encrypted_payload FROM mailbox_messages WHERE recipient_hash = ?1 ORDER BY rowid ASC LIMIT 4")?;
             let rows = stmt.query_map(params![recipient_hash], |row| {
                 Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Vec<u8>>(2)?))
             })?;
@@ -1383,8 +1383,6 @@ impl StorageService {
         ).unwrap_or(0);
         let current = current as u8;
         // Allowed transitions: 0→3, 0→1, 0→2, 3→1, 3→2, 1→2
-        // Status 4 (pending recovery) was removed — see comment at ChatSyncResponse [FILE]: drop.
-        // Status 5 (failed/expired) is set only via raw SQL (mark_file_transfer_failed, sweep).
         let allowed = match current {
             0 => new_status <= 3,
             3 => new_status == 1 || new_status == 2,
@@ -1397,53 +1395,6 @@ impl StorageService {
             return Ok(true);
         }
         Ok(false)
-    }
-
-    /// Mark a file transfer message as failed/expired (status 5).
-    pub fn mark_file_transfer_failed(&self, transfer_id: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        let pattern = format!("%\"transfer_id\":\"{}%", transfer_id);
-        // Never overwrite status 2 (read) — only mark as failed if status is 0, 1, 3, or 4
-        conn.execute(
-            "UPDATE messages SET status = 5 WHERE content LIKE ?1 AND status IN (0, 1, 3, 4)",
-            params![pattern],
-        )?;
-        Ok(())
-    }
-
-    /// Get the age in seconds of a file transfer message.
-    pub fn get_file_transfer_age_secs(&self, transfer_id: &str) -> Result<Option<i64>> {
-        let conn = self.conn.lock();
-        let pattern = format!("%\"transfer_id\":\"{}%", transfer_id);
-        let result = conn.query_row(
-            "SELECT CAST((julianday('now') - julianday(timestamp)) * 86400 AS INTEGER) FROM messages WHERE content LIKE ?1 LIMIT 1",
-            params![pattern],
-            |row| row.get::<_, Option<i64>>(0),
-        ).unwrap_or(None);
-        Ok(result)
-    }
-
-    /// Find and mark as failed all incomplete file transfers older than max_age_secs.
-    pub fn sweep_expired_file_transfers(&self, max_age_secs: i64) -> Result<usize> {
-        let conn = self.conn.lock();
-        // Only mark as failed if: file message, incomplete (no is_complete:true), status eligible, and old enough
-        let affected = conn.execute(
-            "UPDATE messages SET status = 5 WHERE content LIKE '%[[]FILE]:%' AND content NOT LIKE '%is_complete\":true%' AND status IN (0, 3) AND CAST((julianday('now') - julianday(timestamp)) * 86400 AS INTEGER) > ?1",
-            params![max_age_secs],
-        )?;
-        Ok(affected)
-    }
-
-    /// Mark a file transfer as completed after recovery from failed state.
-    /// Only transitions from status 5 (failed/expired) to 1 (delivered).
-    /// Preserves status 2 (read) — a file that was already read stays read.
-    pub fn complete_file_transfer_recovery(&self, msg_id: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        conn.execute(
-            "UPDATE messages SET status = 1 WHERE msg_id = ?1 AND status = 5",
-            params![msg_id],
-        )?;
-        Ok(())
     }
 
     // --- Pending file chunk queue (persistent safety net for cross-network transfers) ---

@@ -1,7 +1,7 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-18 11:00 UTC
-**Git:** main @ 66ca960 (v0.32.0 — Intelligent Transfer Routing)
+**Last Updated:** 2026-07-19 14:30 UTC
+**Git:** main @ cbd5f0f (v0.35.0 — Ghost Message Fix & Mailbox Sync Hardening, uncommitted)
 
 ---
 
@@ -354,5 +354,17 @@ App drains mobile data and phone gets warm when on mobile data. User reported ex
 ---
 ## Backup Status (2026-07-19 12:17)
 - Git: main @ 07aedda
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-20 14:28)
+- Git: main @ cbd5f0f
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-20 14:45)
+- Git: main @ cbd5f0f
 - RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001

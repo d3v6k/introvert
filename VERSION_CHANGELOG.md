@@ -248,3 +248,60 @@ _Stable version history with key changes. Updated at every stable backup._
 ## Backup 19_07_26_1217 (2026-07-19 12:17)
 - Git: main @ 07aedda
 - Machine: devs-Mac-mini.local
+
+## v0.35.0 — Ghost Message Fix & Mailbox Sync Hardening (2026-07-19)
+
+### Ghost Message Fix
+- **Persisted pull-attempt state** — `_pullRequested`/`_pullRequestedAt` moved from ephemeral widget-scoped sets to SharedPreferences, surviving chat close/reopen and app restart
+- **Retry ceiling** — max 5 attempts per transfer (matching Rust `pending_file_chunks` cap), with exponential backoff (30s → 2m → 10m → 30m → stop)
+- **Terminal UI state** — failed/expired transfers render as greyed-out "Failed to download — tap to retry" bubble; tap resets counter and retries once
+- **Incremental merge in `_loadMessages`** — replaced `_messages.clear(); _messages.addAll(loaded)` with diff-based update-in-place; prevents re-triggering pull eligibility for all historical transfers on every reload
+- **Targeted `[FILE]:` update** — `[FILE]:` events now update the specific transfer entry in place instead of triggering a full `_loadMessages()` reload
+
+### Status 5 (Failed/Expired)
+- **New terminal status code 5** — marks file transfers that have exhausted retries or exceeded 7-day TTL
+- **`mark_file_transfer_failed`** — raw SQL update, preserves status 1 (delivered) and 2 (read)
+- **`sweep_expired_file_transfers`** — periodic sweep (piggybacked on status_check_interval) marks incomplete file messages older than 7 days as failed; excludes completed transfers
+- **`complete_file_transfer_recovery`** — transitions status 5 → 1 on successful file completion; preserves status 2 (read)
+- **Chunk-retry bridge** — when `increment_chunk_retry` hits 5-attempt cap, parent message is now marked as status 5
+
+### Backfill Flag (is_backfill)
+- **Wire-level flag** — `ChatMessage` and `SyncMessage` payloads carry `is_backfill: bool` (serde default false)
+- **MailboxDrained handler** — marks all drained messages as `is_backfill = true`
+- **ChatSyncResponse handler** — marks all sync messages as `is_backfill = true`
+- **Event format versioned** — Event 2 dispatch uses `[0x01][timestamp][...][is_backfill_byte]` format; legacy format auto-detected
+- **Flutter parser** — detects version byte, extracts backfill flag; backfill messages skip read receipts and scroll-to-bottom
+
+### Read Receipt Gating
+- **Backfill suppression** — read receipts only sent for live (non-backfill) messages
+- **`_markMessagesAsRead` bulk fix** — persisted `last_read_receipt_{peerId}` timestamp via SharedPreferences; only sends receipts for messages newer than last receipt batch
+- **Local state clear preserved** — `updateMessageStatusForPeer(peerId, 0)` still runs unconditionally on chat open
+
+### Drain Efficiency
+- **`drain_in_progress` per-anchor** — `HashSet<PeerId>` prevents concurrent drain requests to same RBN; cleared on response or `OutboundFailure`
+- **`last_empty_drain` per-anchor** — `HashMap<PeerId, Instant>` tracks empty drain responses; fast-poll skip only fires when ALL connected anchors had empty drains recently
+- **Batch size 4 → 8** — `fetch_mailbox_payloads` LIMIT increased (libp2p max confirmed at 10MB)
+- **7-day file transfer sweep** — expired incomplete transfers marked as failed in periodic cleanup
+
+### Cleared-Chat Race Fix (P1)
+- **Clear-guard re-check on queue pop** — `should_skip_mailbox_message` re-checked when dequeuing from `handle_signaling_payload` queue, catching `delete_chat` calls between initial guard and dispatch
+- **`ClearPendingMessages` command** — new FFI function `introvert_network_clear_pending_messages` clears outbound `pending_messages` buffer for a peer; called after `deleteChat` in Flutter
+
+### Sync Timeout
+- **`sync_in_progress` timeout 60s → 120s** — extended for large history syncs
+- **Recursive sync guard** — time-based cap (120s) prevents infinite recursive `SyncChatMessages` loops
+
+### Deferred
+- **P4 (auto-recovery on sync)** — `ChatSyncResponse` still drops `[FILE]:` messages. Infrastructure for status 4 removed (zero callers). Deferral documented at drop point with §5.2 shared-retry-ceiling requirement noted.
+
+## Backup 19_07_26_1430 (2026-07-19 14:30)
+- Git: main @ cbd5f0f (uncommitted: ghost message fix + mailbox hardening)
+- Machine: devs-Mac-mini.local
+
+## Backup 20_07_26_1428 (2026-07-20 14:28)
+- Git: main @ cbd5f0f
+- Machine: devs-Mac-mini.local
+
+## Backup 20_07_26_1445 (2026-07-20 14:45)
+- Git: main @ cbd5f0f
+- Machine: devs-Mac-mini.local

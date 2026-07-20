@@ -743,6 +743,29 @@ pub extern "C" fn introvert_network_fetch_mailbox() -> FfiResult {
     FfiResult::success()
 }
 
+/// Clear pending messages for a specific peer (called after chat deletion).
+#[no_mangle]
+pub extern "C" fn introvert_network_clear_pending_messages(peer_id_ptr: *const c_char) -> FfiResult {
+    let peer_id = match unsafe { CStr::from_ptr(peer_id_ptr) }.to_str() {
+        Ok(s) => s.to_string(),
+        Err(_) => return FfiResult::error(-2, "Invalid peer_id"),
+    };
+
+    let engine_lock = ENGINE.read();
+    if let Some(engine) = engine_lock.as_ref() {
+        if let Some(ref tx) = *engine.network_tx.read() {
+            let tx_clone = tx.clone();
+            engine.runtime.spawn(async move {
+                if let Ok(pid) = peer_id.parse::<libp2p::PeerId>() {
+                    let _ = tx_clone.send(NetworkCommand::ClearPendingMessages { peer_id: pid }).await;
+                }
+            });
+            return FfiResult::success();
+        }
+    }
+    FfiResult::error(-1, "Network not started")
+}
+
 /// Initiates a file transfer to a remote peer.
 #[no_mangle]
 pub extern "C" fn introvert_network_force_refresh() -> FfiResult {

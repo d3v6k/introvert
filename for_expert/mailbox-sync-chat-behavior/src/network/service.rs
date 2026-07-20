@@ -211,10 +211,6 @@ pub struct NetworkService {
     pub(crate) last_idle_log: Instant,
     /// Last time a mailbox drain was performed (rate-limit to prevent spam on reservation flap)
     pub(crate) last_mailbox_drain: Instant,
-    /// Anchors with an active drain request — prevents concurrent drains to same RBN
-    pub(crate) drain_in_progress: HashSet<PeerId>,
-    /// Per-anchor last empty drain response (for empty-drain backoff)
-    pub(crate) last_empty_drain: HashMap<PeerId, Instant>,
     /// Last time a file chunk drain was performed (separate from mail drain for faster chunk delivery)
     pub(crate) last_chunk_drain: Instant,
     /// Peers with an active flush task — prevents duplicate flush spawns on circuit flap

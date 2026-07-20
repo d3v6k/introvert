@@ -259,8 +259,6 @@ impl NetworkService {
             connected_peer_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             last_idle_log: Instant::now(),
             last_mailbox_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
-            drain_in_progress: HashSet::new(),
-            last_empty_drain: HashMap::new(),
             last_chunk_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
             flush_in_progress: HashMap::new(),
             transfer_router: service::TransferRouter::new(),
@@ -465,15 +463,9 @@ impl NetworkService {
                             }
                         }
                         // FAST MAILBOX FETCH: Poll mailbox every 5s when relay peers are connected.
-                        // Skip if last drain returned 0 messages and was < 30s ago (avoid redundant drains).
-                        // Skip fast-poll if ALL connected anchors had empty drains recently
-                        let connected_anchors: Vec<PeerId> = self.discovered_anchors.iter()
-                            .filter(|p| self.swarm.is_connected(p))
-                            .copied().collect();
-                        let skip_empty = !connected_anchors.is_empty() && connected_anchors.iter().all(|pid| {
-                            self.last_empty_drain.get(pid).map(|t| t.elapsed() < Duration::from_secs(30)).unwrap_or(false)
-                        });
-                        if last_fast_mailbox_fetch.elapsed() > Duration::from_secs(5) && !skip_empty {
+                        // This ensures ACKs and receipts arrive promptly — not just during file transfers.
+                        // Throttled to 5s to avoid flooding the RBN anchor with MailboxDrain requests.
+                        if last_fast_mailbox_fetch.elapsed() > Duration::from_secs(5) {
                             last_fast_mailbox_fetch = Instant::now();
                             self.perform_mailbox_fetch().await;
                         }
@@ -962,7 +954,6 @@ impl NetworkService {
                                         msg_id: msg_id.clone(),
                                         timestamp,
                                         reply_to,
-                                        is_backfill: false,
                                     };
                                     let _ = self.forward_to_mesh(pid, payload, false).await;
                                 }
@@ -1196,15 +1187,8 @@ impl NetworkService {
                     // Cleanup stale pending chunks (>24h)
                     let _ = self.storage.cleanup_stale_pending_chunks(86400);
 
-                    // Sweep expired file transfers (>7 days, matching RBN mailbox TTL)
-                    if let Ok(count) = self.storage.sweep_expired_file_transfers(604800) {
-                        if count > 0 {
-                            info!("[Storage] Swept {} expired file transfers (>7 days)", count);
-                        }
-                    }
-
-                    // Cleanup stale sync_in_progress entries (>120s, extended for large history syncs)
-                    self.sync_in_progress.retain(|_, started| started.elapsed() < Duration::from_secs(120));
+                    // Cleanup stale sync_in_progress entries (>60s)
+                    self.sync_in_progress.retain(|_, started| started.elapsed() < Duration::from_secs(60));
 
                     // Retry undelivered messages: re-send messages stuck at status=0 for >60s
                     // to recipients we are now connected to.
@@ -1219,7 +1203,6 @@ impl NetworkService {
                                         msg_id: msg_id.clone(),
                                         timestamp,
                                         reply_to,
-                                        is_backfill: false,
                                     };
                                     let _ = self.forward_to_mesh(pid, payload, false).await;
                                 }
@@ -2383,8 +2366,6 @@ impl NetworkService {
                     }
                     IntrovertBehaviourEvent::RequestResponse(request_response::Event::OutboundFailure { request_id, peer, error, .. }) => {
                         warn!("[Mesh] Outbound Request-Response FAILURE to {}: {:?}", peer, error);
-                        // Clear drain_in_progress on failure (timeout, connection closed, etc.)
-                        self.drain_in_progress.remove(&peer);
                         
                         // Decrement in-flight counter for this peer
                         if let Some(count) = self.inflight_requests.get_mut(&peer) {
@@ -2421,8 +2402,6 @@ impl NetworkService {
                                 match self.storage.increment_chunk_retry(transfer_id, chunk_index, 5) {
                                     Ok(count) if count >= 5 => {
                                         warn!("[Mesh] Chunk {}/{} exceeded 5 retries — evicting from pending queue", transfer_id, chunk_index);
-                                        // Mark parent message as failed/expired (status 5)
-                                        let _ = self.storage.mark_file_transfer_failed(transfer_id);
                                     }
                                     Ok(count) => {
                                         info!("[Mesh] Chunk {}/{} retry count: {}/5", transfer_id, chunk_index, count);
@@ -3546,26 +3525,12 @@ impl NetworkService {
         for pid in &self.discovered_anchors { if !anchor_ids.contains(pid) { anchor_ids.push(*pid); } }
         
         for peer_id in anchor_ids {
-            // Skip if we already have an active drain request to this anchor
-            if self.drain_in_progress.contains(&peer_id) {
-                debug!("[Mesh] Skipping drain — already in progress for anchor: {}", peer_id);
-                continue;
-            }
             if self.swarm.is_connected(&peer_id) { 
                 info!("[Mesh] Draining verified anchor: {}", peer_id);
-                self.drain_in_progress.insert(peer_id);
                 self.swarm.behaviour_mut().request_response.send_request(&peer_id, SignalingRequest(SignalingPayload::MailboxDrain));
             } else { 
                 let _ = self.swarm.dial(peer_id); 
             }
-        }
-        // Evict stale drain_in_progress entries (> 10s timeout)
-        // Uses a separate timestamp map since HashSet doesn't store per-entry times
-        if !self.drain_in_progress.is_empty() {
-            // Stale entries will be cleared by MailboxDrained response or by this periodic sweep
-            // The 10s timeout is enforced by the request_response config (20s timeout)
-            // If a request never returns, the libp2p timeout will fire OutboundFailure
-            // which we handle by clearing the drain_in_progress entry
         }
 
     }
@@ -3594,7 +3559,7 @@ impl NetworkService {
                 self.reward_tracker.record_message_activity(&peer_id.to_string());
                 
                 let timestamp = chrono::Utc::now().timestamp();
-                let payload = SignalingPayload::ChatMessage { content: message, msg_id, timestamp, reply_to, is_backfill: false };
+                let payload = SignalingPayload::ChatMessage { content: message, msg_id, timestamp, reply_to };
                 let _ = self.forward_to_mesh(peer_id, payload, false).await;
             }
             NetworkCommand::FetchMailbox => {
@@ -3605,11 +3570,6 @@ impl NetworkService {
                 // will skip pre-clear messages via should_skip_mailbox_message()
                 self.perform_mailbox_fetch().await;
                 info!("[Mailbox] Proactive drain triggered for chat clear");
-            }
-            NetworkCommand::ClearPendingMessages { peer_id } => {
-                // Clear in-flight pending messages for this peer (P1: prevents cleared-chat race)
-                self.pending_messages.remove(&peer_id);
-                info!("[Mesh] Cleared pending messages for peer: {}", peer_id);
             }
             NetworkCommand::LookupPeerHandle { peer_id } => {
                 // Query Kademlia DHT for ph_<peer_id> reverse mapping
@@ -5741,15 +5701,6 @@ impl NetworkService {
         info!("[Mesh] handle_signaling_payload entered for peer {}", peer);
         let mut queue = vec![(peer, payload, is_webrtc)];
         while let Some((p, pl, is_wtc)) = queue.pop() {
-            // P1 RACE FIX: Re-check clear guard for queued ChatMessage payloads.
-            // Messages queued by MailboxDrained may have been cleared by delete_chat
-            // (on Dart FFI thread) between the initial guard check and this dispatch.
-            if let SignalingPayload::ChatMessage { timestamp, .. } = &pl {
-                if self.storage.should_skip_mailbox_message(&p.to_string(), *timestamp) {
-                    info!("[Mailbox] Skipping queued pre-clear message from {}", p);
-                    continue;
-                }
-            }
             match pl {
                 SignalingPayload::Secure(secure_msg) => {
                     match secure_msg {
@@ -5911,12 +5862,6 @@ impl NetworkService {
                 SignalingPayload::MailboxDrained(messages) => {
                     let count = messages.len();
                     info!("📦 Drained {} messages from mesh mailbox", count);
-                    // Clear drain_in_progress for this anchor
-                    self.drain_in_progress.remove(&peer);
-                    // Track empty drains per-anchor for backoff
-                    if count == 0 {
-                        self.last_empty_drain.insert(peer, Instant::now());
-                    }
                     for msg in messages {
                         if let Ok(sender_peer) = msg.sender_id.parse::<PeerId>() {
                             if let Ok(signaling) = serde_json::from_slice::<SignalingPayload>(&msg.payload) {
@@ -5941,13 +5886,6 @@ impl NetworkService {
                                         continue;
                                     }
                                 }
-                                // Mark as backfill so Flutter can distinguish from live traffic
-                                let signaling = match signaling {
-                                    SignalingPayload::ChatMessage { content, msg_id, timestamp, reply_to, .. } => {
-                                        SignalingPayload::ChatMessage { content, msg_id, timestamp, reply_to, is_backfill: true }
-                                    }
-                                    other => other,
-                                };
                                 queue.push((sender_peer, signaling, false));
                             }
                         }
@@ -6047,7 +5985,7 @@ impl NetworkService {
                 data.extend_from_slice(json.as_bytes());
                 crate::dispatch_global_event(15, &data);
             }
-            SignalingPayload::ChatMessage { content, msg_id, timestamp, reply_to, is_backfill } => {
+            SignalingPayload::ChatMessage { content, msg_id, timestamp, reply_to } => {
                 let peer_id_str = peer.to_string();
                 let storage = Arc::clone(&self.storage);
 
@@ -6090,9 +6028,8 @@ impl NetworkService {
                     });
                 }
 
-                // Pack [version, timestamp, msg_id_len, msg_id, reply_to_len, reply_to, content, is_backfill] for UI
-                let mut data = vec![0x01u8]; // version byte for new format
-                data.extend(timestamp.to_be_bytes());
+                // Pack [timestamp, msg_id_len, msg_id, reply_to_len, reply_to, content] for UI
+                let mut data = timestamp.to_be_bytes().to_vec();
                 let msg_id_bytes = msg_id.as_bytes();
                 data.push(msg_id_bytes.len() as u8);
                 data.extend(msg_id_bytes);
@@ -6102,7 +6039,6 @@ impl NetworkService {
                 data.extend(rt_bytes);
 
                 data.extend(content.as_bytes());
-                data.push(if is_backfill { 1u8 } else { 0u8 }); // backfill flag
                 crate::dispatch_global_event(2, &data);
             }
             SignalingPayload::FileChunkRequest { transfer_id, chunk_index, chunk_size, relay_hint } => {
@@ -6426,7 +6362,6 @@ impl NetworkService {
                                     content: m.2,
                                     timestamp: m.3,
                                     reply_to: m.4,
-                                    is_backfill: false,
                                 });
                             }
                         }
@@ -6443,7 +6378,6 @@ impl NetworkService {
                                     content: m.0,
                                     timestamp: m.1,
                                     reply_to: m.5,
-                                    is_backfill: false,
                                 });
                             }
                         }
@@ -6513,8 +6447,6 @@ impl NetworkService {
                 let chat_id_clone = chat_id.clone();
                 let is_group_c = is_group;
                 let chat_id_for_dispatch = chat_id.clone();
-                // Mark all sync messages as backfill
-                let messages: Vec<SyncMessage> = messages.into_iter().map(|mut m| { m.is_backfill = true; m }).collect();
                 let relay_messages = if is_group && !is_relay { messages.clone() } else { Vec::new() };
                 let received_count = messages.len();
                 let my_peer_id_str = self.swarm.local_peer_id().to_string();
@@ -6522,16 +6454,9 @@ impl NetworkService {
                 // Store received messages with original timestamps to ensure correct chronological order
                 let _ = tokio::task::spawn_blocking(move || {
                     for msg in messages {
-                        // Filter out [FILE]: messages — file transfers have their own delivery mechanism.
-                        // AUTO-RECOVERY DEFERRED: If a file's metadata was delivered but bytes never arrived,
-                        // sync currently won't notice or auto-recover it. Wiring this up requires:
-                        // 1. Detecting missing file data in the sync response
-                        // 2. Calling startPull via FFI (not directly from Rust — must go through Dart's
-                        //    persisted attempt counter to avoid the shared-retry-ceiling problem from §5.2)
-                        // 3. Adding a status-4 ('pending recovery') entry to the status transition gate
-                        // Status 4 infrastructure was removed (commit TBD) because it had zero callers.
+                        // Filter out [FILE]: messages — file transfers have their own delivery mechanism
                         if msg.content.starts_with("[FILE]:") {
-                            debug!("[Sync] Dropping [FILE]: message from sync — auto-recovery not implemented");
+                            warn!("[Sync] Dropping [FILE]: message from sync (should have been filtered by sender)");
                             continue;
                         }
                         if is_group_c {
@@ -6552,23 +6477,16 @@ impl NetworkService {
                     let peer_id_clone = peer;
                     let chat_id_r = chat_id_for_dispatch.clone();
                     let is_group_r = is_group;
-                    // Max-iterations guard: cap at 20 rounds (2000 messages) to prevent infinite sync
-                    let sync_elapsed = self.sync_in_progress.get(&chat_id_for_dispatch).map(|t| t.elapsed()).unwrap_or(Duration::from_secs(999));
-                    if sync_elapsed < Duration::from_secs(120) {
-                        tokio::spawn(async move {
-                            tokio::time::sleep(Duration::from_millis(500)).await;
-                            info!("[Mesh] Recursive sync: received {} messages, requesting more for {}", received_count, chat_id_r);
-                            let _ = tx.send(NetworkCommand::SyncChatMessages {
-                                peer_id: peer_id_clone,
-                                chat_id: chat_id_r,
-                                is_group: is_group_r,
-                                is_full: false,
-                            }).await;
-                        });
-                    } else {
-                        warn!("[Mesh] Sync timeout for {} after {:?} — stopping recursive sync", chat_id_for_dispatch, sync_elapsed);
-                        self.sync_in_progress.remove(&chat_id_for_dispatch);
-                    }
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_millis(500)).await;
+                        info!("[Mesh] Recursive sync: received {} messages, requesting more for {}", received_count, chat_id_r);
+                        let _ = tx.send(NetworkCommand::SyncChatMessages {
+                            peer_id: peer_id_clone,
+                            chat_id: chat_id_r,
+                            is_group: is_group_r,
+                            is_full: false,
+                        }).await;
+                    });
                 }
 
                 // Relay newly received group messages to other connected peers (only for original sync, not relayed)
@@ -6603,7 +6521,6 @@ impl NetworkService {
                                             content: m.2,
                                             timestamp: m.3,
                                             reply_to: m.4,
-                                            is_backfill: false,
                                         });
                                     }
                                 }
@@ -6620,7 +6537,6 @@ impl NetworkService {
                                                 content: m.0,
                                                 timestamp: m.1,
                                                 reply_to: m.5,
-                                                is_backfill: false,
                                             });
                                         }
                                     }
@@ -7575,19 +7491,16 @@ impl NetworkService {
                 if let Ok(json_str) = serde_json::to_string(&progress) {
                     let c = format!("[FILE]:{}", json_str);
                     // ROUTING FIX: Write to the correct DB table based on transfer type.
+                    // Previously always wrote to store_message_with_id (direct-chat table), causing
+                    // the sender's completed group file to appear in the 1-on-1 chat with the last ACKer.
                     if let Some(ref gid) = grp_id {
                         let gid_clone = gid.clone();
                         tokio::task::spawn_blocking(move || {
                             let _ = storage.store_group_message(&gid_clone, &peer_id_str, &msg_id, &c, true, None, None);
                         });
                     } else {
-                        let storage2 = Arc::clone(&storage);
-                        let mid = msg_id.clone();
                         tokio::task::spawn_blocking(move || {
-                            let _ = storage2.store_message_with_id(&peer_id_str, &mid, &c, true, None, None);
-                            // Recovery success: transition from status 4/5 to 1 (delivered)
-                            // Preserves status 2 (read) — only transitions from 4/5
-                            let _ = storage2.complete_file_transfer_recovery(&mid);
+                            let _ = storage.store_message_with_id(&peer_id_str, &msg_id, &c, true, None, None);
                         });
                     }
                 }

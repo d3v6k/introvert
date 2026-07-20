@@ -110,8 +110,6 @@ pub enum SignalingPayload {
         timestamp: i64,
         #[serde(default)]
         reply_to: Option<String>,
-        #[serde(default)]
-        is_backfill: bool,
     },
     DirectInviteRequest(SovereignIdentity),
     DirectInviteAccept(SovereignIdentity),
@@ -274,8 +272,6 @@ pub struct SyncMessage {
     pub content: String,
     pub timestamp: String,
     pub reply_to: Option<String>,
-    #[serde(default)]
-    pub is_backfill: bool,
 }
 
 /// JSON-serialized request wrapper used by request_response::json::Behaviour
@@ -302,7 +298,6 @@ pub enum NetworkCommand {
     AddAddress { peer_id: PeerId, address: Multiaddr },
     EstablishSecureSession { peer_id: PeerId },
     FetchMailbox,
-    ClearPendingMessages { peer_id: PeerId },
     UpdateAnchorStatus { enabled: bool },
     SendFile { peer_id: PeerId, file_path: String, group_id: Option<String>, transfer_id: Option<String> },
     SendFileFinalize { peer_id: PeerId, file_path: String, has_dc_already: bool, group_id: Option<String>, transfer_id: Option<String> },
