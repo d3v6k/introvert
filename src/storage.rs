@@ -255,7 +255,8 @@ impl StorageService {
                 total_size INTEGER NOT NULL,
                 local_path TEXT,
                 is_backed_up INTEGER DEFAULT 0,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                folder TEXT DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS handle_registry (
                 handle TEXT PRIMARY KEY,
@@ -324,6 +325,9 @@ impl StorageService {
             CREATE INDEX IF NOT EXISTS idx_dlq_peer ON dead_letter_queue (peer_id);
             CREATE INDEX IF NOT EXISTS idx_dlq_queued ON dead_letter_queue (queued_at);"
         )?;
+
+        // Migration: add folder column to drive_files if missing (for existing installs)
+        let _ = conn.execute("ALTER TABLE drive_files ADD COLUMN folder TEXT DEFAULT ''", []);
 
         // Pending file chunks — persistent queue for cross-network file transfers
         // Used when no RBNs are connected and chunks would otherwise be lost on app restart
