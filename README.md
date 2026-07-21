@@ -44,42 +44,13 @@ Introvert is a privacy-focused, decentralized communication system that eliminat
 
 ## 🛡️ Media Safety Module
 
-Introvert incorporates an **on-device Media Safety Module** that inspects all media files before they enter the mesh network. Content is validated locally on the sender's device — **no data is transmitted to external servers** for analysis.
+Introvert incorporates an **on-device Media Safety Module** that inspects all media files before they enter the mesh network. All analysis runs locally — **no data is transmitted to external servers**.
 
-### Detection Layers
+**Detection layers:** PDQ perceptual hashing (CSAM/illegal imagery), executable masquerade detection (malware in media containers), Shannon entropy analysis (steganography), and TFLite on-device classification (explicit content).
 
-| Layer | Technology | What It Catches |
-|-------|-----------|-----------------|
-| **Perceptual Hash (PDQ)** | Custom Rust implementation — 64x64 grayscale resize, 8x8 block DCT, median-threshold to 256-bit hash | Known CSAM and illegal imagery via perceptual hash matching (hamming distance ≤ 10) |
-| **Executable Masquerade Detection** | Magic byte analysis (PE `MZ`, ELF `7F 45 4C 46`, Mach-O `FEEDFACE/FACF`) | Malware disguised as images/videos — blocks `.exe`/`.elf`/`.dylib` files with media extensions |
-| **Shannon Entropy Analysis** | Byte-frequency entropy calculation (threshold: 7.95 bits/byte) | Steganography and encrypted payloads in image files (passive logging, no hard block) |
-| **TFLite Classifier** | TensorFlow Lite on-device inference (224x224 RGB tensor) | Explicit content, violent/gore, and malware payload classification (model integration pending) |
+**Privacy:** Entirely on-device. No cloud APIs. No hashes or metadata leave the device. The blocklist is bundled with the app.
 
-### How It Works
-
-1. User selects media to send
-2. `UploadController` intercepts the file before encryption
-3. Rust `inspect_media()` computes PDQ hash, checks blocklist, validates magic bytes
-4. If `knownViolationBlocked` → file is rejected locally, never enters the mesh
-5. If `approved` → file proceeds through AES-256-GCM encryption and P2P transmission
-
-### Privacy
-
-- All analysis runs **entirely on-device** — no cloud APIs, no external lookups
-- PDQ hashes are computed locally and compared against a local blocklist
-- No content, hashes, or metadata are transmitted to any server
-- The blocklist is bundled with the app and can be updated via app releases
-
-### Libraries & Modules
-
-| Component | Implementation |
-|-----------|---------------|
-| PDQ Perceptual Hash | Custom Rust (`src/safety.rs`) — `image` crate for decode/resize, manual DCT |
-| Entropy Analysis | Custom Rust — Shannon entropy on raw bytes |
-| Executable Detection | Custom Rust — magic byte header inspection |
-| TFLite Classifier | Dart (`tflite_safety_classifier.dart`) — `tflite_flutter` (model loading pending) |
-| Upload Gate | Dart `UploadController` — integrated into all 6 send call sites |
-| FFI Bridge | Dart `native_hash_bridge.dart` → Rust `inspect_media()` |
+→ [Full implementation details](./Docs/MEDIA_SAFETY_MODULE.md)
 
 ---
 
