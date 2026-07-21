@@ -1,2 +1,0 @@
-499:        max_connections: u32,
-543:                            IntrovertBehaviour::new(local_peer_id, keypair.clone(), relay_client, enable_mdns, enable_relay_server, max_connections)
