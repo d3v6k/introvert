@@ -864,6 +864,26 @@ impl NetworkService {
                             } else {
                                 crate::dispatch_debug_log(&format!("[Resilience] Tunnel active ({}s). Waiting for connection...", tunnel_age.as_secs()));
                             }
+
+                            // MOBILE TUNNEL HEALTH CHECK: If tunnel active for >60s on mobile data
+                            // but no relay reservation, the WebSocket bridge is likely dead.
+                            // Force-reset and re-activate with fresh probe.
+                            if self.connectivity_type == 2
+                                && self.tunnel_active
+                                && self.relay_reservations.is_empty()
+                                && tunnel_age > Duration::from_secs(60)
+                            {
+                                warn!("[Tunnel] Mobile: tunnel active {}s but no relay reservation — resetting", tunnel_age.as_secs());
+                                crate::dispatch_debug_log("[Tunnel] Mobile health check: bridge likely dead, resetting");
+                                self.tunnel_active = false;
+                                self._tunnel_handle = None;
+                                self.bootstrap_nodes.retain(|(_, addr)| !addr.to_string().contains("127.0.0.1"));
+                                let tx = self.command_tx.clone();
+                                tokio::spawn(async move {
+                                    tokio::time::sleep(Duration::from_secs(2)).await;
+                                    let _ = tx.send(NetworkCommand::ActivateTunnel).await;
+                                });
+                            }
                         }
 
                         if !any_dialed {
