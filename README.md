@@ -56,9 +56,6 @@ Introvert incorporates an **on-device Media Safety Module** that inspects all me
 
 ## 📥 Download
 
-| Platform | Link |
-|----------|------|
-| Android | [app-release.apk](https://github.com/d3v6k/introvert/releases/download/v0.35.2/app-release.apk) |
-| macOS | [Introvert-macOS.dmg](https://github.com/d3v6k/introvert/releases/download/v0.35.2/Introvert-macOS.dmg) |
+**[Latest Releases](https://github.com/d3v6k/introvert/releases)** — Android APK and macOS DMG available for each release.
 
 For details on configuration and build steps, refer to [Docs/README.md](./Docs/README.md).
