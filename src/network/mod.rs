@@ -2764,7 +2764,12 @@ impl NetworkService {
                                  endpoint_addr.to_string().contains("172.") ||
                                  endpoint_addr.to_string().contains("127.0.0.1");
 
-                let is_relayed = endpoint.is_relayed() && !is_local_ip;
+                // Tunnel connections to the RBN server should be treated as relayed.
+                // When Android switches to mobile data, the tunnel WebSocket (ws://RBN:80/tunnel)
+                // doesn't register as relayed in libp2p, causing TransferRouter to pick Direct
+                // instead of Relay for file transfers. Marking tunnel as relayed fixes this.
+                let is_rbn_server = endpoint_addr.to_string().contains("47.89.252.80");
+                let is_relayed = (endpoint.is_relayed() || is_rbn_server) && !is_local_ip;
                 if !is_relayed {
                     let count = self.direct_conn_count.entry(peer_id).or_insert(0);
                     *count += 1;
