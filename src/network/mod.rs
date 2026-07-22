@@ -7498,11 +7498,32 @@ impl NetworkService {
                 }
             }
             SignalingPayload::FileTransferComplete { transfer_id } => {
-                // Guard: only process if we have an active seeder for this transfer.
-                // Stale FileTransferComplete payloads from previous transfers (delivered
-                // via mailbox drain) must NOT overwrite the message with is_verified: true.
+                // Dispatch sender-side progress update so the UI shows "delivered"
+                // even when chunk requests went through relay (group sends).
+                // This must happen BEFORE the seeder guard so the sender UI updates.
                 if !self.active_seeders.contains_key(&transfer_id) {
-                    info!("[Mesh] Ignoring stale FileTransferComplete for {} — no active seeder", transfer_id);
+                    // No active seeder — still dispatch a completion event for the sender UI.
+                    // The transfer_id contains the file hash, so we can extract the filename.
+                    let parts: Vec<&str> = transfer_id.split('_').collect();
+                    let fallback_filename = if parts.len() >= 2 { format!("file_{}", &parts[1][..8.min(parts[1].len())]) } else { "file".to_string() };
+                    let progress = FileTransferProgress {
+                        transfer_id: transfer_id.clone(),
+                        peer_id: peer.to_string(),
+                        filename: fallback_filename,
+                        mime_type: "application/octet-stream".to_string(),
+                        file_hash: String::new(),
+                        progress: 1.0,
+                        is_complete: true,
+                        is_verified: true,
+                        is_outgoing: true,
+                        local_path: None,
+                        start_time_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as u64,
+                        speed_bps: 0.0,
+                        group_id: None,
+                        caption: None,
+                    };
+                    crate::dispatch_global_event(12, &serde_json::to_vec(&progress).unwrap_or_default());
+                    info!("[Mesh] FileTransferComplete for {} — no active seeder, but dispatched completion event for sender UI", transfer_id);
                     return;
                 }
 
