@@ -211,6 +211,8 @@ pub struct NetworkService {
     pub(crate) last_idle_log: Instant,
     /// Last time a mailbox drain was performed (rate-limit to prevent spam on reservation flap)
     pub(crate) last_mailbox_drain: Instant,
+    /// Last time the "skipping drain" log was printed (throttle to 1/min)
+    pub(crate) last_mailbox_skip_log: Instant,
     /// Anchors with an active drain request — prevents concurrent drains to same RBN
     pub(crate) drain_in_progress: HashSet<PeerId>,
     /// Per-anchor last empty drain response (for empty-drain backoff)

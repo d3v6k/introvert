@@ -259,6 +259,7 @@ impl NetworkService {
             connected_peer_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             last_idle_log: Instant::now(),
             last_mailbox_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
+            last_mailbox_skip_log: Instant::now() - Duration::from_secs(120), // log immediately on first skip
             drain_in_progress: HashSet::new(),
             last_empty_drain: HashMap::new(),
             last_chunk_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
@@ -3560,7 +3561,11 @@ impl NetworkService {
         // Guard: skip if last mail drain was < 30 seconds ago (prevents FCM echo loop)
         // File chunk delivery uses separate event-driven flush in circuit handlers (no cooldown)
         if self.last_mailbox_drain.elapsed() < Duration::from_secs(30) {
-            crate::dispatch_debug_log("[Mailbox] Skipping drain — last drain was < 30s ago");
+            // Throttle skip log to once per 60s to avoid spam
+            if self.last_mailbox_skip_log.elapsed() > Duration::from_secs(60) {
+                crate::dispatch_debug_log("[Mailbox] Skipping drain — last drain was < 30s ago");
+                self.last_mailbox_skip_log = Instant::now();
+            }
             return;
         }
         self.last_mailbox_drain = Instant::now();
