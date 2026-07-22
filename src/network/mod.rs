@@ -5413,6 +5413,57 @@ impl NetworkService {
             }
             NetworkCommand::IntroClawSetActiveChat { chat_id, peer_id, is_group } => {
                 self.intro_claw.set_active_chat(&chat_id, peer_id.as_deref(), is_group);
+
+                // Pre-warm relay circuit for cross-network peers.
+                // When a chat is opened, check if the peer is on the same network (mDNS).
+                // If not, preemptively establish relay circuit to eliminate the 2-3 min
+                // warmup delay when file transfers start.
+                if let Some(ref pid_str) = peer_id {
+                    if let Ok(pid) = pid_str.parse::<PeerId>() {
+                        let is_mdns = self.mdns_peers.contains(&pid);
+                        let is_connected = self.swarm.is_connected(&pid);
+                        let has_relay = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
+
+                        if !is_mdns && !is_connected && !has_relay {
+                            info!("[Resilience] Chat opened with cross-network peer {} — pre-warming relay circuit", pid);
+                            crate::dispatch_debug_log(&format!(
+                                "[Resilience] Pre-warming relay for {}: mdns={}, connected={}, relay={}",
+                                pid, is_mdns, is_connected, has_relay
+                            ));
+                            // Dial bootstrap nodes to establish relay reservation
+                            for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
+                                if !self.swarm.is_connected(rbn_id) {
+                                    let _ = self.swarm.dial(rbn_addr.clone());
+                                    let _ = self.swarm.behaviour_mut().kademlia.add_address(rbn_id, rbn_addr.clone());
+                                }
+                            }
+                            // Request relay reservation from connected RBNs
+                            for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
+                                if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
+                                    let mut relay_addr = rbn_addr.clone();
+                                    if !relay_addr.to_string().contains(&rbn_id.to_string()) {
+                                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
+                                    }
+                                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+                                    match self.swarm.listen_on(relay_addr) {
+                                        Ok(id) => {
+                                            self.relay_reservations.insert(*rbn_id);
+                                            self.relay_listeners.insert(id, *rbn_id);
+                                            info!("[Resilience] Pre-warmed relay reservation from {}", rbn_id);
+                                        }
+                                        Err(e) => debug!("[Resilience] Pre-warm reservation failed: {:?}", e),
+                                    }
+                                }
+                            }
+                        } else if !is_mdns && is_connected {
+                            // Peer is connected via relay — ensure outbound circuit is established
+                            let has_outbound = self.relay_reservations.len() > 0;
+                            if has_outbound {
+                                info!("[Resilience] Chat opened with relay-connected peer {} — circuit ready", pid);
+                            }
+                        }
+                    }
+                }
             }
             NetworkCommand::IntroClawClearActiveChat => {
                 self.intro_claw.clear_active_chat();
