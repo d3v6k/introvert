@@ -2901,7 +2901,8 @@ impl NetworkService {
                                 endpoint_addr.to_string().contains("172.") ||
                                 endpoint_addr.to_string().contains("127.0.0.1");
 
-               let is_relayed = endpoint.is_relayed() && !is_local_ip;
+               let is_rbn_server = endpoint_addr.to_string().contains("47.89.252.80");
+               let is_relayed = (endpoint.is_relayed() || is_rbn_server) && !is_local_ip;
                if !is_relayed {
                    if let Some(count) = self.direct_conn_count.get_mut(&peer_id) {
                        if *count > 0 {
