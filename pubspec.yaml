@@ -1,6 +1,6 @@
 name: introvert
 description: Sovereign peer-to-peer mesh network client with integrated $INTR token economy.
-version: 0.35.2+1
+version: 0.36.0+1
 publish_to: none
 environment:
   sdk: '>=3.3.0 <4.0.0'

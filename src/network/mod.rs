@@ -7920,25 +7920,46 @@ impl NetworkService {
                 event_data.extend(peer_id.as_bytes());
                 crate::dispatch_global_event(33, &event_data);
             }
-            SignalingPayload::TelemetryAck { peer_id, epoch_id, total_points, timestamp } => {
-
-                info!("[Economy] TelemetryAck received from RBN: peer={}, epoch={}, points={:.1}", peer_id, epoch_id, total_points);
+            SignalingPayload::TelemetryAck {
+                peer_id, epoch_id, total_points, timestamp,
+                referral_tier, referral_tier_expires_at,
+                todays_new_referrals, todays_bonus_multiplier,
+            } => {
+                info!("[Economy] TelemetryAck received from RBN: peer={}, epoch={}, points={:.1}, referral_tier={:?}",
+                    peer_id, epoch_id, total_points, referral_tier);
 
                 if let Err(e) = self.storage.mark_local_telemetry_synced(&epoch_id) {
-
                     warn!("[Economy] Failed to mark local telemetry synced: {:?}", e);
-
                 }
+
                 // Feed RBN-reported total points into DailyRewardEngine to bypass static ceiling
                 if let Some(ref daily) = self.daily_reward_engine {
                     daily.accept_rbn_estimate(total_points, timestamp);
                 }
-                // Dispatch to Flutter as Event 40 (Telemetry Acknowledgment)
+
+                // Sync referral status to local mirror tables
+                if let (Some(tier), Some(expires)) = (referral_tier, referral_tier_expires_at) {
+                    let _ = self.storage.upsert_referral_prestige(&peer_id, tier, timestamp as i64, expires as i64);
+                }
+                if todays_new_referrals > 0 {
+                    let bonus_raw = 0.0; // RBN doesn't send raw, only paid is authoritative
+                    let _ = self.storage.log_referral_bonus(
+                        &peer_id, &epoch_id, todays_new_referrals as i32,
+                        todays_bonus_multiplier, 0.0, bonus_raw, 0.0,
+                        referral_tier, referral_tier_expires_at.map(|e| e as i64),
+                    );
+                }
+
+                // Dispatch to Flutter as Event 41 (Telemetry Acknowledgment)
                 let ack_json = serde_json::json!({
                     "peer_id": peer_id,
                     "epoch_id": epoch_id,
                     "total_points": total_points,
                     "timestamp": timestamp,
+                    "referral_tier": referral_tier,
+                    "referral_tier_expires_at": referral_tier_expires_at,
+                    "todays_new_referrals": todays_new_referrals,
+                    "todays_bonus_multiplier": todays_bonus_multiplier,
                 });
                 if let Ok(json_str) = serde_json::to_string(&ack_json) {
                     crate::dispatch_global_event(41, json_str.as_bytes());

@@ -249,6 +249,50 @@ _Stable version history with key changes. Updated at every stable backup._
 - Git: main @ 07aedda
 - Machine: devs-Mac-mini.local
 
+## v0.36.0 — Economy Fixes & Referral System (2026-07-22)
+
+### Economy Phase 1: Mint Address Unification
+- V2 mint `FhKJjqpsCbymrk4Ntv5jFyZihHsAkW4Fb4fuJYBniydP` canonical across all code
+- Runtime + compile-time assertions prevent drift between 3 code locations
+- V1 confirmed stale (1,686 residual INTR)
+
+### Economy Phase 2: Server-Side Prestige Tier Verification
+- RPC-derived tier overrides client-claimed tier at epoch close
+- RPC failure fallback defaults to tier 0 (not client value)
+- Min-hold-duration snapshot gate closes flash-fund exploit
+- Growth-recovery test confirms no permanent ratchet
+
+### Economy Phase 3: Pool-Cap Overshoot Fix
+- Prestige multiplier applied BEFORE normalization (weight-then-normalize)
+- sum(payouts) <= pool cap verified in all cases (all-tier-4, mixed, all-tier-0)
+
+### Economy Phase 4: Epoch Reconciliation
+- `ON CONFLICT (epoch_id, solana_wallet)` with full-row replace
+- Keep-highest logic: higher total_points wins, loser's data fully discarded
+- Duplicate-wallet test confirms correct behavior
+
+### Referral System
+- **25/75 pool split** — 25% of edge/user pool reserved for referrals (4,109.50 INTR/day Year 1)
+- **3-in-7 eligibility gate** — wallet must be active 3 distinct calendar days in 7 days
+- **Peer-subset exclusion** — referred wallets with peers fully contained in referrer's peers are excluded
+- **Tier bands** — 1-2 new referrals = Catalyst (2x), 3+ = Pulsar (3x)
+- **No-stacking effective multiplier** — `max(balance_mult, referral_mult)`, not product
+- **Pro-rata pool overflow** — if bonuses exceed referral pool, all scaled down proportionally
+- **Double-claim guard extended** — `(peer_id, epoch_id, claim_type)` key supports DailySettlement + ReferralBonus per wallet per epoch
+- **RBN to client sync** — TelemetryAck carries referral status fields, client mirrors to local tables
+- **Flutter UI** — referral status card in Settings > Points (distribution_in_progress, tier_active, none)
+
+### Technical Details
+- 21 RBN economy tests + 5 Solana daemon tests, all passing
+- `subtle` pinned to 2.4.1 for solana-zk-token-sdk compatibility
+- TTL purge skipped in test_mode (test data uses 2009 timestamp)
+- JSON wire format confirmed (serde_json), no `deny_unknown_fields` — old clients safe
+
+### Deferred (not blocking)
+- Bounded-concurrency RPC batching (serial acceptable at <50 wallets)
+- Referral anti-farm hardening (rolling 30-day cap)
+- `distribution_in_progress` UI state doesn't reflect on-chain confirmation (cosmetic)
+
 ## v0.35.0 — Ghost Message Fix & Mailbox Sync Hardening (2026-07-19)
 
 ### Ghost Message Fix
@@ -312,4 +356,8 @@ _Stable version history with key changes. Updated at every stable backup._
 
 ## Backup 21_07_26_0555 (2026-07-21 05:55)
 - Git: main @ 81a0c21
+- Machine: devs-Mac-mini.local
+
+## Backup 21_07_26_1747 (2026-07-21 17:47)
+- Git: main @ 6eda1d0
 - Machine: devs-Mac-mini.local

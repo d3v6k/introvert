@@ -218,6 +218,10 @@ pub enum SignalingPayload {
         epoch_id: String,
         total_points: f64,
         timestamp: u64,
+        referral_tier: Option<u8>,
+        referral_tier_expires_at: Option<u64>,
+        todays_new_referrals: u32,
+        todays_bonus_multiplier: f64,
     },
 }
 

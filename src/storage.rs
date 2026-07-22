@@ -495,6 +495,30 @@ impl StorageService {
             )", []
         );
 
+        // Referral status tables (mirrored from RBN for local UI display)
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS referral_prestige (
+                wallet TEXT PRIMARY KEY,
+                tier INTEGER NOT NULL,
+                granted_at INTEGER NOT NULL,
+                expires_at INTEGER NOT NULL
+            )", []
+        );
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS referral_bonus_log (
+                wallet TEXT NOT NULL,
+                epoch_id TEXT NOT NULL,
+                new_referrals_count INTEGER NOT NULL,
+                bonus_multiplier REAL NOT NULL,
+                base_reward REAL NOT NULL,
+                bonus_amount_raw REAL NOT NULL,
+                bonus_amount_paid REAL NOT NULL,
+                tier_granted INTEGER,
+                tier_expires_at INTEGER,
+                PRIMARY KEY (wallet, epoch_id)
+            )", []
+        );
+
         // Migrations: All ALTER TABLE ADD COLUMN failures are intentionally discarded
         // because they succeed on first run and fail with "duplicate column" on subsequent runs.
         let _ = conn.execute("ALTER TABLE profile ADD COLUMN handle TEXT", []);
@@ -3373,5 +3397,87 @@ impl StorageService {
             result.push(r?);
         }
         Ok(result)
+    }
+
+    /// Get active referral prestige for a wallet (unexpired).
+    pub fn get_referral_prestige(&self, wallet: &str) -> Result<Option<(u8, i64, i64)>> {
+        let conn = self.conn.lock();
+        let now = chrono::Utc::now().timestamp();
+        let mut stmt = conn.prepare(
+            "SELECT tier, granted_at, expires_at FROM referral_prestige WHERE wallet = ?1 AND expires_at > ?2"
+        )?;
+        let mut rows = stmt.query_map(params![wallet, now], |row| {
+            Ok((
+                row.get::<_, i32>(0)? as u8,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
+        match rows.next() {
+            Some(Ok((tier, granted, expires))) => Ok(Some((tier, granted, expires))),
+            _ => Ok(None),
+        }
+    }
+
+    /// Upsert referral prestige tier (called when RBN reports tier changes).
+    pub fn upsert_referral_prestige(&self, wallet: &str, tier: u8, granted_at: i64, expires_at: i64) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO referral_prestige (wallet, tier, granted_at, expires_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(wallet) DO UPDATE SET
+                 tier = excluded.tier,
+                 granted_at = excluded.granted_at,
+                 expires_at = excluded.expires_at",
+            params![wallet, tier as i32, granted_at, expires_at],
+        )?;
+        Ok(())
+    }
+
+    /// Check if a referral bonus log exists for a wallet+epoch (distribution_in_progress check).
+    pub fn has_referral_bonus_for_epoch(&self, wallet: &str, epoch_id: &str) -> Result<bool> {
+        let conn = self.conn.lock();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM referral_bonus_log WHERE wallet = ?1 AND epoch_id = ?2",
+            params![wallet, epoch_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    /// Get today's referral bonus info for a wallet.
+    pub fn get_todays_referral_bonus(&self, wallet: &str, epoch_id: &str) -> Result<Option<(i32, f64)>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT new_referrals_count, bonus_multiplier FROM referral_bonus_log WHERE wallet = ?1 AND epoch_id = ?2"
+        )?;
+        let mut rows = stmt.query_map(params![wallet, epoch_id], |row| {
+            Ok((row.get::<_, i32>(0)?, row.get::<_, f64>(1)?))
+        })?;
+        match rows.next() {
+            Some(Ok((count, mult))) => Ok(Some((count, mult))),
+            _ => Ok(None),
+        }
+    }
+
+    /// Log a referral bonus (called when RBN reports bonus via TelemetryAck or sync).
+    pub fn log_referral_bonus(
+        &self, wallet: &str, epoch_id: &str, new_referrals_count: i32,
+        bonus_multiplier: f64, base_reward: f64, bonus_amount_raw: f64,
+        bonus_amount_paid: f64, tier_granted: Option<u8>, tier_expires_at: Option<i64>,
+    ) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT OR REPLACE INTO referral_bonus_log
+             (wallet, epoch_id, new_referrals_count, bonus_multiplier, base_reward,
+              bonus_amount_raw, bonus_amount_paid, tier_granted, tier_expires_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                wallet, epoch_id, new_referrals_count, bonus_multiplier, base_reward,
+                bonus_amount_raw, bonus_amount_paid,
+                tier_granted.map(|t| t as i32), tier_expires_at,
+            ],
+        )?;
+        Ok(())
     }
 }

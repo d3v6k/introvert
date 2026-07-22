@@ -1440,4 +1440,43 @@ mod tests {
         assert!(year_5 < year_2);
         assert!(year_10 < year_5);
     }
+
+    #[test]
+    fn test_pool_cap_weighted_score_math() {
+        let daily_pool = 16_438.0_f64;
+        let entries: Vec<(f64, u8)> = vec![
+            (100.0, 4), (100.0, 3), (100.0, 2), (100.0, 1), (100.0, 0), (100.0, 0),
+        ];
+        let prestige_mult = |tier: u8| -> f64 {
+            match tier { 0 => 1.0, 1 => 1.05, 2 => 1.10, 3 => 1.20, 4 => 1.50, _ => 1.0 }
+        };
+        let weighted: Vec<f64> = entries.iter().map(|(s, t)| s * prestige_mult(*t)).collect();
+        let total_weighted: f64 = weighted.iter().sum();
+        let payouts: Vec<f64> = weighted.iter().map(|w| (w / total_weighted) * daily_pool).collect();
+        let total_payout: f64 = payouts.iter().sum();
+        assert!(total_payout <= daily_pool + 0.01, "MIXED TIERS: total ({:.2}) exceeds pool ({:.2})", total_payout, daily_pool);
+        assert!(payouts[0] > payouts[4], "Tier 4 should get more than tier 0");
+    }
+
+    #[test]
+    fn test_pool_cap_all_tier_4() {
+        let daily_pool = 16_438.0_f64;
+        let entries: Vec<f64> = vec![100.0; 6];
+        let mult = 1.5_f64;
+        let weighted: Vec<f64> = entries.iter().map(|s| s * mult).collect();
+        let total_weighted: f64 = weighted.iter().sum();
+        let payouts: Vec<f64> = weighted.iter().map(|w| (w / total_weighted) * daily_pool).collect();
+        let total_payout: f64 = payouts.iter().sum();
+        assert!(total_payout <= daily_pool + 0.01, "ALL TIER 4: total ({:.2}) exceeds pool ({:.2})", total_payout, daily_pool);
+    }
+
+    #[test]
+    fn test_pool_cap_all_tier_0() {
+        let daily_pool = 16_438.0_f64;
+        let entries: Vec<f64> = vec![100.0; 6];
+        let total_score: f64 = entries.iter().sum();
+        let payouts: Vec<f64> = entries.iter().map(|s| (s / total_score) * daily_pool).collect();
+        let total_payout: f64 = payouts.iter().sum();
+        assert!((total_payout - daily_pool).abs() < 0.01, "ALL TIER 0: total ({:.2}) should equal pool ({:.2})", total_payout, daily_pool);
+    }
 }

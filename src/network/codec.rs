@@ -381,6 +381,7 @@ mod tests {
                 msg_id: "msg_123".to_string(),
                 timestamp: 1234567890,
                 reply_to: None,
+                is_backfill: false,
             }),
             ("Acknowledgement", SignalingPayload::Acknowledgement {
                 msg_id: "msg_123".to_string(),

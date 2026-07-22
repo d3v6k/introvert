@@ -8,9 +8,9 @@
 ## Current System State
 
 ### RBN Server
-- **introvertd**: ACTIVE (PID 197406) — push dedup + per-recipient cooldown deployed
+- **introvertd**: ACTIVE ((active)) — push dedup + per-recipient cooldown deployed
 - **introvert-solana**: ACTIVE — treasury/IPC daemon with unified credential management
-- **IPC Secret**: Both daemons reading from `/etc/introvert/ipc.secret` (chmod 600)
+- **IPC Authentication**: Both daemons reading from `[IPC_SECRET_PATH]` (chmod 600)
 - **Firebase**: Service account loaded, FCM push working
 - **APNs**: Not configured (iOS push disabled)
 - **Connected Peers**: 6+ reconnecting after RBN restart
@@ -35,7 +35,7 @@
 #### 1. Payout Pipeline Fixes
 - **Epoch ID Off-by-One Bug**: Fixed `for_linux/src/lib.rs:412` — changed `hours(0)` (no-op) to `days(1)` so midnight UTC correctly closes previous day's epoch
 - **Startup Catch-up Mechanism**: Added code to automatically close yesterday's epoch on daemon restart if past 00:05 UTC
-- **IPC Secret Mismatch**: Updated `introvert-daemon/introvert-solana/src/main.rs` to read HMAC secret from `/etc/introvert/ipc.secret` instead of hardcoded constant
+- **IPC Authentication Mismatch**: Updated `introvert-daemon/introvert-solana/src/main.rs` to read HMAC secret from `[IPC_SECRET_PATH]` instead of hardcoded constant
 - **Constant-Time HMAC**: Replaced `expected == signature` with `subtle::ConstantTimeEq` to prevent timing attacks
 - **Verified**: Epoch 2026_07_08 closed with 3 claims, 16,438 INTR distributed successfully on Solana Mainnet
 
@@ -46,7 +46,7 @@
 
 #### 3. Documentation Sanitization
 - Removed all server IPs, local machine references, and specific security details from GitHub docs
-- Removed `deploy_rbn.sh`, `for_linux/`, `introvert-daemon/` from GitHub tracking
+- Removed `[deploy_script]`, `for_linux/`, `introvert-daemon/` from GitHub tracking
 - Updated CHANGELOG, TODO, ECONOMY_AUDIT, RECTIFICATION_PLAN, SESSION_SYNOPSIS, HANDLE_REGISTRY_DEPLOYMENT, TOKEN_ADDRESS_DIRECTORY, DEBUG_REPORT, DEBUG_DOCUMENT
 
 ---
@@ -104,7 +104,7 @@ Updated `SwarmEvent::ConnectionClosed` to check if we are completely disconnecte
 ## Pending Work
 
 ### Immediate
-- **Monitor RBN status** — ensure relay server remains active on Alibaba RBN node
+- **Monitor RBN status** — ensure relay server remains active on RBN server
 - **Verify client connectivity** — ensure no regression on other platforms (Android/Mac)
 
 ### Short-term
@@ -213,61 +213,61 @@ Non-VPN:
 ---
 ## Backup Status (2026-07-09 05:23)
 - Git: main @ a6f18dd
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-09 05:48)
 - Git: main @ a6f18dd
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-09 06:06)
 - Git: main @ 95cf389
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-09 06:14)
 - Git: main @ 24b75ab
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-14 17:07)
 - Git: main @ 80c5445
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-14 19:26)
 - Git: main @ 80c5445
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-15 05:53)
 - Git: main @ 80c5445
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-16 15:41)
 - Git: main @ d11ecc7
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-16 16:52)
 - Git: main @ d5a7c9c
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-16 20:26)
 - Git: main @ 521d315
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
@@ -318,65 +318,71 @@ App drains mobile data and phone gets warm when on mobile data. User reported ex
 
 ## Backup Status (2026-07-17 00:10)
 - Git: main @ 521d315 + uncommitted FCM/peer-count fixes
-- RBN: introvertd on 47.89.252.80:443 (push dedup + cooldown deployed)
+- RBN: RBN daemon (active) (push dedup + cooldown deployed)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-17 04:22)
 - Git: main @ 521d315
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-17 15:35)
 - Git: main @ 67e7334
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-18 17:27)
 - Git: main @ 2d591a0
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-18 17:44)
 - Git: main @ 2d591a0
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-18 19:27)
 - Git: main @ 2d591a0
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-19 12:17)
 - Git: main @ 07aedda
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-20 14:28)
 - Git: main @ cbd5f0f
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-20 14:45)
 - Git: main @ cbd5f0f
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-20 17:23)
 - Git: main @ f4ad546
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001
 
 ---
 ## Backup Status (2026-07-21 05:55)
 - Git: main @ 81a0c21
-- RBN: introvertd on 47.89.252.80:443
+- RBN: RBN daemon (active)
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-21 17:47)
+- Git: main @ 6eda1d0
+- RBN: RBN daemon (active)
 - Economy: introvert-solana on localhost:9001

@@ -442,6 +442,8 @@ typedef IntrovertStorageGetLastGroupMessagesAllDart = FfiResult Function();
 // Daily Rewards
 typedef IntrovertDailyRewardGetStatusC = FfiResult Function();
 typedef IntrovertDailyRewardGetStatusDart = FfiResult Function();
+typedef IntrovertGetReferralStatusC = FfiResult Function();
+typedef IntrovertGetReferralStatusDart = FfiResult Function();
 
 typedef IntrovertDailyRewardGetHistoryC = FfiResult Function(Uint32 days);
 typedef IntrovertDailyRewardGetHistoryDart = FfiResult Function(int days);
@@ -749,6 +751,7 @@ class IntrovertClient {
 
   // Daily Rewards
   late IntrovertDailyRewardGetStatusDart _dailyRewardGetStatus;
+  late IntrovertGetReferralStatusDart _getReferralStatus;
   late IntrovertDailyRewardGetHistoryDart _dailyRewardGetHistory;
   late IntrovertDailyRewardRecordActivityDart _dailyRewardRecordActivity;
   late IntrovertDailyRewardUpdateWeightsDart _dailyRewardUpdateWeights;
@@ -1204,6 +1207,7 @@ class IntrovertClient {
 
       // Daily Rewards
       _dailyRewardGetStatus = safeLookup('daily_reward_get_status', () => _dylib.lookupFunction<IntrovertDailyRewardGetStatusC, IntrovertDailyRewardGetStatusDart>('introvert_daily_reward_get_status'), () => FfiResult.dummy);
+      _getReferralStatus = safeLookup('get_referral_status', () => _dylib.lookupFunction<IntrovertGetReferralStatusC, IntrovertGetReferralStatusDart>('introvert_get_referral_status'), () => FfiResult.dummy);
       _dailyRewardGetHistory = safeLookup('daily_reward_get_history', () => _dylib.lookupFunction<IntrovertDailyRewardGetHistoryC, IntrovertDailyRewardGetHistoryDart>('introvert_daily_reward_get_history'), (d) => FfiResult.dummy);
       _dailyRewardRecordActivity = safeLookup('daily_reward_record_activity', () => _dylib.lookupFunction<IntrovertDailyRewardRecordActivityC, IntrovertDailyRewardRecordActivityDart>('introvert_daily_reward_record_activity'), (p, l) => FfiResult.dummy);
       _dailyRewardUpdateWeights = safeLookup('daily_reward_update_weights', () => _dylib.lookupFunction<IntrovertDailyRewardUpdateWeightsC, IntrovertDailyRewardUpdateWeightsDart>('introvert_daily_reward_update_weights'), (p, l) => FfiResult.dummy);
@@ -2194,6 +2198,17 @@ class IntrovertClient {
   }
 
   // ── Daily Rewards ──────────────────────────────────────────────
+
+  Map<String, dynamic>? getReferralStatus() {
+    final res = _getReferralStatus();
+    if (res.code != 0 || res.len == 0) return null;
+    try {
+      final data = utf8.decode(res.data.cast<Uint8>().asTypedList(res.len));
+      return json.decode(data) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Map<String, dynamic>? getDailyRewardStatus() {
     final res = _dailyRewardGetStatus();

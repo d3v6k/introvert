@@ -70,14 +70,25 @@ class _NodeDashboardState extends State<NodeDashboard> {
   bool _noticeExpanded = false;
   bool _declaringPoints = false;
   String _declareStatus = '';
+  Map<String, dynamic>? _referralStatus;
   StreamSubscription? _telemetryAckSub;
   StreamSubscription? _economySub;
   Map<String, dynamic> _liveEconomyStats = {};
+
+  void _loadReferralStatus() {
+    try {
+      final status = IntrovertClient().getReferralStatus();
+      if (mounted) {
+        setState(() { _referralStatus = status; });
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
     _liveEconomyStats = widget.economyStats;
+    _loadReferralStatus();
     // Listen to economy stream directly for real-time point updates
     _economySub = IntrovertClient().economyStream.listen((stats) {
       if (mounted) {
@@ -265,6 +276,12 @@ class _NodeDashboardState extends State<NodeDashboard> {
               textAlign: TextAlign.center,
             ),
           ],
+          // Referral Status
+          if (_referralStatus != null && _referralStatus!['state'] != 'none') ...[
+            _buildReferralStatusCard(_referralStatus!),
+            SizedBox(height: 12),
+          ],
+
           SizedBox(height: 16),
 
           // Sovereign Distribution Notice — expandable
@@ -343,6 +360,64 @@ class _NodeDashboardState extends State<NodeDashboard> {
                 fontSize: 13,
               ),
               overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReferralStatusCard(Map<String, dynamic> status) {
+    final state = status['state'] as String? ?? 'none';
+    final tierName = status['tier_name'] as String?;
+    final activeUntil = status['active_until'] as String?;
+    final newReferrals = status['todays_new_referrals'] as int? ?? 0;
+    final bonusMult = status['todays_bonus_multiplier'] as double? ?? 1.0;
+
+    String title;
+    String subtitle;
+    IconData icon;
+    Color color;
+
+    switch (state) {
+      case 'distribution_in_progress':
+        title = 'Referral reward detected';
+        subtitle = 'Distribution in progress';
+        if (newReferrals > 0) {
+          subtitle += ' ($newReferrals new referral${newReferrals > 1 ? 's' : ''}, ${bonusMult}x)';
+        }
+        icon = Icons.pending_outlined;
+        color = Colors.amberAccent;
+        break;
+      case 'tier_active':
+        title = '$tierName tier achieved';
+        subtitle = 'active till $activeUntil';
+        icon = tierName == 'Pulsar' ? Icons.bolt : Icons.local_fire_department;
+        color = tierName == 'Pulsar' ? Colors.cyanAccent : Colors.orangeAccent;
+        break;
+      default:
+        return SizedBox.shrink();
+    }
+
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+                SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(color: AppTheme.current.text.withValues(alpha: 0.6), fontSize: 11)),
+              ],
             ),
           ),
         ],
