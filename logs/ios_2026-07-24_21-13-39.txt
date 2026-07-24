@@ -1,0 +1,101 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on iPhone 17 in debug mode...
+Running Xcode build...                                          
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/64974/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/64975/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/52578/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/51870/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/64974/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/64975/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/udp/52578/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/udp/51870/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/64974/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/64975/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/52578/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/51870/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=279, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+Xcode build done.                                           66.6s
+Failed to build iOS app
+Swift Compiler Error (Xcode): Error closing '/Users/dev/Library/Developer/Xcode/DerivedData/Runner-fcfbxcmtutamajfuhyxubozisqvi/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/flutter_inappwebview_ios.build/Objects-normal/x86_64/Util.o' for output: /Users/dev/Library/Developer/Xcode/DerivedData/Runner-fcfbxcmtutamajfuhyxubozisqvi/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/flutter_inappwebview_ios.build/Objects-normal/x86_64/Util-4aa2477e.o.tmp => /Users/dev/Library/Developer/Xcode/DerivedData/Runner-fcfbxcmtutamajfuhyxubozisqvi/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/flutter_inappwebview_ios.build/Objects-normal/x86_64/Util.o: No such file or directory
+
+Swift Compiler Error (Xcode): Cannot open constant extraction protocol list input file from /Users/dev/Library/Developer/Xcode/DerivedData/Runner-fcfbxcmtutamajfuhyxubozisqvi/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/flutter_inappwebview_ios.build/Objects-normal/x86_64/flutter_inappwebview_ios_const_extract_protocols.json
+
+Could not build the application for the simulator.
+Error launching application on iPhone 17.

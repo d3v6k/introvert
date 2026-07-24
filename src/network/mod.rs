@@ -146,7 +146,8 @@ impl NetworkService {
                 c
             });
 
-        let mut swarm = if cfg!(target_os = "android") {
+        let mut swarm = if cfg!(target_os = "android") || cfg!(target_os = "ios") {
+            // Android and iOS: skip DNS resolver — iOS sandbox blocks /etc/resolv.conf
             build_swarm!(builder)
         } else {
             build_swarm!(builder.with_dns()?)
@@ -328,7 +329,7 @@ impl NetworkService {
             relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
             match self.swarm.listen_on(relay_addr.clone()) {
                 Ok(listener_id) => {
-                    self.relay_reservations.insert(*peer_id);
+                    // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
                     self.relay_listeners.insert(listener_id, *peer_id);
                     self.connection_budget.record_reservation(*peer_id);
                     info!("[Mesh] Relay reservation requested from RBN on startup: {}", peer_id);
@@ -1900,7 +1901,7 @@ impl NetworkService {
                         let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
 
                         if info.protocols.iter().any(|p| p.to_string().contains("/libp2p/circuit/relay/0.2.0/hop")) {
-                            if !self.relay_reservations.contains(&peer_id) && self.connection_budget.can_request_reservation_urgent(&peer_id) {
+                            if !self.relay_reservations.contains(&peer_id) && !self.relay_listeners.values().any(|rbn| rbn == &peer_id) && self.connection_budget.can_request_reservation_urgent(&peer_id) {
                                 info!("Relay node {} supports HOP. Requesting reservation...", peer_id);
 
                                 // BUG FIX: Construct the FULL multiaddr for the relay reservation.
@@ -1951,7 +1952,7 @@ impl NetworkService {
                                 match self.swarm.listen_on(relay_addr.clone()) {
                                     Ok(id) => {
                                         info!("[Mesh] Relay listen request SUCCESS. Address: {}, Listener ID: {:?}", relay_addr, id);
-                                        self.relay_reservations.insert(peer_id);
+                                        // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
                                         self.relay_listeners.insert(id, peer_id);
                                         self.connection_budget.record_reservation(peer_id);
                                     },
@@ -2756,7 +2757,7 @@ impl NetworkService {
                         match self.swarm.listen_on(relay_addr) {
                             Ok(new_id) => {
                                 info!("[Mesh] Relay re-reservation request SUCCESS. New Listener ID: {:?}", new_id);
-                                self.relay_reservations.insert(peer_id);
+                                // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
                                 self.relay_listeners.insert(new_id, peer_id);
                                 self.connection_budget.record_reservation(peer_id);
                             }
@@ -3475,7 +3476,7 @@ impl NetworkService {
                 }
 
         // WebRTC signaling and handle claims are transient and should never be stored in persistent mailboxes.
-        if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. } | SignalingPayload::HandleResolveRequest { .. } | SignalingPayload::HandleResolveResponse { .. }) {
+        if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. } | SignalingPayload::HandleResolveRequest { .. } | SignalingPayload::HandleResolveResponse { .. } | SignalingPayload::DirectInviteRequest(_) | SignalingPayload::DirectInviteAccept(_)) {
             debug!("[Mesh] Buffering real-time signaling/handle registry payload for {} in RAM...", recipient_str);
             self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
             return Ok(());
@@ -3525,10 +3526,10 @@ impl NetworkService {
             .collect();
 
         if !connected_anchors.is_empty() {
-            let allowed_in_mailbox = matches!(payload, 
-                SignalingPayload::ChatMessage { .. } | 
+            let allowed_in_mailbox = matches!(payload,
+                SignalingPayload::ChatMessage { .. } |
                 SignalingPayload::Acknowledgement { .. } |
-                SignalingPayload::MailboxStored { .. } | 
+                SignalingPayload::MailboxStored { .. } |
                 SignalingPayload::FileTransfer { .. } |
                 SignalingPayload::FileTransferComplete { .. } |
                 SignalingPayload::FileTransferError { .. } |
@@ -3540,6 +3541,8 @@ impl NetworkService {
                 SignalingPayload::EditMessage { .. } |
                 SignalingPayload::SetRetention { .. } |
                 SignalingPayload::HandleClaimWitnessed { .. } |
+                SignalingPayload::DirectInviteRequest(_) |
+                SignalingPayload::DirectInviteAccept(_) |
                 SignalingPayload::ChatSyncRequest { .. } |
                 SignalingPayload::ChatSyncResponse { .. } |
                 SignalingPayload::TelemetryEnvelope { .. }
@@ -5538,7 +5541,7 @@ impl NetworkService {
                                     relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
                                     match self.swarm.listen_on(relay_addr) {
                                         Ok(id) => {
-                                            self.relay_reservations.insert(*rbn_id);
+                                            // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
                                             self.relay_listeners.insert(id, *rbn_id);
                                             info!("[Resilience] Pre-warmed relay reservation from {}", rbn_id);
                                         }

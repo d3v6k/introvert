@@ -1,0 +1,300 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on Sneha’s iPhone in debug mode...
+Automatically signing iOS for device deployment using specified development team in Xcode project: 7C8VLVT5J8
+Running Xcode build...                                          
+Xcode build done.                                           14.2s
+Installing and launching...                                     
+objc[1089]: Class FileUtils is implemented in both /System/Library/PrivateFrameworks/OSAnalytics.framework/OSAnalytics (0x20c9b1068) and /private/var/containers/Bundle/Application/41E74404-0F00-4467-AFFF-CAF9DE6D528C/Runner.app/Frameworks/file_picker.framework/file_picker (0x10040a378). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+🔔 AppDelegate: Notification permission granted: true
+🔔 AppDelegate: Failed to register for remote notifications: Error Domain=NSCocoaErrorDomain Code=3000 "no valid “aps-environment” entitlement string found for application" UserInfo={NSLocalizedDescription=no valid “aps-environment” entitlement string found for application}
+flutter: ✅ FFI Bound: generate_mnemonic
+flutter: ✅ FFI Bound: free_string
+flutter: ✅ FFI Bound: free_binary
+flutter: ✅ FFI Bound: mnemonic_to_seed
+flutter: ✅ FFI Bound: derive_identifiers
+flutter: ✅ FFI Bound: engine_start
+flutter: ✅ FFI Bound: engine_stop
+flutter: ✅ FFI Bound: get_peer_id
+flutter: ✅ FFI Bound: network_start
+flutter: ✅ FFI Bound: economy_monitor
+flutter: ✅ FFI Bound: send_message
+flutter: ✅ FFI Bound: init_webrtc
+flutter: ✅ FFI Bound: send_native_signal
+flutter: ✅ FFI Bound: add_address
+flutter: ✅ FFI Bound: claim_rewards
+flutter: ✅ FFI Bound: store_msg_async
+flutter: ✅ FFI Bound: get_messages
+flutter: ✅ FFI Bound: get_messages_paginated
+flutter: ✅ FFI Bound: secure_session
+flutter: ✅ FFI Bound: fetch_mailbox
+flutter: ✅ FFI Bound: media_stream
+flutter: ✅ FFI Bound: get_contacts
+flutter: ✅ FFI Bound: delete_contact
+flutter: ✅ FFI Bound: set_profile_tier
+flutter: ✅ FFI Bound: delete_chat
+flutter: ✅ FFI Bound: clear_pending_messages
+flutter: ✅ FFI Bound: clear_contacts
+flutter: ✅ FFI Bound: wormhole_start
+flutter: ✅ FFI Bound: wormhole_join
+flutter: ✅ FFI Bound: wormhole_abort
+flutter: ✅ FFI Bound: close_webrtc
+flutter: ✅ FFI Bound: renegotiate_webrtc
+flutter: ✅ FFI Bound: accept_call
+flutter: ✅ FFI Bound: reject_call
+flutter: ✅ FFI Bound: set_anchor
+flutter: ✅ FFI Bound: get_anchor_mode
+flutter: ✅ FFI Bound: set_tunnel
+flutter: ✅ FFI Bound: get_tunnel_mode
+flutter: ✅ FFI Bound: get_rbns
+flutter: ✅ FFI Bound: test_rbn
+flutter: ✅ FFI Bound: disclaimer_is_accepted
+flutter: ✅ FFI Bound: disclaimer_set_accepted
+flutter: ✅ FFI Bound: recheck_connection
+flutter: ✅ FFI Bound: resolve_handle
+flutter: ✅ FFI Bound: send_direct_invite
+flutter: ✅ FFI Bound: register_push_token
+flutter: ✅ FFI Bound: set_retention
+flutter: ✅ FFI Bound: delete_message
+flutter: ✅ FFI Bound: edit_message
+flutter: ✅ FFI Bound: send_reaction
+flutter: ✅ FFI Bound: get_reactions
+flutter: ✅ FFI Bound: claim_handle
+flutter: ✅ FFI Bound: get_handle_status
+flutter: ✅ FFI Bound: get_local_handle
+flutter: ✅ FFI Bound: is_handle_claimed
+flutter: ✅ FFI Bound: lookup_peer_handle
+flutter: ✅ FFI Bound: request_swarm_stats
+flutter: ✅ FFI Bound: poll_peer_profile
+flutter: ✅ FFI Bound: sync_chat_messages
+flutter: ✅ FFI Bound: get_profile
+flutter: ✅ FFI Bound: set_profile
+flutter: ✅ FFI Bound: send_file
+flutter: ✅ FFI Bound: inspect_media
+flutter: ✅ FFI Bound: cancel_file
+flutter: ✅ FFI Bound: force_refresh
+flutter: ✅ FFI Bound: send_manual_telemetry
+flutter: ✅ FFI Bound: set_connectivity_type
+flutter: ✅ FFI Bound: set_app_idle_state
+flutter: ✅ FFI Bound: group_create
+flutter: ✅ FFI Bound: group_send
+flutter: ✅ FFI Bound: group_get_all
+flutter: ✅ FFI Bound: group_get_msgs
+flutter: ✅ FFI Bound: group_add_member
+flutter: ✅ FFI Bound: group_approve_join
+flutter: ✅ FFI Bound: group_reject_join
+flutter: ✅ FFI Bound: group_remove_member
+flutter: ✅ FFI Bound: group_update_role
+flutter: ✅ FFI Bound: group_publish
+flutter: ✅ FFI Bound: group_join_code
+flutter: ✅ FFI Bound: group_delete
+flutter: ✅ FFI Bound: group_get_pending
+flutter: ✅ FFI Bound: group_accept_invite
+flutter: ✅ FFI Bound: group_decline_invite
+flutter: ✅ FFI Bound: group_mute
+flutter: ✅ FFI Bound: group_unmute
+flutter: ✅ FFI Bound: group_get_muted
+flutter: ✅ FFI Bound: update_msg_status
+flutter: ✅ FFI Bound: update_msg_status_peer
+flutter: ✅ FFI Bound: update_group_msg_status
+flutter: ✅ FFI Bound: update_group_msg_status_id
+flutter: ✅ FFI Bound: get_unread_counts
+flutter: ✅ FFI Bound: send_ack
+flutter: ✅ FFI Bound: update_contact_alias
+flutter: ✅ FFI Bound: compute_file_hash
+flutter: ✅ FFI Bound: nuke_identity
+flutter: ✅ FFI Bound: drive_add
+flutter: ✅ FFI Bound: drive_get_all
+flutter: ✅ FFI Bound: drive_get_by_hash
+flutter: ✅ FFI Bound: drive_delete
+flutter: ✅ FFI Bound: drive_add_with_folder
+flutter: ✅ FFI Bound: drive_update_folder
+flutter: ✅ FFI Bound: mesh_capacity
+flutter: ✅ FFI Bound: get_disk_space
+flutter: ✅ FFI Bound: register_seeder
+flutter: ✅ FFI Bound: start_pull
+flutter: ✅ FFI Bound: notes_create
+flutter: ✅ FFI Bound: notes_update
+flutter: ✅ FFI Bound: notes_delete
+flutter: ✅ FFI Bound: notes_get
+flutter: ✅ FFI Bound: notes_get_all
+flutter: ✅ FFI Bound: notes_search
+flutter: ✅ FFI Bound: notes_save_version
+flutter: ✅ FFI Bound: notes_get_versions
+flutter: ✅ FFI Bound: call_history_log
+flutter: ✅ FFI Bound: call_history_get
+flutter: ✅ FFI Bound: call_history_count
+flutter: ✅ FFI Bound: search_messages
+flutter: ✅ FFI Bound: search_group_messages
+flutter: ✅ FFI Bound: send_typing_start
+flutter: ✅ FFI Bound: send_typing_stop
+flutter: ✅ FFI Bound: get_last_seen
+flutter: ✅ FFI Bound: get_ai_mode
+flutter: ✅ FFI Bound: set_ai_mode
+flutter: ✅ FFI Bound: get_api_key
+flutter: ✅ FFI Bound: claw_trigger_tick
+flutter: ✅ FFI Bound: claw_set_active
+flutter: ✅ FFI Bound: claw_set_node_mode
+flutter: ✅ FFI Bound: claw_get_status
+flutter: ⚠️ FFI Bind FAILED: claw_get_endpoint (Using placeholder)
+flutter: ⚠️ FFI Bind FAILED: claw_set_endpoint (Using placeholder)
+flutter: ✅ FFI Bound: claw_process_query
+flutter: ✅ FFI Bound: claw_run_network_recon
+flutter: ✅ FFI Bound: claw_heal_peer
+flutter: ✅ FFI Bound: claw_get_activity_log
+flutter: ✅ FFI Bound: claw_voip_start_call
+flutter: ✅ FFI Bound: claw_voip_end_call
+flutter: ✅ FFI Bound: claw_voip_record_sample
+flutter: ✅ FFI Bound: claw_voip_get_quality
+flutter: ✅ FFI Bound: claw_voip_get_downgrade_recommendation
+flutter: ✅ FFI Bound: claw_set_active_chat
+flutter: ✅ FFI Bound: claw_clear_active_chat
+flutter: ✅ FFI Bound: claw_set_active_group_members
+flutter: ✅ FFI Bound: claw_on_app_launch
+flutter: ✅ FFI Bound: elevate_message
+flutter: ✅ FFI Bound: unelevate_message
+flutter: ✅ FFI Bound: get_elevated_messages
+flutter: ✅ FFI Bound: is_message_elevated
+flutter: ✅ FFI Bound: get_last_message
+flutter: ✅ FFI Bound: get_last_group_message
+flutter: ✅ FFI Bound: get_last_messages_all
+flutter: ✅ FFI Bound: get_last_group_messages_all
+flutter: ✅ FFI Bound: daily_reward_get_status
+flutter: ⚠️ FFI Bind FAILED: get_referral_status (Using placeholder)
+flutter: ✅ FFI Bound: daily_reward_get_history
+flutter: ✅ FFI Bound: daily_reward_record_activity
+flutter: ✅ FFI Bound: daily_reward_update_weights
+flutter: ✅ FFI Bound: daily_reward_update_anti_gaming
+flutter: ✅ FFI Bound: daily_reward_get_realtime_earnings
+flutter: ✅ FFI Bound: daily_reward_record_call_duration
+flutter: ✅ FFI Bound: daily_reward_record_web_activity
+flutter: ✅ FFI Bound: daily_reward_record_webview_media_call
+flutter: ✅ All native functions bound successfully.
+flutter: ✅ Native finalizer initialized.
+Installing and launching...                                        22.0s
+flutter: 📂 Sandbox Paths Initialized: Support='/var/mobile/Containers/Data/Application/2272E56B-49B4-4601-9F63-671E1DA1122F/Library/Application Support', Docs='/var/mobile/Containers/Data/Application/2272E56B-49B4-4601-9F63-671E1DA1122F/Documents'
+flutter: ⏳ Starting sovereign initialization sequence...
+flutter: 📍 Target DB Path (Sandboxed): /var/mobile/Containers/Data/Application/2272E56B-49B4-4601-9F63-671E1DA1122F/Library/Application Support/introvert.db
+flutter: 📍 Target DB Path (Apple/Sanboxed): /var/mobile/Containers/Data/Application/2272E56B-49B4-4601-9F63-671E1DA1122F/Library/Application Support/introvert.db
+flutter: 🔑 Checking for existing identity...
+flutter: 📜 Checking Terms of Use acceptance...
+flutter: ⚠️ Terms not accepted. Blocking engine initialization.
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: ios
+
+Syncing files to device Sneha’s iPhone...                          106ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on Sneha’s iPhone is available at: http://127.0.0.1:59713/DAXm9Y24W5M=/
+The Flutter DevTools debugger and profiler on Sneha’s iPhone is available at: http://127.0.0.1:59713/DAXm9Y24W5M=/devtools/?uri=ws://127.0.0.1:59713/DAXm9Y24W5M=/ws
+flutter: ✅ Disclaimer accepted and saved.
+flutter: 🧠 Identity found. Starting native engine...
+flutter: ✅ Engine Start: Success
+flutter: 📡 Starting networking plane...
+flutter: 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+flutter: ✅ Network Start: Success
+flutter: ✅ IntroClaw On App Launch: Success
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🚀 Introvert Engine Started Successfully!
+flutter: 🦀 Rust Debug: Starting NetworkService initialization...
+flutter: 🦀 Rust Debug: Failed to start network service: proto error: io error: No such file or directory (os error 2)
+flutter: 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+flutter: ✅ Network Start: Success
+flutter: ⚠️ Background sync initialized — push unavailable, starting fallback poll
+flutter: 💰 Subscribing to Economy Monitoring...
+flutter: ✅ Economy Monitoring: Success
+flutter: [Update] Skipping update check (recently checked).
+flutter: 🦀 Rust Debug: Network already started. Ignoring duplicate start call.
+error in connection_block_invoke_2: Connection invalid
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+Process 1089 resuming
+Process 1089 stopped
+* thread #1, queue = 'com.apple.main-thread', stop reason = signal SIGKILL
+    frame #0: 0x00000002514d9cd4 libsystem_kernel.dylib`mach_msg2_trap + 8
+libsystem_kernel.dylib`mach_msg2_trap:
+->  0x2514d9cd4 <+8>: ret    
+
+libsystem_kernel.dylib`macx_swapon:
+    0x2514d9cd8 <+0>: mov    x16, #-0x30               ; =-48 
+    0x2514d9cdc <+4>: svc    #0x80
+    0x2514d9ce0 <+8>: ret    
+Target 0: (Runner) stopped.

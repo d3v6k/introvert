@@ -1,0 +1,1668 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on iPhone 17 in debug mode...
+Running Xcode build...                                          
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+Xcode build done.                                           24.7s
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush already in progress for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — skipping
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=6, now_relayed=true
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: ios
+
+Syncing files to device iPhone 17...                            
+flutter: ✅ FFI Bound: generate_mnemonic
+flutter: ✅ FFI Bound: free_string
+flutter: ✅ FFI Bound: free_binary
+flutter: ✅ FFI Bound: mnemonic_to_seed
+flutter: ✅ FFI Bound: derive_identifiers
+flutter: ✅ FFI Bound: engine_start
+flutter: ✅ FFI Bound: engine_stop
+flutter: ✅ FFI Bound: get_peer_id
+flutter: ✅ FFI Bound: network_start
+flutter: ✅ FFI Bound: economy_monitor
+flutter: ✅ FFI Bound: send_message
+flutter: ✅ FFI Bound: init_webrtc
+flutter: ✅ FFI Bound: send_native_signal
+flutter: ✅ FFI Bound: add_address
+flutter: ✅ FFI Bound: claim_rewards
+flutter: ✅ FFI Bound: store_msg_async
+flutter: ✅ FFI Bound: get_messages
+flutter: ✅ FFI Bound: get_messages_paginated
+flutter: ✅ FFI Bound: secure_session
+flutter: ✅ FFI Bound: fetch_mailbox
+flutter: ✅ FFI Bound: media_stream
+flutter: ✅ FFI Bound: get_contacts
+flutter: ✅ FFI Bound: delete_contact
+flutter: ✅ FFI Bound: set_profile_tier
+flutter: ✅ FFI Bound: delete_chat
+flutter: ✅ FFI Bound: clear_pending_messages
+flutter: ✅ FFI Bound: clear_contacts
+flutter: ✅ FFI Bound: wormhole_start
+flutter: ✅ FFI Bound: wormhole_join
+flutter: ✅ FFI Bound: wormhole_abort
+flutter: ✅ FFI Bound: close_webrtc
+flutter: ✅ FFI Bound: renegotiate_webrtc
+flutter: ✅ FFI Bound: accept_call
+flutter: ✅ FFI Bound: reject_call
+flutter: ✅ FFI Bound: set_anchor
+flutter: ✅ FFI Bound: get_anchor_mode
+flutter: ✅ FFI Bound: set_tunnel
+flutter: ✅ FFI Bound: get_tunnel_mode
+flutter: ✅ FFI Bound: get_rbns
+flutter: ✅ FFI Bound: test_rbn
+flutter: ✅ FFI Bound: disclaimer_is_accepted
+flutter: ✅ FFI Bound: disclaimer_set_accepted
+flutter: ✅ FFI Bound: recheck_connection
+flutter: ✅ FFI Bound: resolve_handle
+flutter: ✅ FFI Bound: send_direct_invite
+flutter: ✅ FFI Bound: register_push_token
+flutter: ✅ FFI Bound: set_retention
+flutter: ✅ FFI Bound: delete_message
+flutter: ✅ FFI Bound: edit_message
+flutter: ✅ FFI Bound: send_reaction
+flutter: ✅ FFI Bound: get_reactions
+flutter: ✅ FFI Bound: claim_handle
+flutter: ✅ FFI Bound: get_handle_status
+flutter: ✅ FFI Bound: get_local_handle
+flutter: ✅ FFI Bound: is_handle_claimed
+flutter: ✅ FFI Bound: lookup_peer_handle
+flutter: ✅ FFI Bound: request_swarm_stats
+flutter: ✅ FFI Bound: poll_peer_profile
+flutter: ✅ FFI Bound: sync_chat_messages
+flutter: ✅ FFI Bound: get_profile
+flutter: ✅ FFI Bound: set_profile
+flutter: ✅ FFI Bound: send_file
+flutter: ✅ FFI Bound: inspect_media
+flutter: ✅ FFI Bound: cancel_file
+flutter: ✅ FFI Bound: force_refresh
+flutter: ✅ FFI Bound: send_manual_telemetry
+flutter: ✅ FFI Bound: set_connectivity_type
+flutter: ✅ FFI Bound: set_app_idle_state
+flutter: ✅ FFI Bound: group_create
+flutter: ✅ FFI Bound: group_send
+flutter: ✅ FFI Bound: group_get_all
+flutter: ✅ FFI Bound: group_get_msgs
+flutter: ✅ FFI Bound: group_add_member
+flutter: ✅ FFI Bound: group_approve_join
+flutter: ✅ FFI Bound: group_reject_join
+flutter: ✅ FFI Bound: group_remove_member
+flutter: ✅ FFI Bound: group_update_role
+flutter: ✅ FFI Bound: group_publish
+flutter: ✅ FFI Bound: group_join_code
+flutter: ✅ FFI Bound: group_delete
+flutter: ✅ FFI Bound: group_get_pending
+flutter: ✅ FFI Bound: group_accept_invite
+flutter: ✅ FFI Bound: group_decline_invite
+flutter: ✅ FFI Bound: group_mute
+flutter: ✅ FFI Bound: group_unmute
+flutter: ✅ FFI Bound: group_get_muted
+flutter: ✅ FFI Bound: update_msg_status
+flutter: ✅ FFI Bound: update_msg_status_peer
+flutter: ✅ FFI Bound: update_group_msg_status
+flutter: ✅ FFI Bound: update_group_msg_status_id
+flutter: ✅ FFI Bound: get_unread_counts
+flutter: ✅ FFI Bound: send_ack
+flutter: ✅ FFI Bound: update_contact_alias
+flutter: ✅ FFI Bound: compute_file_hash
+flutter: ✅ FFI Bound: nuke_identity
+flutter: ✅ FFI Bound: drive_add
+flutter: ✅ FFI Bound: drive_get_all
+flutter: ✅ FFI Bound: drive_get_by_hash
+flutter: ✅ FFI Bound: drive_delete
+flutter: ✅ FFI Bound: drive_add_with_folder
+flutter: ✅ FFI Bound: drive_update_folder
+flutter: ✅ FFI Bound: mesh_capacity
+flutter: ✅ FFI Bound: get_disk_space
+flutter: ✅ FFI Bound: register_seeder
+flutter: ✅ FFI Bound: start_pull
+flutter: ✅ FFI Bound: notes_create
+flutter: ✅ FFI Bound: notes_update
+flutter: ✅ FFI Bound: notes_delete
+flutter: ✅ FFI Bound: notes_get
+flutter: ✅ FFI Bound: notes_get_all
+flutter: ✅ FFI Bound: notes_search
+flutter: ✅ FFI Bound: notes_save_version
+flutter: ✅ FFI Bound: notes_get_versions
+flutter: ✅ FFI Bound: call_history_log
+flutter: ✅ FFI Bound: call_history_get
+flutter: ✅ FFI Bound: call_history_count
+flutter: ✅ FFI Bound: search_messages
+flutter: ✅ FFI Bound: search_group_messages
+flutter: ✅ FFI Bound: send_typing_start
+flutter: ✅ FFI Bound: send_typing_stop
+flutter: ✅ FFI Bound: get_last_seen
+flutter: ✅ FFI Bound: get_ai_mode
+flutter: ✅ FFI Bound: set_ai_mode
+flutter: ✅ FFI Bound: get_api_key
+flutter: ✅ FFI Bound: claw_trigger_tick
+flutter: ✅ FFI Bound: claw_set_active
+flutter: ✅ FFI Bound: claw_set_node_mode
+flutter: ✅ FFI Bound: claw_get_status
+flutter: ⚠️ FFI Bind FAILED: claw_get_endpoint (Using placeholder)
+flutter: ⚠️ FFI Bind FAILED: claw_set_endpoint (Using placeholder)
+flutter: ✅ FFI Bound: claw_process_query
+flutter: ✅ FFI Bound: claw_run_network_recon
+flutter: ✅ FFI Bound: claw_heal_peer
+flutter: ✅ FFI Bound: claw_get_activity_log
+flutter: ✅ FFI Bound: claw_voip_start_call
+flutter: ✅ FFI Bound: claw_voip_end_call
+flutter: ✅ FFI Bound: claw_voip_record_sample
+flutter: ✅ FFI Bound: claw_voip_get_quality
+flutter: ✅ FFI Bound: claw_voip_get_downgrade_recommendation
+flutter: ✅ FFI Bound: claw_set_active_chat
+flutter: ✅ FFI Bound: claw_clear_active_chat
+flutter: ✅ FFI Bound: claw_set_active_group_members
+flutter: ✅ FFI Bound: claw_on_app_launch
+flutter: ✅ FFI Bound: elevate_message
+flutter: ✅ FFI Bound: unelevate_message
+flutter: ✅ FFI Bound: get_elevated_messages
+flutter: ✅ FFI Bound: is_message_elevated
+flutter: ✅ FFI Bound: get_last_message
+flutter: ✅ FFI Bound: get_last_group_message
+flutter: ✅ FFI Bound: get_last_messages_all
+flutter: ✅ FFI Bound: get_last_group_messages_all
+flutter: ✅ FFI Bound: daily_reward_get_status
+flutter: ⚠️ FFI Bind FAILED: get_referral_status (Using placeholder)
+flutter: ✅ FFI Bound: daily_reward_get_history
+flutter: ✅ FFI Bound: daily_reward_record_activity
+flutter: ✅ FFI Bound: daily_reward_update_weights
+flutter: ✅ FFI Bound: daily_reward_update_anti_gaming
+flutter: ✅ FFI Bound: daily_reward_get_realtime_earnings
+flutter: ✅ FFI Bound: daily_reward_record_call_duration
+flutter: ✅ FFI Bound: daily_reward_record_web_activity
+flutter: ✅ FFI Bound: daily_reward_record_webview_media_call
+flutter: ✅ All native functions bound successfully.
+flutter: ✅ Native finalizer initialized.
+Syncing files to device iPhone 17...                               213ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on iPhone 17 is available at: http://127.0.0.1:49335/AJmclyhRJBs=/
+The Flutter DevTools debugger and profiler on iPhone 17 is available at: http://127.0.0.1:49335/AJmclyhRJBs=/devtools/?uri=ws://127.0.0.1:49335/AJmclyhRJBs=/ws
+flutter: 📂 Sandbox Paths Initialized: Support='/Users/dev/Library/Developer/CoreSimulator/Devices/200368C8-0BCB-45D2-B38D-26761E179B63/data/Containers/Data/Application/48C1EF68-2D84-4051-BC1A-4FA26E6A9F97/Library/Application Support', Docs='/Users/dev/Library/Developer/CoreSimulator/Devices/200368C8-0BCB-45D2-B38D-26761E179B63/data/Containers/Data/Application/48C1EF68-2D84-4051-BC1A-4FA26E6A9F97/Documents'
+flutter: ⏳ Starting sovereign initialization sequence...
+flutter: 📍 Target DB Path (Sandboxed): /Users/dev/Library/Developer/CoreSimulator/Devices/200368C8-0BCB-45D2-B38D-26761E179B63/data/Containers/Data/Application/48C1EF68-2D84-4051-BC1A-4FA26E6A9F97/Library/Application Support/introvert.db
+flutter: 📍 Target DB Path (Apple/Sanboxed): /Users/dev/Library/Developer/CoreSimulator/Devices/200368C8-0BCB-45D2-B38D-26761E179B63/data/Containers/Data/Application/48C1EF68-2D84-4051-BC1A-4FA26E6A9F97/Library/Application Support/introvert.db
+flutter: 🔑 Checking for existing identity...
+flutter: 📜 Checking Terms of Use acceptance...
+flutter: ✅ Terms accepted. Proceeding with engine start...
+flutter: 🧠 Identity found. Starting native engine...
+flutter: ✅ Initialization complete. Loading UI.
+flutter: 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+flutter: ❌ Network Start Error (-10): Engine not started
+flutter: ⚠️ Background sync initialized — push unavailable, starting fallback poll
+flutter: 💰 Subscribing to Economy Monitoring...
+flutter: ❌ Economy Monitoring Error (-10): Engine not started
+flutter: ⚠️ Economy monitoring deferred (engine not ready): Exception: Economy Monitoring Error (-10): Engine not started
+flutter: [Update] Skipping update check (recently checked).
+flutter: ✅ Engine Start: Success
+flutter: 📡 Starting networking plane...
+flutter: 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+flutter: ✅ Network Start: Success
+flutter: ✅ IntroClaw On App Launch: Success
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🚀 Introvert Engine Started Successfully!
+flutter: 🦀 Rust Debug: Starting NetworkService initialization...
+flutter: 🦀 Rust Debug: [mDNS] Behaviour initialized for peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🔄 Network online — refreshing profile for handle restoration
+flutter: 🦀 Rust Debug: NetworkService initialized. Running swarm...
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 3 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🌐 Swarm Event Received: Type=48, DataLen=21
+flutter: [StatusStream] connecting:mesh_sweep
+flutter: 🦀 Rust Debug: [StatusStream] Connecting to the mesh swarm...
+flutter: 🦀 Rust Debug: [Resilience] Step 2: Re-dialing all bootstrap nodes (TCP+QUIC) [WIFI]
+flutter: 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/443
+flutter: 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/udp/443/quic-v1
+flutter: 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/80
+flutter: 🦀 Rust Debug: [Resilience] Tunnel active (0s). Waiting for connection...
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: ✅ Fetch Mailbox: Success
+flutter: 💰 Subscribing to Economy Monitoring...
+flutter: ✅ Economy Monitoring: Success
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Tunnel] Activated on port 49359 → ws://47.89.252.80:80/tunnel
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=1, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=2, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/44697/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 1 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] Status change: 1 (peers=41, relay_listener=true)
+flutter: 🌐 Swarm Event Received: Type=48, DataLen=16
+flutter: [StatusStream] online:connected
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 3 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/40717/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/34506/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/47862/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 3 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 1 addresses
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush already in progress for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — skipping
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=2, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=3, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+-[WFIsolatedShortcutRunner init] Taking sandbox extensions for execution
+-[WFIsolatedShortcutRunner init]_block_invoke Sandbox extensions acquired
+Indexing for request: <WFToolKitIndexingRequest: 0x1071b4320>, changeset: .partial(updatedCount: 1 removedCount: 4 updated: ["com.example.introvertTests"], removed: ["com.apple.-GeoToolbox-AppIntents", "com.apple.AppIntents", "com.apple.-Photos-AppIntents", "com.apple.LinkPresentation.-LinkPresentation-AppIntents"], provenance: [VoiceShortcutClient.ToolKitIndexingReason.Changeset.Provenance.launchServicesSnapshot(<LaunchServicesSnapshot uuid=C58D8FA2-A6CE-4A6D-B085-541373657A9A, v=1876)> ["com.apple.SharingViewService", "com.apple.NetworkEndpointPickerUI", "com.apple.CarPlaySettings", "com.apple.quicklook.UIExtension", "com.apple.mobilemail.MailSettingsIntentsExtension", "com.apple.news", "com.apple.mobiletimer.ClockAppIntents", "com.apple.SettingsAppIntents", "com.apple.Posters.KaleidoscopePosterApp", "com.apple.Preferences.ControlCenterAppIntentsExtension", "com.apple.settingsandcoreapps.SoundAndHapticsControls", "com.apple.Maps", "com.apple.contacts.autocomplete.appintentextension", "com.apple.commandandcontrol", "com.apple.<…>, priority: <decode: missing data>
+Indexed: 0
+Errored: 0
+Skipped: [:]
+Finished in 0.513453s
+-[WFIsolatedShortcutRunner unaliveProcess] Releasing sandbox extensions
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1_1784899841851, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1_1784899841851","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_18957.jpg","mime_type":"image/jpeg","total_size":228845,"file_hash":"dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gm_c873616e97ee6d19bbbac897c5d484e3_1784899856547632521_faa2020b, content_encrypted_len=33, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: hello
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=92
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [FilePull] ⭐ Calling startPull for gft_dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1_1784899841851 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=228845)
+flutter: [FilePull] ✅ startPull called for gft_dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1_1784899841851
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1_1784899841851
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_dc8f08dda852425b9ea42fae7cc20f119fbbf8f3ff57aa55d78165c764fee0b1_1784899841851
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_dc8f08dda852425b, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: ✅ Poll Peer Profile: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=79
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=89
+flutter: ✅ IntroClaw Clear Active Chat: Success
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_a605db559c3d2b068465cf76a8be5c01edfb2e0a8affe0fa4e78f3c65de041ac_1784900056925, content_encrypted_len=450, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_a605db559c3d2b068465cf76a8be5c01edfb2e0a8affe0fa4e78f3c65de041ac_1784900056925","sender_peer_id":"12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf","filename":"Sovereign_Login_and_Security_Anatomy.png","mime_type":"image/jpeg","total_size":4489080,"file_hash":"a605db559c3d2b068465cf76a8be5c01edfb2e0a8affe0fa4e78f3c65de041ac","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=509
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_4d603167786a06d0f002a99180767eea399f5c6b20b933924ef314399f252811_1784900057095, content_encrypted_len=448, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_4d603167786a06d0f002a99180767eea399f5c6b20b933924ef314399f252811_1784900057095","sender_peer_id":"12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf","filename":"Off-Grid_Messaging_Delivery_Manual.png","mime_type":"image/jpeg","total_size":4516539,"file_hash":"4d603167786a06d0f002a99180767eea399f5c6b20b933924ef314399f252811","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=507
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_075c27b50c94d08f55d75ed7e1cbdf1b3b808fd1e9bc6ce151b15595dd85eb28_1784900057206, content_encrypted_len=449, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_075c27b50c94d08f55d75ed7e1cbdf1b3b808fd1e9bc6ce151b15595dd85eb28_1784900057206","sender_peer_id":"12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf","filename":"Self-Healing_Swarm_Resilience_Guide.png","mime_type":"image/jpeg","total_size":4568092,"file_hash":"075c27b50c94d08f55d75ed7e1cbdf1b3b808fd1e9bc6ce151b15595dd85eb28","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=508
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_4227fb86c57525eb5cc4b11e85aecddfc78b2b6c184c1d5708db9ffdfe69290d_1784900056992, content_encrypted_len=450, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_4227fb86c57525eb5cc4b11e85aecddfc78b2b6c184c1d5708db9ffdfe69290d_1784900056992","sender_peer_id":"12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf","filename":"Account_Prestige_and_Point_Telemetry.png","mime_type":"image/jpeg","total_size":4210806,"file_hash":"4227fb86c57525eb5cc4b11e85aecddfc78b2b6c184c1d5708db9ffdfe69290d","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=509
+flutter: ✅ Poll Peer Profile: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=89
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=79
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_7a72fa702f26fc5c76d85d253c1631e7c299158d43ea29d077dfa20bb5028504_1784900082114, content_encrypted_len=449, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_7a72fa702f26fc5c76d85d253c1631e7c299158d43ea29d077dfa20bb5028504_1784900082114","sender_peer_id":"12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf","filename":"Off-Grid_Messaging_Delivery_Manual.png","mime_type":"image/jpeg","total_size":20537127,"file_hash":"7a72fa702f26fc5c76d85d253c1631e7c299158d43ea29d077dfa20bb5028504","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=508
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=true, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.118.28/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.118.28/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.118.28/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.118.28/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.118.28/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: [Intro-Claw] Connectivity changed: ConnectivityResult.none → ConnectivityResult.ethernet
+flutter: [Intro-Claw] Network recovery: forcing refresh, recon, and tick...
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — lock released
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: ✅ IntroClaw Tick: Success
+flutter: [IntroClaw] Notification suppressed (rate limited): Connections re-optimized
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 3 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd but no relay yet — status=4 (connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=93, incoming=0, seeders=1, pending=0)
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] Status change: 4 (peers=93, relay_listener=false)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=93, incoming=0, seeders=1, pending=0)
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] Status change: 1 (peers=94, relay_listener=true)
+flutter: 🌐 Swarm Event Received: Type=48, DataLen=16
+flutter: [StatusStream] online:connected
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.119.236/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.119.236/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.119.236/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.119.236/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.119.236/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=4, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=5, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.118.28/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.118.28/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.118.28/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.118.28/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.118.28/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=2, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=3, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — lock released
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/tcp/44697/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/tcp/40717/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/udp/34506/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/udp/47862/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=true, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=1, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=2, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=3, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=4, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.119.236/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.119.236/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.119.236/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.119.236/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.119.236/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+-[WFIsolatedShortcutRunner init] Taking sandbox extensions for execution
+-[WFIsolatedShortcutRunner init]_block_invoke Sandbox extensions acquired
+Indexing for request: <WFToolKitIndexingRequest: 0x104db4320>, changeset: .partial(updatedCount: 0 removedCount: 4 updated: [], removed: ["com.apple.-Photos-AppIntents", "com.apple.AppIntents", "com.apple.-GeoToolbox-AppIntents", "com.apple.LinkPresentation.-LinkPresentation-AppIntents"], provenance: [VoiceShortcutClient.ToolKitIndexingReason.Changeset.Provenance.appIntentsChange(<LinkSnapshot> ["com.apple.TransparencySettingsIntents", "com.apple.TVRemoteUIService", "com.apple.PeopleViewService", "com.apple.AppStoreSettingsAppIntents", "com.apple.Passbook", "com.apple.MediaRemoteAppIntentsExtension", "com.apple.SensitiveContentAnalysis.SensitiveContentAnalysisConfigurationExtension", "com.apple.GameCenter.Settings.DeviceExpertExtension", "com.apple.MobileAddressBook", "com.apple.MobileSMS", "com.apple.ClassKit.ClassKitAppIntents", "com.apple.BarcodeScanner", "com.apple.musicrecognition", "com.apple.mobilesafari", "com.apple.Preview", "com.apple.reminders", "com.apple.Preferences", "com.apple.HealthStandaloneIntents", "com.apple<…>, priority: <decode: missing data>
+Indexed: 0
+Errored: 0
+Skipped: [:]
+Finished in 0.338401s
+-[WFIsolatedShortcutRunner unaliveProcess] Releasing sandbox extensions
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=true, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: ✅ IntroClaw Clear Active Chat: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=false, direct_count=2, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=3, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/udp/56127/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/udp/58331/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/60368/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/60367/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/56127/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/58331/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/60368/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/60367/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/56127/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/58331/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/60368/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/60367/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/udp/64493/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/tcp/49307/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/udp/51236/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/tcp/49308/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/169.254.130.114/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=false, direct_count=3, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=true, local_ip=true, direct_count=4, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+-[WFIsolatedShortcutRunner init] Taking sandbox extensions for execution
+-[WFIsolatedShortcutRunner init]_block_invoke Sandbox extensions acquired
+Indexing for request: <WFToolKitIndexingRequest: 0x1045b4320>, changeset: .partial(updatedCount: 0 removedCount: 4 updated: [], removed: ["com.apple.-GeoToolbox-AppIntents", "com.apple.AppIntents", "com.apple.-Photos-AppIntents", "com.apple.LinkPresentation.-LinkPresentation-AppIntents"], provenance: [VoiceShortcutClient.ToolKitIndexingReason.Changeset.Provenance.appIntentsChange(<LinkSnapshot> ["com.apple.contacts.autocomplete.appintentextension", "com.apple.compass.CompassSettingsAppIntents", "com.apple.musicrecognition", "com.apple.Health", "com.apple.MediaRemoteAppIntentsExtension", "com.apple.SensitiveContentAnalysis.SensitiveContentAnalysisConfigurationExtension", "com.apple.Passbook", "com.apple.BarcodeScanner", "com.apple.mobilecal", "com.apple.ShortcutsActions", "com.apple.omniSearch.SearchToolExtension", "com.apple.ClassKit.ClassKitAppIntents", "com.apple.shortcuts", "com.apple.mobilesafari", "com.apple.Preferences", "com.apple.reminders", "com.apple.DocumentsApp", "com.apple.Preview", "com.apple.TransparencySettingsI<…>, priority: <decode: missing data>
+Indexed: 0
+Errored: 0
+Skipped: [:]
+Finished in 0.308442s
+-[WFIsolatedShortcutRunner unaliveProcess] Releasing sandbox extensions
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=true, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/36901/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/43009/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/58955/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/46371/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 1 addresses
+flutter: 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+flutter: 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — lock released
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn but no relay yet — status=4 (connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] Status change: 4 (peers=267, relay_listener=false)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=266, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 1 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 1 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 1 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 1 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=267, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=270, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=270, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=270, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 4 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/udp/56127/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/udp/58331/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/tcp/60368/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/169.254.130.114/tcp/60367/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 4 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/udp/56127/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/udp/58331/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/60368/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/60367/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 4 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/56127/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/58331/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/60368/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/60367/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=269, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=268, incoming=0, seeders=1, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: [BackgroundSync] Fallback poll — fetching mailbox
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago

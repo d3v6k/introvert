@@ -107,7 +107,6 @@
 				5CCDF44AE69AFEC3A2AB88A2 /* Pods-RunnerTests.release.xcconfig */,
 				F7EC84E6F6F436418D5FB041 /* Pods-RunnerTests.profile.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -475,6 +474,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 7C8VLVT5J8;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -488,12 +488,12 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
-					"$(SRCROOT)/libs/libintrovert_simulator.a",
+					"$(SRCROOT)/libs/libintrovert_device.a",
 					"-ObjC",
 					"-framework",
 					SystemConfiguration,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.introvertTests;
+				PRODUCT_BUNDLE_IDENTIFIER = messenger.introvert.com;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -501,8 +501,6 @@
 			};
 			name = Profile;
 		};
-
-
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 440D0EC8784F05182F5E8492 /* Pods-RunnerTests.debug.xcconfig */;
@@ -671,6 +669,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 7C8VLVT5J8;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -684,12 +683,12 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-force_load",
-					"$(SRCROOT)/libs/libintrovert_simulator.a",
+					"$(SRCROOT)/libs/libintrovert_device.a",
 					"-ObjC",
 					"-framework",
 					SystemConfiguration,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.introvertTests;
+				PRODUCT_BUNDLE_IDENTIFIER = messenger.introvert.com;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -705,6 +704,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				DEVELOPMENT_TEAM = 7C8VLVT5J8;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -717,12 +717,13 @@
 				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
-					"-lintrovert_device",
+					"-force_load",
+					"$(SRCROOT)/libs/libintrovert_device.a",
 					"-ObjC",
 					"-framework",
 					SystemConfiguration,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.introvertTests;
+				PRODUCT_BUNDLE_IDENTIFIER = messenger.introvert.com;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

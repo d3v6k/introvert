@@ -2364,10 +2364,11 @@ class _ChatsTabState extends State<ChatsTab> with AutomaticKeepAliveClientMixin 
               Expanded(
                 child: (_filteredGroups.isEmpty && _filteredContacts.isEmpty)
                   ? Center(
-                      child: Padding(
+                      child: SingleChildScrollView(
                         padding: EdgeInsets.all(32.0),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(_searchQuery.isNotEmpty ? Icons.search_off : Icons.people_outline, size: 64, color: AppTheme.current.mutedText.withValues(alpha: 0.1)),
                             SizedBox(height: 16),

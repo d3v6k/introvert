@@ -1,0 +1,800 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on macOS in debug mode...
+Building macOS application...                                   
+✓ Built build/macos/Build/Products/Debug/introvert.app
+2026-07-24 21:14:00.773 introvert[67717:4214779] Running with merged UI and platform thread. Experimental.
+Failed to foreground app; open returned 1
+🔔 AppDelegate: Notification permission error: Error Domain=UNErrorDomain Code=1 "Notifications are not allowed for this application" UserInfo={NSLocalizedDescription=Notifications are not allowed for this application}
+flutter: ℹ️ macOS: Searching for libintrovert.dylib...
+flutter: ✅ Loaded native library: /Users/dev/Development/introvert/libintrovert.dylib
+flutter: ✅ FFI Bound: generate_mnemonic
+flutter: ✅ FFI Bound: free_string
+flutter: ✅ FFI Bound: free_binary
+flutter: ✅ FFI Bound: mnemonic_to_seed
+flutter: ✅ FFI Bound: derive_identifiers
+flutter: ✅ FFI Bound: engine_start
+flutter: ✅ FFI Bound: engine_stop
+flutter: ✅ FFI Bound: get_peer_id
+flutter: ✅ FFI Bound: network_start
+flutter: ✅ FFI Bound: economy_monitor
+flutter: ✅ FFI Bound: send_message
+flutter: ✅ FFI Bound: init_webrtc
+flutter: ✅ FFI Bound: send_native_signal
+flutter: ✅ FFI Bound: add_address
+flutter: ✅ FFI Bound: claim_rewards
+flutter: ✅ FFI Bound: store_msg_async
+flutter: ✅ FFI Bound: get_messages
+flutter: ✅ FFI Bound: get_messages_paginated
+flutter: ✅ FFI Bound: secure_session
+flutter: ✅ FFI Bound: fetch_mailbox
+flutter: ✅ FFI Bound: media_stream
+flutter: ✅ FFI Bound: get_contacts
+flutter: ✅ FFI Bound: delete_contact
+flutter: ✅ FFI Bound: set_profile_tier
+flutter: ✅ FFI Bound: delete_chat
+flutter: ✅ FFI Bound: clear_pending_messages
+flutter: ✅ FFI Bound: clear_contacts
+flutter: ✅ FFI Bound: wormhole_start
+flutter: ✅ FFI Bound: wormhole_join
+flutter: ✅ FFI Bound: wormhole_abort
+flutter: ✅ FFI Bound: close_webrtc
+flutter: ✅ FFI Bound: renegotiate_webrtc
+flutter: ✅ FFI Bound: accept_call
+flutter: ✅ FFI Bound: reject_call
+flutter: ✅ FFI Bound: set_anchor
+flutter: ✅ FFI Bound: get_anchor_mode
+flutter: ✅ FFI Bound: set_tunnel
+flutter: ✅ FFI Bound: get_tunnel_mode
+flutter: ✅ FFI Bound: get_rbns
+flutter: ✅ FFI Bound: test_rbn
+flutter: ✅ FFI Bound: disclaimer_is_accepted
+flutter: ✅ FFI Bound: disclaimer_set_accepted
+flutter: ✅ FFI Bound: recheck_connection
+flutter: ✅ FFI Bound: resolve_handle
+flutter: ✅ FFI Bound: send_direct_invite
+flutter: ✅ FFI Bound: register_push_token
+flutter: ✅ FFI Bound: set_retention
+flutter: ✅ FFI Bound: delete_message
+flutter: ✅ FFI Bound: edit_message
+flutter: ✅ FFI Bound: send_reaction
+flutter: ✅ FFI Bound: get_reactions
+flutter: ✅ FFI Bound: claim_handle
+flutter: ✅ FFI Bound: get_handle_status
+flutter: ✅ FFI Bound: get_local_handle
+flutter: ✅ FFI Bound: is_handle_claimed
+flutter: ✅ FFI Bound: lookup_peer_handle
+flutter: ✅ FFI Bound: request_swarm_stats
+flutter: ✅ FFI Bound: poll_peer_profile
+flutter: ✅ FFI Bound: sync_chat_messages
+flutter: ✅ FFI Bound: get_profile
+flutter: ✅ FFI Bound: set_profile
+flutter: ✅ FFI Bound: send_file
+flutter: ✅ FFI Bound: inspect_media
+flutter: ✅ FFI Bound: cancel_file
+flutter: ✅ FFI Bound: force_refresh
+flutter: ✅ FFI Bound: send_manual_telemetry
+flutter: ✅ FFI Bound: set_connectivity_type
+flutter: ✅ FFI Bound: set_app_idle_state
+flutter: ✅ FFI Bound: group_create
+flutter: ✅ FFI Bound: group_send
+flutter: ✅ FFI Bound: group_get_all
+flutter: ✅ FFI Bound: group_get_msgs
+flutter: ✅ FFI Bound: group_add_member
+flutter: ✅ FFI Bound: group_approve_join
+flutter: ✅ FFI Bound: group_reject_join
+flutter: ✅ FFI Bound: group_remove_member
+flutter: ✅ FFI Bound: group_update_role
+flutter: ✅ FFI Bound: group_publish
+flutter: ✅ FFI Bound: group_join_code
+flutter: ✅ FFI Bound: group_delete
+flutter: ✅ FFI Bound: group_get_pending
+flutter: ✅ FFI Bound: group_accept_invite
+flutter: ✅ FFI Bound: group_decline_invite
+flutter: ✅ FFI Bound: group_mute
+flutter: ✅ FFI Bound: group_unmute
+flutter: ✅ FFI Bound: group_get_muted
+flutter: ✅ FFI Bound: update_msg_status
+flutter: ✅ FFI Bound: update_msg_status_peer
+flutter: ✅ FFI Bound: update_group_msg_status
+flutter: ✅ FFI Bound: update_group_msg_status_id
+flutter: ✅ FFI Bound: get_unread_counts
+flutter: ✅ FFI Bound: send_ack
+flutter: ✅ FFI Bound: update_contact_alias
+flutter: ✅ FFI Bound: compute_file_hash
+flutter: ✅ FFI Bound: nuke_identity
+flutter: ✅ FFI Bound: drive_add
+flutter: ✅ FFI Bound: drive_get_all
+flutter: ✅ FFI Bound: drive_get_by_hash
+flutter: ✅ FFI Bound: drive_delete
+flutter: ✅ FFI Bound: drive_add_with_folder
+flutter: ✅ FFI Bound: drive_update_folder
+flutter: ✅ FFI Bound: mesh_capacity
+flutter: ✅ FFI Bound: get_disk_space
+flutter: ✅ FFI Bound: register_seeder
+flutter: ✅ FFI Bound: start_pull
+flutter: ✅ FFI Bound: notes_create
+flutter: ✅ FFI Bound: notes_update
+flutter: ✅ FFI Bound: notes_delete
+flutter: ✅ FFI Bound: notes_get
+flutter: ✅ FFI Bound: notes_get_all
+flutter: ✅ FFI Bound: notes_search
+flutter: ✅ FFI Bound: notes_save_version
+flutter: ✅ FFI Bound: notes_get_versions
+flutter: ✅ FFI Bound: call_history_log
+flutter: ✅ FFI Bound: call_history_get
+flutter: ✅ FFI Bound: call_history_count
+flutter: ✅ FFI Bound: search_messages
+flutter: ✅ FFI Bound: search_group_messages
+flutter: ✅ FFI Bound: send_typing_start
+flutter: ✅ FFI Bound: send_typing_stop
+flutter: ✅ FFI Bound: get_last_seen
+flutter: ✅ FFI Bound: get_ai_mode
+flutter: ✅ FFI Bound: set_ai_mode
+flutter: ✅ FFI Bound: get_api_key
+flutter: ✅ FFI Bound: claw_trigger_tick
+flutter: ✅ FFI Bound: claw_set_active
+flutter: ✅ FFI Bound: claw_set_node_mode
+flutter: ✅ FFI Bound: claw_get_status
+flutter: ⚠️ FFI Bind FAILED: claw_get_endpoint (Using placeholder)
+flutter: ⚠️ FFI Bind FAILED: claw_set_endpoint (Using placeholder)
+flutter: ✅ FFI Bound: claw_process_query
+flutter: ✅ FFI Bound: claw_run_network_recon
+flutter: ✅ FFI Bound: claw_heal_peer
+flutter: ✅ FFI Bound: claw_get_activity_log
+flutter: ✅ FFI Bound: claw_voip_start_call
+flutter: ✅ FFI Bound: claw_voip_end_call
+flutter: ✅ FFI Bound: claw_voip_record_sample
+flutter: ✅ FFI Bound: claw_voip_get_quality
+flutter: ✅ FFI Bound: claw_voip_get_downgrade_recommendation
+flutter: ✅ FFI Bound: claw_set_active_chat
+flutter: ✅ FFI Bound: claw_clear_active_chat
+flutter: ✅ FFI Bound: claw_set_active_group_members
+flutter: ✅ FFI Bound: claw_on_app_launch
+flutter: ✅ FFI Bound: elevate_message
+flutter: ✅ FFI Bound: unelevate_message
+flutter: ✅ FFI Bound: get_elevated_messages
+flutter: ✅ FFI Bound: is_message_elevated
+flutter: ✅ FFI Bound: get_last_message
+flutter: ✅ FFI Bound: get_last_group_message
+flutter: ✅ FFI Bound: get_last_messages_all
+flutter: ✅ FFI Bound: get_last_group_messages_all
+flutter: ✅ FFI Bound: daily_reward_get_status
+flutter: ⚠️ FFI Bind FAILED: get_referral_status (Using placeholder)
+flutter: ✅ FFI Bound: daily_reward_get_history
+flutter: ✅ FFI Bound: daily_reward_record_activity
+flutter: ✅ FFI Bound: daily_reward_update_weights
+flutter: ✅ FFI Bound: daily_reward_update_anti_gaming
+flutter: ✅ FFI Bound: daily_reward_get_realtime_earnings
+flutter: ✅ FFI Bound: daily_reward_record_call_duration
+flutter: ✅ FFI Bound: daily_reward_record_web_activity
+flutter: ✅ FFI Bound: daily_reward_record_webview_media_call
+flutter: ✅ All native functions bound successfully.
+flutter: ✅ Native finalizer initialized.
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: macos
+
+Syncing files to device macOS...                                
+flutter: 📂 Sandbox Paths Initialized: Support='/Users/dev/Library/Application Support/com.example.introvertTests', Docs='/Users/dev/Documents'
+flutter: ⏳ Starting sovereign initialization sequence...
+flutter: 📍 Target DB Path (Sandboxed): /Users/dev/Library/Application Support/com.example.introvertTests/introvert.db
+flutter: 📍 Target DB Path (Apple/Sanboxed): /Users/dev/Library/Application Support/com.example.introvertTests/introvert.db
+flutter: 🔑 Checking for existing identity...
+flutter: 🆕 No identity found. Checking if terms accepted via SharedPreferences...
+flutter: 🆕 Terms accepted. Transitioning to onboarding.
+flutter: ✅ Initialization complete. Loading UI.
+Syncing files to device macOS...                                   880ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on macOS is available at: http://127.0.0.1:64946/NFmaxNan5wM=/
+The Flutter DevTools debugger and profiler on macOS is available at: http://127.0.0.1:64946/NFmaxNan5wM=/devtools/?uri=ws://127.0.0.1:64946/NFmaxNan5wM=/ws
+flutter: Secure storage write failed, falling back to SharedPreferences: PlatformException(Unexpected security result code, Code: -34018, Message: A required entitlement isn't present., -34018, null)
+flutter: ✅ Engine Start: Success
+flutter: ✅ Set Disclaimer Accepted: Success
+flutter: ✅ Disclaimer acceptance saved to SQLCipher for new user.
+flutter: 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+flutter: ✅ Network Start: Success
+flutter: ✅ IntroClaw On App Launch: Success
+flutter: ✅ Fetch Mailbox: Success
+flutter: ✅ Set Profile: Success
+flutter: 🦀 Rust Debug: Starting NetworkService initialization...
+flutter: 🦀 Rust Debug: [mDNS] Behaviour initialized for peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+flutter: 🦀 Rust Debug: NetworkService initialized. Running swarm...
+flutter: 🦀 Rust Debug: [StatusStream] Connecting to the mesh swarm...
+flutter: 🦀 Rust Debug: [Resilience] Step 2: Re-dialing all bootstrap nodes (TCP+QUIC) [WIFI]
+flutter: 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/443
+flutter: 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/udp/443/quic-v1
+flutter: 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/80
+flutter: 🦀 Rust Debug: [Resilience] Tunnel active (0s). Waiting for connection...
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 📍 Initial Node Status (from cache): 2
+flutter: 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+flutter: ✅ Network Start: Success
+flutter: ⚠️ Background sync initialized — push unavailable, starting fallback poll
+flutter: 💰 Subscribing to Economy Monitoring...
+flutter: ✅ Economy Monitoring: Success
+flutter: [Update] Skipping update check (recently checked).
+flutter: 🦀 Rust Debug: Network already started. Ignoring duplicate start call.
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/49341/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/61302/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/49342/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/52063/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/43009/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/36901/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/58955/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/46371/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/169.254.130.114/tcp/49341/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/169.254.130.114/udp/61302/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/169.254.130.114/tcp/49342/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/169.254.130.114/udp/52063/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/49341/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/61302/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/49342/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/52063/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+flutter: ✅ Fetch Mailbox: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Tunnel] Activated on port 64993 → ws://47.89.252.80:80/tunnel
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] Status change: 4 (peers=28, relay_listener=false)
+flutter: 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+flutter: [IdleMode] Entered idle — push handles wake-ups, polling disabled
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+flutter: 🦀 Rust Debug: [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 28 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 28 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 28 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 25 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+flutter: 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/46339/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 1 addresses
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 30 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+flutter: 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 32 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 32 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Step 1: 30 peers connected but no relay. Re-establishing...
+flutter: 🦀 Rust Debug: [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+flutter: 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6_1784913479167, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6_1784913479167","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24499.jpg","mime_type":"image/jpeg","total_size":462140,"file_hash":"24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a_1784913479270, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+🔔 AppDelegate: Ping sound asset not found on macOS
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a_1784913479270","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24498.jpg","mime_type":"image/jpeg","total_size":147953,"file_hash":"eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🔔 AlertService: Alert sent → title='New Group Message' isCall=false
+🔔 AppDelegate: Ping sound asset not found on macOS
+flutter: 🔔 AlertService: Alert sent → title='New Group Message' isCall=false
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45_1784913479345, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45_1784913479345","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24495.jpg","mime_type":"image/jpeg","total_size":143091,"file_hash":"ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🔔 AlertService: Suppressed notification (3-min cooldown): New Group Message
+[ERROR:flutter/runtime/dart_vm_initializer.cc(40)] Unhandled Exception: Unable to load asset: "assets/audio/introvert_ping.m4a".
+The asset does not exist or has empty data.
+#0      PlatformAssetBundle.load.<anonymous closure> (package:flutter/src/services/asset_bundle.dart:332:13)
+<asynchronous suspension>
+#1      AudioCache.fetchToMemory (package:audioplayers/src/audio_cache.dart:99:22)
+<asynchronous suspension>
+#2      AudioCache.load (package:audioplayers/src/audio_cache.dart:143:31)
+<asynchronous suspension>
+#3      AudioCache.loadPath (package:audioplayers/src/audio_cache.dart:152:26)
+<asynchronous suspension>
+#4      AudioPlayer.setSourceAsset (package:audioplayers/src/audioplayer.dart:428:23)
+<asynchronous suspension>
+#5      AudioPlayer.setSource (package:audioplayers/src/audioplayer.dart:352:5)
+<asynchronous suspension>
+#6      AudioPlayer.play (package:audioplayers/src/audioplayer.dart:218:5)
+<asynchronous suspension>
+
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379_1784913479504, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379_1784913479504","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24503.jpg","mime_type":"image/jpeg","total_size":269130,"file_hash":"adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🔔 AlertService: Suppressed notification (3-min cooldown): New Group Message
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9_1784913479608, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9_1784913479608","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24502.jpg","mime_type":"image/jpeg","total_size":233026,"file_hash":"6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🔔 AlertService: Suppressed notification (3-min cooldown): New Group Message
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8_1784913479697, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8_1784913479697","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24504.jpg","mime_type":"image/jpeg","total_size":187156,"file_hash":"5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🔔 AlertService: Suppressed notification (3-min cooldown): New Group Message
+flutter: 🦀 Rust Debug: handle_single_payload: Received GroupAction for group c873616e97ee6d19bbbac897c5d484e3 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction signature verified successfully
+flutter: 🦀 Rust Debug: handle_single_payload: Processing GroupAction action variant
+flutter: 🦀 Rust Debug: handle_single_payload: GroupAction::Message: msg_id=gft_5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2_1784913479804, content_encrypted_len=461, reply_to=Some("")
+flutter: 🦀 Rust Debug: handle_single_payload: Found group info for c873616e97ee6d19bbbac897c5d484e3. secret is all zeros: false. Hex prefix: 5a9429a7
+flutter: 🦀 Rust Debug: handle_single_payload: Decrypted group message content: [FILE]:{"transfer_id":"gft_5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2_1784913479804","sender_peer_id":"12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd","filename":"f7e85df9-7116-42cc-a176-afe886557f94-1_all_24506.jpg","mime_type":"image/jpeg","total_size":395050,"file_hash":"5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2","is_relayed":true,"group_id":"c873616e97ee6d19bbbac897c5d484e3"}
+flutter: 🦀 Rust Debug: handle_single_payload: Successfully stored group message
+flutter: 🌐 Swarm Event Received: Type=21, DataLen=520
+flutter: 🔔 AlertService: Suppressed notification (3-min cooldown): New Group Message
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🔄 App Lifecycle State: AppLifecycleState.resumed (isInBackground: false)
+flutter: [IdleMode] Exited idle — resuming normal activity
+flutter: ✅ IntroClaw Tick: Success
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Foreground
+flutter: [FilePull] ⭐ Calling startPull for gft_5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2_1784913479804 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=395050)
+flutter: [FilePull] ✅ startPull called for gft_5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2_1784913479804
+flutter: [FilePull] ⭐ Calling startPull for gft_5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8_1784913479697 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=187156)
+flutter: [FilePull] ✅ startPull called for gft_5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8_1784913479697
+flutter: [FilePull] ⭐ Calling startPull for gft_6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9_1784913479608 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=233026)
+flutter: [FilePull] ✅ startPull called for gft_6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9_1784913479608
+flutter: [FilePull] ⭐ Calling startPull for gft_adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379_1784913479504 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=269130)
+flutter: [FilePull] ✅ startPull called for gft_adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379_1784913479504
+flutter: [FilePull] ⭐ Calling startPull for gft_ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45_1784913479345 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=143091)
+flutter: [FilePull] ✅ startPull called for gft_ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45_1784913479345
+flutter: [FilePull] ⭐ Calling startPull for gft_eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a_1784913479270 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=147953)
+flutter: [FilePull] ✅ startPull called for gft_eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a_1784913479270
+flutter: [FilePull] ⭐ Calling startPull for gft_24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6_1784913479167 from 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd (size=462140)
+flutter: [FilePull] ✅ startPull called for gft_24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6_1784913479167
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2_1784913479804
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_5fa6b4ce8d6fb88d8e704167d3fc5ea1263c5e1a6a59507259bef9e3b04906d2_1784913479804
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8_1784913479697
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_5118e229b64413ef7a535856b753efeafe6341b2bb7e1fc948a2696495f001e8_1784913479697
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9_1784913479608
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_6d4a7f2da49817bdc33e41330db2de4bec36c8e3797b0ff905c07f46ec20d9f9_1784913479608
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379_1784913479504
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_adc7c1911bf260831e9fae8f30d37bd042b97853cd04e0392a5f77fc8f580379_1784913479504
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_5fa6b4ce8d6fb88d, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_5118e229b64413ef, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45_1784913479345
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_6d4a7f2da49817bd, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_ac1539660de1f14ef3fdc691b5398c92eee833037bb2b508cccb57da6d026f45_1784913479345
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_adc7c1911bf26083, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_ac1539660de1f14e, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a_1784913479270
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_eb7ab6d1f5f21bbfb51cafb5025ca3f27aa87a9cdfa2700c0080fa6f5d19262a_1784913479270
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_eb7ab6d1f5f21bbf, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [FFI] start_pull called: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd, tid=gft_24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6_1784913479167
+flutter: 🦀 Rust Debug: [FFI] start_pull: spawning async send for tid=gft_24468a5f28551e05ac1b58d45d9530502176f6947c95efa5a6092a5fa56488b6_1784913479167
+flutter: 🦀 Rust Debug: [FFI] start_pull: inside spawn, about to send...
+flutter: 🦀 Rust Debug: [FFI] start_pull: HandleIncomingPayload sent successfully
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_24468a5f28551e05, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_5fa6b4ce8d6fb88d, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_adc7c1911bf26083, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_24468a5f28551e05, recipient=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd): mdns_peers=true, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Direct(12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+flutter: ✅ Poll Peer Profile: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=85
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=87
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=89
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_24468a5f28551e05, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_ac1539660de1f14e, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_24468a5f28551e05, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_adc7c1911bf26083, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_6d4a7f2da49817bd, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_adc7c1911bf26083, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_eb7ab6d1f5f21bbf, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_5fa6b4ce8d6fb88d, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_5fa6b4ce8d6fb88d, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [TransferRouter] resolve(tid=gft_5118e229b64413ef, recipient=12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm): mdns_peers=false, connected=true, relayed=false, cooldown=false, mdns_set_size=2
+flutter: 🦀 Rust Debug: [TransferRouter] → Relay(12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+flutter: 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+flutter: [IdleMode] Entered idle — push handles wake-ups, polling disabled
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=33, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+flutter: 🔄 App Lifecycle State: AppLifecycleState.resumed (isInBackground: false)
+flutter: [IdleMode] Exited idle — resuming normal activity
+flutter: ✅ IntroClaw Tick: Success
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Foreground
+
+══╡ EXCEPTION CAUGHT BY IMAGE RESOURCE SERVICE ╞════════════════════════════════════════════════════
+The following assertion was thrown resolving an image codec:
+Unable to load asset: "assets/images/logo.png".
+Exception: Asset not found
+
+When the exception was thrown, this was the stack:
+#0      PlatformAssetBundle.loadBuffer (package:flutter/src/services/asset_bundle.dart:373:7)
+<asynchronous suspension>
+#1      AssetBundleImageProvider._loadAsync (package:flutter/src/painting/image_provider.dart:783:16)
+<asynchronous suspension>
+#2      MultiFrameImageStreamCompleter._handleCodecReady (package:flutter/src/painting/image_stream.dart:1021:3)
+<asynchronous suspension>
+
+Image provider: AssetImage(bundle: null, name: "assets/images/logo.png")
+Image key: AssetBundleImageKey(bundle: PlatformAssetBundle#eca5b(), name: "assets/images/logo.png",
+  scale: 1.0)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Another exception was thrown: A RenderFlex overflowed by 195 pixels on the right.
+flutter: ✅ IntroClaw Clear Active Chat: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: ✅ Poll Peer Profile: Success
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=85
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=87
+flutter: 🌐 Swarm Event Received: Type=25, DataLen=89
+Another exception was thrown: Unable to load asset: "assets/images/logo.png".
+flutter: 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+flutter: [IdleMode] Entered idle — push handles wake-ups, polling disabled
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+flutter: 🔄 App Lifecycle State: AppLifecycleState.resumed (isInBackground: false)
+flutter: [IdleMode] Exited idle — resuming normal activity
+flutter: ✅ IntroClaw Tick: Success
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Foreground
+Another exception was thrown: Unable to load asset: "assets/images/logo.png".
+flutter: ✅ IntroClaw Clear Active Chat: Success
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=33, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+flutter: [IdleMode] Entered idle — push handles wake-ups, polling disabled
+flutter: 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [mDNS] Expired event: 4 entries
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/udp/43009/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/tcp/36901/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/udp/58955/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr /ip4/192.168.1.172/tcp/46371/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [mDNS] Discovered event: 3 raw entries
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/49233/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/tcp/38395/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd addr=/ip4/192.168.1.172/udp/48567/quic-v1/p2p/12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+flutter: 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd with 3 addresses
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=37, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=37, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=37, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=37, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=37, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=37, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=35, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=35, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=35, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=34, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=34, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=34, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=34, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: [Intro-Claw] Connectivity changed: ConnectivityResult.none → ConnectivityResult.ethernet
+flutter: [Intro-Claw] Network recovery: forcing refresh, recon, and tick...
+flutter: ✅ IntroClaw Tick: Success
+flutter: [IntroClaw] Notification suppressed (rate limited): Connections re-optimized
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 3 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🔄 Network online — refreshing profile for handle restoration
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — removed from is_relayed_map
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+flutter: 🌐 Swarm Event Received: Type=10, DataLen=1
+flutter: 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+flutter: 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP but no relay yet — status=4 (connecting)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=34, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+flutter: 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a

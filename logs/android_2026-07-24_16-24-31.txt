@@ -1,0 +1,799 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on SM S908E (wireless) in debug mode...
+Running Gradle task 'assembleDebug'...                          
+I/flutter (12027): ✅ Set Profile Tier: Success
+I/flutter (12027): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter (12027): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+WARNING: Your Android app project: app located at: /Users/dev/Development/introvert/android/app/build.gradle.kts
+applies the Kotlin Gradle Plugin, which will cause build failures in future versions of Flutter. 
+Please migrate your app to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): flutter_callkit_incoming, flutter_webrtc, package_info_plus, pdf_render_maintained, share_plus
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+I/flutter (12027): ✅ Set Profile Tier: Success
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: android
+
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+I/flutter (12027): 🦀 Rust Debug: [Resilience] Idle — suppressing background dials
+I/flutter (12027): ✅ Set Profile Tier: Success
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+3 warnings
+I/flutter (12027): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — removed from is_relayed_map
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/64168/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/58630/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/64167/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/65184/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/64168/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/58630/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/64167/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/65184/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+I/flutter (12027): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/64231/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/64232/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/58349/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/56250/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered event: 3 raw entries
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/64231/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/64232/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/58349/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 3 addresses
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/56250/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (12027): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 1 addresses
+I/flutter (12027): ✅ Set Profile Tier: Success
+I/flutter (12027): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+Running Gradle task 'assembleDebug'...                            120.2s
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+Installing build/app/outputs/flutter-apk/app-debug.apk...          24.3s
+I/FlutterActivityAndFragmentDelegate( 3737): If you are attempting to set --enable-dart-profiling via Intent extras to launch a Flutter component outside of using the Flutter CLI, note that support for setting engine flags on Android via Intent will soon be dropped; see https://github.com/flutter/flutter/issues/180686 for more information on this breaking change. To migrate, set --enable-dart-profiling or any other flags specified via Intent extras on the command line instead or see https://github.com/flutter/flutter/blob/main/docs/engine/Flutter-Android-Engine-Flags.md for alternative methods.
+D/FlutterJNI( 3737): Beginning load of flutter...
+D/FlutterJNI( 3737): flutter (null) was loaded normally!
+I/flutter ( 3737): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterGeolocator( 3737): Attaching Geolocator to activity
+D/FlutterRenderer( 3737): Width is zero. 0,0
+I/flutter ( 3737): ✅ Loaded libintrovert.so
+I/flutter ( 3737): ✅ FFI Bound: generate_mnemonic
+I/flutter ( 3737): ✅ FFI Bound: free_string
+I/flutter ( 3737): ✅ FFI Bound: free_binary
+I/flutter ( 3737): ✅ FFI Bound: mnemonic_to_seed
+I/flutter ( 3737): ✅ FFI Bound: derive_identifiers
+I/flutter ( 3737): ✅ FFI Bound: engine_start
+I/flutter ( 3737): ✅ FFI Bound: engine_stop
+I/flutter ( 3737): ✅ FFI Bound: get_peer_id
+I/flutter ( 3737): ✅ FFI Bound: network_start
+I/flutter ( 3737): ✅ FFI Bound: economy_monitor
+I/flutter ( 3737): ✅ FFI Bound: send_message
+I/flutter ( 3737): ✅ FFI Bound: init_webrtc
+I/flutter ( 3737): ✅ FFI Bound: send_native_signal
+I/flutter ( 3737): ✅ FFI Bound: add_address
+I/flutter ( 3737): ✅ FFI Bound: claim_rewards
+I/flutter ( 3737): ✅ FFI Bound: store_msg_async
+I/flutter ( 3737): ✅ FFI Bound: get_messages
+I/flutter ( 3737): ✅ FFI Bound: get_messages_paginated
+I/flutter ( 3737): ✅ FFI Bound: secure_session
+I/flutter ( 3737): ✅ FFI Bound: fetch_mailbox
+I/flutter ( 3737): ✅ FFI Bound: media_stream
+I/flutter ( 3737): ✅ FFI Bound: get_contacts
+I/flutter ( 3737): ✅ FFI Bound: delete_contact
+I/flutter ( 3737): ✅ FFI Bound: set_profile_tier
+I/flutter ( 3737): ✅ FFI Bound: delete_chat
+I/flutter ( 3737): ✅ FFI Bound: clear_pending_messages
+I/flutter ( 3737): ✅ FFI Bound: clear_contacts
+I/flutter ( 3737): ✅ FFI Bound: wormhole_start
+I/flutter ( 3737): ✅ FFI Bound: wormhole_join
+I/flutter ( 3737): ✅ FFI Bound: wormhole_abort
+I/flutter ( 3737): ✅ FFI Bound: close_webrtc
+I/flutter ( 3737): ✅ FFI Bound: renegotiate_webrtc
+I/flutter ( 3737): ✅ FFI Bound: accept_call
+I/flutter ( 3737): ✅ FFI Bound: reject_call
+I/flutter ( 3737): ✅ FFI Bound: set_anchor
+I/flutter ( 3737): ✅ FFI Bound: get_anchor_mode
+I/flutter ( 3737): ✅ FFI Bound: set_tunnel
+I/flutter ( 3737): ✅ FFI Bound: get_tunnel_mode
+I/flutter ( 3737): ✅ FFI Bound: get_rbns
+I/flutter ( 3737): ✅ FFI Bound: test_rbn
+I/flutter ( 3737): ✅ FFI Bound: disclaimer_is_accepted
+I/flutter ( 3737): ✅ FFI Bound: disclaimer_set_accepted
+I/flutter ( 3737): ✅ FFI Bound: recheck_connection
+I/flutter ( 3737): ✅ FFI Bound: resolve_handle
+I/flutter ( 3737): ✅ FFI Bound: send_direct_invite
+I/flutter ( 3737): ✅ FFI Bound: register_push_token
+I/flutter ( 3737): ✅ FFI Bound: set_retention
+I/flutter ( 3737): ✅ FFI Bound: delete_message
+I/flutter ( 3737): ✅ FFI Bound: edit_message
+I/flutter ( 3737): ✅ FFI Bound: send_reaction
+I/flutter ( 3737): ✅ FFI Bound: get_reactions
+I/flutter ( 3737): ✅ FFI Bound: claim_handle
+I/flutter ( 3737): ✅ FFI Bound: get_handle_status
+I/flutter ( 3737): ✅ FFI Bound: get_local_handle
+I/flutter ( 3737): ✅ FFI Bound: is_handle_claimed
+I/flutter ( 3737): ✅ FFI Bound: lookup_peer_handle
+I/flutter ( 3737): ✅ FFI Bound: request_swarm_stats
+I/flutter ( 3737): ✅ FFI Bound: poll_peer_profile
+I/flutter ( 3737): ✅ FFI Bound: sync_chat_messages
+I/flutter ( 3737): ✅ FFI Bound: get_profile
+I/flutter ( 3737): ✅ FFI Bound: set_profile
+I/flutter ( 3737): ✅ FFI Bound: send_file
+I/flutter ( 3737): ✅ FFI Bound: inspect_media
+I/flutter ( 3737): ✅ FFI Bound: cancel_file
+I/flutter ( 3737): ✅ FFI Bound: force_refresh
+I/flutter ( 3737): ✅ FFI Bound: send_manual_telemetry
+I/flutter ( 3737): ✅ FFI Bound: set_connectivity_type
+I/flutter ( 3737): ✅ FFI Bound: set_app_idle_state
+I/flutter ( 3737): ✅ FFI Bound: group_create
+I/flutter ( 3737): ✅ FFI Bound: group_send
+I/flutter ( 3737): ✅ FFI Bound: group_get_all
+I/flutter ( 3737): ✅ FFI Bound: group_get_msgs
+I/flutter ( 3737): ✅ FFI Bound: group_add_member
+I/flutter ( 3737): ✅ FFI Bound: group_approve_join
+I/flutter ( 3737): ✅ FFI Bound: group_reject_join
+I/flutter ( 3737): ✅ FFI Bound: group_remove_member
+I/flutter ( 3737): ✅ FFI Bound: group_update_role
+I/flutter ( 3737): ✅ FFI Bound: group_publish
+I/flutter ( 3737): ✅ FFI Bound: group_join_code
+I/flutter ( 3737): ✅ FFI Bound: group_delete
+I/flutter ( 3737): ✅ FFI Bound: group_get_pending
+I/flutter ( 3737): ✅ FFI Bound: group_accept_invite
+I/flutter ( 3737): ✅ FFI Bound: group_decline_invite
+I/flutter ( 3737): ✅ FFI Bound: group_mute
+I/flutter ( 3737): ✅ FFI Bound: group_unmute
+I/flutter ( 3737): ✅ FFI Bound: group_get_muted
+I/flutter ( 3737): ✅ FFI Bound: update_msg_status
+I/flutter ( 3737): ✅ FFI Bound: update_msg_status_peer
+I/flutter ( 3737): ✅ FFI Bound: update_group_msg_status
+I/flutter ( 3737): ✅ FFI Bound: update_group_msg_status_id
+I/flutter ( 3737): ✅ FFI Bound: get_unread_counts
+I/flutter ( 3737): ✅ FFI Bound: send_ack
+I/flutter ( 3737): ✅ FFI Bound: update_contact_alias
+I/flutter ( 3737): ✅ FFI Bound: compute_file_hash
+I/flutter ( 3737): ✅ FFI Bound: nuke_identity
+I/flutter ( 3737): ✅ FFI Bound: drive_add
+I/flutter ( 3737): ✅ FFI Bound: drive_get_all
+I/flutter ( 3737): ✅ FFI Bound: drive_get_by_hash
+I/flutter ( 3737): ✅ FFI Bound: drive_delete
+I/flutter ( 3737): ✅ FFI Bound: drive_add_with_folder
+I/flutter ( 3737): ✅ FFI Bound: drive_update_folder
+I/flutter ( 3737): ✅ FFI Bound: mesh_capacity
+I/flutter ( 3737): ✅ FFI Bound: get_disk_space
+I/flutter ( 3737): ✅ FFI Bound: register_seeder
+I/flutter ( 3737): ✅ FFI Bound: start_pull
+I/flutter ( 3737): ✅ FFI Bound: notes_create
+I/flutter ( 3737): ✅ FFI Bound: notes_update
+I/flutter ( 3737): ✅ FFI Bound: notes_delete
+I/flutter ( 3737): ✅ FFI Bound: notes_get
+I/flutter ( 3737): ✅ FFI Bound: notes_get_all
+I/flutter ( 3737): ✅ FFI Bound: notes_search
+I/flutter ( 3737): ✅ FFI Bound: notes_save_version
+I/flutter ( 3737): ✅ FFI Bound: notes_get_versions
+I/flutter ( 3737): ✅ FFI Bound: call_history_log
+I/flutter ( 3737): ✅ FFI Bound: call_history_get
+I/flutter ( 3737): ✅ FFI Bound: call_history_count
+I/flutter ( 3737): ✅ FFI Bound: search_messages
+I/flutter ( 3737): ✅ FFI Bound: search_group_messages
+I/flutter ( 3737): ✅ FFI Bound: send_typing_start
+I/flutter ( 3737): ✅ FFI Bound: send_typing_stop
+I/flutter ( 3737): ✅ FFI Bound: get_last_seen
+I/flutter ( 3737): ✅ FFI Bound: get_ai_mode
+I/flutter ( 3737): ✅ FFI Bound: set_ai_mode
+I/flutter ( 3737): ✅ FFI Bound: get_api_key
+I/flutter ( 3737): ✅ FFI Bound: claw_trigger_tick
+I/flutter ( 3737): ✅ FFI Bound: claw_set_active
+I/flutter ( 3737): ✅ FFI Bound: claw_set_node_mode
+I/flutter ( 3737): ✅ FFI Bound: claw_get_status
+I/flutter ( 3737): ⚠️ FFI Bind FAILED: claw_get_endpoint (Using placeholder)
+I/flutter ( 3737): ⚠️ FFI Bind FAILED: claw_set_endpoint (Using placeholder)
+I/flutter ( 3737): ✅ FFI Bound: claw_process_query
+I/flutter ( 3737): ✅ FFI Bound: claw_run_network_recon
+I/flutter ( 3737): ✅ FFI Bound: claw_heal_peer
+I/flutter ( 3737): ✅ FFI Bound: claw_get_activity_log
+I/flutter ( 3737): ✅ FFI Bound: claw_voip_start_call
+I/flutter ( 3737): ✅ FFI Bound: claw_voip_end_call
+I/flutter ( 3737): ✅ FFI Bound: claw_voip_record_sample
+I/flutter ( 3737): ✅ FFI Bound: claw_voip_get_quality
+I/flutter ( 3737): ✅ FFI Bound: claw_voip_get_downgrade_recommendation
+I/flutter ( 3737): ✅ FFI Bound: claw_set_active_chat
+I/flutter ( 3737): ✅ FFI Bound: claw_clear_active_chat
+I/flutter ( 3737): ✅ FFI Bound: claw_set_active_group_members
+I/flutter ( 3737): ✅ FFI Bound: claw_on_app_launch
+I/flutter ( 3737): ✅ FFI Bound: elevate_message
+I/flutter ( 3737): ✅ FFI Bound: unelevate_message
+I/flutter ( 3737): ✅ FFI Bound: get_elevated_messages
+I/flutter ( 3737): ✅ FFI Bound: is_message_elevated
+I/flutter ( 3737): ✅ FFI Bound: get_last_message
+I/flutter ( 3737): ✅ FFI Bound: get_last_group_message
+I/flutter ( 3737): ✅ FFI Bound: get_last_messages_all
+I/flutter ( 3737): ✅ FFI Bound: get_last_group_messages_all
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_get_status
+I/flutter ( 3737): ⚠️ FFI Bind FAILED: get_referral_status (Using placeholder)
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_get_history
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_record_activity
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_update_weights
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_update_anti_gaming
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_get_realtime_earnings
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_record_call_duration
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_record_web_activity
+I/flutter ( 3737): ✅ FFI Bound: daily_reward_record_webview_media_call
+I/flutter ( 3737): ✅ All native functions bound successfully.
+I/flutter ( 3737): ✅ Native finalizer initialized.
+I/flutter ( 3737): 📂 Sandbox Paths Initialized: Support='/data/user/0/chat.introvert.app/files', Docs='/data/user/0/chat.introvert.app/app_flutter'
+I/flutter ( 3737): ⏳ Starting sovereign initialization sequence...
+I/flutter ( 3737): 📍 Target DB Path (Sandboxed): /data/user/0/chat.introvert.app/files/introvert.db
+I/flutter ( 3737): 📍 Target DB Path (Apple/Sanboxed): /data/user/0/chat.introvert.app/files/introvert.db
+I/flutter ( 3737): 🔑 Checking for existing identity...
+D/FlutterGeolocator( 3737): Creating service.
+D/FlutterGeolocator( 3737): Binding to location service.
+I/flutter ( 3737): 🔔 AlertService: FCM token received, caching for registration...
+I/flutter ( 3737): ❌ Register Push Token Error (-10): Engine not started
+I/flutter ( 3737): 🔔 AlertService: Engine not ready yet to register push token: Exception: Register Push Token Error (-10): Engine not started
+I/flutter ( 3737): 🔔 AlertService: Push notification received: chat=null, group=null, call=null
+I/flutter ( 3737): ❌ Fetch Mailbox Error (-10): Engine not started
+D/FlutterRenderer( 3737): Width is zero. 0,0
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/BLASTBufferQueue( 3737): [d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0#1](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/SurfaceComposerClient( 3737): apply transaction with the first frame. layerId: 36795, bufferData(ID: 16050292785166, frameNumber: 1)
+I/SurfaceView( 3737): 226095196 finishedDrawing
+W/FlutterWebRTCPlugin( 3737): audioFocusChangeListener [Earpiece(name=Earpiece)] Earpiece(name=Earpiece)
+W/FlutterWebRTCPlugin( 3737): audioFocusChangeListener [Speakerphone(name=Speakerphone), Earpiece(name=Earpiece)] Speakerphone(name=Speakerphone)
+D/ConnectivityManager( 3737): StackLog: [android.net.ConnectivityManager.sendRequestForNetwork(ConnectivityManager.java:4744)] [android.net.ConnectivityManager.registerDefaultNetworkCallbackForUid(ConnectivityManager.java:5469)] [android.net.ConnectivityManager.registerDefaultNetworkCallback(ConnectivityManager.java:5436)] [android.net.ConnectivityManager.registerDefaultNetworkCallback(ConnectivityManager.java:5410)] [dev.fluttercommunity.plus.connectivity.ConnectivityBroadcastReceiver.onListen(ConnectivityBroadcastReceiver.java:77)] [io.flutter.plugin.common.EventChannel$IncomingStreamRequestHandler.onListen(EventChannel.java:218)] [io.flutter.plugin.common.EventChannel$IncomingStreamRequestHandler.onMessage(EventChannel.java:197)] [io.flutter.embedding.engine.dart.DartMessenger.invokeHandler(DartMessenger.java:286)] [io.flutter.embedding.engine.dart.DartMessenger.lambda$dispatchMessageToQueue$0$io-flutter-embedding-engine-dart-DartMessenger(DartMessenger.java:313)] [io.flutter.embedding.engine.dart.DartMessenger$$ExternalSyntheticLambda0.run(D8$$SyntheticClass:0)]
+D/FlutterGeolocator( 3737): Geolocator foreground service connected
+D/FlutterGeolocator( 3737): Initializing Geolocator services
+D/FlutterGeolocator( 3737): Flutter engine connected. Connected engine count 1
+D/VRI[MainActivity]@9ecccbc( 3737): Setup new sync=wmsSync-VRI[MainActivity]@9ecccbc#1
+I/VRI[MainActivity]@9ecccbc( 3737): Creating new active sync group VRI[MainActivity]@9ecccbc#2
+D/VRI[MainActivity]@9ecccbc( 3737): Draw frame after cancel
+D/VRI[MainActivity]@9ecccbc( 3737): registerCallbacksForSync syncBuffer=false
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: android
+
+Syncing files to device SM S908E (wireless)...                  
+D/SurfaceView( 3737): 226095196 updateSurfacePosition RenderWorker, frameNr = 1, position = [0, 0, 1440, 3088] surfaceSize = 1440x3088
+I/SV[226095196 MainActivity]( 3737): uSP: rtp = Rect(0, 0 - 1440, 3088) rtsw = 1440 rtsh = 3088
+I/SV[226095196 MainActivity]( 3737): onSSPAndSRT: pl = 0 pt = 0 sx = 1.0 sy = 1.0
+I/SV[226095196 MainActivity]( 3737): aOrMT: VRI[MainActivity]@9ecccbc t = android.view.SurfaceControl$Transaction@899ac3d fN = 1 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 android.graphics.RenderNode$CompositePositionUpdateListener.positionChanged:401 
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d41b850 mBlastBufferQueue=0xb400007e1d437260 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SurfaceView.applyOrMergeTransaction:1863 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 
+D/VRI[MainActivity]@9ecccbc( 3737): Received frameDrawingCallback syncResult=0 frameNum=1.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d45ffd0 mBlastBufferQueue=0xb400007e1d437260 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
+I/VRI[MainActivity]@9ecccbc( 3737): Setting up sync and frameCommitCallback
+I/BLASTBufferQueue( 3737): [VRI[MainActivity]@9ecccbc#0](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/SurfaceComposerClient( 3737): apply transaction with the first frame. layerId: 36790, bufferData(ID: 16050292785171, frameNumber: 1)
+I/VRI[MainActivity]@9ecccbc( 3737): Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+D/HWUI    ( 3737): CFMS:: SetUp Pid : 3737    Tid : 3771
+D/VRI[MainActivity]@9ecccbc( 3737): reportDrawFinished seqId=0
+I/InsetsSourceConsumer( 3737): applyRequestedVisibilityToControl: visible=true, type=statusBars, host=chat.introvert.app/chat.introvert.app.MainActivity
+I/InsetsSourceConsumer( 3737): applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=chat.introvert.app/chat.introvert.app.MainActivity
+D/WindowLayoutComponentImpl( 3737): Register WindowLayoutInfoListener on Context=chat.introvert.app.MainActivity@1bf6f52, of which baseContext=android.app.ContextImpl@20209fb
+D/VRI[MainActivity]@9ecccbc( 3737): mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb400007e5d4397b0}
+D/InputMethodManagerUtils( 3737): startInputInner - Id : 0
+I/InputMethodManager( 3737): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+D/InputTransport( 3737): Input channel constructed: 'ClientS', fd=167
+I/InputMethodManager( 3737): handleMessage: setImeVisibility visible=false
+D/InsetsController( 3737): hide(ime(), fromIme=false)
+I/ImeTracker( 3737): chat.introvert.app:6d2c2869: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+Syncing files to device SM S908E (wireless)...                     215ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on SM S908E is available at: http://127.0.0.1:64320/W7oP9JqLZdk=/
+The Flutter DevTools debugger and profiler on SM S908E is available at: http://127.0.0.1:64320/W7oP9JqLZdk=/devtools/?uri=ws://127.0.0.1:64320/W7oP9JqLZdk=/ws
+I/flutter ( 3737): 📜 Checking Terms of Use acceptance...
+I/flutter ( 3737): ✅ Terms accepted. Proceeding with engine start...
+I/flutter ( 3737): 🧠 Identity found. Starting native engine...
+I/flutter ( 3737): ✅ Initialization complete. Loading UI.
+I/flutter ( 3737): 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+I/flutter ( 3737): ❌ Network Start Error (-10): Engine not started
+I/flutter ( 3737): ⚠️ Background sync initialized — push unavailable, starting fallback poll
+I/flutter ( 3737): 💰 Subscribing to Economy Monitoring...
+I/flutter ( 3737): ❌ Economy Monitoring Error (-10): Engine not started
+I/flutter ( 3737): ⚠️ Economy monitoring deferred (engine not ready): Exception: Economy Monitoring Error (-10): Engine not started
+I/flutter ( 3737): [Update] Skipping update check (recently checked).
+I/flutter ( 3737): ✅ Engine Start: Success
+I/flutter ( 3737): 📡 Starting networking plane...
+I/flutter ( 3737): 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+I/flutter ( 3737): ✅ Network Start: Success
+I/flutter ( 3737): ✅ IntroClaw On App Launch: Success
+I/flutter ( 3737): ✅ Register Push Token: Success
+I/flutter ( 3737): 🔔 AlertService: Push token successfully registered with RBN.
+I/flutter ( 3737): 🔄 BackgroundSyncService: Push availability updated to true
+I/flutter ( 3737): ✅ Fetch Mailbox: Success
+I/flutter ( 3737): 🚀 Introvert Engine Started Successfully!
+I/flutter ( 3737): 🦀 Rust Debug: Starting NetworkService initialization...
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Behaviour initialized for peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🔄 Network online — refreshing profile for handle restoration
+I/flutter ( 3737): 🦀 Rust Debug: NetworkService initialized. Running swarm...
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 3 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: FFI: Push token saved successfully to local DB under key: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+I/flutter ( 3737): 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=48, DataLen=21
+I/flutter ( 3737): [StatusStream] connecting:mesh_sweep
+I/flutter ( 3737): 🦀 Rust Debug: [StatusStream] Connecting to the mesh swarm...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 2: Re-dialing all bootstrap nodes (TCP+QUIC) [WIFI]
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/443
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/udp/443/quic-v1
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/80
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Tunnel active (0s). Waiting for connection...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=0, incoming=0, seeders=0, pending=1)
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/64231/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/64232/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/58349/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/56250/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 5 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/64168/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/65184/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/58630/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/64167/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 5 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/64231/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/64232/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/58349/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/56250/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 5 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/64168/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/65184/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/58630/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/64167/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 5 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter ( 3737): ✅ Fetch Mailbox: Success
+I/flutter ( 3737): 💰 Subscribing to Economy Monitoring...
+I/flutter ( 3737): ✅ Economy Monitoring: Success
+D/ProfileInstaller( 3737): Installing profile for chat.introvert.app
+I/flutter ( 3737): 🦀 Rust Debug: [Tunnel] Activated on port 33879 → ws://47.89.252.80:80/tunnel
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=true
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Status] Status change: 4 (peers=68, relay_listener=false)
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=2, now_relayed=false
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=2, now_relayed=true
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Status] Status change: 1 (peers=119, relay_listener=true)
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=48, DataLen=16
+I/flutter ( 3737): [StatusStream] online:connected
+I/VRI[MainActivity]@9ecccbc( 3737): call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@9ecccbc
+W/WindowOnBackDispatcher( 3737): sendCancelIfRunning: isInProgress=false callback=io.flutter.embedding.android.FlutterActivity$1@e6fb1aa
+I/InputMethodManager_LC( 3737): showSoftInput(View,I)
+I/ImeTracker( 3737): chat.introvert.app:f23e993a: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+I/InputMethodManager_LC( 3737): ssi(): flags=0 view=chat.introvert.app reason=SHOW_SOFT_INPUT
+I/InputMethodManager_LC( 3737): ssi() view is not EditText
+D/InputMethodManagerUtils( 3737): startInputInner - Id : 0
+I/InputMethodManager( 3737): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+D/InsetsController( 3737): show(ime(), fromIme=false)
+D/InsetsController( 3737): Setting requestedVisibleTypes to -1 (was -9)
+I/InsetsController( 3737): setRequestedVisibleTypes: visible=true, mask=ime, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.controlAnimationUnchecked:1604 android.view.InsetsController.applyAnimation:2416 android.view.InsetsController.applyAnimation:2343 android.view.InsetsController.show:1422 android.view.inputmethod.InputMethodManager.showSoftInput:2659 android.view.inputmethod.InputMethodManager.showSoftInput:2571 android.view.inputmethod.InputMethodManager.showSoftInput:2563 android.view.inputmethod.InputMethodManager.showSoftInput:2491 io.flutter.plugin.editing.TextInputPlugin.showTextInput:433 io.flutter.plugin.editing.TextInputPlugin$2.show:114 
+D/InputTransport( 3737): Input channel constructed: 'ClientS', fd=379
+I/InputMethodManager_LC( 3737): showSoftInput(View,I)
+I/ImeTracker( 3737): chat.introvert.app:a2a80e2f: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+I/InputMethodManager_LC( 3737): ssi(): flags=0 view=chat.introvert.app reason=SHOW_SOFT_INPUT
+I/InputMethodManager_LC( 3737): ssi() view is not EditText
+D/InsetsController( 3737): show(ime(), fromIme=false)
+I/ImeTracker( 3737): chat.introvert.app:a2a80e2f: onCancelled at PHASE_CLIENT_REPORT_REQUESTED_VISIBLE_TYPES
+I/VRI[MainActivity]@9ecccbc( 3737): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/AssistStructure( 3737): Flattened final assist data: 416 bytes, containing 1 windows, 3 views
+D/InputConnectionAdaptor( 3737): The input method toggled cursor monitoring on
+I/InsetsController( 3737): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc( 3737): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/InsetsController( 3737): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,1793][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc( 3737): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/InsetsController( 3737): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,1793][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/InsetsController( 3737): controlAnimationUncheckedInner: Added types=ime, animType=0, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.controlAnimationUnchecked:1608 android.view.InsetsController.applyAnimation:2416 android.view.InsetsController.applyAnimation:2343 
+I/BLASTBufferQueue_Java( 3737): update, w= 1440 h= 3088 mName = VRI[MainActivity]@9ecccbc mNativeObject= 0xb400007e1d437260 sc.mNativeObject= 0xb400007c6d421b90 format= -3 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3574 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+I/VRI[MainActivity]@9ecccbc( 3737): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=true req=(1440,3088)0 dur=0 res=0x0 s={true 0xb400007e5d4397b0} ch=false seqId=0
+W/InteractionJankMonitor( 3737): Initializing without READ_DEVICE_CONFIG permission. enabled=false, interval=1, missedFrameThreshold=3, frameTimeThreshold=64, package=chat.introvert.app
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): registerCallbackForPendingTransactions
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d5040d0 mBlastBufferQueue=0xb400007e1d437260 fn= 3 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d5112d0 mBlastBufferQueue=0xb400007e1d437260 fn= 3 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$10.onFrameDraw:6536 android.view.ViewRootImpl$4.onFrameDraw:2489 android.view.ThreadedRenderer$1.onFrameDraw:718 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d463290 mBlastBufferQueue=0xb400007e1d437260 fn= 4 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d511b90 mBlastBufferQueue=0xb400007e1d437260 fn= 5 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d510f50 mBlastBufferQueue=0xb400007e1d437260 fn= 6 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d511110 mBlastBufferQueue=0xb400007e1d437260 fn= 7 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d513090 mBlastBufferQueue=0xb400007e1d437260 fn= 8 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d516890 mBlastBufferQueue=0xb400007e1d437260 fn= 9 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d512290 mBlastBufferQueue=0xb400007e1d437260 fn= 10 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d513e90 mBlastBufferQueue=0xb400007e1d437260 fn= 11 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d5120d0 mBlastBufferQueue=0xb400007e1d437260 fn= 12 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d514c90 mBlastBufferQueue=0xb400007e1d437260 fn= 13 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d513950 mBlastBufferQueue=0xb400007e1d437260 fn= 14 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d512ed0 mBlastBufferQueue=0xb400007e1d437260 fn= 15 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d5158d0 mBlastBufferQueue=0xb400007e1d437260 fn= 16 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d514210 mBlastBufferQueue=0xb400007e1d437260 fn= 17 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d4f2550 mBlastBufferQueue=0xb400007e1d437260 fn= 18 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d514590 mBlastBufferQueue=0xb400007e1d437260 fn= 19 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d516a50 mBlastBufferQueue=0xb400007e1d437260 fn= 20 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/InsetsController( 3737): cancelAnimation: types=ime, animType=0, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.notifyFinished:2006 android.view.InsetsAnimationControlImpl.applyChangeInsets:335 android.view.InsetsController.lambda$new$3:957 
+I/ImeTracker( 3737): chat.introvert.app:f23e993a: onShown
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d512990 mBlastBufferQueue=0xb400007e1d437260 fn= 21 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/InputMethodManager_LC( 3737): showSoftInput(View,I)
+I/ImeTracker( 3737): chat.introvert.app:d9d9b0bd: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+I/InputMethodManager_LC( 3737): ssi(): flags=0 view=chat.introvert.app reason=SHOW_SOFT_INPUT
+I/InputMethodManager_LC( 3737): ssi() view is not EditText
+D/InsetsController( 3737): show(ime(), fromIme=false)
+I/ImeTracker( 3737): chat.introvert.app:d9d9b0bd: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+I/InputMethodManager_LC( 3737): showSoftInput(View,I)
+I/ImeTracker( 3737): chat.introvert.app:71824ea9: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+I/InputMethodManager_LC( 3737): ssi(): flags=0 view=chat.introvert.app reason=SHOW_SOFT_INPUT
+I/InputMethodManager_LC( 3737): ssi() view is not EditText
+D/InsetsController( 3737): show(ime(), fromIme=false)
+I/ImeTracker( 3737): chat.introvert.app:71824ea9: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+I/InputMethodManager_LC( 3737): showSoftInput(View,I)
+I/ImeTracker( 3737): chat.introvert.app:86030fac: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+I/InputMethodManager_LC( 3737): ssi(): flags=0 view=chat.introvert.app reason=SHOW_SOFT_INPUT
+I/InputMethodManager_LC( 3737): ssi() view is not EditText
+D/InsetsController( 3737): show(ime(), fromIme=false)
+I/ImeTracker( 3737): chat.introvert.app:86030fac: onCancelled at PHASE_CLIENT_APPLY_ANIMATION
+I/flutter ( 3737): ✅ Resolve Handle: Success
+I/ImeTracker( 3737): chat.introvert.app:7417d799: onRequestHide at ORIGIN_CLIENT reason HIDE_SOFT_INPUT fromUser false
+I/InputMethodManager_LC( 3737): hsifw() - flag : 0
+I/InputMethodManager_LC( 3737): hsifw() - mService.hideSoftInput
+D/InsetsController( 3737): hide(ime(), fromIme=false)
+W/WindowOnBackDispatcher( 3737): sendCancelIfRunning: isInProgress=false callback=android.view.ImeBackAnimationController@322d74b
+D/InsetsController( 3737): Setting requestedVisibleTypes to -9 (was -1)
+I/InsetsController( 3737): setRequestedVisibleTypes: visible=false, mask=ime, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.controlAnimationUnchecked:1604 android.view.InsetsController.applyAnimation:2416 android.view.InsetsController.applyAnimation:2343 android.view.InsetsController.hide:1540 android.view.inputmethod.InputMethodManager.hideSoftInputFromWindow:2889 android.view.inputmethod.InputMethodManager.hideSoftInputFromWindow:2812 android.view.inputmethod.InputMethodManager.hideSoftInputFromWindow:2773 io.flutter.plugin.editing.TextInputPlugin.hideTextInput:447 io.flutter.plugin.editing.TextInputPlugin.access$400:44 io.flutter.plugin.editing.TextInputPlugin$2.hide:122 
+I/InsetsController( 3737): controlAnimationUncheckedInner: Added types=ime, animType=1, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.controlAnimationUnchecked:1608 android.view.InsetsController.applyAnimation:2416 android.view.InsetsController.applyAnimation:2343 
+D/CompatChangeReporter( 3737): Compat change id reported: 395521150; UID 10524; state: ENABLED
+I/BLASTBufferQueue_Java( 3737): update, w= 1440 h= 3088 mName = VRI[MainActivity]@9ecccbc mNativeObject= 0xb400007e1d437260 sc.mNativeObject= 0xb400007c6d421b90 format= -3 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3574 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+I/VRI[MainActivity]@9ecccbc( 3737): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=true req=(1440,3088)0 dur=0 res=0x0 s={true 0xb400007e5d4397b0} ch=false seqId=0
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): registerCallbackForPendingTransactions
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51b210 mBlastBufferQueue=0xb400007e1d437260 fn= 22 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d519b50 mBlastBufferQueue=0xb400007e1d437260 fn= 22 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$10.onFrameDraw:6536 android.view.ViewRootImpl$4.onFrameDraw:2489 android.view.ThreadedRenderer$1.onFrameDraw:718 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51c8d0 mBlastBufferQueue=0xb400007e1d437260 fn= 23 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51a790 mBlastBufferQueue=0xb400007e1d437260 fn= 24 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51c390 mBlastBufferQueue=0xb400007e1d437260 fn= 25 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51ae90 mBlastBufferQueue=0xb400007e1d437260 fn= 26 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d519ed0 mBlastBufferQueue=0xb400007e1d437260 fn= 27 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51b050 mBlastBufferQueue=0xb400007e1d437260 fn= 28 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d518d50 mBlastBufferQueue=0xb400007e1d437260 fn= 29 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51b3d0 mBlastBufferQueue=0xb400007e1d437260 fn= 30 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d518110 mBlastBufferQueue=0xb400007e1d437260 fn= 31 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d5190d0 mBlastBufferQueue=0xb400007e1d437260 fn= 32 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d519610 mBlastBufferQueue=0xb400007e1d437260 fn= 33 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d5189d0 mBlastBufferQueue=0xb400007e1d437260 fn= 34 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/InsetsController( 3737): cancelAnimation: types=ime, animType=1, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.notifyFinished:2006 android.view.InsetsAnimationControlImpl.applyChangeInsets:335 android.view.InsetsController.lambda$new$3:957 
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+D/FlutterJNI( 3737): Sending viewport metrics to the engine.
+D/InputMethodManagerUtils( 3737): startInputInner - Id : 0
+I/InputMethodManager( 3737): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d51b910 mBlastBufferQueue=0xb400007e1d437260 fn= 35 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/InputTransport( 3737): Input channel constructed: 'ClientS', fd=271
+I/InsetsController( 3737): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,1793][1440,3088] mVisible=false mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc( 3737): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/InsetsSourceConsumer( 3737): applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=chat.introvert.app/chat.introvert.app.MainActivity
+I/ImeTracker( 3737): system_server:feb2906e: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=33, DataLen=65
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=33, DataLen=65
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=33, DataLen=65
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=33, DataLen=65
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=33, DataLen=65
+I/InsetsController( 3737): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc( 3737): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/InsetsController( 3737): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc( 3737): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/flutter ( 3737): ✅ Send Direct Invite: Success
+W/WindowOnBackDispatcher( 3737): sendCancelIfRunning: isInProgress=false callback=io.flutter.embedding.android.FlutterActivity$1@e6fb1aa
+I/VRI[MainActivity]@9ecccbc( 3737): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@9ecccbc
+I/VRI[MainActivity]@9ecccbc( 3737): call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@9ecccbc
+I/VRI[MainActivity]@9ecccbc( 3737): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@9ecccbc
+I/VRI[MainActivity]@9ecccbc( 3737): call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@9ecccbc
+W/WindowOnBackDispatcher( 3737): sendCancelIfRunning: isInProgress=false callback=io.flutter.embedding.android.FlutterActivity$1@e6fb1aa
+I/VRI[MainActivity]@9ecccbc( 3737): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@9ecccbc
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — lock released
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+I/flutter ( 3737): [IdleMode] Entered idle — push handles wake-ups, polling disabled
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+I/VRI[MainActivity]@9ecccbc( 3737): onDisplayChanged oldDisplayState=2 newDisplayState=1
+I/VRI[MainActivity]@9ecccbc( 3737): handleAppVisibility mAppVisible = true visible = false
+D/VRI[MainActivity]@9ecccbc( 3737): visibilityChanged oldVisibility=true newVisibility=false
+I/VRI[MainActivity]@9ecccbc( 3737): stopped(true) old = false
+D/VRI[MainActivity]@9ecccbc( 3737): WindowStopped on chat.introvert.app/chat.introvert.app.MainActivity set to true
+D/HWUI    ( 3737): CacheManager::trimMemory(20)
+D/SurfaceView( 3737): 67165594 windowPositionLost, frameNr = 0
+I/SV[226095196 MainActivity]( 3737): aOrMT: VRI[MainActivity]@9ecccbc t = android.view.SurfaceControl$Transaction@6ff76cb fN = 0 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionLost:2025 android.graphics.RenderNode$CompositePositionUpdateListener.positionLost:418 
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d443e10 mBlastBufferQueue=0xb400007e1d437260 fn= 0 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SurfaceView.applyOrMergeTransaction:1863 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionLost:2025 
+I/SV[226095196 MainActivity]( 3737): windowStopped(true) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+I/SurfaceView( 3737): 226095196 Changes: creating=false format=false size=false visible=true alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+I/SurfaceView( 3737): 226095196 Cur surface: Surface(name=null mNativeObject=-5476376604151941248)/@0x4412e9e
+D/SurfaceComposerClient( 3737): setCornerRadius ## d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0#36794 cornerRadius=0.000000
+I/SurfaceView( 3737): 226095196 surfaceDestroyed
+I/SV[226095196 MainActivity]( 3737): surfaceDestroyed callback.size 1 #1 io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088}
+I/SV[226095196 MainActivity]( 3737): updateSurface: mVisible = false mSurface.isValid() = true
+I/SV[226095196 MainActivity]( 3737): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+V/SurfaceView( 3737): Layout: x=0 y=0 w=1440 h=3088, frame=Rect(0, 0 - 1440, 3088)
+I/AutofillManager( 3737): onInvisibleForAutofill(): expiringResponse
+I/flutter ( 3737): 🔄 App Lifecycle State: AppLifecycleState.hidden (isInBackground: false)
+I/flutter ( 3737): 🔄 App Lifecycle State: AppLifecycleState.paused (isInBackground: true)
+D/SV[226095196 MainActivity]( 3737): updateSurface: surface is not valid
+I/SV[226095196 MainActivity]( 3737): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/IntrovertService( 3737): MulticastLock acquired for mDNS discovery.
+D/IntrovertService( 3737): Node Mode: WakeLock acquired.
+I/SV[226095196 MainActivity]( 3737): onWindowVisibilityChanged(8) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c G.E...... ......I. 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+D/SV[226095196 MainActivity]( 3737): updateSurface: surface is not valid
+I/SV[226095196 MainActivity]( 3737): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/HWUI    ( 3737): CacheManager::trimMemory(20)
+I/VRI[MainActivity]@9ecccbc( 3737): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=false req=(1440,3088)8 dur=9 res=0x2 s={false 0x0} ch=false seqId=0
+D/SV[226095196 MainActivity]( 3737): updateSurface: surface is not valid
+I/SV[226095196 MainActivity]( 3737): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc( 3737): applyTransactionOnDraw applyImmediately
+D/VRI[MainActivity]@9ecccbc( 3737): Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+D/VRI[MainActivity]@9ecccbc( 3737): Pending transaction will not be applied in sync with a draw due to view not visible
+I/VRI[MainActivity]@9ecccbc( 3737): mWNT: t=0xb400007c2d441250 mBlastBufferQueue=0xnull fn= 0 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl.handleSyncRequestWhenNoAsyncDraw:6733 android.view.ViewRootImpl.performTraversals:5504 android.view.ViewRootImpl.doTraversal:3924 
+D/HWUI    ( 3737): CacheManager::trimMemory(20)
+I/ImeFocusController( 3737): onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+I/ImeFocusController( 3737): onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Idle — suppressing background dials
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 1 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 1 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=3, now_relayed=false
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=3, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Idle — suppressing background dials
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — removed from is_relayed_map
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Status] Status change: 4 (peers=812, relay_listener=false)
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 812 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 812 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 812 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 812 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Dialing RBN: /ip4/47.89.252.80/tcp/443
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] No RBNs reachable — will retry in 30s
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Step 1: 813 peers connected but no relay. Re-establishing...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] ✅ ReservationReqAccepted via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (renewal=false, limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] Triggering mailbox drain after ReservationReqAccepted
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] ✅ InboundCircuitEstablished from 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) })) — flushing pending payloads
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] Relay hint: 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn is behind RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] Flush completed for 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn — lock released
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWB6ynL4JHZYT1aPAQjjyn9iA9VU1WXbrtysvdNCR6PQjn: is_relayed_endpoint=true, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter ( 3737): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter ( 3737): 🦀 Rust Debug: [Status] Status change: 1 (peers=827, relay_listener=true)
+I/flutter ( 3737): 🌐 Swarm Event Received: Type=48, DataLen=16
+I/flutter ( 3737): [StatusStream] online:connected
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Idle — suppressing background dials
+I/flutter ( 3737): 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=true
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter ( 3737): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired event: 1 entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr /ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired event: 1 entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr /ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 1 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 1 addresses
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+I/flutter ( 3737): 🦀 Rust Debug: [Relay] 🔌 OutboundCircuitEstablished via 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a (limit=Some(Limit { duration: Some(3600s), data_in_bytes: Some(1073741824) }))
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Idle — suppressing background dials
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/64168/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/udp/65184/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/udp/58630/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.193/tcp/64167/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired event: 5 entries
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/64168/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/443/p2p/12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a/p2p-circuit/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/65184/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/58630/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/64167/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter ( 3737): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter ( 3737): 🦀 Rust Debug: [Resilience] Idle — suppressing background dials

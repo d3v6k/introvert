@@ -1,0 +1,371 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on SM S908E (wireless) in debug mode...
+Running Gradle task 'assembleDebug'...                          
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4485
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4486
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4487
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4488
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4489
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4490
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4491
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4492
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4493
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4494
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4495
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4496
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4497
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4498
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4499
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4500
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4501
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4502
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4503
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4504
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4505
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4506
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4507
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4508
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4509
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4510
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4511
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4512
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4513
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4514
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4515
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4516
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4517
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4518
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4519
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4520
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4521
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4522
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4523
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4524
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4525
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4526
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4527
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4528
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4529
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4530
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4531
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4532
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4533
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4534
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4535
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4536
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4537
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4538
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4539
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4540
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4541
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4542
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4543
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4544
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4545
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4546
+WARNING: Your Android app project: app located at: /Users/dev/Development/introvert/android/app/build.gradle.kts
+applies the Kotlin Gradle Plugin, which will cause build failures in future versions of Flutter. 
+Please migrate your app to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): flutter_callkit_incoming, flutter_webrtc, package_info_plus, pdf_render_maintained, share_plus
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4547
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4548
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4549
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4550
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4551
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4552
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4553
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4554
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4555
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4556
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4557
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4558
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4559
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4560
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4561
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4562
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4563
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4564
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4565
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4566
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4567
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4568
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4569
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4570
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4571
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4572
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4573
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4574
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4575
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4576
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4577
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4578
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4579
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4580
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4581
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4582
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4583
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4584
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4585
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: android
+
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4586
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4587
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4588
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4589
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4590
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4591
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4592
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4593
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4594
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4595
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4596
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4597
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4598
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4599
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4600
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4601
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4602
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4603
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4604
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4605
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4606
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4607
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4608
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4609
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4610
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4611
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4612
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4613
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4614
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4615
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4616
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4617
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4618
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4619
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4620
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4621
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4622
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4623
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4624
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4625
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4626
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4627
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4628
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4629
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4630
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4631
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4632
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4633
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4634
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4635
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4636
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4637
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4638
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4639
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4640
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4641
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4642
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4643
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4644
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4645
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4646
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4647
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4648
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4649
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4650
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4651
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4652
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4653
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4654
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4655
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4656
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4657
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4658
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4659
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4660
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4661
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4662
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4663
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4664
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4665
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4666
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4667
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4668
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4669
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4670
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4671
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4672
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4673
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4674
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4675
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4676
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4677
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4678
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4679
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4680
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4681
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4682
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4683
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4684
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4685
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4686
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4687
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4688
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4689
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4690
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4691
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4692
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4693
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4694
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4695
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4696
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4697
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4698
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4699
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4700
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4701
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4702
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4703
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4704
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4705
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4706
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4707
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4708
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4709
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4710
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4711
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4712
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4713
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4714
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4715
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4716
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4717
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4718
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4719
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4720
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4721
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4722
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4723
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4724
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4725
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4726
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4727
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4728
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4729
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4730
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4731
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4732
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4733
+W/FlutterJNI(26134): Tried to send a platform message to Flutter, but FlutterJNI was detached from native C++. Could not send. Channel: introvert/alerts. Response ID: 4734
+Running Gradle task 'assembleDebug'...                             75.1s
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+Installing build/app/outputs/flutter-apk/app-debug.apk...          23.5s
+I/FlutterActivityAndFragmentDelegate(27775): If you are attempting to set --enable-dart-profiling via Intent extras to launch a Flutter component outside of using the Flutter CLI, note that support for setting engine flags on Android via Intent will soon be dropped; see https://github.com/flutter/flutter/issues/180686 for more information on this breaking change. To migrate, set --enable-dart-profiling or any other flags specified via Intent extras on the command line instead or see https://github.com/flutter/flutter/blob/main/docs/engine/Flutter-Android-Engine-Flags.md for alternative methods.
+D/FlutterJNI(27775): Beginning load of flutter...
+D/FlutterJNI(27775): flutter (null) was loaded normally!
+I/flutter (27775): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+Error connecting to the service protocol: failed to connect to http://127.0.0.1:51125/gzaZT3ZRTqw=/ Exception: DDS shut down too early

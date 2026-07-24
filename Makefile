@@ -1,17 +1,22 @@
 # Introvert Native Build System
 
-.PHONY: help mac macos-dmg android ios clean all bk
+# iPhone 13 Pro device ID — update this if the device changes
+IOS_DEVICE ?= 00008110-0009451C1AC2801E
+
+.PHONY: help mac macos-dmg android ios ios-device ios-install clean all bk
 
 help:
 	@echo "Introvert Build System"
 	@echo "Usage:"
-	@echo "  make mac          - Build native library for macOS"
-	@echo "  make macos-dmg    - Build macOS app and create DMG installer"
-	@echo "  make android      - Build native libraries for Android (arm64 and x64)"
-	@echo "  make ios          - Build native static libraries for iOS"
-	@echo "  make all          - Build for all platforms"
-	@echo "  make bk           - Comprehensive backup to external SSD"
-	@echo "  make clean        - Remove build artifacts"
+	@echo "  make mac              - Build native library for macOS"
+	@echo "  make macos-dmg        - Build macOS app and create DMG installer"
+	@echo "  make android          - Build native libraries for Android (arm64 and x64)"
+	@echo "  make ios              - Build native static libraries for iOS device + simulator"
+	@echo "  make ios-device       - Build Flutter iOS release app"
+	@echo "  make ios-install      - Build and install on iPhone 13 Pro (IOS_DEVICE=$(IOS_DEVICE))"
+	@echo "  make all              - Build for all platforms (mac + android + ios + ios-device)"
+	@echo "  make bk               - Comprehensive backup to external SSD"
+	@echo "  make clean            - Remove build artifacts"
 
 mac:
 	@echo "🍏 Building macOS Native Core..."
@@ -41,7 +46,17 @@ ios:
 	@cp target/aarch64-apple-ios-sim/release/libintrovert.a ios/libs/libintrovert_simulator.a
 	@echo "✅ iOS build complete. Libraries available in ios/libs/"
 
-all: mac android ios
+ios-device: ios
+	@echo "📱 Building Flutter iOS release app..."
+	@flutter build ios --release 2>&1 | tail -3
+	@echo "✅ Flutter iOS release app built."
+
+ios-install: ios-device
+	@echo "📲 Installing on iPhone 13 Pro ($(IOS_DEVICE))..."
+	@xcrun devicectl device install app --device $(IOS_DEVICE) build/ios/iphoneos/Runner.app 2>&1
+	@echo "✅ Installed on device."
+
+all: mac android ios ios-device
 
 clean:
 	cargo clean
