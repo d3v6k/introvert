@@ -620,18 +620,22 @@ impl NetworkService {
                     }
 
                     let connected_count = self.connected_peer_count.load(std::sync::atomic::Ordering::Relaxed);
-                    let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
+                    let has_relay_listener = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"))
+                        || !self.relay_listeners.is_empty();
                     let has_confirmed_reservation = !self.relay_reservations.is_empty();
+                    let has_relayed_connections = self.is_relayed_map.read().values().any(|&v| v);
+                    let rbn_connected = self.bootstrap_nodes.iter()
+                        .any(|(id, _)| self.swarm.is_connected(id));
 
                     // --- ACCURATE STATUS DISPATCH ---
                     // status=0: OFFLINE — no connections at all
-                    // status=1: ONLINE — connected AND relay reservation active (messages CAN flow)
+                    // status=1: ONLINE — connected AND relay reachable (messages CAN flow)
                     // status=2: RELAY — relay reservation accepted (set directly in ReservationReqAccepted)
                     // status=3: SYNCING — connecting to network
                     // status=4: CONNECTING — RBN connected but relay not yet established
                     let current_status: u8 = if connected_count == 0 {
                         0 // OFFLINE — no connections
-                    } else if has_relay_listener || has_confirmed_reservation {
+                    } else if has_relay_listener || has_confirmed_reservation || has_relayed_connections || rbn_connected {
                         1 // ONLINE — reachable via relay
                     } else {
                         4 // CONNECTING — connected to RBN but relay pending

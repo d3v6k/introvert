@@ -2755,3 +2755,349 @@ I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0.
 I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
 I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
 I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4011 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=30, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=30, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=30, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=30, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4002 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=30, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (23595): 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4011 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/TY_com.google.android.libraries.communications.conference.service.impl.state.ConferenceStateManager(30667)[722:964][30698] Participant volume level changed for device spaces/1gFGLGaCisIB/devices/234. [CONTEXT group_by="spaces/1gFGLGaCisIB/devices/234" ratelimit_period="3 SECONDS" skipped=9 ]
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4010 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4010 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4010 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4002 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4010 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4010 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=31, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4011 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter (23595): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4008 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4011 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4011 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/TY_com.google.android.libraries.communications.conference.service.impl.state.ConferenceStateManager(30667)[1010:626][30698] Participant volume level changed for device spaces/1gFGLGaCisIB/devices/234. [CONTEXT group_by="spaces/1gFGLGaCisIB/devices/234" ratelimit_period="3 SECONDS" skipped=8 ]
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/CameraManagerGlobal(23595): Camera 1 facing CAMERA_FACING_FRONT state now CAMERA_STATE_IDLE for client com.google.android.apps.tachyon API Level 2 User Id 0Device Id 0
+I/CameraManagerGlobal(23595): Camera 1 facing CAMERA_FACING_FRONT state now CAMERA_STATE_ACTIVE for client com.google.android.apps.tachyon API Level 2 User Id 0Device Id 0
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4009 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4010 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4007 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4003 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4004 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4005 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+I/org.webrtc.Logging(23595): EglRenderer: Duration: 4006 ms. Frames received: 0. Dropped: 0. Rendered: 0. Render fps: .0. Average render time: NA. Average swapBuffer time: NA.
+

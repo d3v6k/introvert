@@ -1,0 +1,958 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on SM S908E (wireless) in debug mode...
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 4805): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+Running Gradle task 'assembleDebug'...                          
+WARNING: Your Android app project: app located at: /Users/dev/Development/introvert/android/app/build.gradle.kts
+applies the Kotlin Gradle Plugin, which will cause build failures in future versions of Flutter. 
+Please migrate your app to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): flutter_callkit_incoming, flutter_webrtc, package_info_plus, pdf_render_maintained, share_plus
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Step 1: 22 peers connected but no relay. Re-establishing...
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 4805): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: android
+
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Step 1: 22 peers connected but no relay. Re-establishing...
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter ( 4805): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Step 1: 22 peers connected but no relay. Re-establishing...
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+Running Gradle task 'assembleDebug'...                             56.3s
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Step 1: 22 peers connected but no relay. Re-establishing...
+I/flutter ( 4805): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+Installing build/app/outputs/flutter-apk/app-debug.apk...          24.1s
+I/FlutterActivityAndFragmentDelegate(20289): If you are attempting to set --enable-dart-profiling via Intent extras to launch a Flutter component outside of using the Flutter CLI, note that support for setting engine flags on Android via Intent will soon be dropped; see https://github.com/flutter/flutter/issues/180686 for more information on this breaking change. To migrate, set --enable-dart-profiling or any other flags specified via Intent extras on the command line instead or see https://github.com/flutter/flutter/blob/main/docs/engine/Flutter-Android-Engine-Flags.md for alternative methods.
+D/FlutterJNI(20289): Beginning load of flutter...
+D/FlutterJNI(20289): flutter (null) was loaded normally!
+I/flutter (20289): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterGeolocator(20289): Attaching Geolocator to activity
+D/FlutterRenderer(20289): Width is zero. 0,0
+I/flutter (20289): ✅ Loaded libintrovert.so
+I/flutter (20289): ✅ FFI Bound: generate_mnemonic
+I/flutter (20289): ✅ FFI Bound: free_string
+I/flutter (20289): ✅ FFI Bound: free_binary
+I/flutter (20289): ✅ FFI Bound: mnemonic_to_seed
+I/flutter (20289): ✅ FFI Bound: derive_identifiers
+I/flutter (20289): ✅ FFI Bound: engine_start
+I/flutter (20289): ✅ FFI Bound: engine_stop
+I/flutter (20289): ✅ FFI Bound: get_peer_id
+I/flutter (20289): ✅ FFI Bound: network_start
+I/flutter (20289): ✅ FFI Bound: economy_monitor
+I/flutter (20289): ✅ FFI Bound: send_message
+I/flutter (20289): ✅ FFI Bound: init_webrtc
+I/flutter (20289): ✅ FFI Bound: send_native_signal
+I/flutter (20289): ✅ FFI Bound: add_address
+I/flutter (20289): ✅ FFI Bound: claim_rewards
+I/flutter (20289): ✅ FFI Bound: store_msg_async
+I/flutter (20289): ✅ FFI Bound: get_messages
+I/flutter (20289): ✅ FFI Bound: get_messages_paginated
+I/flutter (20289): ✅ FFI Bound: secure_session
+I/flutter (20289): ✅ FFI Bound: fetch_mailbox
+I/flutter (20289): ✅ FFI Bound: media_stream
+I/flutter (20289): ✅ FFI Bound: get_contacts
+I/flutter (20289): ✅ FFI Bound: delete_contact
+I/flutter (20289): ✅ FFI Bound: set_profile_tier
+I/flutter (20289): ✅ FFI Bound: delete_chat
+I/flutter (20289): ✅ FFI Bound: clear_pending_messages
+I/flutter (20289): ✅ FFI Bound: clear_contacts
+I/flutter (20289): ✅ FFI Bound: wormhole_start
+I/flutter (20289): ✅ FFI Bound: wormhole_join
+I/flutter (20289): ✅ FFI Bound: wormhole_abort
+I/flutter (20289): ✅ FFI Bound: close_webrtc
+I/flutter (20289): ✅ FFI Bound: renegotiate_webrtc
+I/flutter (20289): ✅ FFI Bound: accept_call
+I/flutter (20289): ✅ FFI Bound: reject_call
+I/flutter (20289): ✅ FFI Bound: set_anchor
+I/flutter (20289): ✅ FFI Bound: get_anchor_mode
+I/flutter (20289): ✅ FFI Bound: set_tunnel
+I/flutter (20289): ✅ FFI Bound: get_tunnel_mode
+I/flutter (20289): ✅ FFI Bound: get_rbns
+I/flutter (20289): ✅ FFI Bound: test_rbn
+I/flutter (20289): ✅ FFI Bound: disclaimer_is_accepted
+I/flutter (20289): ✅ FFI Bound: disclaimer_set_accepted
+I/flutter (20289): ✅ FFI Bound: recheck_connection
+I/flutter (20289): ✅ FFI Bound: resolve_handle
+I/flutter (20289): ✅ FFI Bound: send_direct_invite
+I/flutter (20289): ✅ FFI Bound: register_push_token
+I/flutter (20289): ✅ FFI Bound: set_retention
+I/flutter (20289): ✅ FFI Bound: delete_message
+I/flutter (20289): ✅ FFI Bound: edit_message
+I/flutter (20289): ✅ FFI Bound: send_reaction
+I/flutter (20289): ✅ FFI Bound: get_reactions
+I/flutter (20289): ✅ FFI Bound: claim_handle
+I/flutter (20289): ✅ FFI Bound: get_handle_status
+I/flutter (20289): ✅ FFI Bound: get_local_handle
+I/flutter (20289): ✅ FFI Bound: is_handle_claimed
+I/flutter (20289): ✅ FFI Bound: lookup_peer_handle
+I/flutter (20289): ✅ FFI Bound: request_swarm_stats
+I/flutter (20289): ✅ FFI Bound: poll_peer_profile
+I/flutter (20289): ✅ FFI Bound: sync_chat_messages
+I/flutter (20289): ✅ FFI Bound: get_profile
+I/flutter (20289): ✅ FFI Bound: set_profile
+I/flutter (20289): ✅ FFI Bound: send_file
+I/flutter (20289): ✅ FFI Bound: inspect_media
+I/flutter (20289): ✅ FFI Bound: cancel_file
+I/flutter (20289): ✅ FFI Bound: force_refresh
+I/flutter (20289): ✅ FFI Bound: send_manual_telemetry
+I/flutter (20289): ✅ FFI Bound: set_connectivity_type
+I/flutter (20289): ✅ FFI Bound: set_app_idle_state
+I/flutter (20289): ✅ FFI Bound: group_create
+I/flutter (20289): ✅ FFI Bound: group_send
+I/flutter (20289): ✅ FFI Bound: group_get_all
+I/flutter (20289): ✅ FFI Bound: group_get_msgs
+I/flutter (20289): ✅ FFI Bound: group_add_member
+I/flutter (20289): ✅ FFI Bound: group_approve_join
+I/flutter (20289): ✅ FFI Bound: group_reject_join
+I/flutter (20289): ✅ FFI Bound: group_remove_member
+I/flutter (20289): ✅ FFI Bound: group_update_role
+I/flutter (20289): ✅ FFI Bound: group_publish
+I/flutter (20289): ✅ FFI Bound: group_join_code
+I/flutter (20289): ✅ FFI Bound: group_delete
+I/flutter (20289): ✅ FFI Bound: group_get_pending
+I/flutter (20289): ✅ FFI Bound: group_accept_invite
+I/flutter (20289): ✅ FFI Bound: group_decline_invite
+I/flutter (20289): ✅ FFI Bound: group_mute
+I/flutter (20289): ✅ FFI Bound: group_unmute
+I/flutter (20289): ✅ FFI Bound: group_get_muted
+I/flutter (20289): ✅ FFI Bound: update_msg_status
+I/flutter (20289): ✅ FFI Bound: update_msg_status_peer
+I/flutter (20289): ✅ FFI Bound: update_group_msg_status
+I/flutter (20289): ✅ FFI Bound: update_group_msg_status_id
+I/flutter (20289): ✅ FFI Bound: get_unread_counts
+I/flutter (20289): ✅ FFI Bound: send_ack
+I/flutter (20289): ✅ FFI Bound: update_contact_alias
+I/flutter (20289): ✅ FFI Bound: compute_file_hash
+I/flutter (20289): ✅ FFI Bound: nuke_identity
+I/flutter (20289): ✅ FFI Bound: drive_add
+I/flutter (20289): ✅ FFI Bound: drive_get_all
+I/flutter (20289): ✅ FFI Bound: drive_get_by_hash
+I/flutter (20289): ✅ FFI Bound: drive_delete
+I/flutter (20289): ✅ FFI Bound: drive_add_with_folder
+I/flutter (20289): ✅ FFI Bound: drive_update_folder
+I/flutter (20289): ✅ FFI Bound: mesh_capacity
+I/flutter (20289): ✅ FFI Bound: get_disk_space
+I/flutter (20289): ✅ FFI Bound: register_seeder
+I/flutter (20289): ✅ FFI Bound: start_pull
+I/flutter (20289): ✅ FFI Bound: notes_create
+I/flutter (20289): ✅ FFI Bound: notes_update
+I/flutter (20289): ✅ FFI Bound: notes_delete
+I/flutter (20289): ✅ FFI Bound: notes_get
+I/flutter (20289): ✅ FFI Bound: notes_get_all
+I/flutter (20289): ✅ FFI Bound: notes_search
+I/flutter (20289): ✅ FFI Bound: notes_save_version
+I/flutter (20289): ✅ FFI Bound: notes_get_versions
+I/flutter (20289): ✅ FFI Bound: call_history_log
+I/flutter (20289): ✅ FFI Bound: call_history_get
+I/flutter (20289): ✅ FFI Bound: call_history_count
+I/flutter (20289): ✅ FFI Bound: search_messages
+I/flutter (20289): ✅ FFI Bound: search_group_messages
+I/flutter (20289): ✅ FFI Bound: send_typing_start
+I/flutter (20289): ✅ FFI Bound: send_typing_stop
+I/flutter (20289): ✅ FFI Bound: get_last_seen
+I/flutter (20289): ✅ FFI Bound: get_ai_mode
+I/flutter (20289): ✅ FFI Bound: set_ai_mode
+I/flutter (20289): ✅ FFI Bound: get_api_key
+I/flutter (20289): ✅ FFI Bound: claw_trigger_tick
+I/flutter (20289): ✅ FFI Bound: claw_set_active
+I/flutter (20289): ✅ FFI Bound: claw_set_node_mode
+I/flutter (20289): ✅ FFI Bound: claw_get_status
+I/flutter (20289): ⚠️ FFI Bind FAILED: claw_get_endpoint (Using placeholder)
+I/flutter (20289): ⚠️ FFI Bind FAILED: claw_set_endpoint (Using placeholder)
+I/flutter (20289): ✅ FFI Bound: claw_process_query
+I/flutter (20289): ✅ FFI Bound: claw_run_network_recon
+I/flutter (20289): ✅ FFI Bound: claw_heal_peer
+I/flutter (20289): ✅ FFI Bound: claw_get_activity_log
+I/flutter (20289): ✅ FFI Bound: claw_voip_start_call
+I/flutter (20289): ✅ FFI Bound: claw_voip_end_call
+I/flutter (20289): ✅ FFI Bound: claw_voip_record_sample
+I/flutter (20289): ✅ FFI Bound: claw_voip_get_quality
+I/flutter (20289): ✅ FFI Bound: claw_voip_get_downgrade_recommendation
+I/flutter (20289): ✅ FFI Bound: claw_set_active_chat
+I/flutter (20289): ✅ FFI Bound: claw_clear_active_chat
+I/flutter (20289): ✅ FFI Bound: claw_set_active_group_members
+I/flutter (20289): ✅ FFI Bound: claw_on_app_launch
+I/flutter (20289): ✅ FFI Bound: elevate_message
+I/flutter (20289): ✅ FFI Bound: unelevate_message
+I/flutter (20289): ✅ FFI Bound: get_elevated_messages
+I/flutter (20289): ✅ FFI Bound: is_message_elevated
+I/flutter (20289): ✅ FFI Bound: get_last_message
+I/flutter (20289): ✅ FFI Bound: get_last_group_message
+I/flutter (20289): ✅ FFI Bound: get_last_messages_all
+I/flutter (20289): ✅ FFI Bound: get_last_group_messages_all
+I/flutter (20289): ✅ FFI Bound: daily_reward_get_status
+I/flutter (20289): ⚠️ FFI Bind FAILED: get_referral_status (Using placeholder)
+I/flutter (20289): ✅ FFI Bound: daily_reward_get_history
+I/flutter (20289): ✅ FFI Bound: daily_reward_record_activity
+I/flutter (20289): ✅ FFI Bound: daily_reward_update_weights
+I/flutter (20289): ✅ FFI Bound: daily_reward_update_anti_gaming
+I/flutter (20289): ✅ FFI Bound: daily_reward_get_realtime_earnings
+I/flutter (20289): ✅ FFI Bound: daily_reward_record_call_duration
+I/flutter (20289): ✅ FFI Bound: daily_reward_record_web_activity
+I/flutter (20289): ✅ FFI Bound: daily_reward_record_webview_media_call
+I/flutter (20289): ✅ All native functions bound successfully.
+I/flutter (20289): ✅ Native finalizer initialized.
+I/flutter (20289): 📂 Sandbox Paths Initialized: Support='/data/user/0/chat.introvert.app/files', Docs='/data/user/0/chat.introvert.app/app_flutter'
+I/flutter (20289): ⏳ Starting sovereign initialization sequence...
+I/flutter (20289): 📍 Target DB Path (Sandboxed): /data/user/0/chat.introvert.app/files/introvert.db
+I/flutter (20289): 📍 Target DB Path (Apple/Sanboxed): /data/user/0/chat.introvert.app/files/introvert.db
+I/flutter (20289): 🔑 Checking for existing identity...
+D/FlutterGeolocator(20289): Creating service.
+D/FlutterGeolocator(20289): Binding to location service.
+I/flutter (20289): 🔔 AlertService: FCM token received, caching for registration...
+I/flutter (20289): ❌ Register Push Token Error (-10): Engine not started
+I/flutter (20289): 🔔 AlertService: Engine not ready yet to register push token: Exception: Register Push Token Error (-10): Engine not started
+I/flutter (20289): 🔔 AlertService: Push notification received: chat=null, group=null, call=null
+I/flutter (20289): ❌ Fetch Mailbox Error (-10): Engine not started
+D/FlutterRenderer(20289): Width is zero. 0,0
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+W/FlutterWebRTCPlugin(20289): audioFocusChangeListener [Earpiece(name=Earpiece)] Earpiece(name=Earpiece)
+W/FlutterWebRTCPlugin(20289): audioFocusChangeListener [Speakerphone(name=Speakerphone), Earpiece(name=Earpiece)] Speakerphone(name=Speakerphone)
+D/FlutterGeolocator(20289): Geolocator foreground service connected
+D/FlutterGeolocator(20289): Initializing Geolocator services
+D/FlutterGeolocator(20289): Flutter engine connected. Connected engine count 1
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+I/SurfaceView(20289): 226095196 finishedDrawing
+D/VRI[MainActivity]@9ecccbc(20289): Setup new sync=wmsSync-VRI[MainActivity]@9ecccbc#1
+I/VRI[MainActivity]@9ecccbc(20289): Creating new active sync group VRI[MainActivity]@9ecccbc#2
+D/VRI[MainActivity]@9ecccbc(20289): Draw frame after cancel
+D/VRI[MainActivity]@9ecccbc(20289): registerCallbacksForSync syncBuffer=false
+D/SurfaceView(20289): 226095196 updateSurfacePosition RenderWorker, frameNr = 1, position = [0, 0, 1440, 3088] surfaceSize = 1440x3088
+I/SV[226095196 MainActivity](20289): uSP: rtp = Rect(0, 0 - 1440, 3088) rtsw = 1440 rtsh = 3088
+I/SV[226095196 MainActivity](20289): onSSPAndSRT: pl = 0 pt = 0 sx = 1.0 sy = 1.0
+I/SV[226095196 MainActivity](20289): aOrMT: VRI[MainActivity]@9ecccbc t = android.view.SurfaceControl$Transaction@416c97e fN = 1 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 android.graphics.RenderNode$CompositePositionUpdateListener.positionChanged:401 
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d432b50 mBlastBufferQueue=0xb400007e1d46e5d0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SurfaceView.applyOrMergeTransaction:1863 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 
+D/VRI[MainActivity]@9ecccbc(20289): Received frameDrawingCallback syncResult=0 frameNum=1.
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4526d0 mBlastBufferQueue=0xb400007e1d46e5d0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
+I/VRI[MainActivity]@9ecccbc(20289): Setting up sync and frameCommitCallback
+I/BLASTBufferQueue(20289): [VRI[MainActivity]@9ecccbc#0](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/SurfaceComposerClient(20289): apply transaction with the first frame. layerId: 38682, bufferData(ID: 87140591468563, frameNumber: 1)
+I/VRI[MainActivity]@9ecccbc(20289): Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+D/HWUI    (20289): CFMS:: SetUp Pid : 20289    Tid : 20322
+D/VRI[MainActivity]@9ecccbc(20289): reportDrawFinished seqId=0
+D/VRI[MainActivity]@9ecccbc(20289): mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb400007e5d43b7e0}
+D/InputMethodManagerUtils(20289): startInputInner - Id : 0
+I/InputMethodManager(20289): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+D/InputTransport(20289): Input channel constructed: 'ClientS', fd=168
+I/InputMethodManager(20289): handleMessage: setImeVisibility visible=false
+D/InsetsController(20289): hide(ime(), fromIme=false)
+I/ImeTracker(20289): chat.introvert.app:e765ab20: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: android
+
+Syncing files to device SM S908E (wireless)...                  
+I/flutter (20289): 📜 Checking Terms of Use acceptance...
+I/flutter (20289): ✅ Terms accepted. Proceeding with engine start...
+I/flutter (20289): 🧠 Identity found. Starting native engine...
+I/flutter (20289): ✅ Initialization complete. Loading UI.
+I/flutter (20289): 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+I/flutter (20289): ❌ Network Start Error (-10): Engine not started
+I/flutter (20289): ⚠️ Background sync initialized — push unavailable, starting fallback poll
+I/flutter (20289): 💰 Subscribing to Economy Monitoring...
+I/flutter (20289): ❌ Economy Monitoring Error (-10): Engine not started
+I/flutter (20289): ⚠️ Economy monitoring deferred (engine not ready): Exception: Economy Monitoring Error (-10): Engine not started
+Syncing files to device SM S908E (wireless)...                     175ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on SM S908E is available at: http://127.0.0.1:53300/r0ND4KhBODs=/
+The Flutter DevTools debugger and profiler on SM S908E is available at: http://127.0.0.1:53300/r0ND4KhBODs=/devtools/?uri=ws://127.0.0.1:53300/r0ND4KhBODs=/ws
+I/flutter (20289): [Update] Skipping update check (recently checked).
+I/flutter (20289): ✅ Engine Start: Success
+I/flutter (20289): 📡 Starting networking plane...
+I/flutter (20289): 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+I/flutter (20289): ✅ Network Start: Success
+I/flutter (20289): ✅ IntroClaw On App Launch: Success
+I/flutter (20289): ✅ Register Push Token: Success
+I/flutter (20289): 🔔 AlertService: Push token successfully registered with RBN.
+I/flutter (20289): 🔄 BackgroundSyncService: Push availability updated to true
+I/flutter (20289): ✅ Fetch Mailbox: Success
+I/flutter (20289): 🚀 Introvert Engine Started Successfully!
+I/flutter (20289): 🦀 Rust Debug: Starting NetworkService initialization...
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Behaviour initialized for peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🔄 Network online — refreshing profile for handle restoration
+I/flutter (20289): 🦀 Rust Debug: NetworkService initialized. Running swarm...
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 3 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 2 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: FFI: Push token saved successfully to local DB under key: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+I/flutter (20289): 🌐 Swarm Event Received: Type=48, DataLen=21
+I/flutter (20289): [StatusStream] connecting:mesh_sweep
+I/flutter (20289): 🦀 Rust Debug: [StatusStream] Connecting to the mesh swarm...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 2: Re-dialing all bootstrap nodes (TCP+QUIC) [WIFI]
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/443
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/udp/443/quic-v1
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/80
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Tunnel active (0s). Waiting for connection...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=0, incoming=0, seeders=0, pending=1)
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/53159/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/50275/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/udp/54629/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.194/tcp/53160/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 4 addresses
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/49341/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/61302/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/tcp/49342/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.194/udp/52063/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered event: 3 raw entries
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/53159/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/50275/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/udp/54629/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 3 addresses
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered event: 1 raw entries
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr=/ip4/192.168.1.193/tcp/53160/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf with 1 addresses
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered event: 4 raw entries
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/49341/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/61302/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/tcp/49342/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Raw entry: peer=12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP addr=/ip4/192.168.1.193/udp/52063/quic-v1/p2p/12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Discovered peer 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP with 4 addresses
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter (20289): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter (20289): ✅ Fetch Mailbox: Success
+I/flutter (20289): 💰 Subscribing to Economy Monitoring...
+I/flutter (20289): ✅ Economy Monitoring: Success
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+D/ProfileInstaller(20289): Installing profile for chat.introvert.app
+I/flutter (20289): 🦀 Rust Debug: [Tunnel] Activated on port 39847 → ws://47.89.252.80:80/tunnel
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] Status change: 4 (peers=13, relay_listener=false)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=2, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+I/flutter (20289): [IdleMode] Entered idle — push handles wake-ups, polling disabled
+I/flutter (20289): 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+I/VRI[MainActivity]@9ecccbc(20289): onDisplayChanged oldDisplayState=2 newDisplayState=1
+I/VRI[MainActivity]@9ecccbc(20289): handleAppVisibility mAppVisible = true visible = false
+D/VRI[MainActivity]@9ecccbc(20289): visibilityChanged oldVisibility=true newVisibility=false
+I/VRI[MainActivity]@9ecccbc(20289): stopped(true) old = false
+D/VRI[MainActivity]@9ecccbc(20289): WindowStopped on chat.introvert.app/chat.introvert.app.MainActivity set to true
+D/HWUI    (20289): CacheManager::trimMemory(20)
+D/SurfaceView(20289): 35666232 windowPositionLost, frameNr = 0
+I/SV[226095196 MainActivity](20289): aOrMT: VRI[MainActivity]@9ecccbc t = android.view.SurfaceControl$Transaction@2779d11 fN = 0 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionLost:2025 android.graphics.RenderNode$CompositePositionUpdateListener.positionLost:418 
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d430690 mBlastBufferQueue=0xb400007e1d46e5d0 fn= 0 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SurfaceView.applyOrMergeTransaction:1863 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionLost:2025 
+I/SV[226095196 MainActivity](20289): windowStopped(true) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+I/SurfaceView(20289): 226095196 Changes: creating=false format=false size=false visible=true alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+I/SurfaceView(20289): 226095196 Cur surface: Surface(name=null mNativeObject=-5476376604151933008)/@0x4412e9e
+D/SurfaceComposerClient(20289): setCornerRadius ## d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0#38686 cornerRadius=0.000000
+I/SurfaceView(20289): 226095196 surfaceDestroyed
+I/SV[226095196 MainActivity](20289): surfaceDestroyed callback.size 1 #1 io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088}
+I/SV[226095196 MainActivity](20289): updateSurface: mVisible = false mSurface.isValid() = true
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+V/SurfaceView(20289): Layout: x=0 y=0 w=1440 h=3088, frame=Rect(0, 0 - 1440, 3088)
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.hidden (isInBackground: false)
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.paused (isInBackground: true)
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/IntrovertService(20289): MulticastLock acquired for mDNS discovery.
+D/IntrovertService(20289): Node Mode: WakeLock acquired.
+I/SV[226095196 MainActivity](20289): onWindowVisibilityChanged(8) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c G.E...... ......I. 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/HWUI    (20289): CacheManager::trimMemory(20)
+I/VRI[MainActivity]@9ecccbc(20289): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=false req=(1440,3088)8 dur=16 res=0x2 s={false 0x0} ch=false seqId=0
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+D/VRI[MainActivity]@9ecccbc(20289): Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+D/VRI[MainActivity]@9ecccbc(20289): Pending transaction will not be applied in sync with a draw due to view not visible
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4335d0 mBlastBufferQueue=0xnull fn= 0 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl.handleSyncRequestWhenNoAsyncDraw:6733 android.view.ViewRootImpl.performTraversals:5504 android.view.ViewRootImpl.doTraversal:3924 
+D/HWUI    (20289): CacheManager::trimMemory(20)
+I/ImeFocusController(20289): onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+I/ImeFocusController(20289): onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 17 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] Status change: 1 (peers=18, relay_listener=false)
+I/flutter (20289): 🌐 Swarm Event Received: Type=48, DataLen=16
+I/flutter (20289): [StatusStream] online:connected
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 18 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter (20289): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] Status change: 4 (peers=24, relay_listener=false)
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] Status change: 1 (peers=24, relay_listener=false)
+I/flutter (20289): 🌐 Swarm Event Received: Type=48, DataLen=16
+I/flutter (20289): [StatusStream] online:connected
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 24 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter (20289): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] Status change: 4 (peers=26, relay_listener=false)
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] Status change: 1 (peers=26, relay_listener=false)
+I/flutter (20289): 🌐 Swarm Event Received: Type=48, DataLen=16
+I/flutter (20289): [StatusStream] online:connected
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a but no relay yet — status=4 (connecting)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+
+Performing hot reload...                                        
+Reloaded 0 libraries in 908ms (compile: 64 ms, reload: 0 ms, reassemble: 595 ms).
+
+Performing hot reload...                                        
+Reloaded 0 libraries in 635ms (compile: 20 ms, reload: 0 ms, reassemble: 488 ms).
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/VRI[MainActivity]@9ecccbc(20289): onDisplayChanged oldDisplayState=1 newDisplayState=2
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+I/flutter (20289): [Intro-Claw] Connectivity changed: ConnectivityResult.none → ConnectivityResult.wifi
+I/flutter (20289): [Intro-Claw] Network recovery: forcing refresh, recon, and tick...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 26 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): ✅ IntroClaw Tick: Success
+I/flutter (20289): [IntroClaw] Notification suppressed (rate limited): Connections re-optimized
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 3 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 1 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+I/flutter (20289): 🌐 Swarm Event Received: Type=10, DataLen=1
+I/flutter (20289): 📍 Node Status Change: 4 (0=Offline, 1=Online, 2=Relay, 3=Syncing, 4=Connecting)
+I/flutter (20289): 🦀 Rust Debug: [Status] ConnectionEstablished with 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP but no relay yet — status=4 (connecting)
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=false, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf: is_relayed_endpoint=false, local_ip=true, direct_count=1, now_relayed=false
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 30 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/VRI[MainActivity]@9ecccbc(20289): onDisplayChanged oldDisplayState=2 newDisplayState=1
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 30 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/VRI[MainActivity]@9ecccbc(20289): onDisplayChanged oldDisplayState=1 newDisplayState=2
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/VRI[MainActivity]@9ecccbc(20289): handleAppVisibility mAppVisible = false visible = true
+I/VRI[MainActivity]@9ecccbc(20289): stopped(false) old = true
+D/VRI[MainActivity]@9ecccbc(20289): WindowStopped on chat.introvert.app/chat.introvert.app.MainActivity set to false
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.hidden (isInBackground: false)
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+I/flutter (20289): 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+I/SV[226095196 MainActivity](20289): onWindowVisibilityChanged(0) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ......ID 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+I/InsetsController(20289): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=false mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+W/libc    (20289): Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+I/BufferQueueProducer(20289): [](id:4f4100000002,api:0,p:2037654139,c:20289) setDequeueTimeout:2077252342
+I/BLASTBufferQueue_Java(20289): new BLASTBufferQueue, mName= VRI[MainActivity]@9ecccbc mNativeObject= 0xb400007e1d4feed0 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3585 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 android.view.Choreographer.doCallbacks:1367 android.view.Choreographer.doFrame:1292 android.view.Choreographer$FrameDisplayEventReceiver.run:1870 
+I/BLASTBufferQueue_Java(20289): update, w= 1440 h= 3088 mName = VRI[MainActivity]@9ecccbc mNativeObject= 0xb400007e1d4feed0 sc.mNativeObject= 0xb400007c6d447f90 format= -3 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3590 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+W/libc    (20289): Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+I/VRI[MainActivity]@9ecccbc(20289): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=false req=(1440,3088)0 dur=19 res=0x3 s={true 0xb400007e5d491310} ch=true seqId=0
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+D/VRI[MainActivity]@9ecccbc(20289): mThreadedRenderer.initialize() mSurface={isValid=true 0xb400007e5d491310} hwInitialized=true
+I/SV[226095196 MainActivity](20289): windowStopped(false) true io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ......ID 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+I/SurfaceView(20289): 226095196 Changes: creating=true format=false size=false visible=true alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+W/libc    (20289): Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+I/BufferQueueProducer(20289): [](id:4f4100000003,api:0,p:0,c:20289) setDequeueTimeout:2077252342
+I/BLASTBufferQueue_Java(20289): new BLASTBufferQueue, mName= d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0 mNativeObject= 0xb400007e1d50bfa0 caller= android.view.SurfaceView.createBlastSurfaceControls:1781 android.view.SurfaceView.updateSurface:1450 android.view.SurfaceView.setWindowStopped:539 android.view.SurfaceView.surfaceCreated:2327 android.view.ViewRootImpl.notifySurfaceCreated:3502 android.view.ViewRootImpl.performTraversals:5286 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 
+I/BLASTBufferQueue_Java(20289): update, w= 1440 h= 3088 mName = d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0 mNativeObject= 0xb400007e1d50bfa0 sc.mNativeObject= 0xb400007c6d449910 format= 4 caller= android.view.SurfaceView.createBlastSurfaceControls:1782 android.view.SurfaceView.updateSurface:1450 android.view.SurfaceView.setWindowStopped:539 android.view.SurfaceView.surfaceCreated:2327 android.view.ViewRootImpl.notifySurfaceCreated:3502 android.view.ViewRootImpl.performTraversals:5286 
+I/SurfaceView(20289): 226095196 Cur surface: Surface(name=null mNativeObject=0)/@0x4412e9e
+D/SurfaceComposerClient(20289): setCornerRadius ## d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0#38777 cornerRadius=0.000000
+I/SV[226095196 MainActivity](20289): pST: sr = Rect(0, 0 - 1440, 3088) sw = 1440 sh = 3088
+D/SurfaceView(20289): 226095196 performSurfaceTransaction RenderWorker position = [0, 0, 1440, 3088] surfaceSize = 1440x3088
+W/libc    (20289): Access denied finding property "vendor.display.enable_optimal_refresh_rate"
+I/SV[226095196 MainActivity](20289): updateSurface: mVisible = true mSurface.isValid() = true
+I/SV[226095196 MainActivity](20289): updateSurface: mSurfaceCreated = false surfaceChanged = true visibleChanged = true
+I/SurfaceView(20289): 226095196 visibleChanged -- surfaceCreated
+I/SV[226095196 MainActivity](20289): surfaceCreated 1 #1 io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ......ID 0,0-1440,3088}
+E/qdgralloc(20289): GetSize: Unrecognized pixel format: 0x38
+E/Gralloc4(20289): isSupported(1, 1, 56, 1, ...) failed with 5
+E/GraphicBufferAllocator(20289): Failed to allocate (4 x 4) layerCount 1 format 56 usage b00: 5
+E/AHardwareBuffer(20289): GraphicBuffer(w=4, h=4, lc=1) failed (Unknown error -5), handle=0x0
+E/qdgralloc(20289): GetSize: Unrecognized pixel format: 0x3b
+E/Gralloc4(20289): isSupported(1, 1, 59, 1, ...) failed with 5
+E/GraphicBufferAllocator(20289): Failed to allocate (4 x 4) layerCount 1 format 59 usage b00: 5
+E/AHardwareBuffer(20289): GraphicBuffer(w=4, h=4, lc=1) failed (Unknown error -5), handle=0x0
+E/qdgralloc(20289): GetSize: Unrecognized pixel format: 0x38
+E/Gralloc4(20289): isSupported(1, 1, 56, 1, ...) failed with 5
+E/GraphicBufferAllocator(20289): Failed to allocate (4 x 4) layerCount 1 format 56 usage b00: 5
+E/AHardwareBuffer(20289): GraphicBuffer(w=4, h=4, lc=1) failed (Unknown error -5), handle=0x0
+E/qdgralloc(20289): GetSize: Unrecognized pixel format: 0x3b
+E/Gralloc4(20289): isSupported(1, 1, 59, 1, ...) failed with 5
+E/GraphicBufferAllocator(20289): Failed to allocate (4 x 4) layerCount 1 format 59 usage b00: 5
+E/AHardwareBuffer(20289): GraphicBuffer(w=4, h=4, lc=1) failed (Unknown error -5), handle=0x0
+I/SurfaceView(20289): 226095196 surfaceChanged -- format=4 w=1440 h=3088
+I/SV[226095196 MainActivity](20289): surfaceChanged (1440,3088) 1 #1 io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ......ID 0,0-1440,3088}
+I/SurfaceView(20289): 226095196 surfaceRedrawNeeded
+V/SurfaceView(20289): Layout: x=0 y=0 w=1440 h=3088, frame=Rect(0, 0 - 1440, 3088)
+D/VRI[MainActivity]@9ecccbc(20289): reportNextDraw android.view.ViewRootImpl.performTraversals:5443 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 android.view.Choreographer$CallbackRecord.run:1910 
+D/VRI[MainActivity]@9ecccbc(20289): Setup new sync=wmsSync-VRI[MainActivity]@9ecccbc#4
+I/VRI[MainActivity]@9ecccbc(20289): Creating new active sync group VRI[MainActivity]@9ecccbc#5
+D/VRI[MainActivity]@9ecccbc(20289): Start draw after previous draw not visible
+D/VRI[MainActivity]@9ecccbc(20289): registerCallbacksForSync syncBuffer=false
+D/SurfaceView(20289): 226095196 updateSurfacePosition RenderWorker, frameNr = 1, position = [0, 0, 1440, 3088] surfaceSize = 1440x3088
+I/SV[226095196 MainActivity](20289): uSP: rtp = Rect(0, 0 - 1440, 3088) rtsw = 1440 rtsh = 3088
+I/SV[226095196 MainActivity](20289): onSSPAndSRT: pl = 0 pt = 0 sx = 1.0 sy = 1.0
+I/SV[226095196 MainActivity](20289): aOrMT: VRI[MainActivity]@9ecccbc t = android.view.SurfaceControl$Transaction@936cfbd fN = 1 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 android.graphics.RenderNode$CompositePositionUpdateListener.positionChanged:401 
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4a3410 mBlastBufferQueue=0xb400007e1d4feed0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SurfaceView.applyOrMergeTransaction:1863 android.view.SurfaceView.-$$Nest$mapplyOrMergeTransaction:0 android.view.SurfaceView$SurfaceViewPositionUpdateListener.positionChanged:1932 
+D/VRI[MainActivity]@9ecccbc(20289): Received frameDrawingCallback syncResult=0 frameNum=1.
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d45bd50 mBlastBufferQueue=0xb400007e1d4feed0 fn= 1 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$12.onFrameDraw:15441 android.view.ThreadedRenderer$1.onFrameDraw:718 <bottom of call stack> 
+I/VRI[MainActivity]@9ecccbc(20289): Setting up sync and frameCommitCallback
+I/BLASTBufferQueue(20289): [VRI[MainActivity]@9ecccbc#2](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/SurfaceComposerClient(20289): apply transaction with the first frame. layerId: 38774, bufferData(ID: 87140591468583, frameNumber: 1)
+I/VRI[MainActivity]@9ecccbc(20289): Received frameCommittedCallback lastAttemptedDrawFrameNum=1 didProduceBuffer=true
+I/Choreographer(20289): Skipped 53 frames!  The application may be doing too much work on its main thread.
+I/InsetsController(20289): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc(20289): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/VRI[MainActivity]@9ecccbc(20289): handleResized mSyncSeqId = 0
+D/VRI[MainActivity]@9ecccbc(20289): reportNextDraw android.view.ViewRootImpl.handleResized:2983 android.view.ViewRootImpl.-$$Nest$mhandleResized:0 android.view.ViewRootImpl$W.resized:14082 android.app.servertransaction.WindowStateResizeItem.execute:93 android.app.servertransaction.WindowStateTransactionItem.execute:62 
+I/BLASTBufferQueue(20289): [d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0#3](f:0,a:0,s:0) onFrameAvailable the first frame is available
+I/SurfaceComposerClient(20289): apply transaction with the first frame. layerId: 38778, bufferData(ID: 87140591468578, frameNumber: 1)
+D/VRI[MainActivity]@9ecccbc(20289): reportDrawFinished seqId=0
+I/SurfaceView(20289): 226095196 finishedDrawing
+I/VRI[MainActivity]@9ecccbc(20289): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/VRI[MainActivity]@9ecccbc(20289): handleResized mSyncSeqId = 0
+D/VRI[MainActivity]@9ecccbc(20289): reportNextDraw android.view.ViewRootImpl.handleResized:2983 android.view.ViewRootImpl.-$$Nest$mhandleResized:0 android.view.ViewRootImpl$W.resized:14082 android.app.servertransaction.WindowStateResizeItem.execute:93 android.app.servertransaction.WindowStateTransactionItem.execute:62 
+I/InsetsSourceConsumer(20289): applyRequestedVisibilityToControl: visible=true, type=statusBars, host=chat.introvert.app/chat.introvert.app.MainActivity
+I/InsetsSourceConsumer(20289): applyRequestedVisibilityToControl: visible=true, type=navigationBars, host=chat.introvert.app/chat.introvert.app.MainActivity
+D/VRI[MainActivity]@9ecccbc(20289): Setup new sync=wmsSync-VRI[MainActivity]@9ecccbc#6
+I/VRI[MainActivity]@9ecccbc(20289): Creating new active sync group VRI[MainActivity]@9ecccbc#7
+D/VRI[MainActivity]@9ecccbc(20289): registerCallbacksForSync syncBuffer=false
+D/VRI[MainActivity]@9ecccbc(20289): Received frameDrawingCallback syncResult=0 frameNum=2.
+I/VRI[MainActivity]@9ecccbc(20289): Setting up sync and frameCommitCallback
+I/VRI[MainActivity]@9ecccbc(20289): Received frameCommittedCallback lastAttemptedDrawFrameNum=2 didProduceBuffer=true
+D/VRI[MainActivity]@9ecccbc(20289): reportDrawFinished seqId=0
+D/VRI[MainActivity]@9ecccbc(20289): mThreadedRenderer.initializeIfNeeded()#2 mSurface={isValid=true 0xb400007e5d491310}
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.resumed (isInBackground: false)
+I/flutter (20289): [IdleMode] Exited idle — resuming normal activity
+I/flutter (20289): ✅ IntroClaw Tick: Success
+D/InputMethodManagerUtils(20289): startInputInner - Id : 0
+I/InputMethodManager(20289): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+I/flutter (20289): 🦀 Rust Debug: [Resilience] app_state set to Foreground
+D/InputTransport(20289): Input channel constructed: 'ClientS', fd=233
+D/IntrovertService(20289): MulticastLock released.
+D/IntrovertService(20289): Standard Mode: WakeLock released.
+I/InputMethodManager(20289): handleMessage: setImeVisibility visible=false
+D/InsetsController(20289): hide(ime(), fromIme=false)
+I/ImeTracker(20289): chat.introvert.app:bcd535f4: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+I/VRI[MainActivity]@9ecccbc(20289): call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@9ecccbc
+I/flutter (20289): ✅ Poll Peer Profile: Success
+I/flutter (20289): ✅ Poll Peer Profile: Success
+I/flutter (20289): ✅ Poll Peer Profile: Success
+I/flutter (20289): 🌐 Swarm Event Received: Type=25, DataLen=79
+I/flutter (20289): 🌐 Swarm Event Received: Type=25, DataLen=85
+I/InputMethodManager_LC(20289): showSoftInput(View,I)
+I/ImeTracker(20289): chat.introvert.app:ca71aaeb: onRequestShow at ORIGIN_CLIENT reason SHOW_SOFT_INPUT fromUser false
+I/InputMethodManager_LC(20289): ssi(): flags=0 view=chat.introvert.app reason=SHOW_SOFT_INPUT
+I/InputMethodManager_LC(20289): ssi() view is not EditText
+D/InputMethodManagerUtils(20289): startInputInner - Id : 0
+I/InputMethodManager(20289): startInputInner - IInputMethodManagerGlobalInvoker.startInputOrWindowGainedFocus
+D/InsetsController(20289): show(ime(), fromIme=false)
+D/InsetsController(20289): Setting requestedVisibleTypes to -1 (was -9)
+I/InsetsController(20289): setRequestedVisibleTypes: visible=true, mask=ime, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.controlAnimationUnchecked:1604 android.view.InsetsController.applyAnimation:2416 android.view.InsetsController.applyAnimation:2343 android.view.InsetsController.show:1422 android.view.inputmethod.InputMethodManager.showSoftInput:2659 android.view.inputmethod.InputMethodManager.showSoftInput:2571 android.view.inputmethod.InputMethodManager.showSoftInput:2563 android.view.inputmethod.InputMethodManager.showSoftInput:2491 io.flutter.plugin.editing.TextInputPlugin.showTextInput:433 io.flutter.plugin.editing.TextInputPlugin$2.show:114 
+D/InputTransport(20289): Input channel constructed: 'ClientS', fd=236
+I/VRI[MainActivity]@9ecccbc(20289): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/AssistStructure(20289): Flattened final assist data: 504 bytes, containing 1 windows, 3 views
+D/InputConnectionAdaptor(20289): The input method toggled cursor monitoring on
+I/InsetsController(20289): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,0][0,0] mVisible=false mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc(20289): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/InsetsController(20289): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,1793][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/VRI[MainActivity]@9ecccbc(20289): handleResized, frames=ClientWindowFrames{frame=[0,0][1440,3088] display=[0,0][1440,3088] parentFrame=[0,0][0,0]} displayId=0 dragResizing=false compatScale=1.0 frameChanged=false attachedFrameChanged=false configChanged=false displayChanged=false compatScaleChanged=false dragResizingChanged=false
+I/InsetsController(20289): onStateChanged: host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.ViewRootImpl.onInsetsStateChanged:3026, state=InsetsState: {mDisplayFrame=Rect(0, 0 - 1440, 3088), mDisplayCutout=DisplayCutout{insets=Rect(0, 100 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(683, 0 - 758, 100), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=1440 displayHeight=3088 physicalDisplayWidth=1440 physicalDisplayHeight=3088 density={3.75} cutoutSpec={M 0,0 H -10 V 26.66666666666667 H 10 V 0 H 0 Z @dp} rotation={0} scale={1.0} physicalPixelDisplaySizeRatio={1.0}}} sideOverrides={}}, mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=14, center=Point(14, 14)}, RoundedCorner{position=TopRight, radius=14, center=Point(1426, 14)}, RoundedCorner{position=BottomRight, radius=14, center=Point(1426, 3074)}, RoundedCorner{position=BottomLeft, radius=14, center=Point(14, 3074)}]}  mRoundedCornerFrame=Rect(0, 0 - 1440, 3088), mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(1286, 0 - 1440, 100) rotation=0}, mDisplayShape=DisplayShape{ spec=-311912193 displayWidth=1440 displayHeight=3088 physicalPixelDisplaySizeRatio=1.0 rotation=0 offsetX=0 offsetY=0 scale=1.0}, mSources= { InsetsSource: {c4590001 mType=navigationBars mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590004 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {c4590005 mType=mandatorySystemGestures mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590006 mType=tappableElement mFrame=[0,2920][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {c4590024 mType=systemGestures mFrame=[0,0][0,0] mVisible=true mFlags= mSideHint=NONE mBoundingRects=null}, InsetsSource: {df450000 mType=statusBars mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450005 mType=mandatorySystemGestures mFrame=[0,0][1440,142] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {df450006 mType=tappableElement mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null}, InsetsSource: {3 mType=ime mFrame=[0,1793][1440,3088] mVisible=true mFlags= mSideHint=BOTTOM mBoundingRects=null}, InsetsSource: {27 mType=displayCutout mFrame=[0,0][1440,100] mVisible=true mFlags= mSideHint=TOP mBoundingRects=null} }
+I/InsetsController(20289): controlAnimationUncheckedInner: Added types=ime, animType=0, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.controlAnimationUnchecked:1608 android.view.InsetsController.applyAnimation:2416 android.view.InsetsController.applyAnimation:2343 
+I/BLASTBufferQueue_Java(20289): update, w= 1440 h= 3088 mName = VRI[MainActivity]@9ecccbc mNativeObject= 0xb400007e1d4feed0 sc.mNativeObject= 0xb400007c6d447f90 format= -3 caller= android.view.ViewRootImpl.updateBlastSurfaceIfNeeded:3574 android.view.ViewRootImpl.relayoutWindow:11685 android.view.ViewRootImpl.performTraversals:4804 android.view.ViewRootImpl.doTraversal:3924 android.view.ViewRootImpl$TraversalRunnable.run:12903 android.view.Choreographer$CallbackRecord.run:1901 
+I/VRI[MainActivity]@9ecccbc(20289): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=true req=(1440,3088)0 dur=0 res=0x0 s={true 0xb400007e5d491310} ch=false seqId=0
+W/InteractionJankMonitor(20289): Initializing without READ_DEVICE_CONFIG permission. enabled=false, interval=1, missedFrameThreshold=3, frameTimeThreshold=64, package=chat.introvert.app
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc(20289): registerCallbackForPendingTransactions
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4a4ad0 mBlastBufferQueue=0xb400007e1d4feed0 fn= 4 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4bc310 mBlastBufferQueue=0xb400007e1d4feed0 fn= 4 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl$10.onFrameDraw:6536 android.view.ViewRootImpl$4.onFrameDraw:2489 android.view.ThreadedRenderer$1.onFrameDraw:718 
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4596d0 mBlastBufferQueue=0xb400007e1d4feed0 fn= 5 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4ad510 mBlastBufferQueue=0xb400007e1d4feed0 fn= 6 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4676d0 mBlastBufferQueue=0xb400007e1d4feed0 fn= 7 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/Choreographer(20289): Skipped 56 frames!  The application may be doing too much work on its main thread.
+I/InsetsController(20289): cancelAnimation: types=ime, animType=0, host=chat.introvert.app/chat.introvert.app.MainActivity, from=android.view.InsetsController.notifyFinished:2006 android.view.InsetsAnimationControlImpl.applyChangeInsets:335 android.view.InsetsController.lambda$new$3:957 
+I/ImeTracker(20289): chat.introvert.app:ca71aaeb: onShown
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+D/FlutterJNI(20289): Sending viewport metrics to the engine.
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d44bdd0 mBlastBufferQueue=0xb400007e1d4feed0 fn= 8 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.SyncRtSurfaceTransactionApplier.applyTransaction:100 android.view.SyncRtSurfaceTransactionApplier.lambda$scheduleApply$0:73 android.view.SyncRtSurfaceTransactionApplier.$r8$lambda$afI4fXg3U3-nBZQEDQMiNy-B06s:0 
+I/VRI[MainActivity]@9ecccbc(20289): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@9ecccbc
+I/VRI[MainActivity]@9ecccbc(20289): call setFrameRateCategory for touch hint category=high hint, reason=touch, vri=VRI[MainActivity]@9ecccbc
+I/flutter (20289): 🦀 Rust Debug: introvert_group_send_message: Loaded group secret. Hex prefix: 5a9429a7
+I/flutter (20289): 🦀 Rust Debug: introvert_group_send_message: Spawning send loop for group c873616e97ee6d19bbbac897c5d484e3
+I/flutter (20289): 🦀 Rust Debug: introvert_group_send_message: Group c873616e97ee6d19bbbac897c5d484e3 has 4 members
+I/flutter (20289): 🦀 Rust Debug: introvert_group_send_message: Forwarding GroupAction to member 12D3KooWN6Hu1AZwZyRhaFiWrxA8fkpDnpc32Mtgm1SyRDUyajWP
+I/flutter (20289): 🦀 Rust Debug: introvert_group_send_message: Forwarding GroupAction to member 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: introvert_group_send_message: Forwarding GroupAction to member 12D3KooWMNfz4MoeTcP2f6PefcWtfiqv9R44f8uxdYPxAFatepPm
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/VRI[MainActivity]@9ecccbc(20289): call setFrameRateCategory for touch hint category=no preference, reason=boost timeout, vri=VRI[MainActivity]@9ecccbc
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.inactive (isInBackground: true)
+I/flutter (20289): [IdleMode] Entered idle — push handles wake-ups, polling disabled
+I/flutter (20289): 🦀 Rust Debug: [Resilience] app_state set to Backgrounded
+D/IntrovertService(20289): MulticastLock acquired for mDNS discovery.
+D/IntrovertService(20289): Node Mode: WakeLock acquired.
+I/ImeTracker(20289): system_server:ba59695: onCancelled at PHASE_CLIENT_ON_CONTROLS_CHANGED
+I/ImeFocusController(20289): onPreWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+I/ImeFocusController(20289): onPostWindowFocus: skipped hasWindowFocus=false mHasImeFocus=true
+W/WindowOnBackDispatcher(20289): sendCancelIfRunning: isInProgress=false callback=android.view.ImeBackAnimationController@c72f33d
+D/InputTransport(20289): Input channel destroyed: 'ClientS', fd=168
+I/VRI[MainActivity]@9ecccbc(20289): handleAppVisibility mAppVisible = true visible = false
+D/VRI[MainActivity]@9ecccbc(20289): visibilityChanged oldVisibility=true newVisibility=false
+I/SV[226095196 MainActivity](20289): onWindowVisibilityChanged(8) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+I/SurfaceView(20289): 226095196 Changes: creating=false format=false size=false visible=true alpha=false hint=false left=false top=false z=false attached=true lifecycleStrategy=false
+I/SurfaceView(20289): 226095196 Cur surface: Surface(name=null mNativeObject=-5476376604151610000)/@0x4412e9e
+D/SurfaceComposerClient(20289): setCornerRadius ## d79f05c SurfaceView[chat.introvert.app/chat.introvert.app.MainActivity]@0#38777 cornerRadius=0.000000
+I/SurfaceView(20289): 226095196 surfaceDestroyed
+I/SV[226095196 MainActivity](20289): surfaceDestroyed callback.size 1 #2 io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088}
+I/SV[226095196 MainActivity](20289): updateSurface: mVisible = false mSurface.isValid() = true
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+V/SurfaceView(20289): Layout: x=0 y=0 w=1440 h=3088, frame=Rect(0, 0 - 1440, 3088)
+D/SurfaceView(20289): 151966749 windowPositionLost, frameNr = 0
+D/HWUI    (20289): CacheManager::trimMemory(20)
+I/VRI[MainActivity]@9ecccbc(20289): Relayout returned: old=(0,0,1440,3088) new=(0,0,1440,3088) relayoutAsync=false req=(1440,3088)8 dur=7 res=0x2 s={false 0x0} ch=true seqId=0
+I/SV[226095196 MainActivity](20289): windowStopped(true) false io.flutter.embedding.android.FlutterSurfaceView{d79f05c V.E...... ........ 0,0-1440,3088} of VRI[MainActivity]@9ecccbc
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+D/VRI[MainActivity]@9ecccbc(20289): Not drawing due to not visible. Reason=!mAppVisible && !mForceDecorViewVisibility
+D/VRI[MainActivity]@9ecccbc(20289): Pending transaction will not be applied in sync with a draw due to view not visible
+I/VRI[MainActivity]@9ecccbc(20289): mWNT: t=0xb400007c2d4335d0 mBlastBufferQueue=0xnull fn= 0 HdrRenderState mRenderHdrSdrRatio=1.0 caller= android.view.ViewRootImpl.handleSyncRequestWhenNoAsyncDraw:6733 android.view.ViewRootImpl.performTraversals:5504 android.view.ViewRootImpl.doTraversal:3924 
+I/VRI[MainActivity]@9ecccbc(20289): stopped(true) old = false
+D/VRI[MainActivity]@9ecccbc(20289): WindowStopped on chat.introvert.app/chat.introvert.app.MainActivity set to true
+D/HWUI    (20289): CacheManager::trimMemory(20)
+I/AutofillManager(20289): onInvisibleForAutofill(): expiringResponse
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.hidden (isInBackground: false)
+I/flutter (20289): 🔄 App Lifecycle State: AppLifecycleState.paused (isInBackground: true)
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+D/SV[226095196 MainActivity](20289): updateSurface: surface is not valid
+I/SV[226095196 MainActivity](20289): releaseSurfaces: viewRoot = VRI[MainActivity]@9ecccbc
+D/VRI[MainActivity]@9ecccbc(20289): applyTransactionOnDraw applyImmediately
+D/BBA2    (20289): setIsFg isFg = false; delayValue 3999ms
+I/VRI[MainActivity]@9ecccbc(20289): onDisplayChanged oldDisplayState=2 newDisplayState=1
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd)
+I/flutter (20289): 🦀 Rust Debug: [Mesh] 🔔 Found local token. Auto-registering with RBN 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a on Identify...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Wake-on-push: app_state → BackgroundedPendingWake
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Expired event: 4 entries
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/53159/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/50275/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/udp/54629/quic-v1/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [mDNS] Expired peer 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf addr /ip4/192.168.1.194/tcp/53160/p2p/12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Relay reservation re-requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (20289): 🦀 Rust Debug: [Resilience] Step 1: 31 peers connected but no relay. Re-establishing...
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionClosed with 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a — removed from is_relayed_map
+I/flutter (20289): 🦀 Rust Debug: [RelayMap] ConnectionEstablished to 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a: is_relayed_endpoint=false, local_ip=false, direct_count=0, now_relayed=true
+I/flutter (20289): 🦀 Rust Debug: [Mesh] Relay reservation requested from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+Lost connection to device.

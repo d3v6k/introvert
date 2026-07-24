@@ -798,3 +798,34 @@ flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no rel
 flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
 flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
 flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mesh] Checking local push token for auto-registration on Identify (my_peer_id: 12D3KooWCSejiZ1V5UDg6tkFu7g1rHjYf1LnzMiThywrMAFNtYvf)
+flutter: 🦀 Rust Debug: [Mesh] No local push token found in DB to auto-register.
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=36, incoming=0, seeders=7, pending=0)
+flutter: 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a

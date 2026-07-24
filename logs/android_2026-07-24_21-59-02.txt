@@ -1,0 +1,352 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.5.2 available)
+  connectivity_plus 6.1.5 (7.3.0 available)
+  file_picker 8.3.7 (11.0.2 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_secure_storage 9.2.4 (10.3.1 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.1 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.0.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  flutter_webrtc 0.14.2 (1.5.2 available)
+  geolocator 14.0.2 (14.0.3 available)
+  geolocator_linux 0.2.4 (0.2.6 available)
+  hooks 2.0.2 (2.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  js 0.6.7 (0.7.2 available)
+  latlong2 0.9.1 (0.10.1 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  open_file 3.5.11 (4.0.0 available)
+  open_file_linux 0.0.5 (1.1.0 available)
+  open_file_web 0.0.4 (1.1.0 available)
+  open_file_windows 0.0.3 (1.1.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 9.0.1 (10.2.1 available)
+  package_info_plus_platform_interface 3.2.1 (4.1.0 available)
+  record_linux 2.1.0 (2.1.1 available)
+  record_use 0.6.0 (1.0.0 available)
+  share_plus 10.1.4 (13.2.1 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  shared_preferences_android 2.4.26 (2.4.27 available)
+  synchronized 3.4.1 (3.4.1+1 available)
+  test_api 0.7.11 (0.7.13 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_math 2.2.0 (2.4.1 available)
+  video_player 2.11.1 (2.13.0 available)
+  video_player_android 2.10.0 (2.12.0 available)
+  video_player_avfoundation 2.10.0 (2.11.0 available)
+  video_player_platform_interface 6.8.0 (6.9.0 available)
+  win32 5.15.0 (6.3.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+44 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+The following plugins do not support Swift Package Manager for ios:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage
+  - flutter_inappwebview_ios
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+The following plugins do not support Swift Package Manager for macos:
+  - flutter_webrtc
+  - flutter_video_thumbnail_plus
+  - flutter_secure_storage_macos
+  - flutter_inappwebview_macos
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Launching lib/main.dart on SM S908E (wireless) in debug mode...
+Running Gradle task 'assembleDebug'...                          
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+WARNING: Your Android app project: app located at: /Users/dev/Development/introvert/android/app/build.gradle.kts
+applies the Kotlin Gradle Plugin, which will cause build failures in future versions of Flutter. 
+Please migrate your app to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): flutter_callkit_incoming, flutter_webrtc, package_info_plus, pdf_render_maintained, share_plus
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+Skipping assets entry "packages/record_web/assets/js/record.worklet.js" since its configured platform(s) did not match the target platform.
+Configured platforms: web
+Target platform: android
+
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+3 warnings
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+Running Gradle task 'assembleDebug'...                            130.7s
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=32, incoming=0, seeders=7, pending=1)
+I/flutter (23595): 🦀 Rust Debug: [Resilience] Fast reconnect: relay reservation from 12D3KooWJqiNgP67shH4m1usQtMPQyCqwCWQrnHx6bgmkGNmhz8a
+Installing build/app/outputs/flutter-apk/app-debug.apk...          44.3s
+I/FlutterActivityAndFragmentDelegate( 4805): If you are attempting to set --enable-dart-profiling via Intent extras to launch a Flutter component outside of using the Flutter CLI, note that support for setting engine flags on Android via Intent will soon be dropped; see https://github.com/flutter/flutter/issues/180686 for more information on this breaking change. To migrate, set --enable-dart-profiling or any other flags specified via Intent extras on the command line instead or see https://github.com/flutter/flutter/blob/main/docs/engine/Flutter-Android-Engine-Flags.md for alternative methods.
+D/FlutterJNI( 4805): Beginning load of flutter...
+D/FlutterJNI( 4805): flutter (null) was loaded normally!
+I/flutter ( 4805): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterGeolocator( 4805): Attaching Geolocator to activity
+D/FlutterRenderer( 4805): Width is zero. 0,0
+I/flutter ( 4805): ✅ Loaded libintrovert.so
+I/flutter ( 4805): ✅ FFI Bound: generate_mnemonic
+I/flutter ( 4805): ✅ FFI Bound: free_string
+I/flutter ( 4805): ✅ FFI Bound: free_binary
+I/flutter ( 4805): ✅ FFI Bound: mnemonic_to_seed
+I/flutter ( 4805): ✅ FFI Bound: derive_identifiers
+I/flutter ( 4805): ✅ FFI Bound: engine_start
+I/flutter ( 4805): ✅ FFI Bound: engine_stop
+I/flutter ( 4805): ✅ FFI Bound: get_peer_id
+I/flutter ( 4805): ✅ FFI Bound: network_start
+I/flutter ( 4805): ✅ FFI Bound: economy_monitor
+I/flutter ( 4805): ✅ FFI Bound: send_message
+I/flutter ( 4805): ✅ FFI Bound: init_webrtc
+I/flutter ( 4805): ✅ FFI Bound: send_native_signal
+I/flutter ( 4805): ✅ FFI Bound: add_address
+I/flutter ( 4805): ✅ FFI Bound: claim_rewards
+I/flutter ( 4805): ✅ FFI Bound: store_msg_async
+I/flutter ( 4805): ✅ FFI Bound: get_messages
+I/flutter ( 4805): ✅ FFI Bound: get_messages_paginated
+I/flutter ( 4805): ✅ FFI Bound: secure_session
+I/flutter ( 4805): ✅ FFI Bound: fetch_mailbox
+I/flutter ( 4805): ✅ FFI Bound: media_stream
+I/flutter ( 4805): ✅ FFI Bound: get_contacts
+I/flutter ( 4805): ✅ FFI Bound: delete_contact
+I/flutter ( 4805): ✅ FFI Bound: set_profile_tier
+I/flutter ( 4805): ✅ FFI Bound: delete_chat
+I/flutter ( 4805): ✅ FFI Bound: clear_pending_messages
+I/flutter ( 4805): ✅ FFI Bound: clear_contacts
+I/flutter ( 4805): ✅ FFI Bound: wormhole_start
+I/flutter ( 4805): ✅ FFI Bound: wormhole_join
+I/flutter ( 4805): ✅ FFI Bound: wormhole_abort
+I/flutter ( 4805): ✅ FFI Bound: close_webrtc
+I/flutter ( 4805): ✅ FFI Bound: renegotiate_webrtc
+I/flutter ( 4805): ✅ FFI Bound: accept_call
+I/flutter ( 4805): ✅ FFI Bound: reject_call
+I/flutter ( 4805): ✅ FFI Bound: set_anchor
+I/flutter ( 4805): ✅ FFI Bound: get_anchor_mode
+I/flutter ( 4805): ✅ FFI Bound: set_tunnel
+I/flutter ( 4805): ✅ FFI Bound: get_tunnel_mode
+I/flutter ( 4805): ✅ FFI Bound: get_rbns
+I/flutter ( 4805): ✅ FFI Bound: test_rbn
+I/flutter ( 4805): ✅ FFI Bound: disclaimer_is_accepted
+I/flutter ( 4805): ✅ FFI Bound: disclaimer_set_accepted
+I/flutter ( 4805): ✅ FFI Bound: recheck_connection
+I/flutter ( 4805): ✅ FFI Bound: resolve_handle
+I/flutter ( 4805): ✅ FFI Bound: send_direct_invite
+I/flutter ( 4805): ✅ FFI Bound: register_push_token
+I/flutter ( 4805): ✅ FFI Bound: set_retention
+I/flutter ( 4805): ✅ FFI Bound: delete_message
+I/flutter ( 4805): ✅ FFI Bound: edit_message
+I/flutter ( 4805): ✅ FFI Bound: send_reaction
+I/flutter ( 4805): ✅ FFI Bound: get_reactions
+I/flutter ( 4805): ✅ FFI Bound: claim_handle
+I/flutter ( 4805): ✅ FFI Bound: get_handle_status
+I/flutter ( 4805): ✅ FFI Bound: get_local_handle
+I/flutter ( 4805): ✅ FFI Bound: is_handle_claimed
+I/flutter ( 4805): ✅ FFI Bound: lookup_peer_handle
+I/flutter ( 4805): ✅ FFI Bound: request_swarm_stats
+I/flutter ( 4805): ✅ FFI Bound: poll_peer_profile
+I/flutter ( 4805): ✅ FFI Bound: sync_chat_messages
+I/flutter ( 4805): ✅ FFI Bound: get_profile
+I/flutter ( 4805): ✅ FFI Bound: set_profile
+I/flutter ( 4805): ✅ FFI Bound: send_file
+I/flutter ( 4805): ✅ FFI Bound: inspect_media
+I/flutter ( 4805): ✅ FFI Bound: cancel_file
+I/flutter ( 4805): ✅ FFI Bound: force_refresh
+I/flutter ( 4805): ✅ FFI Bound: send_manual_telemetry
+I/flutter ( 4805): ✅ FFI Bound: set_connectivity_type
+I/flutter ( 4805): ✅ FFI Bound: set_app_idle_state
+I/flutter ( 4805): ✅ FFI Bound: group_create
+I/flutter ( 4805): ✅ FFI Bound: group_send
+I/flutter ( 4805): ✅ FFI Bound: group_get_all
+I/flutter ( 4805): ✅ FFI Bound: group_get_msgs
+I/flutter ( 4805): ✅ FFI Bound: group_add_member
+I/flutter ( 4805): ✅ FFI Bound: group_approve_join
+I/flutter ( 4805): ✅ FFI Bound: group_reject_join
+I/flutter ( 4805): ✅ FFI Bound: group_remove_member
+I/flutter ( 4805): ✅ FFI Bound: group_update_role
+I/flutter ( 4805): ✅ FFI Bound: group_publish
+I/flutter ( 4805): ✅ FFI Bound: group_join_code
+I/flutter ( 4805): ✅ FFI Bound: group_delete
+I/flutter ( 4805): ✅ FFI Bound: group_get_pending
+I/flutter ( 4805): ✅ FFI Bound: group_accept_invite
+I/flutter ( 4805): ✅ FFI Bound: group_decline_invite
+I/flutter ( 4805): ✅ FFI Bound: group_mute
+I/flutter ( 4805): ✅ FFI Bound: group_unmute
+I/flutter ( 4805): ✅ FFI Bound: group_get_muted
+I/flutter ( 4805): ✅ FFI Bound: update_msg_status
+I/flutter ( 4805): ✅ FFI Bound: update_msg_status_peer
+I/flutter ( 4805): ✅ FFI Bound: update_group_msg_status
+I/flutter ( 4805): ✅ FFI Bound: update_group_msg_status_id
+I/flutter ( 4805): ✅ FFI Bound: get_unread_counts
+I/flutter ( 4805): ✅ FFI Bound: send_ack
+I/flutter ( 4805): ✅ FFI Bound: update_contact_alias
+I/flutter ( 4805): ✅ FFI Bound: compute_file_hash
+I/flutter ( 4805): ✅ FFI Bound: nuke_identity
+I/flutter ( 4805): ✅ FFI Bound: drive_add
+I/flutter ( 4805): ✅ FFI Bound: drive_get_all
+I/flutter ( 4805): ✅ FFI Bound: drive_get_by_hash
+I/flutter ( 4805): ✅ FFI Bound: drive_delete
+I/flutter ( 4805): ✅ FFI Bound: drive_add_with_folder
+I/flutter ( 4805): ✅ FFI Bound: drive_update_folder
+I/flutter ( 4805): ✅ FFI Bound: mesh_capacity
+I/flutter ( 4805): ✅ FFI Bound: get_disk_space
+I/flutter ( 4805): ✅ FFI Bound: register_seeder
+I/flutter ( 4805): ✅ FFI Bound: start_pull
+I/flutter ( 4805): ✅ FFI Bound: notes_create
+I/flutter ( 4805): ✅ FFI Bound: notes_update
+I/flutter ( 4805): ✅ FFI Bound: notes_delete
+I/flutter ( 4805): ✅ FFI Bound: notes_get
+I/flutter ( 4805): ✅ FFI Bound: notes_get_all
+I/flutter ( 4805): ✅ FFI Bound: notes_search
+I/flutter ( 4805): ✅ FFI Bound: notes_save_version
+I/flutter ( 4805): ✅ FFI Bound: notes_get_versions
+I/flutter ( 4805): ✅ FFI Bound: call_history_log
+I/flutter ( 4805): ✅ FFI Bound: call_history_get
+I/flutter ( 4805): ✅ FFI Bound: call_history_count
+I/flutter ( 4805): ✅ FFI Bound: search_messages
+I/flutter ( 4805): ✅ FFI Bound: search_group_messages
+I/flutter ( 4805): ✅ FFI Bound: send_typing_start
+I/flutter ( 4805): ✅ FFI Bound: send_typing_stop
+I/flutter ( 4805): ✅ FFI Bound: get_last_seen
+I/flutter ( 4805): ✅ FFI Bound: get_ai_mode
+I/flutter ( 4805): ✅ FFI Bound: set_ai_mode
+I/flutter ( 4805): ✅ FFI Bound: get_api_key
+I/flutter ( 4805): ✅ FFI Bound: claw_trigger_tick
+I/flutter ( 4805): ✅ FFI Bound: claw_set_active
+I/flutter ( 4805): ✅ FFI Bound: claw_set_node_mode
+I/flutter ( 4805): ✅ FFI Bound: claw_get_status
+I/flutter ( 4805): ⚠️ FFI Bind FAILED: claw_get_endpoint (Using placeholder)
+I/flutter ( 4805): ⚠️ FFI Bind FAILED: claw_set_endpoint (Using placeholder)
+I/flutter ( 4805): ✅ FFI Bound: claw_process_query
+I/flutter ( 4805): ✅ FFI Bound: claw_run_network_recon
+I/flutter ( 4805): ✅ FFI Bound: claw_heal_peer
+I/flutter ( 4805): ✅ FFI Bound: claw_get_activity_log
+I/flutter ( 4805): ✅ FFI Bound: claw_voip_start_call
+I/flutter ( 4805): ✅ FFI Bound: claw_voip_end_call
+I/flutter ( 4805): ✅ FFI Bound: claw_voip_record_sample
+I/flutter ( 4805): ✅ FFI Bound: claw_voip_get_quality
+I/flutter ( 4805): ✅ FFI Bound: claw_voip_get_downgrade_recommendation
+I/flutter ( 4805): ✅ FFI Bound: claw_set_active_chat
+I/flutter ( 4805): ✅ FFI Bound: claw_clear_active_chat
+I/flutter ( 4805): ✅ FFI Bound: claw_set_active_group_members
+I/flutter ( 4805): ✅ FFI Bound: claw_on_app_launch
+I/flutter ( 4805): ✅ FFI Bound: elevate_message
+I/flutter ( 4805): ✅ FFI Bound: unelevate_message
+I/flutter ( 4805): ✅ FFI Bound: get_elevated_messages
+I/flutter ( 4805): ✅ FFI Bound: is_message_elevated
+I/flutter ( 4805): ✅ FFI Bound: get_last_message
+I/flutter ( 4805): ✅ FFI Bound: get_last_group_message
+I/flutter ( 4805): ✅ FFI Bound: get_last_messages_all
+I/flutter ( 4805): ✅ FFI Bound: get_last_group_messages_all
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_get_status
+I/flutter ( 4805): ⚠️ FFI Bind FAILED: get_referral_status (Using placeholder)
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_get_history
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_record_activity
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_update_weights
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_update_anti_gaming
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_get_realtime_earnings
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_record_call_duration
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_record_web_activity
+I/flutter ( 4805): ✅ FFI Bound: daily_reward_record_webview_media_call
+I/flutter ( 4805): ✅ All native functions bound successfully.
+I/flutter ( 4805): ✅ Native finalizer initialized.
+I/flutter ( 4805): 📂 Sandbox Paths Initialized: Support='/data/user/0/chat.introvert.app/files', Docs='/data/user/0/chat.introvert.app/app_flutter'
+I/flutter ( 4805): ⏳ Starting sovereign initialization sequence...
+D/FlutterGeolocator( 4805): Creating service.
+I/flutter ( 4805): 📍 Target DB Path (Sandboxed): /data/user/0/chat.introvert.app/files/introvert.db
+I/flutter ( 4805): 📍 Target DB Path (Apple/Sanboxed): /data/user/0/chat.introvert.app/files/introvert.db
+I/flutter ( 4805): 🔑 Checking for existing identity...
+D/FlutterGeolocator( 4805): Binding to location service.
+I/flutter ( 4805): 🔔 AlertService: FCM token received, caching for registration...
+I/flutter ( 4805): ❌ Register Push Token Error (-10): Engine not started
+I/flutter ( 4805): 🔔 AlertService: Engine not ready yet to register push token: Exception: Register Push Token Error (-10): Engine not started
+I/flutter ( 4805): 🔔 AlertService: Push notification received: chat=null, group=null, call=null
+I/flutter ( 4805): ❌ Fetch Mailbox Error (-10): Engine not started
+D/FlutterRenderer( 4805): Width is zero. 0,0
+D/FlutterJNI( 4805): Sending viewport metrics to the engine.
+W/FlutterWebRTCPlugin( 4805): audioFocusChangeListener [Earpiece(name=Earpiece)] Earpiece(name=Earpiece)
+I/TY_com.google.android.libraries.communications.conference.service.impl.state.ConferenceStateManager(30667)[1324:385][30696] Participant volume level changed for device spaces/1gFGLGaCisIB/devices/234. [CONTEXT group_by="spaces/1gFGLGaCisIB/devices/234" ratelimit_period="3 SECONDS" skipped=3 ]
+W/FlutterWebRTCPlugin( 4805): audioFocusChangeListener [Speakerphone(name=Speakerphone), Earpiece(name=Earpiece)] Speakerphone(name=Speakerphone)
+W/FlutterWebRTCPlugin( 4805): audioFocusChangeListener [BluetoothHeadset(name=Galaxy Buds Pro (4823)), Speakerphone(name=Speakerphone), Earpiece(name=Earpiece)] BluetoothHeadset(name=Galaxy Buds Pro (4823))
+D/FlutterGeolocator( 4805): Geolocator foreground service connected
+D/FlutterGeolocator( 4805): Initializing Geolocator services
+D/FlutterGeolocator( 4805): Flutter engine connected. Connected engine count 1
+D/FlutterJNI( 4805): Sending viewport metrics to the engine.
+I/flutter ( 4805): 📜 Checking Terms of Use acceptance...
+I/flutter ( 4805): ✅ Terms accepted. Proceeding with engine start...
+I/flutter ( 4805): 🧠 Identity found. Starting native engine...
+I/flutter ( 4805): ✅ Initialization complete. Loading UI.
+I/flutter ( 4805): ✅ Engine Start: Success
+I/flutter ( 4805): 📡 Starting networking plane...
+I/flutter ( 4805): 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+I/flutter ( 4805): ✅ Network Start: Success
+I/flutter ( 4805): ✅ IntroClaw On App Launch: Success
+I/flutter ( 4805): ✅ Register Push Token: Success
+I/flutter ( 4805): 🔔 AlertService: Push token successfully registered with RBN.
+I/flutter ( 4805): 🔄 BackgroundSyncService: Push availability updated to true
+I/flutter ( 4805): ✅ Fetch Mailbox: Success
+I/flutter ( 4805): 🚀 Introvert Engine Started Successfully!
+I/flutter ( 4805): 🦀 Rust Debug: Starting NetworkService initialization...
+I/flutter ( 4805): 🦀 Rust Debug: [mDNS] Behaviour initialized for peer 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+I/flutter ( 4805): 🦀 Rust Debug: NetworkService initialized. Running swarm...
+I/flutter ( 4805): 🦀 Rust Debug: [StatusStream] Connecting to the mesh swarm...
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Step 2: Re-dialing all bootstrap nodes (TCP+QUIC) [WIFI]
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/443
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/udp/443/quic-v1
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Dialing bootstrap: /ip4/47.89.252.80/tcp/80
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Tunnel active (0s). Waiting for connection...
+I/flutter ( 4805): 🦀 Rust Debug: [Mailbox] Skipping drain — last drain was < 30s ago
+I/flutter ( 4805): 🦀 Rust Debug: FFI: Push token saved successfully to local DB under key: 12D3KooWQM5mi5VV23k3APgXfafBpbiiG9QJEmXfmdLtipMdxECd
+I/flutter ( 4805): 🦀 Rust Debug: [Resilience] Fast reconnect: transfers waiting, no relay (peers=0, incoming=0, seeders=0, pending=1)
+Error connecting to the service protocol: failed to connect to http://127.0.0.1:51774/Jg3oTtfgw1k=/ Exception: DDS shut down too early
+D/FlutterJNI( 4805): Sending viewport metrics to the engine.
+I/flutter ( 4805): 📍 Initial Node Status (from cache): 0
+I/flutter ( 4805): 📡 Initializing Unified Network Plane (Port: 0, Relay: false)...
+I/flutter ( 4805): ✅ Network Start: Success
+I/flutter ( 4805): ✅ Background sync initialized — push active, polling disabled
+I/flutter ( 4805): 💰 Subscribing to Economy Monitoring...
+I/flutter ( 4805): ✅ Economy Monitoring: Success
