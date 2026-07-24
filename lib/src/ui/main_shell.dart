@@ -5758,8 +5758,8 @@ class _ResolveHandleDialogState extends State<_ResolveHandleDialog> {
       });
     }
 
-    // Timeout: if no Event 33/35 in 15 seconds, show error
-    Future.delayed(const Duration(seconds: 15), () {
+    // Timeout: if no Event 33/35 in 30 seconds, show error
+    Future.delayed(const Duration(seconds: 30), () {
       if (mounted && _state == _ResolveState.resolving && _resolvingHandle == h) {
         setState(() {
           _errorMessage = "Timed out resolving $h. The handle may not exist or the network is unreachable.";

@@ -225,6 +225,7 @@ impl NetworkService {
             _tunnel_handle: tunnel_handle,
             tunnel_active: is_tunnel_enabled,
             tunnel_started_at: if is_tunnel_enabled { Some(Instant::now()) } else { None },
+            tunnel_retry_count: 0,
             pending_diagnostics: HashMap::new(),
             registry: registry::RegistryManager::new(storage.clone()),
             pending_claims: HashMap::new(),
@@ -265,6 +266,10 @@ impl NetworkService {
             last_chunk_drain: Instant::now() - Duration::from_secs(60), // allow first drain immediately
             flush_in_progress: HashMap::new(),
             transfer_router: service::TransferRouter::new(),
+            connection_budget: service::ConnectionBudget::new(),
+            last_dispatched_status: 255, // sentinel — first real status always dispatches
+            last_peer_status: HashMap::new(),
+            connected_event_dispatched: HashSet::new(),
         };
 
         // Sync to global RBN bootstrap list
@@ -301,15 +306,21 @@ impl NetworkService {
         };
         let _ = self.swarm.behaviour_mut().kademlia.put_record(pubkey_record, kad::Quorum::One);
 
-        // Pre-populate anchors with known RBN nodes and request relay reservations
+        // Pre-populate anchors with known RBN nodes — add all to Kademlia but only dial primary
         for (peer_id, addr) in &self.bootstrap_nodes {
             self.swarm.behaviour_mut().kademlia.add_address(peer_id, addr.clone());
             if !self.discovered_anchors.contains(peer_id) {
                 self.discovered_anchors.push(peer_id.clone());
             }
+        }
+        // Dial RBNs at startup with budget and fallback — try next if primary fails.
+        for (peer_id, addr) in &self.bootstrap_nodes {
+            if !self.connection_budget.can_dial_urgent(peer_id) {
+                continue; // Budget exceeded for this RBN, skip
+            }
             let _ = self.swarm.dial(addr.clone());
-            // Request relay reservation immediately — all devices must be reachable.
-            // Must use full multiaddr; relative /p2p/X/p2p-circuit fails with MissingRelayAddr.
+            self.connection_budget.record_dial(*peer_id);
+            // Request relay reservation
             let mut relay_addr = addr.clone();
             if !relay_addr.to_string().contains(&peer_id.to_string()) {
                 relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*peer_id));
@@ -319,9 +330,14 @@ impl NetworkService {
                 Ok(listener_id) => {
                     self.relay_reservations.insert(*peer_id);
                     self.relay_listeners.insert(listener_id, *peer_id);
+                    self.connection_budget.record_reservation(*peer_id);
                     info!("[Mesh] Relay reservation requested from RBN on startup: {}", peer_id);
+                    break; // Success — stop trying other RBNs
                 }
-                Err(e) => debug!("[Mesh] Relay reservation request failed for {}: {:?}", peer_id, e),
+                Err(e) => {
+                    debug!("[Mesh] Relay reservation failed for {}: {:?}, trying next RBN", peer_id, e);
+                    // Continue to next RBN immediately (fallback)
+                }
             }
         }
 
@@ -623,6 +639,7 @@ impl NetworkService {
                     if current_status != last_status {
                         let prev_status = last_status;
                         last_status = current_status;
+                        self.last_dispatched_status = current_status;
                         crate::dispatch_global_event(10, &[current_status]);
                         crate::dispatch_debug_log(&format!("[Status] Status change: {} (peers={}, relay_listener={})", current_status, connected_count, has_relay_listener));
 
@@ -893,6 +910,7 @@ impl NetworkService {
                             crate::dispatch_debug_log("[Resilience] Step 4: All strategies exhausted — OFFLINE");
                         }
                         } // end else (!intro_claw.is_active())
+                        } // end if connected_count == 0
                     } else if !has_relay_listener {
                         // Peers connected but no relay — reset zero-peers counter
                         self.consecutive_zero_peers_ticks = 0;
@@ -907,34 +925,46 @@ impl NetworkService {
                             warn!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count);
                             crate::dispatch_debug_log(&format!("[Resilience] Step 1: {} peers connected but no relay. Re-establishing...", connected_count));
 
-                            // Dial any disconnected RBNs first
+                            // Dial disconnected RBNs with budget and fallback — try next if first fails
                             let mut any_rbn_connected = false;
                             for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
                                 if !self.swarm.is_connected(rbn_id) {
-                                    crate::dispatch_debug_log(&format!("[Resilience] Dialing RBN: {}", rbn_addr));
-                                    let _ = self.swarm.dial(rbn_addr.clone());
-                                    let _ = self.swarm.behaviour_mut().kademlia.add_address(rbn_id, rbn_addr.clone());
+                                    if self.connection_budget.can_dial_urgent(rbn_id) {
+                                        crate::dispatch_debug_log(&format!("[Resilience] Dialing RBN: {}", rbn_addr));
+                                        let _ = self.swarm.dial(rbn_addr.clone());
+                                        self.connection_budget.record_dial(*rbn_id);
+                                        let _ = self.swarm.behaviour_mut().kademlia.add_address(rbn_id, rbn_addr.clone());
+                                        break; // Only dial ONE per tick, but budget allows retry on next tick
+                                    }
                                 } else {
                                     any_rbn_connected = true;
                                 }
                             }
 
-                            // Request relay reservations from connected RBNs
+                            // Request relay reservation from connected RBNs with budget and fallback
                             for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
-                                if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
-                                    let mut relay_addr = rbn_addr.clone();
-                                    if !relay_addr.to_string().contains(&rbn_id.to_string()) {
-                                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
-                                    }
-                                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
-                                    match self.swarm.listen_on(relay_addr.clone()) {
-                                        Ok(id) => {
-                                            self.relay_reservations.insert(*rbn_id);
-                                            self.relay_listeners.insert(id, *rbn_id);
-                                            crate::dispatch_debug_log(&format!("[Resilience] Relay reservation re-requested from {}", rbn_id));
+                                if self.swarm.is_connected(rbn_id)
+                                    && !self.relay_reservations.contains(rbn_id)
+                                    && !self.relay_listeners.values().any(|rbn| rbn == rbn_id)
+                                {
+                                    if self.connection_budget.can_request_reservation_urgent(rbn_id) {
+                                        let mut relay_addr = rbn_addr.clone();
+                                        if !relay_addr.to_string().contains(&rbn_id.to_string()) {
+                                            relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
                                         }
-                                        Err(e) => {
-                                            crate::dispatch_debug_log(&format!("[Resilience] Relay reservation failed: {:?}", e));
+                                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+                                        match self.swarm.listen_on(relay_addr.clone()) {
+                                            Ok(id) => {
+                                                // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
+                                                self.relay_listeners.insert(id, *rbn_id);
+                                                self.connection_budget.record_reservation(*rbn_id);
+                                                crate::dispatch_debug_log(&format!("[Resilience] Relay reservation re-requested from {}", rbn_id));
+                                                break; // Success — stop trying
+                                            }
+                                            Err(e) => {
+                                                crate::dispatch_debug_log(&format!("[Resilience] Relay reservation failed for {}: {:?}, trying next", rbn_id, e));
+                                                // Continue to next RBN (fallback)
+                                            }
                                         }
                                     }
                                 }
@@ -944,26 +974,34 @@ impl NetworkService {
                                 crate::dispatch_debug_log("[Resilience] No RBNs reachable — will retry in 30s");
                             }
 
-                            // VPN DETECTION: If reservations are empty but RBNs are connected,
-                            // the VPN likely made reservations stale. Force-clear and re-dial.
-                            // BUT: if we have pending relay listeners (requested, not yet accepted),
-                            // don't force-disconnect — the reservation is still being established.
+                            // Tunnel fallback: if no relay reservation and no RBN reachable,
+                            // try activating the WebSocket tunnel as an alternative path.
+                            if self.relay_reservations.is_empty() && !self.tunnel_active {
+                                let rbn_connected = self.bootstrap_nodes.iter()
+                                    .any(|(id, _)| self.swarm.is_connected(id));
+                                if !rbn_connected {
+                                    crate::dispatch_debug_log("[Resilience] No RBN connected — activating tunnel fallback");
+                                    let tx = self.command_tx.clone();
+                                    tokio::spawn(async move {
+                                        let _ = tx.send(NetworkCommand::ActivateTunnel).await;
+                                    });
+                                }
+                            }
+
+                            // VPN detection: log only, do NOT force-disconnect (causes reconnect loop)
                             if self.relay_reservations.is_empty() && self.relay_listeners.is_empty() {
                                 let rbn_connected: Vec<PeerId> = self.bootstrap_nodes.iter()
                                     .filter(|(id, _)| self.swarm.is_connected(id))
                                     .map(|(id, _)| *id)
                                     .collect();
                                 if !rbn_connected.is_empty() {
-                                    warn!("[VPN] Stale relay reservation detected — re-establishing connections to {} RBNs", rbn_connected.len());
-                                    crate::dispatch_debug_log(&format!("[VPN] Stale reservation: {} RBNs connected but 0 reservations. Force re-dial.", rbn_connected.len()));
+                                    warn!("[VPN] Stale relay reservation detected — {} RBNs connected but 0 reservations. Force-disconnecting to trigger clean reconnect.", rbn_connected.len());
                                     for rbn_id in &rbn_connected {
                                         let _ = self.swarm.disconnect_peer_id(*rbn_id);
                                     }
-                                    // Re-dial will happen on next tick via Step 2 (connected_count == 0)
                                 }
                             }
                         }
-                    }
                     } else if self.last_idle_log.elapsed() > Duration::from_secs(300) {
                         self.last_idle_log = Instant::now();
                         crate::dispatch_debug_log("[Resilience] Idle — suppressing background dials");
@@ -1061,29 +1099,41 @@ impl NetworkService {
                                 }
                             }
 
-                            // Dial any disconnected RBNs
+                            // Dial disconnected RBNs with budget and fallback
                             for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
-                                if !self.swarm.is_connected(rbn_id) {
+                                if !self.swarm.is_connected(rbn_id) && self.connection_budget.can_dial_urgent(rbn_id) {
                                     let _ = self.swarm.dial(rbn_addr.clone());
+                                    self.connection_budget.record_dial(*rbn_id);
                                     let _ = self.swarm.behaviour_mut().kademlia.add_address(rbn_id, rbn_addr.clone());
+                                    break; // Only dial ONE per tick
                                 }
                             }
 
-                            // Request relay reservations from connected RBNs
+                            // Request relay reservation from connected RBNs with budget and fallback
                             for (rbn_id, rbn_addr) in &self.bootstrap_nodes {
-                                if self.swarm.is_connected(rbn_id) && !self.relay_reservations.contains(rbn_id) {
-                                    let mut relay_addr = rbn_addr.clone();
-                                    if !relay_addr.to_string().contains(&rbn_id.to_string()) {
-                                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
-                                    }
-                                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
-                                    match self.swarm.listen_on(relay_addr) {
-                                        Ok(id) => {
-                                            self.relay_reservations.insert(*rbn_id);
-                                            self.relay_listeners.insert(id, *rbn_id);
-                                            crate::dispatch_debug_log(&format!("[Resilience] Fast reconnect: relay reservation from {}", rbn_id));
+                                if self.swarm.is_connected(rbn_id)
+                                    && !self.relay_reservations.contains(rbn_id)
+                                    && !self.relay_listeners.values().any(|rbn| rbn == rbn_id)
+                                {
+                                    if self.connection_budget.can_request_reservation_urgent(rbn_id) {
+                                        let mut relay_addr = rbn_addr.clone();
+                                        if !relay_addr.to_string().contains(&rbn_id.to_string()) {
+                                            relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(*rbn_id));
                                         }
-                                        Err(e) => debug!("[Resilience] Fast reconnect: reservation failed: {:?}", e),
+                                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+                                        match self.swarm.listen_on(relay_addr) {
+                                            Ok(id) => {
+                                                // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
+                                                self.relay_listeners.insert(id, *rbn_id);
+                                                self.connection_budget.record_reservation(*rbn_id);
+                                                crate::dispatch_debug_log(&format!("[Resilience] Fast reconnect: relay reservation from {}", rbn_id));
+                                                break; // Success — stop trying
+                                            }
+                                            Err(e) => {
+                                                debug!("[Resilience] Fast reconnect: reservation failed for {}: {:?}, trying next", rbn_id, e);
+                                                // Continue to next RBN (fallback)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1181,6 +1231,8 @@ impl NetworkService {
                         }
                     }
                     self.perform_mailbox_fetch().await;
+                    // Keepalive: periodically dial all bootstrap nodes to prevent silent connection deaths.
+                    // This catches NAT timeouts and carrier-grade NAT drops that don't surface as ConnectionClosed.
                     for (_, addr) in &self.bootstrap_nodes {
                         let _ = self.swarm.dial(addr.clone());
                     }
@@ -1260,6 +1312,7 @@ impl NetworkService {
                             self.swarm.behaviour_mut().kademlia.stop_providing(&anchor_key);
                             let _ = self.swarm.disconnect_peer_id(local_peer_id); 
                             crate::dispatch_global_event(10, &[0]);
+                            self.last_dispatched_status = 0;
                         }
                     }
                 }
@@ -1847,7 +1900,7 @@ impl NetworkService {
                         let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
 
                         if info.protocols.iter().any(|p| p.to_string().contains("/libp2p/circuit/relay/0.2.0/hop")) {
-                            if !self.relay_reservations.contains(&peer_id) {
+                            if !self.relay_reservations.contains(&peer_id) && self.connection_budget.can_request_reservation_urgent(&peer_id) {
                                 info!("Relay node {} supports HOP. Requesting reservation...", peer_id);
 
                                 // BUG FIX: Construct the FULL multiaddr for the relay reservation.
@@ -1900,6 +1953,7 @@ impl NetworkService {
                                         info!("[Mesh] Relay listen request SUCCESS. Address: {}, Listener ID: {:?}", relay_addr, id);
                                         self.relay_reservations.insert(peer_id);
                                         self.relay_listeners.insert(id, peer_id);
+                                        self.connection_budget.record_reservation(peer_id);
                                     },
                                     Err(e) => info!("[Mesh] Relay listen request FAILED on {}: {:?}", relay_addr, e),
                                 }
@@ -1978,12 +2032,15 @@ impl NetworkService {
                                 data.push(1); // 1 = Relay Active
                                 crate::dispatch_global_event(8, &data);
                                 crate::dispatch_global_event(10, &[2]);
+                                self.last_dispatched_status = 2;
 
                                 // FIX B: Drain mailbox immediately after reservation so queued messages are delivered
                                 // This is critical for mobile data / VPN: messages sent to us while we were
                                 // offline are sitting in the RBN mailbox waiting to be drained.
+                                // Reset cooldown so the drain is not skipped after network transitions.
                                 info!("[Relay] Triggering immediate mailbox drain after reservation...");
                                 crate::dispatch_debug_log("[Relay] Triggering mailbox drain after ReservationReqAccepted");
+                                self.last_mailbox_drain = Instant::now() - Duration::from_secs(60);
                                 self.perform_mailbox_fetch().await;
 
                                 // FIX C: Flush any pending messages that were buffered while we had no relay
@@ -2516,9 +2573,9 @@ impl NetworkService {
                             let is_rbn_or_anchor = self.bootstrap_nodes.iter().any(|(id, _)| id == &ping_event.peer)
                                 || self.discovered_anchors.contains(&ping_event.peer);
                             if is_rbn_or_anchor {
-                                warn!("[Relay] Ping failure to RBN/anchor {} — forcing disconnect to trigger reservation cleanup", ping_event.peer);
+                                warn!("[Relay] Ping failure to RBN/anchor {} — disconnecting", ping_event.peer);
                                 let _ = self.swarm.disconnect_peer_id(ping_event.peer);
-                                // FIX 2: Reset rate limiter so next tick retries reservation immediately
+                                // Reset reservation timer to allow immediate retry on next tick
                                 self.last_relay_reservation_attempt = Instant::now() - Duration::from_secs(11);
                             }
                         }
@@ -2647,11 +2704,8 @@ impl NetworkService {
             }
             SwarmEvent::ExternalAddrConfirmed { address } => {
                 info!("[Swarm] External address CONFIRMED: {}", address);
-                // Proactively bootstrap and re-dial RBNs on address confirmation to update DHT/Relay
+                // Bootstrap DHT only — do NOT dial all RBNs (causes connection storms)
                 let _ = self.swarm.behaviour_mut().kademlia.bootstrap();
-                for (_, addr) in &self.bootstrap_nodes {
-                    let _ = self.swarm.dial(addr.clone());
-                }
             }
             SwarmEvent::ExternalAddrExpired { address } => {
                 info!("[Swarm] External address EXPIRED: {}", address);
@@ -2680,16 +2734,12 @@ impl NetworkService {
             SwarmEvent::ListenerClosed { listener_id, reason, .. } => {
                 info!("[Swarm] Listener closed ({:?}): {:?}", listener_id, reason);
                 if let Some(peer_id) = self.relay_listeners.remove(&listener_id) {
-                    info!("[Mesh] Relay listener for {} closed. Keeping reservation for status stability.", peer_id);
-                    // NOTE: Do NOT remove relay_reservations here. Keeping the reservation
-                    // ensures has_confirmed_reservation stays true, preventing status from
-                    // dropping to "no relay" during brief listener closures. The reservation
-                    // will be naturally refreshed on the next re-request.
+                    info!("[Mesh] Relay listener for {} closed. Removing reservation to allow re-request.", peer_id);
+                    self.relay_reservations.remove(&peer_id);
 
                     // AUTO-RECOVERY: If we still have an active connection to this RBN,
-                    // immediately re-request a relay reservation so we stay reachable.
-                    // MUST use full multiaddr; relative /p2p/X/p2p-circuit fails with MissingRelayAddr.
-                    if self.swarm.is_connected(&peer_id) {
+                    // re-request a relay reservation (with budget check to prevent storms).
+                    if self.swarm.is_connected(&peer_id) && self.connection_budget.can_request_reservation_urgent(&peer_id) {
                         info!("[Mesh] Still connected to RBN {}. Re-requesting relay reservation...", peer_id);
                         let relay_addr = if let Some((_, addr)) = self.bootstrap_nodes.iter().find(|(id, _)| *id == peer_id) {
                             let mut a = addr.clone();
@@ -2698,7 +2748,6 @@ impl NetworkService {
                             }
                             a.with(libp2p::multiaddr::Protocol::P2pCircuit)
                         } else {
-                            // Fallback: try to get address from Kademlia
                             let mut a = libp2p::multiaddr::Multiaddr::empty()
                                 .with(libp2p::multiaddr::Protocol::P2p(peer_id))
                                 .with(libp2p::multiaddr::Protocol::P2pCircuit);
@@ -2709,9 +2758,12 @@ impl NetworkService {
                                 info!("[Mesh] Relay re-reservation request SUCCESS. New Listener ID: {:?}", new_id);
                                 self.relay_reservations.insert(peer_id);
                                 self.relay_listeners.insert(new_id, peer_id);
+                                self.connection_budget.record_reservation(peer_id);
                             }
                             Err(e) => warn!("[Mesh] Relay re-reservation FAILED: {:?}", e),
                         }
+                    } else if self.swarm.is_connected(&peer_id) {
+                        debug!("[Mesh] Reservation budget exceeded for {}, will retry on next status check", peer_id);
                     }
                 }
             }
@@ -2751,12 +2803,13 @@ impl NetworkService {
                 //   - If we already have a relay listener: status=1 (reachable)
                 //   - Otherwise: status=4 (connecting — RBN connected, waiting for relay)
                 let has_relay = self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit"));
-                if has_relay {
-                    crate::dispatch_global_event(10, &[1]);
-                } else {
-                    // Status 4 = RBN connected, relay reservation pending
-                    crate::dispatch_global_event(10, &[4]);
-                    crate::dispatch_debug_log(&format!("[Status] ConnectionEstablished with {} but no relay yet — status=4 (connecting)", peer_id));
+                let new_status: u8 = if has_relay { 1 } else { 4 };
+                if new_status != self.last_dispatched_status {
+                    self.last_dispatched_status = new_status;
+                    crate::dispatch_global_event(10, &[new_status]);
+                    if !has_relay {
+                        crate::dispatch_debug_log(&format!("[Status] ConnectionEstablished with {} but no relay yet — status=4 (connecting)", peer_id));
+                    }
                 }
 
                 let endpoint_addr = endpoint.get_remote_address();
@@ -2781,13 +2834,16 @@ impl NetworkService {
                 // that hasn't been closed yet (e.g., device moved LAN→VPN without
                 // triggering ConnectionClosed on the old path).
                 let is_now_relayed = is_relayed || self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0) == 0;
+                let prev_relayed = self.is_relayed_map.read().get(&peer_id).copied();
                 self.is_relayed_map.write().insert(peer_id, is_now_relayed);
                 
-                crate::dispatch_debug_log(&format!(
-                    "[RelayMap] ConnectionEstablished to {}: is_relayed_endpoint={}, local_ip={}, direct_count={}, now_relayed={}",
-                    peer_id, endpoint.is_relayed(), is_local_ip,
-                    self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0), is_now_relayed
-                ));
+                if prev_relayed != Some(is_now_relayed) {
+                    crate::dispatch_debug_log(&format!(
+                        "[RelayMap] ConnectionEstablished to {}: is_relayed_endpoint={}, local_ip={}, direct_count={}, now_relayed={}",
+                        peer_id, endpoint.is_relayed(), is_local_ip,
+                        self.direct_conn_count.get(&peer_id).cloned().unwrap_or(0), is_now_relayed
+                    ));
+                }
                 
                 if is_local_ip && endpoint.is_relayed() {
                     info!("[Mesh] Peer {} connected via LOCAL RELAY. Treating as DIRECT for performance.", peer_id);
@@ -2800,35 +2856,48 @@ impl NetworkService {
                 let is_anchor = self.discovered_anchors.contains(&peer_id);
                 let we_are_anchor = self.storage.is_anchor_mode_enabled();
 
-                if (is_rbn || is_anchor) && !we_are_anchor && !self.relay_reservations.contains(&peer_id) {
-                    info!("[Mesh] Requesting RELAY RESERVATION from anchor: {}", peer_id);
-                    // Build full multiaddr from the endpoint we just connected to.
-                    // Relative addresses (/p2p/X/p2p-circuit) fail with MissingRelayAddr
-                    // because libp2p-relay requires a transport address before the circuit.
-                    let mut relay_addr = endpoint_addr.clone();
-                    if !relay_addr.to_string().contains(&peer_id.to_string()) {
-                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(peer_id));
-                    }
-                    relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
-                    match self.swarm.listen_on(relay_addr.clone()) {
-                        Ok(id) => {
-                            info!("[Mesh] Relay reservation requested. Address: {}, Listener: {:?}", relay_addr, id);
-                            self.relay_reservations.insert(peer_id);
-                            self.relay_listeners.insert(id, peer_id);
+                if (is_rbn || is_anchor) && !we_are_anchor
+                    && !self.relay_reservations.contains(&peer_id)
+                    && !self.relay_listeners.values().any(|rbn| rbn == &peer_id)
+                {
+                    // Check connection budget before requesting reservation
+                    if self.connection_budget.can_request_reservation_urgent(&peer_id) {
+                        info!("[Mesh] Requesting RELAY RESERVATION from anchor: {}", peer_id);
+                        let mut relay_addr = endpoint_addr.clone();
+                        if !relay_addr.to_string().contains(&peer_id.to_string()) {
+                            relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2p(peer_id));
                         }
-                        Err(e) => info!("[Mesh] Relay reservation failed: {:?}", e),
+                        relay_addr = relay_addr.with(libp2p::multiaddr::Protocol::P2pCircuit);
+                        match self.swarm.listen_on(relay_addr.clone()) {
+                            Ok(id) => {
+                                info!("[Mesh] Relay reservation requested. Address: {}, Listener: {:?}", relay_addr, id);
+                                crate::dispatch_debug_log(&format!("[Mesh] Relay reservation requested from {}", peer_id));
+                                // Only track in relay_listeners — relay_reservations is populated on ReservationReqAccepted
+                                self.relay_listeners.insert(id, peer_id);
+                                self.connection_budget.record_reservation(peer_id);
+                            }
+                            Err(e) => info!("[Mesh] Relay reservation failed: {:?}", e),
+                        }
+                    } else {
+                        debug!("[Mesh] Reservation budget exceeded for {}, skipping", peer_id);
                     }
                 }
                 let status: u8 = if is_now_relayed { 1 } else { 0 };
-                let mut data = peer_id.to_string().into_bytes();
-                data.push(b':');
-                data.push(status);
-                crate::dispatch_global_event(8, &data);
+                let peer_status_changed = self.last_peer_status.get(&peer_id).copied() != Some(status);
+                if peer_status_changed {
+                    self.last_peer_status.insert(peer_id, status);
+                    let mut data = peer_id.to_string().into_bytes();
+                    data.push(b':');
+                    data.push(status);
+                    crate::dispatch_global_event(8, &data);
+                }
                 
                 if is_now_relayed { self.reward_tracker.record_relay(&peer_id.to_string(), 1024); }
                 
-                let data = peer_id.to_bytes();
-                crate::dispatch_global_event(1, &data); 
+                if self.connected_event_dispatched.insert(peer_id) {
+                    let data = peer_id.to_bytes();
+                    crate::dispatch_global_event(1, &data);
+                }
 
                 // Diagnostic recheck: record transport type (settled event fires on first Ping RTT)
                 if let Some(diag) = self.pending_diagnostics.get_mut(&peer_id) {
@@ -2921,6 +2990,8 @@ impl NetworkService {
                    self.is_relayed_map.write().remove(&peer_id);
                     crate::dispatch_debug_log(&format!("[RelayMap] ConnectionClosed with {} — removed from is_relayed_map", peer_id));
                    self.direct_conn_count.remove(&peer_id);
+                   self.last_peer_status.remove(&peer_id);
+                   self.connected_event_dispatched.remove(&peer_id);
                    if self.mesh_active_peers.remove(&peer_id) {
                        crate::ACTIVE_PEER_COUNT.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
                    }
@@ -3404,7 +3475,7 @@ impl NetworkService {
                 }
 
         // WebRTC signaling and handle claims are transient and should never be stored in persistent mailboxes.
-        if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. }) {
+        if matches!(payload, SignalingPayload::WebRtc(_) | SignalingPayload::WebRtcNative(_) | SignalingPayload::Candidate(_) | SignalingPayload::Offer(_) | SignalingPayload::Answer(_) | SignalingPayload::HandleClaimRequest { .. } | SignalingPayload::HandleClaimWitnessed { .. } | SignalingPayload::HandleResolveRequest { .. } | SignalingPayload::HandleResolveResponse { .. }) {
             debug!("[Mesh] Buffering real-time signaling/handle registry payload for {} in RAM...", recipient_str);
             self.pending_messages.entry(recipient_id).or_default().push(payload.clone());
             return Ok(());
@@ -3669,12 +3740,14 @@ impl NetworkService {
                 
                 if connectivity_type != old_type {
                     info!("[Network] Connectivity transition detected: {} -> {}", old_type, connectivity_type);
-                    
+
                     // NOTE: Do NOT clear relay_reservations on network transition.
                     // This was the root cause of cross-network/VPN relay failure.
                     // Instead, stale reservations are detected by the periodic status check
                     // which force-reconnects RBNs when reservations=0 but RBNs are connected.
                     self.relay_dial_limiter.clear();
+                    // Reset tunnel retry count so tunnel can be re-attempted after network change
+                    self.tunnel_retry_count = 0;
 
                     // No VPN detection — connectivity_plus VPN detection has false positives.
                     // Let the resilience ladder handle tunnel activation (60s no peers → activate tunnel).
@@ -4545,6 +4618,7 @@ impl NetworkService {
                 info!("[Network] Force Mesh Refresh triggered. Performing HARD RESET of networking stack.");
                 // Immediately notify UI we are connecting
                 crate::dispatch_global_event(10, &[3]);
+                self.last_dispatched_status = 3;
 
                 // 1. Actively disconnect all current peers to clear stale WiFi/VPN sockets
                 let current_peers: Vec<PeerId> = self.swarm.connected_peers().cloned().collect();
@@ -4592,10 +4666,12 @@ impl NetworkService {
                 if connected_count > 0 {
                     let status = if self.swarm.listeners().any(|l| l.to_string().contains("p2p-circuit")) { 2u8 } else { 1u8 };
                     crate::dispatch_global_event(10, &[status]);
+                    self.last_dispatched_status = status;
                     info!("[Network] ForceMeshRefresh complete — {} peers connected, status={}", connected_count, status);
                 } else {
                     // No peers yet — show Relay (connecting via RBN)
                     crate::dispatch_global_event(10, &[2]);
+                    self.last_dispatched_status = 2;
                     info!("[Network] ForceMeshRefresh complete — dialing RBNs...");
                 }
 
@@ -4641,6 +4717,20 @@ impl NetworkService {
                                     crate::dispatch_debug_log(&format!("[Tunnel] Both TLS and plaintext failed: {:?} / {:?}", tls_err, plain_err));
                                     self.tunnel_active = false;
                                     self.tunnel_started_at = None;
+                                    // Retry with exponential backoff (5s, 10s, 20s, 40s, 80s, max 120s)
+                                    self.tunnel_retry_count += 1;
+                                    if self.tunnel_retry_count <= 10 {
+                                        let delay = Duration::from_secs((5 * 2u64.pow(self.tunnel_retry_count.min(4))).min(120));
+                                        warn!("[Network] Tunnel retry {}/{} in {}s", self.tunnel_retry_count, 10, delay.as_secs());
+                                        let tx = self.command_tx.clone();
+                                        tokio::spawn(async move {
+                                            tokio::time::sleep(delay).await;
+                                            let _ = tx.send(NetworkCommand::ActivateTunnel).await;
+                                        });
+                                    } else {
+                                        warn!("[Network] Tunnel activation failed after {} retries. Giving up until next network change.", self.tunnel_retry_count);
+                                        crate::dispatch_debug_log("[Tunnel] All retries exhausted. Will retry on next network change.");
+                                    }
                                     return Ok(());
                                 }
                             }
@@ -4648,6 +4738,7 @@ impl NetworkService {
                     };
                     self.tunnel_active = true;
                     self.tunnel_started_at = Some(Instant::now());
+                    self.tunnel_retry_count = 0;
                     self._tunnel_handle = Some(handle);
                     let tunnel_addr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{}", port).parse()?;
                     let rbn_peer_id: PeerId = types::RBN_PEER_ID.parse()?;
@@ -5567,7 +5658,7 @@ impl NetworkService {
         // Initialize Solana client for Mainnet
         let solana_client = match crate::economy::solana::SolanaIncentiveEngine::new(
             "https://api.mainnet-beta.solana.com",
-            "FhKJjqpsCbymrk4Ntv5jFyZihHsAkW4Fb4fuJYBniydP",
+            "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm",
             "https://api.introvert.network/claim",
         ) {
             Ok(c) => c,
@@ -5768,7 +5859,7 @@ impl NetworkService {
 
         let solana_client = match crate::economy::solana::SolanaIncentiveEngine::new(
             "https://api.mainnet-beta.solana.com",
-            "FhKJjqpsCbymrk4Ntv5jFyZihHsAkW4Fb4fuJYBniydP",
+            "DZWeLhjPeH3q4Z45HyTh5BbWXiuXdHKK7od4yR9wGLQm",
             "https://api.introvert.network/claim",
         ) {
             Ok(c) => c,
@@ -7960,7 +8051,13 @@ impl NetworkService {
                         signatures: witnesses.iter().cloned().collect(),
                     };
                     let _ = self.registry.verify_claim(&claim);
-                    
+
+                    // Persist handle claim to SQLite so HandleResolveRequest can find it
+                    let signatures_json = serde_json::to_string(&claim.signatures).unwrap_or_else(|_| "[]".to_string());
+                    if let Err(e) = self.storage.insert_handle_claim(&handle, &peer_id, timestamp, &signatures_json, true) {
+                        warn!("[Registry] Failed to persist handle claim for {}: {:?}", handle, e);
+                    }
+
                     // Publish handle mapping to DHT
                     let h_key = RecordKey::new(&handle.as_bytes());
                     let h_value = serde_json::to_string(&claim).unwrap_or_else(|_| peer_id.clone()).into_bytes();
@@ -7991,6 +8088,40 @@ impl NetworkService {
                     
                     // Remove from pending to prevent double-event
                     self.pending_claims.remove(&handle);
+                }
+            }
+            SignalingPayload::HandleResolveRequest { handle } => {
+                info!("[Registry] Received HandleResolveRequest for '{}' from {}", handle, peer);
+                // Path 1: Check local storage for a cached handle claim
+                match self.storage.get_handle_claim(&handle) {
+                    Ok(Some((peer_id, _timestamp, _signatures, verified))) => {
+                        info!("[Registry] Handle '{}' found locally -> {} (verified: {})", handle, peer_id, verified);
+                        let response = SignalingPayload::HandleResolveResponse {
+                            handle: handle.clone(),
+                            peer_id,
+                            verified,
+                        };
+                        let tx = self.command_tx.clone();
+                        let recipient = peer;
+                        tokio::spawn(async move {
+                            let _ = tx.send(NetworkCommand::ForwardMeshSignaling {
+                                peer_id: recipient,
+                                payload: response,
+                            }).await;
+                        });
+                    }
+                    Ok(None) => {
+                        // Path 2: Not in local storage — query Kademlia DHT
+                        info!("[Registry] Handle '{}' not cached locally, querying DHT", handle);
+                        let key = libp2p::kad::RecordKey::new(&handle.as_bytes());
+                        let _ = self.swarm.behaviour_mut().kademlia.get_record(key);
+                        // DHT result will be handled by the OutboundQueryProgressed handler,
+                        // which dispatches Event 33/35 to Flutter. The requesting peer will
+                        // need to retry or use their own DHT lookup.
+                    }
+                    Err(e) => {
+                        warn!("[Registry] Storage error looking up handle '{}': {}", handle, e);
+                    }
                 }
             }
             SignalingPayload::HandleResolveResponse { handle, peer_id, verified } => {

@@ -83,26 +83,15 @@ class IntrovertFirebaseMessagingService : FirebaseMessagingService() {
         prefs.edit().putBoolean("pending_wakeup", true).apply()
         Log.d(TAG, "Set pending_wakeup flag for mailbox fetch")
 
-        // FOREGROUND: Skip native notification. Dart plays sound only.
-        if (isAppInForeground) {
-            Log.d(TAG, "App in foreground — skipping native notification, Dart handles sound")
-            return
-        }
-
-        // COOLDOWN: Skip if less than 3 minutes since last notification.
-        val now = System.currentTimeMillis()
-        if (now - lastNotificationTime < COOLDOWN_MS) {
-            Log.d(TAG, "Notification suppressed (3-min cooldown): $messageType")
-            return
-        }
-
-        // Show notification
-        when (messageType) {
-            "call" -> showCallNotification(senderPeerId)
-            "group" -> showGroupNotification(senderPeerId, data)
-            else -> showMessageNotification(senderPeerId)
-        }
-        lastNotificationTime = now
+        // NOTE: Native notification display removed.
+        // The Dart side handles all notification display AFTER verifying actual messages exist
+        // in the RBN mailbox via fetchMailbox(). This prevents false "You have a new message"
+        // notifications from protocol traffic (relay ACKs, connection events, etc.).
+        //
+        // The pending_wakeup flag (line 83) signals the Dart side to fetch messages.
+        // The Dart side (alert_service.dart → main_shell.dart) only shows notifications
+        // for actual message content after MailboxDrained events.
+        Log.d(TAG, "Push received ($messageType) — native notification skipped, Dart handles display after mailbox fetch")
     }
 
     /**

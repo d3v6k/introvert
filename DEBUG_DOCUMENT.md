@@ -1,7 +1,7 @@
 # Debug Document — Introvert Sovereign Messenger
 
-**Last Updated:** 2026-07-19 14:30 UTC
-**Git:** main @ cbd5f0f (v0.35.0 — Ghost Message Fix & Mailbox Sync Hardening, uncommitted)
+**Last Updated:** 2026-07-23 04:45 UTC
+**Git:** main @ (v0.36.0+ — Event Dedup + ConnectionBudget Urgent Bypass)
 
 ---
 
@@ -76,6 +76,42 @@ A legacy fallback routing block in `forward_to_mesh` (lines 3139–3150) designe
 
 **Resolution:**
 Removed the buggy relay-aware routing block from `forward_to_mesh`. Now, when direct circuit connections are not yet fully established, the chunks/requests are correctly buffered in RAM and persisted to the SQLite DB, and then dialed via the relay circuit. Once the circuit connection is open, the outbound/inbound handlers flush the queue directly to the recipient's PeerId, restoring file transfer functionality across relay connections.
+
+
+### Android Mobile Data File Transfer Stuck at "Waiting for Recipient" (ACTIVE)
+
+**Timeline (2026-07-23):**
+- 04:32 — Android started on WiFi, connected to RBN, relay reservation accepted
+- 04:35:22-28 — All connections closed (WiFi to mobile data transition)
+- 04:35:36 — [MOBILE] Mobile data detected — activating tunnel
+- 04:35:38 — Tunnel activated, RBN connected via WebSocket
+- 04:35:40 — ReservationReqAccepted, OutboundCircuitEstablished
+- 04:35:40 — **Mailbox drain SKIPPED** — "last drain was < 30s ago"
+- 04:35:41 — iOS connected via relay (is_relayed_endpoint=true)
+- 04:35:47 — Status change to 1 (ONLINE)
+- 04:35:58+ — Text messages (group_send) work fine via live relay circuit
+- **File transfers stuck at "Waiting for Recipient"** — no TransferRouter or gft_ events in netlog
+- 04:37:03 — WiFi reconnected -> file transfers completed immediately
+
+**Root Cause:**
+The file manifest ([FILE]:) is published via gossipsub when the user picks a file. If the relay circuit is not up at that moment (during mobile data transition), the manifest goes to the RBN mailbox. When the relay re-establishes at 04:35:40, the mailbox drain is **skipped** due to the 30-second cooldown (last_mailbox_drain). The manifest sits in the mailbox until the next drain cycle (up to 300s for non-anchor mode).
+
+Text messages work because they are sent AFTER the relay is established — they go through the live circuit directly. File manifests are published at send-time, which may be before the relay is fully up.
+
+Additionally, InboundCircuitEstablished from iOS never appears on Android netlog, suggesting the relay inbound path for FileChunkRequest messages may not be working for cross-network connections.
+
+**Contributing Factors:**
+1. ConnectionBudget rate limiter (added post-backup 22_07_26_1053) throttled relay reconnection on cross-network — partially fixed with urgent bypass
+2. VPN stale detection downgraded from force-disconnect to log-only — fixed (restored force-disconnect)
+3. Ping failure recovery no longer resets reservation timer — fixed (restored timer reset)
+4. Mailbox dial keepalive removed — fixed (restored periodic bootstrap dial)
+
+**Status:** Partially resolved. ConnectionBudget, VPN stale, ping failure, and keepalive fixes deployed. Mailbox drain cooldown issue remains — the 30s cooldown on last_mailbox_drain prevents immediate drain after relay circuit establishment on network transitions.
+
+**Next Steps:**
+- Investigate mailbox drain cooldown: bypass or reset last_mailbox_drain when relay circuit first establishes after a network transition
+- Verify InboundCircuitEstablished fires on Android for cross-network relay connections
+- Test file transfer on mobile data after mailbox drain fix
 
 ### iOS Device Issue (Resolved)
 
@@ -385,4 +421,22 @@ App drains mobile data and phone gets warm when on mobile data. User reported ex
 ## Backup Status (2026-07-21 17:47)
 - Git: main @ 6eda1d0
 - RBN: RBN daemon (active)
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-22 10:53)
+- Git: main @ a8b2597
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-23 03:48)
+- Git: main @ fa0b6e0
+- RBN: introvertd on 47.89.252.80:443
+- Economy: introvert-solana on localhost:9001
+
+---
+## Backup Status (2026-07-23 05:24)
+- Git: main @ fa0b6e0
+- RBN: introvertd on 47.89.252.80:443
 - Economy: introvert-solana on localhost:9001

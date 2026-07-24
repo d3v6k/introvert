@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -8,6 +8,122 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use webrtc::peer_connection::RTCPeerConnection;
 use x25519_dalek::{StaticSecret, PublicKey};
+
+
+/// Centralized connection budget to prevent connection storms.
+/// All dial and reservation requests must consult this budget before proceeding.
+/// This ensures scalability — at 1,000 devices, each device creates ≤6 connections per minute.
+pub struct ConnectionBudget {
+    /// Per-RBN last dial time
+    pub(crate) last_dial: HashMap<PeerId, Instant>,
+    /// Per-RBN last reservation request time
+    pub(crate) last_reservation: HashMap<PeerId, Instant>,
+    /// Rolling window of dial attempts (for global rate limiting)
+    pub(crate) dial_window: VecDeque<Instant>,
+    /// Rolling window of reservation attempts (for global rate limiting)
+    pub(crate) reservation_window: VecDeque<Instant>,
+}
+
+impl ConnectionBudget {
+    /// Minimum interval between dials to the same RBN
+    const MIN_DIAL_INTERVAL: Duration = Duration::from_secs(30);
+    /// Minimum interval between reservation requests to the same RBN
+    const MIN_RESERVATION_INTERVAL: Duration = Duration::from_secs(15);
+    /// Maximum dials per minute (global across all RBNs)
+    const MAX_DIALS_PER_MINUTE: usize = 6;
+    /// Maximum reservation requests per minute (global across all RBNs)
+    const MAX_RESERVATIONS_PER_MINUTE: usize = 6;
+    /// Window duration for rate limiting
+    const WINDOW_DURATION: Duration = Duration::from_secs(60);
+
+    pub fn new() -> Self {
+        Self {
+            last_dial: HashMap::new(),
+            last_reservation: HashMap::new(),
+            dial_window: VecDeque::new(),
+            reservation_window: VecDeque::new(),
+        }
+    }
+
+    /// Check if we can dial a specific RBN (per-RBN + global budget)
+    pub fn can_dial(&mut self, peer_id: &PeerId) -> bool {
+        let now = Instant::now();
+
+        // Per-RBN throttle
+        if let Some(last) = self.last_dial.get(peer_id) {
+            if now.duration_since(*last) < Self::MIN_DIAL_INTERVAL {
+                return false;
+            }
+        }
+
+        // Global budget: prune old entries and check count
+        self.dial_window.retain(|t| now.duration_since(*t) < Self::WINDOW_DURATION);
+        if self.dial_window.len() >= Self::MAX_DIALS_PER_MINUTE {
+            return false;
+        }
+
+        true
+    }
+
+    /// Check if we can request a reservation from a specific RBN
+    pub fn can_request_reservation(&mut self, peer_id: &PeerId) -> bool {
+        let now = Instant::now();
+
+        // Per-RBN throttle
+        if let Some(last) = self.last_reservation.get(peer_id) {
+            if now.duration_since(*last) < Self::MIN_RESERVATION_INTERVAL {
+                return false;
+            }
+        }
+
+        // Global budget: prune old entries and check count
+        self.reservation_window.retain(|t| now.duration_since(*t) < Self::WINDOW_DURATION);
+        if self.reservation_window.len() >= Self::MAX_RESERVATIONS_PER_MINUTE {
+            return false;
+        }
+
+        true
+    }
+
+    /// Record a dial attempt
+    pub fn record_dial(&mut self, peer_id: PeerId) {
+        let now = Instant::now();
+        self.last_dial.insert(peer_id, now);
+        self.dial_window.push_back(now);
+    }
+
+    /// Record a reservation request
+    pub fn record_reservation(&mut self, peer_id: PeerId) {
+        let now = Instant::now();
+        self.last_reservation.insert(peer_id, now);
+        self.reservation_window.push_back(now);
+    }
+
+    /// Urgent dial check — only per-RBN cooldown, no global budget.
+    /// Used for startup, reconnect, and ping-failure recovery where
+    /// the global budget would cause unacceptable delays.
+    pub fn can_dial_urgent(&mut self, peer_id: &PeerId) -> bool {
+        let now = Instant::now();
+        if let Some(last) = self.last_dial.get(peer_id) {
+            if now.duration_since(*last) < Self::MIN_DIAL_INTERVAL {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Urgent reservation check — only per-RBN cooldown, no global budget.
+    /// Used for startup, reconnect, and ping-failure recovery.
+    pub fn can_request_reservation_urgent(&mut self, peer_id: &PeerId) -> bool {
+        let now = Instant::now();
+        if let Some(last) = self.last_reservation.get(peer_id) {
+            if now.duration_since(*last) < Self::MIN_RESERVATION_INTERVAL {
+                return false;
+            }
+        }
+        true
+    }
+}
 
 /// Resolves the optimal transfer path for file payloads.
 /// Priority: P1 Direct > P2/P3 LocalSeeder > P4 Relay
@@ -163,6 +279,7 @@ pub struct NetworkService {
     pub(crate) _tunnel_handle: Option<tokio::task::JoinHandle<Result<(), anyhow::Error>>>,
     pub(crate) tunnel_active: bool,
     pub(crate) tunnel_started_at: Option<Instant>,
+    pub(crate) tunnel_retry_count: u32,
     pub(crate) pending_diagnostics: HashMap<PeerId, PendingDiagnostic>,
     pub(crate) registry: registry::RegistryManager,
     pub(crate) pending_claims: HashMap<String, HashSet<String>>,
@@ -224,6 +341,14 @@ pub struct NetworkService {
     pub(crate) flush_in_progress: HashMap<PeerId, Instant>,
     /// Intelligent file transfer router — resolves Direct vs LocalSeeder vs Relay path
     pub(crate) transfer_router: TransferRouter,
+    /// Centralized connection budget — prevents connection storms at scale
+    pub(crate) connection_budget: ConnectionBudget,
+    /// Last Event 10 (node status) value dispatched — suppress duplicate status events
+    pub(crate) last_dispatched_status: u8,
+    /// Per-peer last Event 8 (relay status) dispatched — suppress duplicate peer status events
+    pub(crate) last_peer_status: HashMap<PeerId, u8>,
+    /// Peers that have received Event 1 (peer connected) — suppress re-dispatch on same connection
+    pub(crate) connected_event_dispatched: HashSet<PeerId>,
 }
 
 #[derive(Debug, Clone)]
